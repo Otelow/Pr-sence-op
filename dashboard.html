@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — 21 Block Savage</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="grain"></div>
+
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <div class="badge-mini">21BS</div>
+        <span class="sidebar-title">CMD</span>
+    </div>
+
+    <nav class="nav">
+        <a href="#" class="nav-item active" data-tab="presence">
+            <span class="nav-icon">▣</span>
+            <span>Présence</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="commands">
+            <span class="nav-icon">⚡</span>
+            <span>Commandes</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="stats">
+            <span class="nav-icon">▤</span>
+            <span>Statistiques</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="sanctions">
+            <span class="nav-icon">⚠</span>
+            <span>Sanctions</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="user-card">
+            <img id="userAvatar" src="" alt="" class="user-avatar">
+            <div class="user-info">
+                <div id="userName" class="user-name">—</div>
+                <a href="/auth/logout" class="logout-link">Déconnexion ↗</a>
+            </div>
+        </div>
+    </div>
+</aside>
+
+<main class="main">
+
+    <header class="topbar">
+        <div class="topbar-left">
+            <h1 class="page-title" id="pageTitle">Présence OP</h1>
+            <span class="page-sub" id="pageSub">Suivi temps réel</span>
+        </div>
+        <div class="topbar-right">
+            <div class="live-indicator">
+                <span class="live-dot"></span>
+                <span class="live-text">LIVE</span>
+            </div>
+            <button class="btn-refresh" onclick="refreshAll()" title="Rafraîchir">↻</button>
+        </div>
+    </header>
+
+    <!-- TAB: PRÉSENCE -->
+    <section class="tab-content active" id="tab-presence">
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Membres total</div>
+                <div class="stat-value" id="statTotal">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Absences semaine</div>
+                <div class="stat-value" id="statAbsences">—</div>
+            </div>
+            <div class="stat-card stat-warning" id="statConsecutiveCard">
+                <div class="stat-label">Alertes KP</div>
+                <div class="stat-value" id="statConsecutive">—</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">OP Actives</div>
+                <div class="stat-value" id="statOPs">—</div>
+            </div>
+        </div>
+
+        <div class="op-grid">
+            <div class="op-panel" id="op1Panel">
+                <div class="op-header">
+                    <h2>1ère Présence OP</h2>
+                    <span class="op-status" id="op1Status">—</span>
+                </div>
+                <div class="op-categories" id="op1Categories"></div>
+            </div>
+
+            <div class="op-panel" id="op2Panel">
+                <div class="op-header">
+                    <h2>2ème Présence OP</h2>
+                    <span class="op-status" id="op2Status">—</span>
+                </div>
+                <div class="op-categories" id="op2Categories"></div>
+            </div>
+        </div>
+
+        <div class="absences-panel">
+            <h2 class="section-title">📅 Absences posées dans le salon</h2>
+            <div class="absences-grid">
+                <div class="absences-block">
+                    <div class="absences-header valid">
+                        <span>✅ Conformes</span>
+                        <span class="count" id="validCount">0</span>
+                    </div>
+                    <div class="absences-list" id="validList"></div>
+                </div>
+                <div class="absences-block">
+                    <div class="absences-header invalid">
+                        <span>❌ Non conformes</span>
+                        <span class="count" id="invalidCount">0</span>
+                    </div>
+                    <div class="absences-list" id="invalidList"></div>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- TAB: COMMANDES -->
+    <section class="tab-content" id="tab-commands">
+
+        <div class="cmd-section">
+            <h2 class="section-title">🚨 Alertes terrain</h2>
+            <div class="cmd-grid">
+                <button class="cmd-btn cmd-danger" onclick="runCmd('qg')">
+                    <span class="cmd-icon">📍</span>
+                    <span class="cmd-name">QG</span>
+                    <span class="cmd-desc">Rendez-vous au Hood (5 min)</span>
+                </button>
+                <button class="cmd-btn cmd-danger" onclick="runCmd('defense')">
+                    <span class="cmd-icon">🔥</span>
+                    <span class="cmd-name">Défense Labo</span>
+                    <span class="cmd-desc">Laboratoire attaqué</span>
+                </button>
+                <button class="cmd-btn" onclick="runCmd('garage')">
+                    <span class="cmd-icon">🏗</span>
+                    <span class="cmd-name">Garage</span>
+                    <span class="cmd-desc">Rendez-vous au Garage Hood</span>
+                </button>
+                <button class="cmd-btn" onclick="runCmd('alignement')">
+                    <span class="cmd-icon">📐</span>
+                    <span class="cmd-name">Alignement</span>
+                    <span class="cmd-desc">3 minutes pour s'aligner</span>
+                </button>
+                <button class="cmd-btn" onclick="runCmd('position')">
+                    <span class="cmd-icon">🎯</span>
+                    <span class="cmd-name">Positions</span>
+                    <span class="cmd-desc">Prendre des positions</span>
+                </button>
+                <button class="cmd-btn" onclick="runCmd('tir')">
+                    <span class="cmd-icon">✋</span>
+                    <span class="cmd-name">Stop Tir</span>
+                    <span class="cmd-desc">Arrêter de tirer</span>
+                </button>
+                <button class="cmd-btn" onclick="runCmd('weed')">
+                    <span class="cmd-icon">🌿</span>
+                    <span class="cmd-name">Weed</span>
+                    <span class="cmd-desc">Aller sur la weed</span>
+                </button>
+                <button class="cmd-btn" onclick="runCmd('traitement-weed')">
+                    <span class="cmd-icon">⚗</span>
+                    <span class="cmd-name">Traitement</span>
+                    <span class="cmd-desc">Traitement de la weed</span>
+                </button>
+                <button class="cmd-btn" onclick="runCmd('trash')">
+                    <span class="cmd-icon">🚫</span>
+                    <span class="cmd-name">Anti-Trash</span>
+                    <span class="cmd-desc">Avertissement trash</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="cmd-section">
+            <h2 class="section-title">📡 Communications</h2>
+            <div class="cmd-grid">
+                <button class="cmd-btn cmd-info" onclick="runCmd('radio')">
+                    <span class="cmd-icon">📻</span>
+                    <span class="cmd-name">Nouvelle Radio</span>
+                    <span class="cmd-desc">Fréquence aléatoire</span>
+                </button>
+                <button class="cmd-btn cmd-info" onclick="runCmd('presence')">
+                    <span class="cmd-icon">📋</span>
+                    <span class="cmd-name">1ère Présence OP</span>
+                    <span class="cmd-desc">Lancer la présence</span>
+                </button>
+                <button class="cmd-btn cmd-info" onclick="runCmd('presence2')">
+                    <span class="cmd-icon">📋</span>
+                    <span class="cmd-name">2ème Présence OP</span>
+                    <span class="cmd-desc">Sans relances</span>
+                </button>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- TAB: STATS -->
+    <section class="tab-content" id="tab-stats">
+        <h2 class="section-title">📊 Suivi hebdomadaire des absences</h2>
+
+        <div class="stats-tables">
+            <div class="stats-block">
+                <h3 class="stats-block-title alert">🚨 Alertes KP — Absences consécutives</h3>
+                <div class="stats-list" id="consecutiveList">
+                    <p class="empty">Chargement...</p>
+                </div>
+            </div>
+
+            <div class="stats-block">
+                <h3 class="stats-block-title">📋 Toutes les absences cette semaine</h3>
+                <div class="stats-list" id="classicList">
+                    <p class="empty">Chargement...</p>
+                </div>
+            </div>
+        </div>
+
+        <p class="stats-note">Reset automatique chaque dimanche à 22h00</p>
+    </section>
+
+    <!-- TAB: SANCTIONS -->
+    <section class="tab-content" id="tab-sanctions">
+        <h2 class="section-title">⚠ Historique des sanctions / avertissements</h2>
+        <div class="sanctions-list" id="sanctionsList">
+            <p class="empty">Chargement...</p>
+        </div>
+    </section>
+
+</main>
+
+<!-- Toast -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
