@@ -59,6 +59,7 @@ const CONFIG = {
         '1358060794000183348',
         '1260991191739269130',
         '1375511683472035890',
+        '952986899667103804',
     ],
 
     EMOJIS: {
@@ -129,16 +130,6 @@ const renameCheckState = new Map();
 const RENAME_KICK_DELAY = 10 * 60 * 1000;
 const roleRemovalProcessing = new Set();
 let lastRadioMessageId = null;
-
-// ==========================================
-// DÉLAI MEMBRE_3 (changement de grade)
-// ==========================================
-// Quand MEMBRE_3 est retiré, on attend 5 min avant de lancer la procédure
-// d'accueil. Si pendant ce délai un nouveau rôle est ajouté ou MEMBRE_3 est
-// remis, on annule. Cela permet de modifier les grades sans déclencher la
-// procédure d'accueil par erreur.
-const member3RemovalDelays = new Map(); // userId -> timeoutId
-const MEMBER3_DELAY = 5 * 60 * 1000;
 
 let presenceItems = [
     'Armes, munitions',
@@ -679,15 +670,6 @@ client.on('guildMemberAdd', async (member) => {
 // ==========================================
 // RÔLE SUPPRIMÉ → Relance accueil
 // ==========================================
-// Logique :
-// - MEMBRE_1 (1485270431291277383) ou MEMBRE_2 (1485636099853516982) retiré
-//   → procédure d'accueil immédiate
-// - MEMBRE_3 (1485279821658456306) retiré seul
-//   → délai de 5 minutes avant la procédure
-//   → si pendant ce délai un autre rôle est ajouté, ou MEMBRE_3 est remis,
-//     ou MEMBRE_3 est retiré dans le même update qu'un ajout de rôle
-//     (changement de grade), on annule
-// - Ajout d'un rôle (sans rien retirer) → ne fait rien
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const rs = renameCheckState.get(newMember.id);
     if (rs) {
@@ -698,41 +680,16 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
     if (roleRemovalProcessing.has(newMember.id) || welcomeState.has(newMember.id)) return;
 
-    // Détecter les rôles ajoutés dans cet update
-    const addedRoles = newMember.roles.cache.filter(r => !oldMember.roles.cache.has(r));
-
-    // Si un délai MEMBRE_3 est en cours et qu'un rôle a été ajouté
-    // (ou MEMBRE_3 remis) → on annule
-    if (member3RemovalDelays.has(newMember.id)) {
-        const memberHasMembre3 = newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3);
-        if (addedRoles.size > 0 || memberHasMembre3) {
-            clearTimeout(member3RemovalDelays.get(newMember.id));
-            member3RemovalDelays.delete(newMember.id);
-            console.log(`✅ Délai MEMBRE_3 annulé pour ${newMember.user.tag} (rôle ajouté ou MEMBRE_3 remis)`);
-            return;
-        }
-    }
-
     const lost1 = oldMember.roles.cache.has(CONFIG.ROLES.MEMBRE_1) && !newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_1);
     const lost2 = oldMember.roles.cache.has(CONFIG.ROLES.MEMBRE_2) && !newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_2);
     const lost3 = oldMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3) && !newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3);
 
-    // Aucun rôle membre retiré → rien à faire (cas ajout de rôle simple)
-    if (!lost1 && !lost2 && !lost3) return;
-
-    // Vérifier rôle protégé une fois pour les deux cas
-    const hasProtectedRole = CONFIG.ROLES.PROTECTED_ROLES.some(r => newMember.roles.cache.has(r));
-    if (hasProtectedRole) {
-        console.log(`🛡️ ${newMember.user.tag} a un rôle protégé, pas de relance accueil`);
-        return;
-    }
-
-    // === CAS 1 : MEMBRE_1 ou MEMBRE_2 retiré → procédure immédiate ===
-    if (lost1 || lost2) {
-        // Annuler tout délai MEMBRE_3 en cours pour ce membre
-        if (member3RemovalDelays.has(newMember.id)) {
-            clearTimeout(member3RemovalDelays.get(newMember.id));
-            member3RemovalDelays.delete(newMember.id);
+    if (lost1 || lost2 || lost3) {
+        // Ne pas relancer si le membre a un rôle protégé
+        const hasProtectedRole = CONFIG.ROLES.PROTECTED_ROLES.some(r => newMember.roles.cache.has(r));
+        if (hasProtectedRole) {
+            console.log(`🛡️ ${newMember.user.tag} a un rôle protégé, pas de relance accueil`);
+            return;
         }
 
         roleRemovalProcessing.add(newMember.id);
@@ -742,71 +699,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         if (newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_2)) await newMember.roles.remove(CONFIG.ROLES.MEMBRE_2).catch(() => {});
         if (newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3)) await newMember.roles.remove(CONFIG.ROLES.MEMBRE_3).catch(() => {});
 
-        console.log(`🚪 Procédure accueil immédiate pour ${newMember.user.tag} (MEMBRE_1 ou MEMBRE_2 retiré)`);
         await startWelcomeFlow(newMember);
-        return;
-    }
-
-    // === CAS 2 : MEMBRE_3 retiré seul → délai 5 minutes ===
-    if (lost3) {
-        // Si MEMBRE_3 retiré dans le même update qu'un ajout de rôle
-        // (typique d'un changement de grade) → ne rien faire
-        if (addedRoles.size > 0) {
-            console.log(`✅ MEMBRE_3 retiré + rôle ajouté pour ${newMember.user.tag} (changement de grade), pas de procédure`);
-            return;
-        }
-
-        // Si déjà un délai en cours, ne pas en lancer un nouveau
-        if (member3RemovalDelays.has(newMember.id)) return;
-
-        console.log(`⏳ MEMBRE_3 retiré pour ${newMember.user.tag}, délai de 5 min avant procédure`);
-
-        const userId = newMember.id;
-        const guildId = newMember.guild.id;
-
-        const timeoutId = setTimeout(async () => {
-            member3RemovalDelays.delete(userId);
-            try {
-                const guild = client.guilds.cache.get(guildId);
-                if (!guild) return;
-                const m = await guild.members.fetch(userId).catch(() => null);
-                if (!m) return;
-
-                // Re-vérifier qu'il n'a toujours pas MEMBRE_3 (au cas où)
-                if (m.roles.cache.has(CONFIG.ROLES.MEMBRE_3)) {
-                    console.log(`✅ MEMBRE_3 remis pour ${m.user.tag}, procédure annulée`);
-                    return;
-                }
-
-                // Re-vérifier rôle protégé
-                const hasProtected = CONFIG.ROLES.PROTECTED_ROLES.some(r => m.roles.cache.has(r));
-                if (hasProtected) {
-                    console.log(`🛡️ ${m.user.tag} a maintenant un rôle protégé, procédure annulée`);
-                    return;
-                }
-
-                // Re-vérifier qu'il n'a pas pris MEMBRE_1 ou MEMBRE_2 entre-temps
-                // (sinon ce serait un changement de grade tardif → on annule aussi)
-                if (m.roles.cache.has(CONFIG.ROLES.MEMBRE_1) || m.roles.cache.has(CONFIG.ROLES.MEMBRE_2)) {
-                    console.log(`✅ ${m.user.tag} a un autre rôle membre, procédure annulée`);
-                    return;
-                }
-
-                console.log(`🚪 Lancement procédure accueil pour ${m.user.tag} (MEMBRE_3 retiré depuis 5 min)`);
-
-                roleRemovalProcessing.add(m.id);
-                setTimeout(() => roleRemovalProcessing.delete(m.id), 10_000);
-
-                if (m.roles.cache.has(CONFIG.ROLES.MEMBRE_1)) await m.roles.remove(CONFIG.ROLES.MEMBRE_1).catch(() => {});
-                if (m.roles.cache.has(CONFIG.ROLES.MEMBRE_2)) await m.roles.remove(CONFIG.ROLES.MEMBRE_2).catch(() => {});
-
-                await startWelcomeFlow(m);
-            } catch (e) {
-                console.error('❌ Erreur procédure différée MEMBRE_3:', e.message);
-            }
-        }, MEMBER3_DELAY);
-
-        member3RemovalDelays.set(userId, timeoutId);
     }
 });
 
