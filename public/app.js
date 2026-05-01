@@ -5,20 +5,33 @@
 const PAGE_TITLES = {
     presence: { title: 'Présence OP', sub: 'Suivi temps réel' },
     commands: { title: 'Commandes', sub: 'Centre de contrôle' },
+    channels: { title: 'Salons Discord', sub: 'Historique et navigation' },
+    map: { title: 'Carte du Laboratoire', sub: 'Marquage de zones' },
     stats: { title: 'Statistiques', sub: 'Suivi hebdomadaire' },
     sanctions: { title: 'Sanctions', sub: 'Historique des avertissements' },
 };
 
 let currentTab = 'presence';
 let refreshTimer = null;
+let userPermissions = { canEditMap: false };
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
     await loadUser();
+    await loadPermissions();
     setupNav();
+    setupChannelSearch();
+    setupMap();
     refreshAll();
-    refreshTimer = setInterval(refreshAll, 15_000); // Refresh toutes les 15s
+    refreshTimer = setInterval(refreshAll, 15_000);
 });
+
+async function loadPermissions() {
+    try {
+        const res = await fetch('/api/me/permissions');
+        if (res.ok) userPermissions = await res.json();
+    } catch {}
+}
 
 async function loadUser() {
     try {
@@ -61,6 +74,10 @@ async function refreshAll() {
         await loadWeekly();
     } else if (currentTab === 'sanctions') {
         await loadSanctions();
+    } else if (currentTab === 'channels') {
+        if (!channelsLoaded) await loadChannels();
+    } else if (currentTab === 'map') {
+        await loadMapPoints();
     }
 }
 
@@ -264,3 +281,402 @@ function toast(message, type = 'success') {
         setTimeout(() => t.remove(), 300);
     }, 4000);
 }
+
+// ==========================================
+// SALONS
+// ==========================================
+let channelsLoaded = false;
+let channelsData = null;
+let currentChannelId = null;
+let oldestMessageId = null;
+let loadingMore = false;
+
+async function loadChannels() {
+    try {
+        const res = await fetch('/api/channels');
+        const data = await res.json();
+        channelsData = data;
+        channelsLoaded = true;
+        renderChannelsTree();
+    } catch (e) {
+        console.error('Channels:', e);
+    }
+}
+
+function renderChannelsTree(filter = '') {
+    if (!channelsData) return;
+    const tree = document.getElementById('channelsTree');
+    tree.innerHTML = '';
+    const f = filter.toLowerCase();
+
+    const renderChannel = (ch) => {
+        const matches = !f || ch.name.toLowerCase().includes(f);
+        if (!matches) return null;
+        const icon = ch.type === 2 ? '🔊' : ch.type === 5 ? '📢' : ch.type === 15 ? '💬' : '#';
+        const div = document.createElement('div');
+        div.className = 'channel-item' + (ch.id === currentChannelId ? ' active' : '');
+        div.dataset.id = ch.id;
+        div.innerHTML = `<span class="channel-icon">${icon}</span><span>${ch.name}</span>`;
+        if (ch.type === 0 || ch.type === 5) {
+            div.onclick = () => selectChannel(ch);
+        } else {
+            div.style.cursor = 'default';
+            div.style.opacity = '0.6';
+        }
+        return div;
+    };
+
+    // Orphans
+    if (channelsData.orphans?.length) {
+        for (const ch of channelsData.orphans) {
+            const item = renderChannel(ch);
+            if (item) tree.appendChild(item);
+        }
+    }
+
+    // Catégories
+    for (const cat of channelsData.categories) {
+        const matchingChannels = cat.channels.map(renderChannel).filter(Boolean);
+        if (matchingChannels.length === 0 && f) continue;
+
+        const catDiv = document.createElement('div');
+        catDiv.className = 'channel-category';
+        catDiv.innerHTML = `
+            <div class="channel-category-header">
+                <span class="channel-category-arrow">▼</span>
+                <span>${cat.name}</span>
+            </div>
+            <div class="channel-list"></div>
+        `;
+        const list = catDiv.querySelector('.channel-list');
+        matchingChannels.forEach(c => list.appendChild(c));
+
+        catDiv.querySelector('.channel-category-header').onclick = () => {
+            catDiv.classList.toggle('collapsed');
+        };
+
+        tree.appendChild(catDiv);
+    }
+}
+
+function setupChannelSearch() {
+    const input = document.getElementById('channelSearch');
+    if (!input) return;
+    input.addEventListener('input', e => renderChannelsTree(e.target.value));
+}
+
+async function selectChannel(ch) {
+    currentChannelId = ch.id;
+    renderChannelsTree(document.getElementById('channelSearch')?.value || '');
+
+    document.getElementById('channelsEmpty').style.display = 'none';
+    document.getElementById('channelsViewer').style.display = 'flex';
+    document.getElementById('viewerName').textContent = '#' + ch.name;
+    document.getElementById('viewerTopic').textContent = ch.topic || '';
+    document.getElementById('viewerOpenDiscord').href = ch.url;
+
+    document.getElementById('channelsMessages').innerHTML = '<p class="empty">Chargement...</p>';
+    document.getElementById('loadMoreBtn').style.display = 'none';
+    oldestMessageId = null;
+
+    await loadMessages(ch.id);
+}
+
+async function loadMessages(channelId, before = null) {
+    try {
+        const url = before ? `/api/channel/${channelId}/messages?before=${before}` : `/api/channel/${channelId}/messages`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.error) {
+            document.getElementById('channelsMessages').innerHTML = `<p class="empty">❌ ${data.error}</p>`;
+            return;
+        }
+
+        const container = document.getElementById('channelsMessages');
+        if (!before) container.innerHTML = '';
+
+        for (const m of data.messages) {
+            container.appendChild(renderMessage(m));
+            oldestMessageId = m.id;
+        }
+
+        const loadBtn = document.getElementById('loadMoreBtn');
+        if (data.hasMore) {
+            loadBtn.style.display = 'inline-block';
+            loadBtn.disabled = false;
+            loadBtn.textContent = '↑ Charger plus de messages';
+        } else {
+            loadBtn.style.display = 'none';
+        }
+    } catch (e) {
+        console.error('Messages:', e);
+    }
+}
+
+function renderMessage(m) {
+    const div = document.createElement('div');
+    div.className = 'message';
+    const date = new Date(m.createdTimestamp);
+    const dateStr = date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+
+    const avatar = m.authorAvatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'><rect width='36' height='36' fill='%23262626'/></svg>`;
+
+    let content = escapeHtml(m.content)
+        .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')
+        .replace(/<@!?(\d+)>/g, (_, id) => {
+            const u = m.mentions.users.find(u => u.id === id);
+            return `<span style="color:var(--blue)">@${u?.name || 'inconnu'}</span>`;
+        })
+        .replace(/<@&(\d+)>/g, (_, id) => {
+            const r = m.mentions.roles.find(r => r.id === id);
+            return `<span style="color:var(--orange)">@${r?.name || 'rôle'}</span>`;
+        })
+        .replace(/<#(\d+)>/g, '<span style="color:var(--blue)">#salon</span>')
+        .replace(/<a?:(\w+):\d+>/g, ':$1:');
+
+    let attachmentsHtml = '';
+    for (const a of m.attachments) {
+        if (a.isImage) {
+            attachmentsHtml += `<img class="message-attachment-img" src="${a.url}" alt="${a.name}" onclick="window.open('${a.url}', '_blank')">`;
+        } else {
+            attachmentsHtml += `<a href="${a.url}" target="_blank" class="message-attachment-file">📎 ${a.name}</a>`;
+        }
+    }
+
+    let embedsHtml = '';
+    for (const e of m.embeds) {
+        embedsHtml += `
+            <div class="message-embed" style="${e.color ? `border-left-color:#${e.color.toString(16).padStart(6,'0')};` : ''}">
+                ${e.title ? `<div class="message-embed-title">${escapeHtml(e.title)}</div>` : ''}
+                ${e.description ? `<div class="message-embed-desc">${escapeHtml(e.description).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')}</div>` : ''}
+                ${e.image ? `<img class="message-embed-image" src="${e.image}" alt="">` : ''}
+                ${(e.fields || []).map(f => `<div style="margin-top:8px;"><strong style="font-size:12px;">${escapeHtml(f.name)}</strong><div style="font-size:12px;color:var(--text-dim);white-space:pre-wrap;">${escapeHtml(f.value)}</div></div>`).join('')}
+            </div>
+        `;
+    }
+
+    let reactionsHtml = '';
+    for (const r of m.reactions) {
+        reactionsHtml += `<span class="message-reaction">${r.emojiUrl ? `<img src="${r.emojiUrl}">` : r.emoji} ${r.count}</span>`;
+    }
+
+    div.innerHTML = `
+        <img class="message-avatar" src="${avatar}" alt="">
+        <div class="message-body">
+            <div class="message-header">
+                <span class="message-author ${m.authorBot ? 'bot' : ''}">${escapeHtml(m.authorName)}</span>
+                ${m.authorBot ? '<span class="message-bot-tag">BOT</span>' : ''}
+                ${m.pinned ? '<span class="message-pinned-tag">📌 ÉPINGLÉ</span>' : ''}
+                <span class="message-time">${dateStr}</span>
+            </div>
+            ${content ? `<div class="message-content">${content}</div>` : ''}
+            ${attachmentsHtml ? `<div class="message-attachments">${attachmentsHtml}</div>` : ''}
+            ${embedsHtml ? `<div class="message-embeds">${embedsHtml}</div>` : ''}
+            ${reactionsHtml ? `<div class="message-reactions">${reactionsHtml}</div>` : ''}
+        </div>
+    `;
+    return div;
+}
+
+function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+}
+
+// Bouton "Charger plus"
+document.addEventListener('click', async (e) => {
+    if (e.target.id === 'loadMoreBtn' && !loadingMore) {
+        loadingMore = true;
+        e.target.disabled = true;
+        e.target.textContent = 'Chargement...';
+        await loadMessages(currentChannelId, oldestMessageId);
+        loadingMore = false;
+    }
+});
+
+// ==========================================
+// CARTE INTERACTIVE
+// ==========================================
+let mapPoints = [];
+let mapMode = 'view'; // 'view', 'add', 'delete'
+let pendingPoint = null;
+
+function setupMap() {
+    // Boutons mode
+    document.querySelectorAll('.map-mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const mode = btn.dataset.mode;
+            if ((mode === 'add' || mode === 'delete') && !userPermissions.canEditMap) {
+                toast('❌ Tu n\'as pas les permissions pour modifier la carte', 'error');
+                return;
+            }
+            setMapMode(mode);
+        });
+    });
+
+    // Click sur la carte
+    const canvas = document.getElementById('mapCanvas');
+    if (canvas) {
+        canvas.addEventListener('click', (e) => {
+            if (mapMode !== 'add') return;
+            if (e.target.closest('.map-point')) return;
+
+            const img = document.getElementById('mapImage');
+            const rect = img.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+            if (x < 0 || x > 100 || y < 0 || y > 100) return;
+
+            pendingPoint = { x, y };
+            document.getElementById('pointLabel').value = '';
+            document.getElementById('pointType').value = 'default';
+            document.getElementById('pointModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('pointLabel').focus(), 100);
+        });
+    }
+}
+
+function setMapMode(mode) {
+    mapMode = mode;
+    document.querySelectorAll('.map-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+    const canvas = document.getElementById('mapCanvas');
+    canvas.classList.remove('add-mode', 'delete-mode');
+    if (mode === 'add') canvas.classList.add('add-mode');
+    if (mode === 'delete') canvas.classList.add('delete-mode');
+
+    const info = document.getElementById('mapInfo').querySelector('.info-text') || document.getElementById('mapInfo');
+    const messages = {
+        view: 'Mode <strong>Voir</strong> — Clique sur un point pour voir les détails',
+        add: 'Mode <strong>Ajouter</strong> — Clique sur la carte pour placer un nouveau point',
+        delete: 'Mode <strong>Supprimer</strong> — Clique sur un point pour le supprimer',
+    };
+    info.innerHTML = messages[mode];
+}
+
+async function loadMapPoints() {
+    try {
+        const res = await fetch('/api/map/points');
+        const data = await res.json();
+        mapPoints = data.points || [];
+        renderMapPoints();
+    } catch (e) {
+        console.error('Map:', e);
+    }
+}
+
+function renderMapPoints() {
+    const layer = document.getElementById('mapPointsLayer');
+    layer.innerHTML = '';
+
+    for (const p of mapPoints) {
+        const pin = document.createElement('div');
+        pin.className = 'map-point';
+        pin.style.left = p.x + '%';
+        pin.style.top = p.y + '%';
+        pin.innerHTML = `
+            <svg class="map-point-pin" viewBox="0 0 24 32" fill="${p.color || '#ff3333'}" stroke="#000" stroke-width="1">
+                <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z"/>
+                <circle cx="12" cy="12" r="5" fill="#fff"/>
+            </svg>
+            <div class="map-point-label">${escapeHtml(p.label)}${p.type !== 'default' ? ` (${getPointTypeIcon(p.type)})` : ''}</div>
+        `;
+        pin.onclick = (e) => {
+            e.stopPropagation();
+            if (mapMode === 'delete') {
+                deletePoint(p.id);
+            } else {
+                showPointDetails(p);
+            }
+        };
+        layer.appendChild(pin);
+    }
+
+    document.getElementById('mapPointCount').textContent = mapPoints.length;
+}
+
+function getPointTypeIcon(type) {
+    const icons = {
+        lab: '⚗', stash: '📦', vehicle: '🚗', entry: '🚪',
+        danger: '⚠', meeting: '📌', default: '📍'
+    };
+    return icons[type] || '📍';
+}
+
+async function confirmAddPoint() {
+    if (!pendingPoint) return;
+    const label = document.getElementById('pointLabel').value.trim() || 'Point sans nom';
+    const type = document.getElementById('pointType').value;
+    const color = document.getElementById('mapColor').value;
+
+    try {
+        const res = await fetch('/api/map/points', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...pendingPoint, label, type, color })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            mapPoints.push(data.point);
+            renderMapPoints();
+            toast('📍 Point ajouté');
+        } else {
+            const err = await res.json();
+            toast(`❌ ${err.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+
+    closePointModal();
+}
+
+function closePointModal() {
+    document.getElementById('pointModal').style.display = 'none';
+    pendingPoint = null;
+}
+
+async function deletePoint(id) {
+    if (!confirm('Supprimer ce point ?')) return;
+    try {
+        const res = await fetch(`/api/map/points/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            mapPoints = mapPoints.filter(p => p.id !== id);
+            renderMapPoints();
+            toast('🗑 Point supprimé');
+        } else {
+            const err = await res.json();
+            toast(`❌ ${err.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+function showPointDetails(p) {
+    const date = new Date(p.createdAt).toLocaleString('fr-FR');
+    document.getElementById('detailsTitle').textContent = `${getPointTypeIcon(p.type)} ${p.label}`;
+    document.getElementById('detailsContent').innerHTML = `
+        <div class="detail-row"><span>Type</span><span>${p.type}</span></div>
+        <div class="detail-row"><span>Position</span><span>${p.x.toFixed(1)}%, ${p.y.toFixed(1)}%</span></div>
+        <div class="detail-row"><span>Couleur</span><span style="color:${p.color}">●</span></div>
+        <div class="detail-row"><span>Placé par</span><span>${escapeHtml(p.createdBy)}</span></div>
+        <div class="detail-row"><span>Date</span><span>${date}</span></div>
+        ${userPermissions.canEditMap ? `<button class="btn-delete-point" onclick="deletePoint('${p.id}'); closeDetailsModal();">🗑 Supprimer ce point</button>` : ''}
+    `;
+    document.getElementById('pointDetailsModal').style.display = 'flex';
+}
+
+function closeDetailsModal() {
+    document.getElementById('pointDetailsModal').style.display = 'none';
+}
+
+// Touche Échap pour fermer les modales
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        closePointModal();
+        closeDetailsModal();
+    }
+});
