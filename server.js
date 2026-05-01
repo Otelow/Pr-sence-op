@@ -43,8 +43,31 @@ function startServer(client, getState) {
         const code = req.query.code;
         if (!code) return res.redirect('/');
 
+        const errorPage = (msg) => `
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8">
+<title>Accès refusé — 21 Block Savage</title>
+<link rel="stylesheet" href="/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-body">
+<div class="grain"></div>
+<div class="login-container">
+    <div class="login-card error-card">
+        <div class="login-header">
+            <div class="error-icon">⚠</div>
+            <h1 class="error-title">ACCÈS<br>REFUSÉ</h1>
+            <div class="divider"></div>
+        </div>
+        <div class="login-content">
+            <p class="error-message">${msg}</p>
+            <a href="/" class="btn-back">← Retour</a>
+        </div>
+    </div>
+</div>
+</body></html>`;
+
         try {
-            // Échanger le code contre un token
             const tokenRes = await axios.post('https://discord.com/api/oauth2/token',
                 new URLSearchParams({
                     client_id: DISCORD_CLIENT_ID,
@@ -56,34 +79,32 @@ function startServer(client, getState) {
                 { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
             );
 
-            // Récupérer les infos user
             const userRes = await axios.get('https://discord.com/api/users/@me', {
                 headers: { Authorization: `Bearer ${tokenRes.data.access_token}` }
             });
 
             const user = userRes.data;
-
-            // Vérifier que l'user est dans le serveur ET a un rôle autorisé
             const state = botState();
             const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
-            if (!guild) return res.send('❌ Bot non connecté au serveur');
+            if (!guild) return res.send(errorPage('Bot non connecté au serveur Discord'));
 
             const member = await guild.members.fetch(user.id).catch(() => null);
-            if (!member) return res.send('❌ Tu n\'es pas membre du serveur Discord');
+            if (!member) return res.send(errorPage('Tu n\'es pas membre du serveur Discord 21 Block Savage'));
 
             const hasPermission = state.CONFIG.ROLES.COMMAND_ROLES.some(r => member.roles.cache.has(r));
-            if (!hasPermission) return res.send('❌ Tu n\'as pas les permissions pour accéder au dashboard');
+            if (!hasPermission) return res.send(errorPage('Tu n\'as pas les permissions pour accéder au dashboard'));
 
             req.session.user = {
                 id: user.id,
                 username: member.nickname || user.username,
                 avatar: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : null,
+                roles: [...member.roles.cache.keys()],
             };
 
             res.redirect('/dashboard');
         } catch (e) {
             console.error('❌ OAuth erreur:', e.message);
-            res.send('❌ Erreur de connexion. Vérifie la console.');
+            res.send(errorPage('Erreur de connexion. Réessaie.'));
         }
     });
 
@@ -319,6 +340,269 @@ function startServer(client, getState) {
             membersWithConsecutive: withConsecutive,
             op1Active: state.presenceData.active,
             op2Active: state.presence2Data.active,
+        });
+    });
+
+    // ==========================================
+    // API — Salons Discord
+    // ==========================================
+    app.get('/api/channels', requireAuth, async (req, res) => {
+        const state = botState();
+        const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
+        if (!guild) return res.json({ categories: [] });
+
+        try {
+            const channels = guild.channels.cache;
+            const categories = [];
+            const orphans = [];
+
+            // Collecter les catégories
+            for (const [, ch] of channels) {
+                if (ch.type === 4) { // CategoryChannel
+                    categories.push({
+                        id: ch.id,
+                        name: ch.name,
+                        position: ch.position,
+                        channels: [],
+                    });
+                }
+            }
+
+            // Trier les catégories par position
+            categories.sort((a, b) => a.position - b.position);
+
+            // Assigner les salons aux catégories
+            for (const [, ch] of channels) {
+                if (ch.type === 4) continue; // Skip catégories elles-mêmes
+
+                const channelData = {
+                    id: ch.id,
+                    name: ch.name,
+                    type: ch.type, // 0 = text, 2 = voice, 5 = announcement, 13 = stage, 15 = forum
+                    typeLabel: getChannelTypeLabel(ch.type),
+                    position: ch.position,
+                    topic: ch.topic || null,
+                    nsfw: ch.nsfw || false,
+                    url: `https://discord.com/channels/${state.CONFIG.GUILD_ID}/${ch.id}`,
+                };
+
+                if (ch.parentId) {
+                    const cat = categories.find(c => c.id === ch.parentId);
+                    if (cat) cat.channels.push(channelData);
+                } else {
+                    orphans.push(channelData);
+                }
+            }
+
+            // Trier les salons dans chaque catégorie
+            for (const cat of categories) {
+                cat.channels.sort((a, b) => a.position - b.position);
+            }
+            orphans.sort((a, b) => a.position - b.position);
+
+            res.json({ categories, orphans, guildId: state.CONFIG.GUILD_ID });
+        } catch (e) {
+            res.json({ error: e.message, categories: [] });
+        }
+    });
+
+    function getChannelTypeLabel(type) {
+        const types = {
+            0: 'text',
+            2: 'voice',
+            4: 'category',
+            5: 'announcement',
+            10: 'thread',
+            11: 'thread',
+            12: 'thread',
+            13: 'stage',
+            15: 'forum',
+        };
+        return types[type] || 'unknown';
+    }
+
+    // ==========================================
+    // API — Historique messages d'un salon
+    // ==========================================
+    app.get('/api/channel/:id/messages', requireAuth, async (req, res) => {
+        const channelId = req.params.id;
+        const before = req.query.before; // Pour pagination
+
+        try {
+            const channel = botClient.channels.cache.get(channelId);
+            if (!channel) return res.status(404).json({ error: 'Salon introuvable' });
+            if (channel.type !== 0 && channel.type !== 5) {
+                return res.status(400).json({ error: 'Ce type de salon ne supporte pas les messages' });
+            }
+
+            const fetchOptions = { limit: 100 };
+            if (before) fetchOptions.before = before;
+
+            const messages = await channel.messages.fetch(fetchOptions);
+            const result = [...messages.values()].map(m => ({
+                id: m.id,
+                content: m.content,
+                authorId: m.author.id,
+                authorName: m.member?.nickname || m.author.username,
+                authorAvatar: m.author.avatar
+                    ? `https://cdn.discordapp.com/avatars/${m.author.id}/${m.author.avatar}.png`
+                    : null,
+                authorBot: m.author.bot,
+                createdTimestamp: m.createdTimestamp,
+                editedTimestamp: m.editedTimestamp,
+                attachments: [...m.attachments.values()].map(a => ({
+                    url: a.url,
+                    name: a.name,
+                    size: a.size,
+                    contentType: a.contentType,
+                    isImage: a.contentType?.startsWith('image/') || false,
+                })),
+                embeds: m.embeds.map(e => ({
+                    title: e.title,
+                    description: e.description,
+                    url: e.url,
+                    color: e.color,
+                    image: e.image?.url,
+                    thumbnail: e.thumbnail?.url,
+                    fields: e.fields,
+                })),
+                pinned: m.pinned,
+                mentions: {
+                    users: [...m.mentions.users.values()].map(u => ({ id: u.id, name: u.username })),
+                    roles: [...m.mentions.roles.values()].map(r => ({ id: r.id, name: r.name })),
+                },
+                reactions: [...m.reactions.cache.values()].map(r => ({
+                    emoji: r.emoji.id ? `<${r.emoji.animated ? 'a' : ''}:${r.emoji.name}:${r.emoji.id}>` : r.emoji.name,
+                    emojiUrl: r.emoji.id ? `https://cdn.discordapp.com/emojis/${r.emoji.id}.${r.emoji.animated ? 'gif' : 'png'}` : null,
+                    count: r.count,
+                })),
+            }));
+
+            res.json({
+                messages: result,
+                hasMore: result.length === 100,
+                channelName: channel.name,
+            });
+        } catch (e) {
+            console.error('❌ /api/channel/messages:', e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ==========================================
+    // API — Messages épinglés
+    // ==========================================
+    app.get('/api/channel/:id/pinned', requireAuth, async (req, res) => {
+        try {
+            const channel = botClient.channels.cache.get(req.params.id);
+            if (!channel) return res.status(404).json({ error: 'Salon introuvable' });
+
+            const pinned = await channel.messages.fetchPinned();
+            const result = [...pinned.values()].map(m => ({
+                id: m.id,
+                content: m.content,
+                authorName: m.member?.nickname || m.author.username,
+                authorAvatar: m.author.avatar ? `https://cdn.discordapp.com/avatars/${m.author.id}/${m.author.avatar}.png` : null,
+                createdTimestamp: m.createdTimestamp,
+            }));
+            res.json({ pinned: result });
+        } catch (e) {
+            res.json({ pinned: [], error: e.message });
+        }
+    });
+
+    // ==========================================
+    // API — Carte interactive (points)
+    // ==========================================
+    const fs = require('fs');
+    const MAP_POINTS_FILE = '/data/map_points.json';
+
+    function loadMapPoints() {
+        try {
+            if (fs.existsSync(MAP_POINTS_FILE)) {
+                return JSON.parse(fs.readFileSync(MAP_POINTS_FILE, 'utf8'));
+            }
+        } catch {}
+        return [];
+    }
+
+    function saveMapPoints(points) {
+        try {
+            fs.writeFileSync(MAP_POINTS_FILE, JSON.stringify(points, null, 2));
+        } catch (e) {
+            console.error('❌ Erreur sauvegarde map points:', e.message);
+        }
+    }
+
+    app.get('/api/map/points', requireAuth, (req, res) => {
+        res.json({ points: loadMapPoints() });
+    });
+
+    // Vérifier permissions de placer des points (mêmes que COMMAND_ROLES par défaut)
+    function canEditMap(req) {
+        const state = botState();
+        const userRoles = req.session.user?.roles || [];
+        return state.CONFIG.ROLES.COMMAND_ROLES.some(r => userRoles.includes(r));
+    }
+
+    app.post('/api/map/points', requireAuth, (req, res) => {
+        if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes pour modifier la carte' });
+
+        const { x, y, label, type, color } = req.body;
+        if (typeof x !== 'number' || typeof y !== 'number') {
+            return res.status(400).json({ error: 'Coordonnées invalides' });
+        }
+
+        const points = loadMapPoints();
+        const point = {
+            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+            x, y,
+            label: label || 'Point',
+            type: type || 'default',
+            color: color || '#ff3333',
+            createdBy: req.session.user.username,
+            createdById: req.session.user.id,
+            createdAt: Date.now(),
+        };
+        points.push(point);
+        saveMapPoints(points);
+        res.json({ success: true, point });
+    });
+
+    app.delete('/api/map/points/:id', requireAuth, (req, res) => {
+        if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes' });
+
+        const points = loadMapPoints();
+        const filtered = points.filter(p => p.id !== req.params.id);
+        if (filtered.length === points.length) return res.status(404).json({ error: 'Point introuvable' });
+        saveMapPoints(filtered);
+        res.json({ success: true });
+    });
+
+    app.put('/api/map/points/:id', requireAuth, (req, res) => {
+        if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes' });
+
+        const points = loadMapPoints();
+        const point = points.find(p => p.id === req.params.id);
+        if (!point) return res.status(404).json({ error: 'Point introuvable' });
+
+        const { x, y, label, type, color } = req.body;
+        if (typeof x === 'number') point.x = x;
+        if (typeof y === 'number') point.y = y;
+        if (label !== undefined) point.label = label;
+        if (type !== undefined) point.type = type;
+        if (color !== undefined) point.color = color;
+        point.updatedAt = Date.now();
+        point.updatedBy = req.session.user.username;
+
+        saveMapPoints(points);
+        res.json({ success: true, point });
+    });
+
+    // Permissions de l'utilisateur courant
+    app.get('/api/me/permissions', requireAuth, (req, res) => {
+        res.json({
+            canEditMap: canEditMap(req),
         });
     });
 
