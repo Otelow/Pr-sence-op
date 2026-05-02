@@ -5,7 +5,7 @@
 // Lancer: node bot.js
 // ==========================================
 
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
 
@@ -27,6 +27,8 @@ const CONFIG = {
         AVERTISSEMENT: '1490345122678837419',
         BM_ANNONCES: '1485636616683913346',
         BM_NOTIF: '1485636555480502404',
+        RAPPELS_PANEL: '1485669809956982984',
+        CLIPS: '1485624000569933905',
     },
 
     ROLES: {
@@ -61,6 +63,11 @@ const CONFIG = {
         '1375511683472035890',
         '952986899667103804',
     ],
+
+    // Mapping userID → roleID à attribuer automatiquement (et à maintenir en permanence)
+    AUTO_ROLE_USERS: {
+        '952986899667103804': '1485279148246175764',
+    },
 
     EMOJIS: {
         CHECK: '<a:check:1486393925219647519>',
@@ -568,6 +575,7 @@ async function registerCommands() {
             .addRoleOption(o => o.setName('role').setDescription('Rôle').setRequired(true))
             .addStringOption(o => o.setName('message').setDescription('Message').setRequired(true)),
         new SlashCommandBuilder().setName('presence-force').setDescription('🔄 Force le démarrage de la présence OP (si redéployé en cours)'),
+        new SlashCommandBuilder().setName('panel').setDescription('🎮 Ouvrir le panneau de contrôle (rappels programmés)'),
     ];
 
     const rest = new REST().setToken(CONFIG.TOKEN);
@@ -587,12 +595,33 @@ client.once('ready', async () => {
     await registerCommands();
     setupPresenceCron();
 
+    // Charger les rappels du panel
+    loadReminders();
+    if (reminders.some(r => r.enabled)) {
+        startReminderLoop();
+        console.log('⏰ Boucle de rappels démarrée');
+    }
+
     // Prefetch membres + absences au boot
     try {
         const guild = client.guilds.cache.get(CONFIG.GUILD_ID);
         if (guild) {
             await guild.members.fetch();
             console.log(`👥 ${guild.members.cache.size} membres mis en cache`);
+
+            // Vérifier les auto-rôles
+            for (const [userId, roleId] of Object.entries(CONFIG.AUTO_ROLE_USERS)) {
+                try {
+                    const member = guild.members.cache.get(userId);
+                    if (member && !member.roles.cache.has(roleId)) {
+                        const role = guild.roles.cache.get(roleId);
+                        if (role) {
+                            await member.roles.add(role);
+                            console.log(`🎯 Auto-rôle restauré pour ${member.user.tag}`);
+                        }
+                    }
+                } catch {}
+            }
         }
         await updateAbsenceSalonCache();
         console.log('📋 Cache absences salon initialisé');
@@ -602,13 +631,17 @@ client.once('ready', async () => {
 
     // Restaurer l'état de présence si le bot a été redéployé en cours d'OP
     const savedState = loadPresenceState();
+    let op1Restored = false;
+    let op2Restored = false;
+
     if (savedState) {
         if (savedState.op1 && savedState.op1.active && savedState.op1.messageId) {
-            console.log('🔄 Restauration 1ère Présence OP...');
+            console.log('🔄 Restauration 1ère Présence OP depuis fichier...');
             const restored = await restoreReactionsFromMessage(savedState.op1.messageId, reactionsOP1);
             if (restored) {
                 presenceData.messageId = savedState.op1.messageId;
                 presenceData.active = true;
+                op1Restored = true;
                 console.log('✅ 1ère Présence OP restaurée');
 
                 // Relancer les rappels et crons
@@ -618,20 +651,78 @@ client.once('ready', async () => {
                     if (msg) startPresenceReminders(channel, msg);
                 }
             } else {
-                console.log('⚠️ Message 1ère OP introuvable, présence non restaurée');
+                console.log('⚠️ Message 1ère OP introuvable dans le fichier');
             }
         }
 
         if (savedState.op2 && savedState.op2.active && savedState.op2.messageId) {
-            console.log('🔄 Restauration 2ème Présence OP...');
+            console.log('🔄 Restauration 2ème Présence OP depuis fichier...');
             const restored = await restoreReactionsFromMessage(savedState.op2.messageId, reactionsOP2);
             if (restored) {
                 presence2Data.messageId = savedState.op2.messageId;
                 presence2Data.active = true;
+                op2Restored = true;
                 console.log('✅ 2ème Présence OP restaurée');
             } else {
                 console.log('⚠️ Message 2ème OP introuvable');
             }
+        }
+    }
+
+    // FALLBACK : scanner le salon présence si rien n'a été restauré
+    // (couvre le cas où le fichier state est manquant/corrompu mais qu'une présence est en cours)
+    if (!op1Restored || !op2Restored) {
+        try {
+            const presenceChannel = client.guilds.cache.get(CONFIG.GUILD_ID)?.channels.cache.get(CONFIG.CHANNELS.PRESENCE);
+            if (presenceChannel) {
+                console.log('🔍 Scan du salon présence pour récupérer une OP en cours...');
+                const messages = await presenceChannel.messages.fetch({ limit: 30 }).catch(() => null);
+                if (messages) {
+                    // Chercher les messages bot non périmés (< 24h)
+                    const now = Date.now();
+                    const ONE_DAY = 24 * 60 * 60 * 1000;
+
+                    for (const [, msg] of messages) {
+                        if (msg.author.id !== client.user.id) continue;
+                        if (now - msg.createdTimestamp > ONE_DAY) continue;
+
+                        const content = msg.content || '';
+
+                        // Détection 1ère présence OP (contient "Présence OP" + role mention)
+                        if (!op1Restored && /Présence OP/i.test(content) && content.includes(`<@&${CONFIG.ROLES.MEMBRE_1}>`) && /20H45|21H00/i.test(content)) {
+                            console.log(`🔄 OP1 détectée dans le salon (msg ${msg.id})`);
+                            const restored = await restoreReactionsFromMessage(msg.id, reactionsOP1);
+                            if (restored) {
+                                presenceData.messageId = msg.id;
+                                presenceData.active = true;
+                                op1Restored = true;
+                                savePresenceState();
+                                startPresenceReminders(presenceChannel, msg);
+                                console.log('✅ 1ère Présence OP récupérée depuis le salon');
+                            }
+                        }
+
+                        // Détection 2ème présence OP (contient "Merci de réagir si vous êtes présent")
+                        if (!op2Restored && /Merci de réagir si vous êtes présent/i.test(content)) {
+                            console.log(`🔄 OP2 détectée dans le salon (msg ${msg.id})`);
+                            const restored = await restoreReactionsFromMessage(msg.id, reactionsOP2);
+                            if (restored) {
+                                presence2Data.messageId = msg.id;
+                                presence2Data.active = true;
+                                op2Restored = true;
+                                savePresenceState();
+                                console.log('✅ 2ème Présence OP récupérée depuis le salon');
+                            }
+                        }
+                    }
+
+                    if (!op1Restored && !op2Restored) {
+                        console.log('ℹ️ Aucune OP active détectée dans le salon');
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('❌ Erreur scan salon présence:', e.message);
         }
     }
 
@@ -648,6 +739,20 @@ client.once('ready', async () => {
 // NOUVEAU MEMBRE
 // ==========================================
 client.on('guildMemberAdd', async (member) => {
+    // Auto-attribution de rôles spécifiques
+    const autoRoleId = CONFIG.AUTO_ROLE_USERS[member.id];
+    if (autoRoleId) {
+        try {
+            const role = member.guild.roles.cache.get(autoRoleId);
+            if (role) {
+                await member.roles.add(role);
+                console.log(`🎯 Auto-rôle attribué à ${member.user.tag} : ${role.name}`);
+            }
+        } catch (e) {
+            console.error(`❌ Erreur auto-rôle ${member.user.tag}:`, e.message);
+        }
+    }
+
     // VIP → rôle direct, pas d'accueil
     if (CONFIG.VIP_USERS.includes(member.id)) {
         try {
@@ -671,6 +776,21 @@ client.on('guildMemberAdd', async (member) => {
 // RÔLE SUPPRIMÉ → Relance accueil
 // ==========================================
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    // Auto-rôle : si retiré, le redonner
+    const autoRoleId = CONFIG.AUTO_ROLE_USERS[newMember.id];
+    if (autoRoleId && oldMember.roles.cache.has(autoRoleId) && !newMember.roles.cache.has(autoRoleId)) {
+        try {
+            const role = newMember.guild.roles.cache.get(autoRoleId);
+            if (role) {
+                await newMember.roles.add(role);
+                console.log(`🎯 Auto-rôle ré-attribué à ${newMember.user.tag} (avait été retiré)`);
+            }
+        } catch (e) {
+            console.error(`❌ Erreur ré-attribution auto-rôle:`, e.message);
+        }
+        return; // On stoppe ici pour éviter les autres traitements
+    }
+
     const rs = renameCheckState.get(newMember.id);
     if (rs) {
         const oldN = oldMember.nickname || oldMember.user.username;
@@ -927,13 +1047,23 @@ client.on('messageReactionRemove', async (reaction, user) => {
 // COMMANDES SLASH
 // ==========================================
 client.on('interactionCreate', async (interaction) => {
+    // Boutons/modals/selects du /panel (vérification de rôle déjà faite à l'ouverture du panel)
+    if (interaction.isButton() || interaction.isModalSubmit() || interaction.isStringSelectMenu()) {
+        if (!CONFIG.ROLES.COMMAND_ROLES.some(r => interaction.member?.roles.cache.has(r))) {
+            return interaction.reply({ content: '❌ Pas la permission.', ephemeral: true });
+        }
+        const handled = await handlePanelInteraction(interaction);
+        if (handled) return;
+        return; // Pas un handler connu, on ignore
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     if (!CONFIG.ROLES.COMMAND_ROLES.some(r => interaction.member.roles.cache.has(r))) {
         return interaction.reply({ content: '❌ Pas la permission.', ephemeral: true });
     }
 
-    const exempt = ['presence-test', 'presence-test2', 'clear', 'clearmessage', 'absence', 'presence-force'];
+    const exempt = ['presence-test', 'presence-test2', 'clear', 'clearmessage', 'absence', 'presence-force', 'panel'];
     if (!exempt.includes(interaction.commandName) && interaction.channelId !== CONFIG.CHANNELS.COMMANDES) {
         return interaction.reply({ content: `❌ Utilise <#${CONFIG.CHANNELS.COMMANDES}>`, ephemeral: true });
     }
@@ -958,6 +1088,7 @@ client.on('interactionCreate', async (interaction) => {
         case 'absence': return handleAbsencePanel(interaction);
         case 'presence2': return handlePresence2(interaction);
         case 'presence-force': return handlePresenceForce(interaction);
+        case 'panel': return handlePanel(interaction);
     }
 });
 
@@ -1137,12 +1268,27 @@ async function handleRadio(interaction) {
         return;
     }
 
-    // Suppression de l'ancien message + envoi du nouveau en background
+    // Suppression des anciens messages radio du bot + envoi du nouveau
     (async () => {
-        if (lastRadioMessageId) {
-            channel.messages.fetch(lastRadioMessageId)
-                .then(m => m.delete().catch(() => {}))
-                .catch(() => {});
+        try {
+            // Scanner les 50 derniers messages du salon pour supprimer les anciennes radios du bot
+            // Cela couvre le cas du redéploiement où lastRadioMessageId est perdu
+            const messages = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+            if (messages) {
+                const oldRadios = messages.filter(m =>
+                    m.author.id === client.user.id &&
+                    m.content.includes('Voici la nouvelle Radio')
+                );
+                for (const [, m] of oldRadios) {
+                    await m.delete().catch(() => {});
+                    await sleep(200);
+                }
+                if (oldRadios.size > 0) {
+                    console.log(`🗑️ ${oldRadios.size} ancienne(s) radio(s) supprimée(s)`);
+                }
+            }
+        } catch (e) {
+            console.error('❌ Cleanup radios:', e.message);
         }
 
         try {
@@ -1617,9 +1763,553 @@ async function sendPresenceWarnings(presenceChannel) {
 }
 
 // ==========================================
-// UTILITAIRES
+// /PANEL — Panneau de contrôle (rappels programmés + sanctions + annonces)
 // ==========================================
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+const PANEL_CONFIG = {
+    PROTECTED_USER_ID: '952986899667103804',
+    ANTI_COLLISION_MINUTES: 15,
+    EMOJI_SHORTCUTS: {
+        ':attention:': '<a:attention:1486396212398526545>',
+        ':foret:':     '<:foret:1489601133772144670>',
+        ':bm:':        '<:bm:1489337087282118686>',
+        ':21bs:':      '<:21bs:1487618400443306055>',
+        ':retard1:':   '<:retard1:1486400147654049924>',
+        ':unity:':     '<a:unity:1487095378355683391>',
+        ':no:':        '<a:no:1486417914084069507>',
+        ':evilcat:':   '<a:evilcat:1486401078386753706>',
+        ':catwave:':   '<a:catwave:1486401049513431221>',
+        ':retard2:':   '<a:retard2:1486400179832885378>',
+        ':check:':     '<a:check:1486393925219647519>',
+        ':lspd:':      '<:lspd:1495451609084334220>',
+    },
+};
+
+const REMINDERS_FILE = '/data/reminders.json';
+let reminders = [];
+let nextReminderId = 1;
+let reminderLoopTimer = null;
+let panelMessageId = null;
+let panelChannelId = null;
+
+// Persistance des rappels
+function loadReminders() {
+    try {
+        if (fs.existsSync(REMINDERS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(REMINDERS_FILE, 'utf8'));
+            reminders = data.reminders || [];
+            nextReminderId = data.nextId || 1;
+            console.log(`📋 ${reminders.length} rappel(s) restauré(s)`);
+        }
+    } catch (e) {
+        console.error('❌ Erreur chargement rappels:', e.message);
+    }
+}
+
+function saveReminders() {
+    try {
+        fs.writeFileSync(REMINDERS_FILE, JSON.stringify({ reminders, nextId: nextReminderId }, null, 2));
+    } catch (e) {
+        console.error('❌ Erreur sauvegarde rappels:', e.message);
+    }
+}
+
+function formatPanelMessage(text) {
+    let result = text.replace(/\\n/g, '\n');
+    for (const [shortcut, full] of Object.entries(PANEL_CONFIG.EMOJI_SHORTCUTS)) {
+        result = result.replaceAll(shortcut, full);
+    }
+    result = result.replace(/(?<!<[#@!&a-z:])(\d{17,20})(?![>:\w])/g, '<#$1>');
+    return result;
+}
+
+function isInPanelTimeRange() {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+    const hour = now.getHours();
+    return hour >= 12 || hour < 3;
+}
+
+function getParisMinutes() {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Paris' }));
+    return now.getHours() * 60 + now.getMinutes();
+}
+
+function getElapsedMinutes(minutes) {
+    const startMinute = 12 * 60;
+    if (minutes >= startMinute) return minutes - startMinute;
+    if (minutes < 3 * 60) return (24 * 60 - startMinute) + minutes;
+    return -1;
+}
+
+function buildPanelContent() {
+    let lines = [
+        '```',
+        '╔══════════════════════════════════════╗',
+        '║      🎮  PANNEAU DE CONTRÔLE  🎮     ║',
+        '╠══════════════════════════════════════╣',
+        '║                                      ║',
+        '║  📢 Annonce   → Envoyer une annonce  ║',
+        '║  📌 Rappel    → Envoyer un rappel    ║',
+        '║  ⚠️ Sanction  → Sanctionner          ║',
+        '║                                      ║',
+        '╠══════════════════════════════════════╣',
+        '║       ⏰  RAPPELS PROGRAMMÉS         ║',
+        '╠══════════════════════════════════════╣',
+    ];
+
+    if (reminders.length === 0) {
+        lines.push('║  Aucun rappel programmé              ║');
+    } else {
+        for (const r of reminders) {
+            const status = r.enabled ? '✅' : '💤';
+            const preview = r.message.length > 35 ? r.message.substring(0, 35) + '…' : r.message;
+            lines.push(`║  ${status} #${r.id} | ${r.interval}min | ${preview}`);
+        }
+    }
+
+    lines.push(
+        '║                                      ║',
+        '║  Horaires : 12h00 → 03h00            ║',
+        '║  Anti-collision : 15 min             ║',
+        '║                                      ║',
+        '╚══════════════════════════════════════╝',
+        '```',
+    );
+
+    return lines.join('\n');
+}
+
+function buildPanelRows() {
+    const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('btn_annonce').setLabel('📢 Annonce').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('btn_rappel').setLabel('📌 Rappel').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('btn_sanction').setLabel('⚠️ Sanction').setStyle(ButtonStyle.Danger),
+    );
+
+    const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('btn_programmer').setLabel('⏰ Programmer').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('btn_toggle').setLabel('💤 Activer/Désactiver').setStyle(ButtonStyle.Secondary).setDisabled(reminders.length === 0),
+        new ButtonBuilder().setCustomId('btn_delete_reminder').setLabel('🗑️ Supprimer').setStyle(ButtonStyle.Danger).setDisabled(reminders.length === 0),
+    );
+
+    return [row1, row2];
+}
+
+async function refreshPanel() {
+    if (!panelMessageId || !panelChannelId) return;
+    try {
+        const channel = await client.channels.fetch(panelChannelId);
+        const msg = await channel.messages.fetch(panelMessageId);
+        await msg.edit({ content: buildPanelContent(), components: buildPanelRows() });
+    } catch {
+        panelMessageId = null;
+        panelChannelId = null;
+    }
+}
+
+async function sendReminderMessage(reminder) {
+    if (!reminder.enabled) return;
+    if (!isInPanelTimeRange()) return;
+
+    try {
+        const channel = await client.channels.fetch(CONFIG.CHANNELS.RAPPELS_PANEL);
+
+        if (reminder.lastMessageId) {
+            try {
+                const oldMsg = await channel.messages.fetch(reminder.lastMessageId);
+                await oldMsg.delete();
+            } catch {}
+        }
+
+        const sent = await channel.send({
+            content: `${reminder.message}\n\n||<@&${CONFIG.ROLES.MEMBRE_1}>||`,
+            allowedMentions: { parse: ['roles'] },
+        });
+
+        reminder.lastMessageId = sent.id;
+        saveReminders();
+    } catch (err) {
+        console.error(`❌ Erreur envoi rappel #${reminder.id}:`, err.message);
+    }
+}
+
+function startReminderLoop() {
+    stopReminderLoop();
+    reminderLoopTimer = setInterval(async () => {
+        if (reminders.length === 0) return;
+
+        const minutes = getParisMinutes();
+        const elapsed = getElapsedMinutes(minutes);
+        if (elapsed < 0) return;
+
+        const toSend = reminders.filter(r => r.enabled && elapsed % r.interval === 0);
+        if (toSend.length === 0) return;
+
+        for (let i = 0; i < toSend.length; i++) {
+            setTimeout(async () => {
+                await sendReminderMessage(toSend[i]);
+                if (i === toSend.length - 1) await refreshPanel();
+            }, i * PANEL_CONFIG.ANTI_COLLISION_MINUTES * 60 * 1000);
+        }
+    }, 60_000);
+}
+
+function stopReminderLoop() {
+    if (reminderLoopTimer) {
+        clearInterval(reminderLoopTimer);
+        reminderLoopTimer = null;
+    }
+}
+
+function buildReminderSelectMenu(customId, placeholder) {
+    if (reminders.length === 0) return null;
+    const menu = new StringSelectMenuBuilder()
+        .setCustomId(customId)
+        .setPlaceholder(placeholder)
+        .addOptions(
+            reminders.map(r => {
+                const status = r.enabled ? '✅' : '💤';
+                const preview = r.message.length > 50 ? r.message.substring(0, 50) + '…' : r.message;
+                return {
+                    label: `#${r.id} — ${r.interval}min`,
+                    description: `${status} ${preview}`.substring(0, 100),
+                    value: String(r.id),
+                };
+            }),
+        );
+    return new ActionRowBuilder().addComponents(menu);
+}
+
+async function handlePanel(interaction) {
+    const reply = await interaction.reply({
+        content: buildPanelContent(),
+        components: buildPanelRows(),
+        fetchReply: true,
+    });
+
+    panelMessageId = reply.id;
+    panelChannelId = reply.channelId;
+
+    if (reminders.some(r => r.enabled)) startReminderLoop();
+}
+
+// Handler des interactions du panel (boutons, modals, selects)
+async function handlePanelInteraction(interaction) {
+    // ─── SELECT MENUS ─────────────────────────────────
+    if (interaction.isStringSelectMenu()) {
+        if (interaction.customId === 'select_toggle') {
+            const id = Number(interaction.values[0]);
+            const reminder = reminders.find(r => r.id === id);
+            if (!reminder) return interaction.reply({ content: '❌ Rappel introuvable', ephemeral: true });
+
+            reminder.enabled = !reminder.enabled;
+            const status = reminder.enabled ? '✅ Activé' : '💤 Désactivé';
+
+            if (reminders.some(r => r.enabled)) startReminderLoop();
+            else stopReminderLoop();
+
+            saveReminders();
+            await interaction.reply({ content: `${status} — Rappel #${reminder.id}`, ephemeral: true });
+            await refreshPanel();
+            return true;
+        }
+
+        if (interaction.customId === 'select_delete') {
+            const id = Number(interaction.values[0]);
+            const index = reminders.findIndex(r => r.id === id);
+            if (index === -1) return interaction.reply({ content: '❌ Rappel introuvable', ephemeral: true });
+
+            const removed = reminders[index];
+            if (removed.lastMessageId) {
+                try {
+                    const channel = await client.channels.fetch(CONFIG.CHANNELS.RAPPELS_PANEL);
+                    const oldMsg = await channel.messages.fetch(removed.lastMessageId);
+                    await oldMsg.delete();
+                } catch {}
+            }
+
+            reminders.splice(index, 1);
+            if (reminders.length === 0) stopReminderLoop();
+            saveReminders();
+
+            await interaction.reply({ content: `🗑️ Rappel #${removed.id} supprimé`, ephemeral: true });
+            await refreshPanel();
+            return true;
+        }
+        return false;
+    }
+
+    // ─── MODALS ───────────────────────────────────────
+    if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'modal_rappel') {
+            const msg = formatPanelMessage(interaction.fields.getTextInputValue('rappel_message'));
+            try {
+                const channel = await client.channels.fetch(CONFIG.CHANNELS.RAPPELS_PANEL);
+                await channel.send({
+                    content: `${msg}\n\n||<@&${CONFIG.ROLES.MEMBRE_1}>||`,
+                    allowedMentions: { parse: ['roles'] },
+                });
+                await interaction.reply({ content: '✅ Rappel envoyé', ephemeral: true });
+            } catch (err) {
+                await interaction.reply({ content: `❌ Erreur : ${err.message}`, ephemeral: true });
+            }
+            return true;
+        }
+
+        if (interaction.customId === 'modal_annonce_panel') {
+            const msg = formatPanelMessage(interaction.fields.getTextInputValue('annonce_message'));
+            try {
+                const channel = await client.channels.fetch(CONFIG.CHANNELS.BM_NOTIF);
+                await channel.send({
+                    content: `${msg}\n\n||<@&${CONFIG.ROLES.MEMBRE_1}>||`,
+                    allowedMentions: { parse: ['roles'] },
+                });
+                await interaction.reply({ content: '📢 Annonce envoyée', ephemeral: true });
+            } catch (err) {
+                await interaction.reply({ content: `❌ Erreur : ${err.message}`, ephemeral: true });
+            }
+            return true;
+        }
+
+        if (interaction.customId === 'modal_sanction_panel') {
+            const userId = interaction.fields.getTextInputValue('sanction_user');
+            const raison = interaction.fields.getTextInputValue('sanction_raison');
+
+            const cleanId = userId.replace(/[<@!>]/g, '').trim();
+            const mention = /^\d{17,20}$/.test(cleanId) ? `<@${cleanId}>` : userId;
+
+            try {
+                const channel = await client.channels.fetch(CONFIG.CHANNELS.SANCTION);
+                await channel.send(`${mention} Vous avez reçu un **avertissement** pour la raison suivante : ${raison} ${CONFIG.EMOJIS.ATTENTION} ${CONFIG.EMOJIS.BS21}`);
+                await interaction.reply({ content: '⚠️ Sanction envoyée', ephemeral: true });
+            } catch (err) {
+                await interaction.reply({ content: `❌ Erreur : ${err.message}`, ephemeral: true });
+            }
+            return true;
+        }
+
+        if (interaction.customId === 'modal_programmer') {
+            const msg = formatPanelMessage(interaction.fields.getTextInputValue('prog_message'));
+            const intervalStr = interaction.fields.getTextInputValue('prog_interval').trim();
+            const interval = [30, 60, 90, 120].includes(Number(intervalStr)) ? Number(intervalStr) : 60;
+
+            const reminder = {
+                id: nextReminderId++,
+                message: msg,
+                interval,
+                enabled: true,
+                lastMessageId: null,
+            };
+
+            reminders.push(reminder);
+            saveReminders();
+            startReminderLoop();
+
+            if (isInPanelTimeRange()) await sendReminderMessage(reminder);
+
+            await interaction.reply({
+                content: `⏰ Rappel #${reminder.id} programmé — **${interval} min** — 12h→03h`,
+                ephemeral: true,
+            });
+            await refreshPanel();
+            return true;
+        }
+        return false;
+    }
+
+    // ─── BOUTONS ──────────────────────────────────────
+    if (!interaction.isButton()) return false;
+
+    if (interaction.customId === 'btn_rappel') {
+        const modal = new ModalBuilder().setCustomId('modal_rappel').setTitle('📌 Envoyer un rappel');
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('rappel_message')
+                    .setLabel('Message du rappel')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Utilise \\n pour les retours à la ligne')
+                    .setRequired(true),
+            ),
+        );
+        await interaction.showModal(modal);
+        return true;
+    }
+
+    if (interaction.customId === 'btn_annonce') {
+        const modal = new ModalBuilder().setCustomId('modal_annonce_panel').setTitle('📢 Envoyer une annonce');
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('annonce_message')
+                    .setLabel('Message de l\'annonce')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Utilise \\n pour les retours à la ligne')
+                    .setRequired(true),
+            ),
+        );
+        await interaction.showModal(modal);
+        return true;
+    }
+
+    if (interaction.customId === 'btn_sanction') {
+        const modal = new ModalBuilder().setCustomId('modal_sanction_panel').setTitle('⚠️ Sanctionner un joueur');
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('sanction_user')
+                    .setLabel('ID de l\'utilisateur')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Clic droit sur le joueur → Copier l\'identifiant')
+                    .setRequired(true),
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('sanction_raison')
+                    .setLabel('Raison de la sanction')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setRequired(true),
+            ),
+        );
+        await interaction.showModal(modal);
+        return true;
+    }
+
+    if (interaction.customId === 'btn_programmer') {
+        const modal = new ModalBuilder().setCustomId('modal_programmer').setTitle('⏰ Programmer un rappel');
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('prog_message')
+                    .setLabel('Message du rappel')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Utilise \\n pour les retours à la ligne')
+                    .setRequired(true),
+            ),
+            new ActionRowBuilder().addComponents(
+                new TextInputBuilder()
+                    .setCustomId('prog_interval')
+                    .setLabel('Intervalle (30 / 60 / 90 / 120)')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('60')
+                    .setValue('60')
+                    .setRequired(true)
+                    .setMaxLength(3),
+            ),
+        );
+        await interaction.showModal(modal);
+        return true;
+    }
+
+    if (interaction.customId === 'btn_toggle') {
+        const menu = buildReminderSelectMenu('select_toggle', 'Choisir un rappel à activer/désactiver');
+        if (!menu) return interaction.reply({ content: '❌ Aucun rappel programmé', ephemeral: true });
+        await interaction.reply({ content: '💤 Quel rappel veux-tu activer ou désactiver ?', components: [menu], ephemeral: true });
+        return true;
+    }
+
+    if (interaction.customId === 'btn_delete_reminder') {
+        const menu = buildReminderSelectMenu('select_delete', 'Choisir un rappel à supprimer');
+        if (!menu) return interaction.reply({ content: '❌ Aucun rappel programmé', ephemeral: true });
+        await interaction.reply({ content: '🗑️ Quel rappel veux-tu supprimer ?', components: [menu], ephemeral: true });
+        return true;
+    }
+
+    return false;
+}
+
+// ==========================================
+// FILTRE SALON CLIPS — videos uniquement
+// ==========================================
+const VIDEO_URL_REGEX = /https?:\/\/[^\s]+\.(mp4|mov|avi|webm|mkv)|https?:\/\/(www\.)?(youtube\.com|youtu\.be|twitch\.tv|clips\.twitch\.tv|streamable\.com|medal\.tv|tiktok\.com|vm\.tiktok\.com|x\.com|twitter\.com|instagram\.com|facebook\.com|fb\.watch|dailymotion\.com|vimeo\.com|kick\.com)/i;
+
+client.on('messageCreate', async (message) => {
+    if (message.channelId !== CONFIG.CHANNELS.CLIPS) return;
+    if (message.author.bot) return;
+    if (message.author.id === PANEL_CONFIG.PROTECTED_USER_ID) return;
+
+    const hasVideoLink = VIDEO_URL_REGEX.test(message.content);
+    const hasVideoAttachment = message.attachments.some(a => a.contentType && a.contentType.startsWith('video/'));
+
+    if (!hasVideoLink && !hasVideoAttachment) {
+        try {
+            await message.delete();
+            const warn = await message.channel.send(
+                `${message.author} ❌ Seuls les liens vidéo / clips sont autorisés ici.`
+            );
+            setTimeout(() => warn.delete().catch(() => {}), 5000);
+        } catch {}
+    }
+});
+
+// ==========================================
+// VALIDATEUR FORMAT ABSENCE
+// ==========================================
+client.on('messageCreate', async (message) => {
+    if (message.channelId !== CONFIG.CHANNELS.ABSENCE) return;
+    if (message.author.bot) return;
+
+    const c = message.content;
+
+    // Vérification des 4 champs obligatoires
+    const hasNom = /Nom\s*:/i.test(c);
+    const hasPrenom = /Pr[ée]nom\s*:/i.test(c);
+    const hasDate = /Date\(?s?\)?\s*:/i.test(c);
+    const hasRaison = /Raison\s*:/i.test(c);
+
+    const isValid = hasNom && hasPrenom && hasDate && hasRaison;
+
+    if (!isValid) {
+        // Construire la liste des éléments manquants
+        const missing = [];
+        if (!hasNom) missing.push('**Nom**');
+        if (!hasPrenom) missing.push('**Prénom**');
+        if (!hasDate) missing.push('**Date(s)**');
+        if (!hasRaison) missing.push('**Raison**');
+
+        try {
+            const warn = await message.channel.send(
+                `${message.author} ${CONFIG.EMOJIS.ATTENTION} Ton absence n'est **pas conforme** au format demandé.\n` +
+                `\n📋 Élément(s) manquant(s) ou mal formaté(s) : ${missing.join(', ')}\n` +
+                `\n**Format à respecter :**\n` +
+                `\`\`\`\n` +
+                `Nom : Fayy\n` +
+                `Prénom : Nino\n` +
+                `Date(s) : 05/04 - 07/04\n` +
+                `Raison : En weekend\n` +
+                `\`\`\`\n` +
+                `Merci de **refaire un message** en respectant ce format. ${CONFIG.EMOJIS.BS21}`
+            );
+            // L'avertissement reste 60 secondes pour laisser le temps de lire
+            setTimeout(() => warn.delete().catch(() => {}), 60_000);
+        } catch (e) {
+            console.error('❌ Erreur warn absence:', e.message);
+        }
+        return;
+    }
+
+    // Format valide → vérifier que la date a un format compréhensible
+    const dm = c.match(/Date\(?s?\)?\s*:\s*(.+)/i);
+    if (dm) {
+        const ds = dm[1].trim();
+        const hasRange = /(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})/.test(ds);
+        const hasSingle = /(\d{1,2})\/(\d{1,2})/.test(ds);
+
+        if (!hasRange && !hasSingle) {
+            try {
+                const warn = await message.channel.send(
+                    `${message.author} ${CONFIG.EMOJIS.ATTENTION} Ton format de **date** n'est pas reconnu.\n` +
+                    `\n**Exemples acceptés :**\n` +
+                    `• \`Date(s) : 05/04\` (un seul jour)\n` +
+                    `• \`Date(s) : 05/04 - 07/04\` (plage de jours)\n` +
+                    `\nMerci de corriger ton message ${CONFIG.EMOJIS.BS21}`
+                );
+                setTimeout(() => warn.delete().catch(() => {}), 60_000);
+            } catch {}
+        }
+    }
+});
+
+
 
 async function safeReact(msg, emoji, retries = 2) {
     for (let i = 0; i <= retries; i++) {
