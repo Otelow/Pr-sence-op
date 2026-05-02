@@ -3132,3 +3132,146 @@ html, body {
     border: 2px solid var(--bg-deep);
     font-size: 9px;
 }
+
+/* ============================================
+   CARTE V5 — Reset et refonte complète
+   ============================================ */
+
+/* Override toutes les règles précédentes */
+.map-container {
+    background: var(--bg-deep) !important;
+    border: 1px solid var(--border) !important;
+    overflow: hidden !important; /* Pas de scroll natif, on gère avec transform */
+    height: calc(100vh - 280px) !important;
+    position: relative !important;
+    cursor: grab !important;
+    user-select: none !important;
+    border-radius: 8px;
+}
+
+.map-container.dragging {
+    cursor: grabbing !important;
+}
+
+.map-container.add-mode {
+    cursor: crosshair !important;
+}
+
+.map-canvas {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform-origin: 0 0 !important;
+    will-change: transform !important;
+    transition: none !important;
+}
+
+.map-canvas.smooth-zoom {
+    transition: transform 0.15s ease-out !important;
+}
+
+.map-image {
+    display: block !important;
+    max-width: none !important;
+    width: auto !important;
+    height: auto !important;
+    user-select: none !important;
+    -webkit-user-drag: none !important;
+    pointer-events: none !important;
+}
+
+.map-points-layer {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    pointer-events: none !important;
+}
+
+/* Points : taille FIXE peu importe le zoom (on inverse l'échelle) */
+.map-point {
+    position: absolute;
+    width: 36px;
+    height: 44px;
+    margin-left: -18px;
+    margin-top: -44px; /* Pin pointe vers le bas, donc ancre en bas */
+    pointer-events: auto;
+    cursor: pointer;
+    transform-origin: 50% 100%;
+    transition: transform 0.15s ease-out;
+    z-index: 10;
+}
+
+.map-point:hover {
+    transform: scale(1.15);
+    z-index: 100;
+}
+
+.map-point-pin {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7));
+}
+
+.map-point-label {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-deep);
+    color: var(--text);
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid var(--border-hover);
+    border-radius: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.map-point:hover .map-point-label {
+    opacity: 1;
+}
+
+/* Animation danger toujours active */
+.map-point[data-type="danger"] .map-point-pin {
+    animation: dangerPulse 1.2s infinite;
+}
+
+@keyframes dangerPulse {
+    0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 51, 51, 0)) drop-shadow(0 4px 8px rgba(0,0,0,0.7)); }
+    50% { filter: drop-shadow(0 0 16px rgba(255, 51, 51, 1)) drop-shadow(0 4px 8px rgba(0,0,0,0.7)); }
+}
+
+/* Indicateur code pour Lab/Lab armes */
+.map-point[data-type="lab"]::after,
+.map-point[data-type="weapon-lab"]::after {
+    content: '🔐';
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    font-size: 11px;
+    background: var(--gold);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-deep);
+    z-index: 1;
+}
+
+/* Container en mode delete */
+.map-container.delete-mode .map-point {
+    animation: pulseDelete 0.8s infinite;
+}
+
+@keyframes pulseDelete {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
