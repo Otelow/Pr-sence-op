@@ -16,7 +16,7 @@
 <aside class="sidebar">
     <div class="sidebar-header">
         <div class="badge-mini">21BS</div>
-        <span class="sidebar-title">CMD</span>
+        <span class="sidebar-title">Centre Contrôle</span>
     </div>
 
     <nav class="nav">
@@ -81,6 +81,11 @@
                 <div class="stat-label">Membres total</div>
                 <div class="stat-value" id="statTotal">—</div>
             </div>
+            <div class="stat-card stat-info">
+                <div class="stat-label">Inscrits OP</div>
+                <div class="stat-value" id="statInscrits">—</div>
+                <div class="stat-sub">Rôle 21BS</div>
+            </div>
             <div class="stat-card">
                 <div class="stat-label">Absences semaine</div>
                 <div class="stat-value" id="statAbsences">—</div>
@@ -88,10 +93,6 @@
             <div class="stat-card stat-warning" id="statConsecutiveCard">
                 <div class="stat-label">Alertes KP</div>
                 <div class="stat-value" id="statConsecutive">—</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">OP Actives</div>
-                <div class="stat-value" id="statOPs">—</div>
             </div>
         </div>
 
@@ -210,11 +211,39 @@
             </div>
         </div>
 
+        <div class="cmd-section">
+            <h2 class="section-title">📢 Annonces</h2>
+            <div class="annonce-form">
+                <div class="annonce-field">
+                    <label>Rôle à mentionner</label>
+                    <select id="annonceRole">
+                        <option value="">Chargement...</option>
+                    </select>
+                </div>
+                <div class="annonce-field">
+                    <label>Message
+                        <span class="field-hint">(les retours à la ligne et espaces sont conservés)</span>
+                    </label>
+                    <div class="emoji-toolbar">
+                        <button type="button" class="emoji-toolbar-btn" onclick="toggleEmojiPicker()">😀 Emojis serveur</button>
+                    </div>
+                    <textarea id="annonceMessage" rows="6" placeholder="Tape ton message ici...&#10;Tu peux faire des retours à la ligne&#10;Et insérer des :emojis: du serveur"></textarea>
+                    <div class="emoji-picker" id="emojiPicker" style="display:none;">
+                        <p class="empty" style="padding:12px;">Chargement des emojis...</p>
+                    </div>
+                </div>
+                <div class="annonce-actions">
+                    <button class="btn-primary" onclick="sendAnnonce()">📤 Envoyer l'annonce</button>
+                </div>
+            </div>
+        </div>
+
     </section>
 
     <!-- TAB: STATS -->
     <section class="tab-content" id="tab-stats">
-        <h2 class="section-title">📊 Suivi hebdomadaire des absences</h2>
+
+        <div class="stats-overview" id="statsOverview"></div>
 
         <div class="stats-tables">
             <div class="stats-block">
@@ -225,8 +254,8 @@
             </div>
 
             <div class="stats-block">
-                <h3 class="stats-block-title">📋 Toutes les absences cette semaine</h3>
-                <div class="stats-list" id="classicList">
+                <h3 class="stats-block-title">📅 Calendrier de présence — Cette semaine</h3>
+                <div class="stats-calendar" id="statsCalendar">
                     <p class="empty">Chargement...</p>
                 </div>
             </div>
@@ -245,36 +274,30 @@
 
     <!-- TAB: SALONS -->
     <section class="tab-content" id="tab-channels">
-        <div class="channels-layout">
-            <div class="channels-sidebar">
-                <div class="channels-header">
-                    <h2>Salons Discord</h2>
-                    <input type="text" id="channelSearch" placeholder="Rechercher..." class="channel-search">
+        <div class="channels-toolbar">
+            <input type="text" id="channelSearch" placeholder="Rechercher un salon..." class="channel-search">
+            <button class="btn-back-channels" id="backToChannelsBtn" style="display:none;" onclick="backToChannels()">← Retour aux salons</button>
+        </div>
+
+        <!-- Vue grille des salons -->
+        <div class="channels-grid-view" id="channelsGridView">
+            <p class="empty">Chargement...</p>
+        </div>
+
+        <!-- Vue messages d'un salon -->
+        <div class="channel-messages-view" id="channelMessagesView" style="display:none;">
+            <div class="channel-viewer-header">
+                <div>
+                    <h2 id="viewerName">—</h2>
+                    <p id="viewerTopic" class="viewer-topic"></p>
                 </div>
-                <div class="channels-tree" id="channelsTree">
-                    <p class="empty">Chargement...</p>
+                <div class="viewer-actions">
+                    <a id="viewerOpenDiscord" href="#" target="_blank" class="btn-discord-mini">Ouvrir dans Discord ↗</a>
                 </div>
             </div>
-            <div class="channels-content">
-                <div class="channels-empty" id="channelsEmpty">
-                    <div class="channels-empty-icon">#</div>
-                    <p>Sélectionne un salon pour voir son historique</p>
-                </div>
-                <div class="channels-viewer" id="channelsViewer" style="display:none;">
-                    <div class="channels-viewer-header">
-                        <div>
-                            <h3 id="viewerName">—</h3>
-                            <p id="viewerTopic" class="viewer-topic"></p>
-                        </div>
-                        <div class="viewer-actions">
-                            <a id="viewerOpenDiscord" href="#" target="_blank" class="btn-discord-mini">Ouvrir dans Discord ↗</a>
-                        </div>
-                    </div>
-                    <div class="channels-messages" id="channelsMessages"></div>
-                    <div class="channels-load-more">
-                        <button id="loadMoreBtn" class="btn-load-more" style="display:none;">↑ Charger plus de messages</button>
-                    </div>
-                </div>
+            <div class="channel-timeline" id="channelTimeline"></div>
+            <div class="channels-load-more">
+                <button id="loadMoreBtn" class="btn-load-more" style="display:none;">↑ Charger plus de messages</button>
             </div>
         </div>
     </section>
@@ -282,22 +305,24 @@
     <!-- TAB: MAP -->
     <section class="tab-content" id="tab-map">
         <div class="map-toolbar">
-            <h2 class="section-title" style="margin:0;">🗺 Carte du Laboratoire</h2>
+            <h2 class="section-title" style="margin:0;">🗺 Carte Los Santos / 21BS Confidential</h2>
             <div class="map-controls">
                 <div class="map-mode" id="mapMode">
                     <button class="map-mode-btn active" data-mode="view">👁 Voir</button>
                     <button class="map-mode-btn" data-mode="add" id="mapAddBtn">＋ Ajouter</button>
                     <button class="map-mode-btn" data-mode="delete" id="mapDeleteBtn">🗑 Supprimer</button>
                 </div>
-                <div class="map-color-picker">
-                    <label>Couleur :</label>
-                    <input type="color" id="mapColor" value="#ff3333">
+                <div class="map-zoom-controls">
+                    <button class="map-zoom-btn" onclick="mapZoom(-1)" title="Dézoomer">−</button>
+                    <span class="map-zoom-label" id="mapZoomLabel">100%</span>
+                    <button class="map-zoom-btn" onclick="mapZoom(1)" title="Zoomer">+</button>
+                    <button class="map-zoom-btn" onclick="mapZoomReset()" title="Reset">⟲</button>
                 </div>
             </div>
         </div>
 
         <div class="map-info" id="mapInfo">
-            <span class="info-text">Mode <strong>Voir</strong> — Clique sur un point pour voir les détails</span>
+            <span class="info-text">Mode <strong>Voir</strong> — Clique sur un point pour voir les détails • Molette pour zoomer • Drag pour déplacer</span>
         </div>
 
         <div class="map-container" id="mapContainer">
@@ -322,19 +347,30 @@
             <h3 class="modal-title">📍 Ajouter un point</h3>
             <div class="modal-field">
                 <label>Nom du point</label>
-                <input type="text" id="pointLabel" placeholder="Ex: Entrée labo, Cache, Stash...">
+                <input type="text" id="pointLabel" placeholder="Ex: Cache Sud, Champ Nord...">
             </div>
             <div class="modal-field">
                 <label>Type</label>
                 <select id="pointType">
-                    <option value="default">📍 Point</option>
-                    <option value="lab">⚗ Laboratoire</option>
-                    <option value="stash">📦 Cache / Stash</option>
-                    <option value="vehicle">🚗 Véhicule</option>
-                    <option value="entry">🚪 Entrée</option>
+                    <option value="weed">🌿 Champ de Weed</option>
+                    <option value="weed-treatment">⚗ Traitement Weed</option>
+                    <option value="opium">🌺 Champ Opium</option>
+                    <option value="coke">❄ Champ Coke</option>
+                    <option value="lab">🧪 Laboratoire</option>
+                    <option value="weapon-lab">🔫 Laboratoire d'armes</option>
+                    <option value="hood">🏘 Hood</option>
                     <option value="danger">⚠ Danger</option>
-                    <option value="meeting">📌 Point de RDV</option>
                 </select>
+            </div>
+            <div class="modal-field">
+                <label>Visible par <span class="field-hint">(rôles autorisés à voir ce point)</span></label>
+                <div class="roles-selector" id="pointRolesSelector">
+                    <p class="empty" style="padding:12px;">Chargement...</p>
+                </div>
+                <div class="roles-quick-actions">
+                    <button type="button" class="btn-quick" onclick="selectAllRoles()">Tout cocher</button>
+                    <button type="button" class="btn-quick" onclick="selectNoRoles()">Tout décocher</button>
+                </div>
             </div>
             <div class="modal-actions">
                 <button onclick="closePointModal()" class="btn-secondary">Annuler</button>
