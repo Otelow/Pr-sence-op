@@ -138,6 +138,43 @@ const RENAME_KICK_DELAY = 10 * 60 * 1000;
 const roleRemovalProcessing = new Set();
 let lastRadioMessageId = null;
 
+// Persistance du welcomeState pour survivre aux redéploiements
+const WELCOME_STATE_FILE = '/data/welcome_state.json';
+
+function saveWelcomeState() {
+    try {
+        const data = {};
+        for (const [userId, state] of welcomeState) {
+            // On sauve uniquement ce qui peut être restauré (pas les timers)
+            data[userId] = {
+                step: state.step,
+                messageId: state.messageId,
+                guildId: state.guildId,
+                createdAt: state.createdAt || Date.now(),
+            };
+        }
+        fs.writeFileSync(WELCOME_STATE_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('❌ Erreur sauvegarde welcome:', e.message);
+    }
+}
+
+function loadWelcomeStateData() {
+    try {
+        if (fs.existsSync(WELCOME_STATE_FILE)) {
+            return JSON.parse(fs.readFileSync(WELCOME_STATE_FILE, 'utf8'));
+        }
+    } catch (e) {
+        console.error('❌ Erreur chargement welcome:', e.message);
+    }
+    return {};
+}
+
+function deleteWelcomeState(userId) {
+    welcomeState.delete(userId);
+    saveWelcomeState();
+}
+
 let presenceItems = [
     'Armes, munitions',
     'Eau, nourriture',
@@ -602,6 +639,53 @@ client.once('ready', async () => {
         console.log('⏰ Boucle de rappels démarrée');
     }
 
+    // Restaurer les flows de welcome en cours (après redéploiement)
+    try {
+        const savedWelcomes = loadWelcomeStateData();
+        const guild = client.guilds.cache.get(CONFIG.GUILD_ID);
+        const now = Date.now();
+        let restored = 0;
+
+        for (const [userId, state] of Object.entries(savedWelcomes)) {
+            // Si le welcome a plus de 10 minutes, on le considère expiré
+            const age = now - (state.createdAt || 0);
+            if (age > 10 * 60 * 1000) continue;
+
+            // Restaurer en mémoire
+            welcomeState.set(userId, state);
+            restored++;
+
+            // Relancer un kick timer pour le délai restant
+            const remainingTime = WELCOME_KICK_DELAY - age;
+            if (remainingTime > 0 && guild) {
+                setTimeout(async () => {
+                    const current = welcomeState.get(userId);
+                    if (!current || current.messageId !== state.messageId) return; // Déjà avancé
+
+                    try {
+                        const channel = guild.channels.cache.get(CONFIG.CHANNELS.REGLEMENT);
+                        const msg = channel ? await channel.messages.fetch(state.messageId).catch(() => null) : null;
+                        if (msg) await msg.delete().catch(() => {});
+
+                        const member = await guild.members.fetch(userId).catch(() => null);
+                        if (member) {
+                            const hasProtected = CONFIG.ROLES.PROTECTED_ROLES.some(r => member.roles.cache.has(r));
+                            if (!hasProtected) await member.kick('Timeout (restauré)').catch(() => {});
+                        }
+                    } catch {}
+                    deleteWelcomeState(userId);
+                }, remainingTime);
+            }
+        }
+
+        // Nettoyer les expirés du fichier
+        if (restored !== Object.keys(savedWelcomes).length) saveWelcomeState();
+
+        if (restored > 0) console.log(`👋 ${restored} flow(s) de welcome restauré(s)`);
+    } catch (e) {
+        console.error('⚠️ Erreur restauration welcome:', e.message);
+    }
+
     // Prefetch membres + absences au boot
     try {
         const guild = client.guilds.cache.get(CONFIG.GUILD_ID);
@@ -870,7 +954,8 @@ async function runWelcomeStep(channel, guild, member, step) {
 
     const msg = await channel.send(messages[step]);
     for (const emoji of reactions[step]) await safeReact(msg, emoji);
-    welcomeState.set(userId, { step, messageId: msg.id });
+    welcomeState.set(userId, { step, messageId: msg.id, guildId: guild.id, createdAt: Date.now() });
+    saveWelcomeState();
 
     const filter = (reaction, user) => {
         if (user.bot || user.id !== userId) return false;
@@ -886,7 +971,7 @@ async function runWelcomeStep(channel, guild, member, step) {
 
         if (isNo) {
             try { const m = await guild.members.fetch(userId); await m.kick('Refusé'); } catch {}
-            welcomeState.delete(userId);
+            deleteWelcomeState(userId);
             return;
         }
 
@@ -923,7 +1008,7 @@ async function runWelcomeStep(channel, guild, member, step) {
             }, RENAME_KICK_DELAY);
         } catch {}
 
-        welcomeState.delete(userId);
+        deleteWelcomeState(userId);
         setTimeout(() => welcomeMsg.delete().catch(() => {}), 30_000);
     });
 
@@ -934,7 +1019,7 @@ async function runWelcomeStep(channel, guild, member, step) {
                 const hasProtected = CONFIG.ROLES.PROTECTED_ROLES.some(r => m.roles.cache.has(r));
                 if (!hasProtected) m.kick('Timeout').catch(() => {});
             }).catch(() => {});
-            welcomeState.delete(userId);
+            deleteWelcomeState(userId);
         }
     });
 }
@@ -1019,6 +1104,21 @@ client.on('messageDelete', async (message) => {
 
 client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
+
+    // ─── Fallback Welcome ─────────────────────────────
+    // Si la réaction est sur un message de welcome ET que c'est le bon utilisateur
+    // (ce handler rattrape le cas où le collector a été perdu suite à un redéploiement)
+    try {
+        for (const [userId, state] of welcomeState) {
+            if (state.messageId === reaction.message.id && userId === user.id) {
+                await handleWelcomeReactionFallback(reaction, user, state);
+                break;
+            }
+        }
+    } catch (e) {
+        console.error('❌ Fallback welcome:', e.message);
+    }
+
     const msgId = reaction.message.id;
     const map = getReactionMap(msgId);
     if (!map) return;
@@ -1029,6 +1129,76 @@ client.on('messageReactionAdd', async (reaction, user) => {
         scheduleAbsencePanelRefresh();
     }
 });
+
+// Handler de fallback pour les réactions de welcome (quand le collector est mort)
+async function handleWelcomeReactionFallback(reaction, user, state) {
+    const userId = user.id;
+    const isCheck = reaction.emoji.name === 'check' || reaction.emoji.id === '1486393925219647519' || reaction.emoji.name === '✅';
+    const isNo = reaction.emoji.name === 'no' || reaction.emoji.id === '1486417914084069507' || reaction.emoji.name === '❌';
+    const isBM = reaction.emoji.name === 'bm' || reaction.emoji.id === '1489337087282118686';
+
+    if (!isCheck && !isNo && !isBM) return; // Réaction non reconnue
+
+    const guild = client.guilds.cache.get(state.guildId || CONFIG.GUILD_ID);
+    if (!guild) return;
+    const channel = guild.channels.cache.get(CONFIG.CHANNELS.REGLEMENT);
+    if (!channel) return;
+    const member = await guild.members.fetch(userId).catch(() => null);
+    if (!member) return;
+
+    // Supprimer le message actuel
+    try {
+        const oldMsg = await channel.messages.fetch(state.messageId).catch(() => null);
+        if (oldMsg) await oldMsg.delete().catch(() => {});
+    } catch {}
+
+    // Refus → kick
+    if (isNo) {
+        try { await member.kick('Refusé'); } catch {}
+        deleteWelcomeState(userId);
+        return;
+    }
+
+    // Validé : passer à l'étape suivante OU finaliser
+    if (state.step < 4) {
+        await runWelcomeStep(channel, guild, member, state.step + 1);
+        return;
+    }
+
+    // Étape 4 validée → donner les rôles
+    const welcomeMsg = await channel.send(`${member} Très bien, bienvenu à toi jeune **21 Block Savage** ! ${CONFIG.EMOJIS.BS21}`);
+
+    try {
+        for (const rId of [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_2, CONFIG.ROLES.MEMBRE_3]) {
+            const r = guild.roles.cache.get(rId);
+            if (r) await member.roles.add(r);
+        }
+
+        const origName = member.nickname || member.user.username;
+        renameCheckState.set(userId, { originalName: origName, guildId: guild.id });
+
+        setTimeout(async () => {
+            const rs = renameCheckState.get(userId);
+            if (!rs) return;
+            try {
+                const g = client.guilds.cache.get(rs.guildId);
+                const m = await g.members.fetch(userId).catch(() => null);
+                if (!m) { renameCheckState.delete(userId); return; }
+                if (m.roles.cache.has(CONFIG.ROLES.EXCLUDED_RENAME)) { renameCheckState.delete(userId); return; }
+                const hasProtected = CONFIG.ROLES.PROTECTED_ROLES.some(r => m.roles.cache.has(r));
+                if (hasProtected) { renameCheckState.delete(userId); return; }
+                if ((m.nickname || m.user.username) === rs.originalName) {
+                    await m.send(`Salut, tu viens d'être Kick du Serveur **21 Block Savage** ${CONFIG.EMOJIS.BS21} car tu ne t'es pas renommé.\nA bientôt ! ${CONFIG.EMOJIS.BS21}`).catch(() => {});
+                    await m.kick('Pas renommé').catch(() => {});
+                }
+                renameCheckState.delete(userId);
+            } catch { renameCheckState.delete(userId); }
+        }, RENAME_KICK_DELAY);
+    } catch {}
+
+    deleteWelcomeState(userId);
+    setTimeout(() => welcomeMsg.delete().catch(() => {}), 30_000);
+}
 
 client.on('messageReactionRemove', async (reaction, user) => {
     if (user.bot) return;
