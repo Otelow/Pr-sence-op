@@ -876,6 +876,27 @@ function scheduleAbsencePanelRefresh() {
     }, 2_000);
 }
 
+client.on('messageDelete', async (message) => {
+    // Si le message de la 2ème OP est supprimé manuellement → stop la présence
+    if (presence2Data.messageId === message.id) {
+        console.log('🗑️ Message 2ème OP supprimé manuellement → arrêt présence');
+        presence2Data = { messageId: null, active: false };
+        reactionsOP2.clear();
+        savePresenceState();
+        await refreshAbsencePanel();
+    }
+
+    // Idem pour la 1ère OP
+    if (presenceData.messageId === message.id) {
+        console.log('🗑️ Message 1ère OP supprimé manuellement → arrêt présence');
+        if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+        presenceData = { messageId: null, reminderIds: [], reminderInterval: null, active: false };
+        reactionsOP1.clear();
+        savePresenceState();
+        await refreshAbsencePanel();
+    }
+});
+
 client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
     const msgId = reaction.message.id;
