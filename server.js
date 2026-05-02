@@ -507,21 +507,56 @@ function startServer(client, getState) {
             // Forums : on retourne les threads à la place des messages
             if (channel.type === 15) {
                 const activeThreads = await channel.threads.fetchActive().catch(() => ({ threads: new Map() }));
-                const archivedThreads = await channel.threads.fetchArchived({ limit: 50 }).catch(() => ({ threads: new Map() }));
+                const archivedThreads = await channel.threads.fetchArchived({ limit: 100 }).catch(() => ({ threads: new Map() }));
 
                 const allThreads = [
-                    ...[...activeThreads.threads.values()].map(t => ({ ...t, archived: false })),
-                    ...[...archivedThreads.threads.values()].map(t => ({ ...t, archived: true })),
+                    ...[...activeThreads.threads.values()],
+                    ...[...archivedThreads.threads.values()],
                 ];
 
                 const threads = await Promise.all(allThreads.map(async t => {
                     let firstMessage = null;
                     try {
-                        const messages = await t.messages.fetch({ limit: 1, after: '0' }).catch(() => null);
-                        if (messages && messages.size > 0) {
-                            firstMessage = messages.first();
+                        // Le starter message d'un thread de forum a le même ID que le thread
+                        const starterMsg = await t.fetchStarterMessage().catch(() => null);
+                        if (starterMsg) {
+                            firstMessage = starterMsg;
+                        } else {
+                            // Fallback : récupérer le premier message du thread
+                            const messages = await t.messages.fetch({ limit: 1 }).catch(() => null);
+                            if (messages && messages.size > 0) {
+                                firstMessage = messages.first();
+                            }
                         }
                     } catch {}
+
+                    let firstMessageData = null;
+                    if (firstMessage) {
+                        firstMessageData = {
+                            content: firstMessage.content,
+                            authorId: firstMessage.author.id,
+                            authorName: firstMessage.member?.nickname || firstMessage.author.username,
+                            authorAvatar: firstMessage.author.avatar
+                                ? `https://cdn.discordapp.com/avatars/${firstMessage.author.id}/${firstMessage.author.avatar}.png?size=64`
+                                : null,
+                            attachments: [...firstMessage.attachments.values()].map(a => ({
+                                url: a.url,
+                                name: a.name,
+                                size: a.size,
+                                contentType: a.contentType,
+                                isImage: a.contentType?.startsWith('image/') || false,
+                                isVideo: a.contentType?.startsWith('video/') || false,
+                            })),
+                            embeds: firstMessage.embeds.map(e => ({
+                                title: e.title,
+                                description: e.description,
+                                url: e.url,
+                                image: e.image?.url,
+                                thumbnail: e.thumbnail?.url,
+                                video: e.video?.url,
+                            })),
+                        };
+                    }
 
                     return {
                         id: t.id,
@@ -530,18 +565,7 @@ function startServer(client, getState) {
                         messageCount: t.messageCount,
                         memberCount: t.memberCount,
                         createdTimestamp: t.createdTimestamp,
-                        firstMessage: firstMessage ? {
-                            content: firstMessage.content,
-                            authorName: firstMessage.member?.nickname || firstMessage.author.username,
-                            authorAvatar: firstMessage.author.avatar
-                                ? `https://cdn.discordapp.com/avatars/${firstMessage.author.id}/${firstMessage.author.avatar}.png?size=64`
-                                : null,
-                            attachments: [...firstMessage.attachments.values()].map(a => ({
-                                url: a.url,
-                                name: a.name,
-                                isImage: a.contentType?.startsWith('image/') || false,
-                            })),
-                        } : null,
+                        firstMessage: firstMessageData,
                     };
                 }));
 
