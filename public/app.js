@@ -592,21 +592,54 @@ function renderThread(t, parentId) {
     let preview = '';
     if (t.firstMessage) {
         const fm = t.firstMessage;
-        const avatar = fm.authorAvatar || '';
-        let attachPreview = '';
+        const avatar = fm.authorAvatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><rect width='24' height='24' fill='%23262626'/></svg>`;
+
+        // Détecter le type de média (image, vidéo, lien externe)
+        let mediaPreview = '';
         if (fm.attachments && fm.attachments.length > 0) {
             const firstImg = fm.attachments.find(a => a.isImage);
-            if (firstImg) attachPreview = `<img class="thread-thumbnail" src="${firstImg.url}" alt="">`;
+            const firstVid = fm.attachments.find(a => a.isVideo);
+            if (firstImg) {
+                mediaPreview = `<img class="thread-thumbnail" src="${firstImg.url}" alt="">`;
+            } else if (firstVid) {
+                mediaPreview = `<div class="thread-thumbnail thread-video-icon">🎥<br><small>VIDÉO</small></div>`;
+            }
         }
+
+        // Si pas d'attachment mais un embed avec image (ex: lien YouTube)
+        if (!mediaPreview && fm.embeds && fm.embeds.length > 0) {
+            const embedImg = fm.embeds.find(e => e.thumbnail || e.image);
+            if (embedImg) {
+                mediaPreview = `<img class="thread-thumbnail" src="${embedImg.thumbnail || embedImg.image}" alt="">`;
+            } else {
+                mediaPreview = `<div class="thread-thumbnail thread-link-icon">🔗<br><small>LIEN</small></div>`;
+            }
+        }
+
+        // Détecter les liens vidéo dans le contenu
+        if (!mediaPreview && fm.content) {
+            const videoMatch = fm.content.match(/https?:\/\/[^\s]+\.(mp4|mov|avi|webm|mkv)|https?:\/\/(www\.)?(youtube\.com|youtu\.be|twitch\.tv|clips\.twitch\.tv|streamable\.com|medal\.tv|tiktok\.com|x\.com|twitter\.com)/i);
+            if (videoMatch) {
+                mediaPreview = `<div class="thread-thumbnail thread-link-icon">🎥<br><small>CLIP</small></div>`;
+            }
+        }
+
+        // Contenu texte (avec liens cliquables)
+        let textContent = '';
+        if (fm.content) {
+            const truncated = fm.content.length > 200 ? fm.content.substring(0, 200) + '…' : fm.content;
+            textContent = escapeHtml(truncated).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" onclick="event.stopPropagation()">$1</a>');
+        }
+
         preview = `
             <div class="thread-preview">
-                ${attachPreview}
+                ${mediaPreview}
                 <div class="thread-preview-content">
                     <div class="thread-preview-author">
-                        ${avatar ? `<img class="thread-preview-avatar" src="${avatar}" alt="">` : ''}
+                        <img class="thread-preview-avatar" src="${avatar}" alt="">
                         <span>${escapeHtml(fm.authorName)}</span>
                     </div>
-                    ${fm.content ? `<div class="thread-preview-text">${escapeHtml(fm.content.substring(0, 200))}${fm.content.length > 200 ? '…' : ''}</div>` : ''}
+                    ${textContent ? `<div class="thread-preview-text">${textContent}</div>` : ''}
                 </div>
             </div>
         `;
