@@ -377,12 +377,27 @@ function startServer(client, getState) {
     });
 
     // Stats globales
-    app.get('/api/stats', requireAuth, (req, res) => {
+    app.get('/api/stats', requireAuth, async (req, res) => {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
+
+        // Forcer le fetch complet des membres pour avoir les bons counts
+        if (guild) {
+            try { await guild.members.fetch(); } catch {}
+        }
+
+        // Total = membres ayant MEMBRE_1 OU MEMBRE_2
+        let totalMembers = 0;
+        if (guild) {
+            const counted = new Set();
+            const role1 = guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_1);
+            const role2 = guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_2);
+            if (role1) for (const [id, m] of role1.members) if (!m.user.bot) counted.add(id);
+            if (role2) for (const [id, m] of role2.members) if (!m.user.bot) counted.add(id);
+            totalMembers = counted.size;
+        }
+
         const role = guild ? guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_1) : null;
-        // memberCount est le vrai nombre de membres du serveur (sans bots inclus dans le compte)
-        const totalMembers = guild ? guild.memberCount : 0;
         const inscritsOP = role ? role.members.filter(m => !m.user.bot).size : 0;
 
         const tracking = [...state.absenceTracking.values()];
