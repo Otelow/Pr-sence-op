@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -115,18 +115,21 @@
         </div>
 
         <div class="absences-panel">
-            <h2 class="section-title">📅 Absences posées dans le salon</h2>
+            <div class="absences-panel-header">
+                <h2 class="section-title" style="margin:0;">📅 Absences posées dans le salon</h2>
+                <p class="absences-panel-sub">Récap des absences déclarées par les membres dans le salon dédié</p>
+            </div>
             <div class="absences-grid">
                 <div class="absences-block">
                     <div class="absences-header valid">
-                        <span>✅ Conformes</span>
+                        <span><span class="absences-icon">✅</span> Conformes</span>
                         <span class="count" id="validCount">0</span>
                     </div>
                     <div class="absences-list" id="validList"></div>
                 </div>
                 <div class="absences-block">
                     <div class="absences-header invalid">
-                        <span>❌ Non conformes</span>
+                        <span><span class="absences-icon">❌</span> Non conformes</span>
                         <span class="count" id="invalidCount">0</span>
                     </div>
                     <div class="absences-list" id="invalidList"></div>
@@ -299,6 +302,25 @@
             <div class="channels-load-more">
                 <button id="loadMoreBtn" class="btn-load-more" style="display:none;">↑ Charger plus de messages</button>
             </div>
+            <!-- Zone d'envoi de message -->
+            <div class="message-input-area" id="messageInputArea" style="display:none;">
+                <div class="message-input-wrapper">
+                    <textarea id="messageInput" placeholder="Écris un message..." rows="1" maxlength="2000"></textarea>
+                    <div class="message-input-actions">
+                        <button class="msg-action-btn" title="Emojis" onclick="toggleMessageEmojiPicker()">😀</button>
+                        <button class="msg-action-btn" title="Mentionner" onclick="insertMention()">@</button>
+                        <button class="msg-send-btn" id="sendMessageBtn" onclick="sendChannelMessage()">Envoyer ↗</button>
+                    </div>
+                </div>
+                <!-- Picker emojis pour message -->
+                <div class="msg-emoji-picker" id="msgEmojiPicker" style="display:none;"></div>
+                <!-- Suggestion mentions -->
+                <div class="msg-mention-suggest" id="msgMentionSuggest" style="display:none;"></div>
+                <div class="message-input-hint">
+                    <span><kbd>Entrée</kbd> pour envoyer · <kbd>Maj+Entrée</kbd> pour nouvelle ligne · <kbd>@</kbd> pour mentionner</span>
+                    <span class="char-count" id="charCount">0/2000</span>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -351,7 +373,7 @@
             </div>
             <div class="modal-field">
                 <label>Type</label>
-                <select id="pointType">
+                <select id="pointType" onchange="onPointTypeChange()">
                     <option value="weed">🌿 Champ de Weed</option>
                     <option value="weed-treatment">⚗ Traitement Weed</option>
                     <option value="opium">🌺 Champ Opium</option>
@@ -361,6 +383,10 @@
                     <option value="hood">🏘 Hood</option>
                     <option value="danger">⚠ Danger</option>
                 </select>
+            </div>
+            <div class="modal-field" id="pointCodeField" style="display:none;">
+                <label>🔐 Code d'accès <span class="field-hint">(visible uniquement par les rôles autorisés)</span></label>
+                <input type="text" id="pointCode" placeholder="Ex: 4829, ALPHA-7, etc." maxlength="50">
             </div>
             <div class="modal-field">
                 <label>Visible par <span class="field-hint">(rôles autorisés à voir ce point)</span></label>
