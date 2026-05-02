@@ -319,29 +319,40 @@ function startServer(client, getState) {
                 .map(async m => {
                     let content = m.content;
 
-                    // Résoudre <@&roleId> → @nomDuRole
+                    // 1. Résoudre <@&roleId> → @nomDuRole (avec data pour stylisation)
                     content = content.replace(/<@&(\d+)>/g, (match, id) => {
                         const role = guild?.roles.cache.get(id);
-                        return role ? `@${role.name}` : match;
+                        return role ? `@@ROLE@${role.name}@@` : match;
                     });
 
-                    // Résoudre <@!?userId> → @username
-                    const userMatches = [...content.matchAll(/<@!?(\d+)>/g)];
-                    for (const um of userMatches) {
+                    // 2. Résoudre <@!?userId> → @username (avec data pour stylisation)
+                    const userMentions = [...content.matchAll(/<@!?(\d+)>/g)];
+                    const mentionedUsers = []; // Pour avoir les avatars
+                    for (const um of userMentions) {
                         const userId = um[1];
                         try {
                             const member = await guild?.members.fetch(userId).catch(() => null);
                             if (member) {
                                 const name = member.nickname || member.user.username;
-                                content = content.replace(um[0], `@${name}`);
+                                const avatar = member.user.avatar
+                                    ? `https://cdn.discordapp.com/avatars/${userId}/${member.user.avatar}.png?size=32`
+                                    : null;
+                                mentionedUsers.push({ id: userId, name, avatar });
+                                content = content.replace(um[0], `@@USER@${userId}@${name}@@`);
                             }
                         } catch {}
                     }
+
+                    // 3. Convertir emojis customs <:name:id> → @@EMOJI@id@name@@
+                    content = content.replace(/<(a?):(\w+):(\d+)>/g, (match, animated, name, id) => {
+                        return `@@EMOJI@${id}@${name}@${animated ? 'a' : ''}@@`;
+                    });
 
                     return {
                         id: m.id,
                         content,
                         rawContent: m.content,
+                        mentionedUsers,
                         createdAt: m.createdAt,
                         timestamp: m.createdTimestamp,
                     };
@@ -370,7 +381,8 @@ function startServer(client, getState) {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
         const role = guild ? guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_1) : null;
-        const totalMembers = guild ? guild.members.cache.filter(m => !m.user.bot).size : 0;
+        // memberCount est le vrai nombre de membres du serveur (sans bots inclus dans le compte)
+        const totalMembers = guild ? guild.memberCount : 0;
         const inscritsOP = role ? role.members.filter(m => !m.user.bot).size : 0;
 
         const tracking = [...state.absenceTracking.values()];
@@ -471,59 +483,125 @@ function startServer(client, getState) {
     // ==========================================
     app.get('/api/channel/:id/messages', requireAuth, async (req, res) => {
         const channelId = req.params.id;
-        const before = req.query.before; // Pour pagination
+        const before = req.query.before;
 
         try {
             const channel = botClient.channels.cache.get(channelId);
             if (!channel) return res.status(404).json({ error: 'Salon introuvable' });
-            if (channel.type !== 0 && channel.type !== 5) {
+
+            // Forums : on retourne les threads à la place des messages
+            if (channel.type === 15) {
+                const activeThreads = await channel.threads.fetchActive().catch(() => ({ threads: new Map() }));
+                const archivedThreads = await channel.threads.fetchArchived({ limit: 50 }).catch(() => ({ threads: new Map() }));
+
+                const allThreads = [
+                    ...[...activeThreads.threads.values()].map(t => ({ ...t, archived: false })),
+                    ...[...archivedThreads.threads.values()].map(t => ({ ...t, archived: true })),
+                ];
+
+                const threads = await Promise.all(allThreads.map(async t => {
+                    let firstMessage = null;
+                    try {
+                        const messages = await t.messages.fetch({ limit: 1, after: '0' }).catch(() => null);
+                        if (messages && messages.size > 0) {
+                            firstMessage = messages.first();
+                        }
+                    } catch {}
+
+                    return {
+                        id: t.id,
+                        name: t.name,
+                        archived: t.archived,
+                        messageCount: t.messageCount,
+                        memberCount: t.memberCount,
+                        createdTimestamp: t.createdTimestamp,
+                        firstMessage: firstMessage ? {
+                            content: firstMessage.content,
+                            authorName: firstMessage.member?.nickname || firstMessage.author.username,
+                            authorAvatar: firstMessage.author.avatar
+                                ? `https://cdn.discordapp.com/avatars/${firstMessage.author.id}/${firstMessage.author.avatar}.png?size=64`
+                                : null,
+                            attachments: [...firstMessage.attachments.values()].map(a => ({
+                                url: a.url,
+                                name: a.name,
+                                isImage: a.contentType?.startsWith('image/') || false,
+                            })),
+                        } : null,
+                    };
+                }));
+
+                return res.json({
+                    type: 'forum',
+                    threads: threads.sort((a, b) => b.createdTimestamp - a.createdTimestamp),
+                    channelName: channel.name,
+                });
+            }
+
+            // Salons texte normaux
+            if (channel.type !== 0 && channel.type !== 5 && channel.type !== 11 && channel.type !== 12) {
                 return res.status(400).json({ error: 'Ce type de salon ne supporte pas les messages' });
             }
 
             const fetchOptions = { limit: 100 };
             if (before) fetchOptions.before = before;
 
+            const guild = botClient.guilds.cache.get(botState().CONFIG.GUILD_ID);
             const messages = await channel.messages.fetch(fetchOptions);
-            const result = [...messages.values()].map(m => ({
-                id: m.id,
-                content: m.content,
-                authorId: m.author.id,
-                authorName: m.member?.nickname || m.author.username,
-                authorAvatar: m.author.avatar
-                    ? `https://cdn.discordapp.com/avatars/${m.author.id}/${m.author.avatar}.png`
-                    : null,
-                authorBot: m.author.bot,
-                createdTimestamp: m.createdTimestamp,
-                editedTimestamp: m.editedTimestamp,
-                attachments: [...m.attachments.values()].map(a => ({
-                    url: a.url,
-                    name: a.name,
-                    size: a.size,
-                    contentType: a.contentType,
-                    isImage: a.contentType?.startsWith('image/') || false,
-                })),
-                embeds: m.embeds.map(e => ({
-                    title: e.title,
-                    description: e.description,
-                    url: e.url,
-                    color: e.color,
-                    image: e.image?.url,
-                    thumbnail: e.thumbnail?.url,
-                    fields: e.fields,
-                })),
-                pinned: m.pinned,
-                mentions: {
-                    users: [...m.mentions.users.values()].map(u => ({ id: u.id, name: u.username })),
-                    roles: [...m.mentions.roles.values()].map(r => ({ id: r.id, name: r.name })),
-                },
-                reactions: [...m.reactions.cache.values()].map(r => ({
-                    emoji: r.emoji.id ? `<${r.emoji.animated ? 'a' : ''}:${r.emoji.name}:${r.emoji.id}>` : r.emoji.name,
-                    emojiUrl: r.emoji.id ? `https://cdn.discordapp.com/emojis/${r.emoji.id}.${r.emoji.animated ? 'gif' : 'png'}` : null,
-                    count: r.count,
-                })),
+
+            const result = await Promise.all([...messages.values()].map(async m => {
+                // Construire la liste des mentions avec noms RÉSOLUS
+                const userMentions = await Promise.all([...m.mentions.users.values()].map(async u => {
+                    const member = await guild?.members.fetch(u.id).catch(() => null);
+                    return {
+                        id: u.id,
+                        name: member?.nickname || u.username,
+                    };
+                }));
+
+                return {
+                    id: m.id,
+                    content: m.content,
+                    authorId: m.author.id,
+                    authorName: m.member?.nickname || m.author.username,
+                    authorAvatar: m.author.avatar
+                        ? `https://cdn.discordapp.com/avatars/${m.author.id}/${m.author.avatar}.png?size=64`
+                        : null,
+                    authorBot: m.author.bot,
+                    createdTimestamp: m.createdTimestamp,
+                    editedTimestamp: m.editedTimestamp,
+                    attachments: [...m.attachments.values()].map(a => ({
+                        url: a.url,
+                        name: a.name,
+                        size: a.size,
+                        contentType: a.contentType,
+                        isImage: a.contentType?.startsWith('image/') || false,
+                        isVideo: a.contentType?.startsWith('video/') || false,
+                    })),
+                    embeds: m.embeds.map(e => ({
+                        title: e.title,
+                        description: e.description,
+                        url: e.url,
+                        color: e.color,
+                        image: e.image?.url,
+                        thumbnail: e.thumbnail?.url,
+                        fields: e.fields,
+                    })),
+                    pinned: m.pinned,
+                    mentions: {
+                        users: userMentions,
+                        roles: [...m.mentions.roles.values()].map(r => ({ id: r.id, name: r.name, color: r.color })),
+                    },
+                    reactions: [...m.reactions.cache.values()].map(r => ({
+                        emoji: r.emoji.id ? `<${r.emoji.animated ? 'a' : ''}:${r.emoji.name}:${r.emoji.id}>` : r.emoji.name,
+                        emojiUrl: r.emoji.id ? `https://cdn.discordapp.com/emojis/${r.emoji.id}.${r.emoji.animated ? 'gif' : 'png'}` : null,
+                        emojiName: r.emoji.name,
+                        count: r.count,
+                    })),
+                };
             }));
 
             res.json({
+                type: 'text',
                 messages: result,
                 hasMore: result.length === 100,
                 channelName: channel.name,
@@ -537,6 +615,97 @@ function startServer(client, getState) {
     // ==========================================
     // API — Messages épinglés
     // ==========================================
+    // ==========================================
+    // API — Envoyer un message dans un salon (via webhook)
+    // ==========================================
+    app.post('/api/channel/:id/send', requireAuth, async (req, res) => {
+        const channelId = req.params.id;
+        const { content } = req.body;
+
+        if (!content || typeof content !== 'string' || content.trim().length === 0) {
+            return res.status(400).json({ error: 'Message vide' });
+        }
+        if (content.length > 2000) {
+            return res.status(400).json({ error: 'Message trop long (max 2000 caractères)' });
+        }
+
+        try {
+            const channel = botClient.channels.cache.get(channelId);
+            if (!channel) return res.status(404).json({ error: 'Salon introuvable' });
+
+            // Threads : on envoie directement dans le thread
+            const isThread = [10, 11, 12].includes(channel.type);
+            if (![0, 5].includes(channel.type) && !isThread) {
+                return res.status(400).json({ error: 'Ce salon ne supporte pas l\'envoi de messages' });
+            }
+
+            // Pour un thread, on récupère le webhook du salon parent
+            const webhookChannel = isThread ? channel.parent : channel;
+            if (!webhookChannel) return res.status(400).json({ error: 'Salon parent introuvable' });
+
+            // Récupérer ou créer le webhook
+            let webhook;
+            try {
+                const webhooks = await webhookChannel.fetchWebhooks();
+                webhook = webhooks.find(w => w.name === '21BS Web Dashboard');
+                if (!webhook) {
+                    webhook = await webhookChannel.createWebhook({
+                        name: '21BS Web Dashboard',
+                        reason: 'Webhook pour l\'envoi de messages depuis le dashboard',
+                    });
+                }
+            } catch (e) {
+                console.error('❌ Webhook erreur:', e.message);
+                return res.status(500).json({ error: 'Impossible de créer/récupérer le webhook (permissions manquantes ?)' });
+            }
+
+            // Envoyer le message avec l'identité de l'utilisateur
+            await webhook.send({
+                content,
+                username: req.session.user.username,
+                avatarURL: req.session.user.avatar || undefined,
+                threadId: isThread ? channelId : undefined,
+                allowedMentions: {
+                    parse: ['users', 'roles'],
+                },
+            });
+
+            res.json({ success: true });
+        } catch (e) {
+            console.error('❌ /api/channel/send:', e.message);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    // ==========================================
+    // API — Recherche de membres (pour @mentions)
+    // ==========================================
+    app.get('/api/members/search', requireAuth, async (req, res) => {
+        const query = (req.query.q || '').toLowerCase().trim();
+        if (query.length < 1) return res.json({ members: [] });
+
+        const state = botState();
+        const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
+        if (!guild) return res.json({ members: [] });
+
+        const members = [...guild.members.cache.values()]
+            .filter(m => !m.user.bot)
+            .filter(m => {
+                const name = (m.nickname || m.user.username).toLowerCase();
+                return name.includes(query);
+            })
+            .slice(0, 10)
+            .map(m => ({
+                id: m.id,
+                name: m.nickname || m.user.username,
+                avatar: m.user.avatar
+                    ? `https://cdn.discordapp.com/avatars/${m.id}/${m.user.avatar}.png?size=32`
+                    : null,
+            }));
+
+        res.json({ members });
+    });
+
     app.get('/api/channel/:id/pinned', requireAuth, async (req, res) => {
         try {
             const channel = botClient.channels.cache.get(req.params.id);
@@ -666,7 +835,7 @@ function startServer(client, getState) {
     app.post('/api/map/points', requireAuth, (req, res) => {
         if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes pour modifier la carte' });
 
-        const { x, y, label, type, allowedRoles } = req.body;
+        const { x, y, label, type, allowedRoles, code } = req.body;
         if (typeof x !== 'number' || typeof y !== 'number') {
             return res.status(400).json({ error: 'Coordonnées invalides' });
         }
@@ -677,7 +846,9 @@ function startServer(client, getState) {
             x, y,
             label: label || 'Point',
             type: type || 'weed',
-            allowedRoles: Array.isArray(allowedRoles) ? allowedRoles : [], // [] = visible par tous
+            // Code uniquement pour les types qui en ont besoin
+            code: ['lab', 'weapon-lab'].includes(type) ? (code || '').trim().slice(0, 50) : null,
+            allowedRoles: Array.isArray(allowedRoles) ? allowedRoles : [],
             createdBy: req.session.user.username,
             createdById: req.session.user.id,
             createdAt: Date.now(),
@@ -704,12 +875,16 @@ function startServer(client, getState) {
         const point = points.find(p => p.id === req.params.id);
         if (!point) return res.status(404).json({ error: 'Point introuvable' });
 
-        const { x, y, label, type, color } = req.body;
+        const { x, y, label, type, color, code, allowedRoles } = req.body;
         if (typeof x === 'number') point.x = x;
         if (typeof y === 'number') point.y = y;
         if (label !== undefined) point.label = label;
         if (type !== undefined) point.type = type;
         if (color !== undefined) point.color = color;
+        if (code !== undefined && ['lab', 'weapon-lab'].includes(point.type)) {
+            point.code = (code || '').trim().slice(0, 50);
+        }
+        if (Array.isArray(allowedRoles)) point.allowedRoles = allowedRoles;
         point.updatedAt = Date.now();
         point.updatedBy = req.session.user.username;
 
