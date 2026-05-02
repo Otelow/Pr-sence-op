@@ -2590,9 +2590,22 @@ client.on('messageCreate', async (message) => {
 
 
 async function safeReact(msg, emoji, retries = 2) {
+    // Si format "name:id", on extrait l'ID seul (Discord accepte juste l'ID pour les emojis custom)
+    let toReact = emoji;
+    const match = typeof emoji === 'string' ? emoji.match(/^(\w+):(\d+)$/) : null;
+    if (match) toReact = match[2]; // Juste l'ID de l'emoji
+
     for (let i = 0; i <= retries; i++) {
-        try { await msg.react(emoji); await sleep(500); return true; } catch { if (i < retries) await sleep(1000); }
+        try {
+            await msg.react(toReact);
+            await sleep(500);
+            return true;
+        } catch (err) {
+            console.warn(`⚠️ safeReact échec (${emoji}, tentative ${i + 1}/${retries + 1}):`, err.message);
+            if (i < retries) await sleep(1000);
+        }
     }
+    console.error(`❌ safeReact ABANDONNÉ pour emoji: ${emoji}`);
     return false;
 }
 
