@@ -163,7 +163,7 @@ function startServer(client, getState) {
                 if (member.roles.cache.has(state.CONFIG.ROLES.EXCLUDED_ROLE)) continue;
 
                 const name = member.nickname || member.user.username;
-                const m = { id: member.id, name, avatar: member.user.avatar ? `https://cdn.discordapp.com/avatars/${member.id}/${member.user.avatar}.png` : null };
+                const m = { id: member.id, name, avatar: member.user.avatar ? `https://cdn.discordapp.com/avatars/${member.id}/${member.user.avatar}.png?size=64` : null };
                 const reaction = reactionMap.get(member.id);
 
                 if (reaction === 'check') result.present.push(m);
@@ -187,16 +187,33 @@ function startServer(client, getState) {
     });
 
     // Suivi hebdomadaire
-    app.get('/api/weekly', requireAuth, (req, res) => {
+    app.get('/api/weekly', requireAuth, async (req, res) => {
         const state = botState();
-        const tracking = [...state.absenceTracking.entries()].map(([id, data]) => ({
-            id,
-            username: data.username,
-            count: data.count,
-            details: data.details || [],
-            consecutiveDays: state.getConsecutiveDays(data),
-        })).sort((a, b) => b.count - a.count);
+        const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
 
+        const tracking = await Promise.all([...state.absenceTracking.entries()].map(async ([id, data]) => {
+            let avatar = null;
+            if (guild) {
+                try {
+                    const member = await guild.members.fetch(id).catch(() => null);
+                    if (member) {
+                        avatar = member.user.avatar
+                            ? `https://cdn.discordapp.com/avatars/${id}/${member.user.avatar}.png?size=64`
+                            : null;
+                    }
+                } catch {}
+            }
+            return {
+                id,
+                username: data.username,
+                avatar,
+                count: data.count,
+                details: data.details || [],
+                consecutiveDays: state.getConsecutiveDays(data),
+            };
+        }));
+
+        tracking.sort((a, b) => b.count - a.count);
         res.json({ tracking });
     });
 
@@ -294,14 +311,40 @@ function startServer(client, getState) {
             const channel = botClient.channels.cache.get(state.CONFIG.CHANNELS.AVERTISSEMENT);
             if (!channel) return res.json({ sanctions: [] });
 
+            const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
             const messages = await channel.messages.fetch({ limit: 50 });
-            const sanctions = [...messages.values()]
+
+            const sanctions = await Promise.all([...messages.values()]
                 .filter(m => m.author.bot)
-                .map(m => ({
-                    id: m.id,
-                    content: m.content,
-                    createdAt: m.createdAt,
-                    timestamp: m.createdTimestamp,
+                .map(async m => {
+                    let content = m.content;
+
+                    // Résoudre <@&roleId> → @nomDuRole
+                    content = content.replace(/<@&(\d+)>/g, (match, id) => {
+                        const role = guild?.roles.cache.get(id);
+                        return role ? `@${role.name}` : match;
+                    });
+
+                    // Résoudre <@!?userId> → @username
+                    const userMatches = [...content.matchAll(/<@!?(\d+)>/g)];
+                    for (const um of userMatches) {
+                        const userId = um[1];
+                        try {
+                            const member = await guild?.members.fetch(userId).catch(() => null);
+                            if (member) {
+                                const name = member.nickname || member.user.username;
+                                content = content.replace(um[0], `@${name}`);
+                            }
+                        } catch {}
+                    }
+
+                    return {
+                        id: m.id,
+                        content,
+                        rawContent: m.content,
+                        createdAt: m.createdAt,
+                        timestamp: m.createdTimestamp,
+                    };
                 }));
 
             res.json({ sanctions });
@@ -327,7 +370,8 @@ function startServer(client, getState) {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
         const role = guild ? guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_1) : null;
-        const totalMembers = role ? role.members.filter(m => !m.user.bot).size : 0;
+        const totalMembers = guild ? guild.members.cache.filter(m => !m.user.bot).size : 0;
+        const inscritsOP = role ? role.members.filter(m => !m.user.bot).size : 0;
 
         const tracking = [...state.absenceTracking.values()];
         const totalUnjustified = tracking.reduce((sum, t) => sum + t.count, 0);
@@ -335,6 +379,7 @@ function startServer(client, getState) {
 
         res.json({
             totalMembers,
+            inscritsOP,
             totalUnjustified,
             membersWithAbsences: tracking.length,
             membersWithConsecutive: withConsecutive,
@@ -512,6 +557,70 @@ function startServer(client, getState) {
     });
 
     // ==========================================
+    // API — Liste des commandes disponibles (pour mise à jour auto du site)
+    // ==========================================
+    app.get('/api/commands', requireAuth, (req, res) => {
+        const commands = [
+            // Alertes terrain
+            { id: 'qg', icon: '📍', name: 'QG', desc: 'Rendez-vous au Hood (5 min)', category: 'alert', danger: true },
+            { id: 'defense', icon: '🔥', name: 'Défense Labo', desc: 'Laboratoire attaqué', category: 'alert', danger: true },
+            { id: 'garage', icon: '🏗', name: 'Garage', desc: 'Rendez-vous au Garage Hood', category: 'alert' },
+            { id: 'alignement', icon: '📐', name: 'Alignement', desc: '3 minutes pour s\'aligner', category: 'alert' },
+            { id: 'position', icon: '🎯', name: 'Positions', desc: 'Prendre des positions', category: 'alert' },
+            { id: 'tir', icon: '✋', name: 'Stop Tir', desc: 'Arrêter de tirer', category: 'alert' },
+            { id: 'weed', icon: '🌿', name: 'Weed', desc: 'Aller sur la weed', category: 'alert' },
+            { id: 'traitement-weed', icon: '⚗', name: 'Traitement', desc: 'Traitement de la weed', category: 'alert' },
+            { id: 'trash', icon: '🚫', name: 'Anti-Trash', desc: 'Avertissement trash', category: 'alert' },
+            // Communications
+            { id: 'radio', icon: '📻', name: 'Nouvelle Radio', desc: 'Fréquence aléatoire', category: 'comm', info: true },
+            { id: 'presence', icon: '📋', name: '1ère Présence OP', desc: 'Lancer la présence', category: 'comm', info: true },
+            { id: 'presence2', icon: '📋', name: '2ème Présence OP', desc: 'Sans relances', category: 'comm', info: true },
+        ];
+        res.json({ commands });
+    });
+
+    // ==========================================
+    // API — Liste des rôles (pour /annonce et carte)
+    // ==========================================
+    app.get('/api/roles', requireAuth, (req, res) => {
+        const state = botState();
+        const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
+        if (!guild) return res.json({ roles: [] });
+
+        const roles = [...guild.roles.cache.values()]
+            .filter(r => r.name !== '@everyone' && !r.managed)
+            .sort((a, b) => b.position - a.position)
+            .map(r => ({
+                id: r.id,
+                name: r.name,
+                color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,
+                position: r.position,
+                memberCount: r.members.size,
+            }));
+
+        res.json({ roles });
+    });
+
+    // ==========================================
+    // API — Liste des emojis du serveur
+    // ==========================================
+    app.get('/api/emojis', requireAuth, (req, res) => {
+        const state = botState();
+        const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
+        if (!guild) return res.json({ emojis: [] });
+
+        const emojis = [...guild.emojis.cache.values()].map(e => ({
+            id: e.id,
+            name: e.name,
+            animated: e.animated,
+            url: e.url,
+            code: `<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`,
+        }));
+
+        res.json({ emojis });
+    });
+
+    // ==========================================
     // API — Carte interactive (points)
     // ==========================================
     const fs = require('fs');
@@ -535,7 +644,16 @@ function startServer(client, getState) {
     }
 
     app.get('/api/map/points', requireAuth, (req, res) => {
-        res.json({ points: loadMapPoints() });
+        const userRoles = req.session.user?.roles || [];
+        const allPoints = loadMapPoints();
+
+        // Filtrer : si le point a allowedRoles, l'user doit avoir au moins un de ces rôles
+        const visiblePoints = allPoints.filter(p => {
+            if (!p.allowedRoles || p.allowedRoles.length === 0) return true; // Public
+            return p.allowedRoles.some(r => userRoles.includes(r));
+        });
+
+        res.json({ points: visiblePoints });
     });
 
     // Vérifier permissions de placer des points (mêmes que COMMAND_ROLES par défaut)
@@ -548,7 +666,7 @@ function startServer(client, getState) {
     app.post('/api/map/points', requireAuth, (req, res) => {
         if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes pour modifier la carte' });
 
-        const { x, y, label, type, color } = req.body;
+        const { x, y, label, type, allowedRoles } = req.body;
         if (typeof x !== 'number' || typeof y !== 'number') {
             return res.status(400).json({ error: 'Coordonnées invalides' });
         }
@@ -558,8 +676,8 @@ function startServer(client, getState) {
             id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
             x, y,
             label: label || 'Point',
-            type: type || 'default',
-            color: color || '#ff3333',
+            type: type || 'weed',
+            allowedRoles: Array.isArray(allowedRoles) ? allowedRoles : [], // [] = visible par tous
             createdBy: req.session.user.username,
             createdById: req.session.user.id,
             createdAt: Date.now(),
