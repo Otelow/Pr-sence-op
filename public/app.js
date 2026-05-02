@@ -3,7 +3,7 @@
 // ==========================================
 
 const PAGE_TITLES = {
-    presence: { title: 'Présence OP', sub: 'Suivi temps réel' },
+    presence: { title: 'Présence', sub: 'Suivi Présence/Absence' },
     commands: { title: 'Commandes', sub: 'Centre de contrôle' },
     channels: { title: 'Salons Discord', sub: 'Historique et navigation' },
     map: { title: 'Carte du Laboratoire', sub: 'Marquage de zones' },
@@ -173,13 +173,20 @@ function renderAbsencesSalon(data) {
     document.getElementById('validCount').textContent = data.valid.length;
     document.getElementById('invalidCount').textContent = data.invalid.length;
 
+    const renderChip = (name, isValid) => `
+        <div class="absence-chip ${isValid ? 'chip-valid' : 'chip-invalid'}">
+            <span class="chip-icon">${isValid ? '✓' : '✗'}</span>
+            <span class="chip-name">${escapeHtml(name)}</span>
+        </div>
+    `;
+
     validList.innerHTML = data.valid.length === 0
-        ? '<p class="empty">Aucune</p>'
-        : data.valid.map(n => `<div class="item">• ${n}</div>`).join('');
+        ? '<p class="empty-list">Aucune absence conforme posée</p>'
+        : `<div class="chips-grid">${data.valid.map(n => renderChip(n, true)).join('')}</div>`;
 
     invalidList.innerHTML = data.invalid.length === 0
-        ? '<p class="empty">Aucune</p>'
-        : data.invalid.map(n => `<div class="item">• ${n}</div>`).join('');
+        ? '<p class="empty-list">Aucune absence non conforme</p>'
+        : `<div class="chips-grid">${data.invalid.map(n => renderChip(n, false)).join('')}</div>`;
 }
 
 // ===== WEEKLY (avec calendrier) =====
@@ -276,7 +283,7 @@ function renderCalendar(tracking) {
             } else {
                 const hasJustified = dayDetails.some(det => det.justified);
                 const hasUnjustified = dayDetails.some(det => !det.justified);
-                if (hasJustified && !hasUnjustified) cell = '<span class="calendar-cell justified" title="Absence justifiée">📋</span>';
+                if (hasJustified && !hasUnjustified) cell = '<span class="calendar-cell justified" title="Absence justifiée">📋✓</span>';
                 else if (hasUnjustified) cell = '<span class="calendar-cell absent" title="Absence non justifiée">❌</span>';
             }
             html += `<td>${cell}</td>`;
@@ -291,7 +298,7 @@ function renderCalendar(tracking) {
     // Légende
     html += `
         <div class="calendar-legend">
-            <div class="calendar-legend-item">📋 <span>Absence justifiée</span></div>
+            <div class="calendar-legend-item">📋✓ <span>Absence justifiée</span></div>
             <div class="calendar-legend-item">❌ <span>Absence non justifiée</span></div>
             <div class="calendar-legend-item">— <span>Pas d'OP / présent</span></div>
         </div>
@@ -316,15 +323,32 @@ async function loadSanctions() {
             const date = new Date(s.timestamp);
             const dateStr = date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 
-            // Mettre en évidence les mentions @user et @role résolues
-            const content = escapeHtml(s.content)
-                .replace(/(@[^\s]+)/g, '<span class="mention">$1</span>')
-                .replace(/—\s+(.+)/, '<strong>— $1</strong>');
+            // Trouver l'utilisateur principal (premier mentionné) pour la pp
+            const mainUser = s.mentionedUsers && s.mentionedUsers[0];
+            const avatar = mainUser?.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
+
+            // Parser le contenu : remplacer @@USER@@, @@ROLE@@, @@EMOJI@@
+            let content = escapeHtml(s.content);
+            content = content.replace(/@@USER@(\d+)@([^@]+)@@/g, (_, id, name) => {
+                return `<span class="mention mention-user">@${escapeHtml(name)}</span>`;
+            });
+            content = content.replace(/@@ROLE@([^@]+)@@/g, (_, name) => {
+                return `<span class="mention mention-role">@${escapeHtml(name)}</span>`;
+            });
+            content = content.replace(/@@EMOJI@(\d+)@([^@]+)@(a?)@@/g, (_, id, name, animated) => {
+                const ext = animated === 'a' ? 'gif' : 'png';
+                return `<img class="inline-emoji" src="https://cdn.discordapp.com/emojis/${id}.${ext}" alt=":${name}:" title=":${name}:">`;
+            });
+            // Convertir markdown gras **texte**
+            content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
             return `
                 <div class="sanction">
-                    <span class="sanction-time">📅 ${dateStr}</span>
-                    <div class="sanction-content">${content}</div>
+                    <img class="sanction-avatar" src="${avatar}" alt="">
+                    <div class="sanction-body">
+                        <span class="sanction-time">📅 ${dateStr}</span>
+                        <div class="sanction-content">${content}</div>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -398,7 +422,7 @@ function renderChannelsTree(filter = '') {
     tree.innerHTML = '';
     const f = filter.toLowerCase();
 
-    const renderChannelCard = (ch) => {
+    const renderChannelRow = (ch) => {
         const matches = !f || ch.name.toLowerCase().includes(f);
         if (!matches) return null;
 
@@ -406,46 +430,51 @@ function renderChannelsTree(filter = '') {
         const types = { 0: 'Texte', 2: 'Vocal', 5: 'Annonces', 13: 'Stage', 15: 'Forum' };
         const icon = icons[ch.type] || '#';
         const typeLabel = types[ch.type] || 'Salon';
-        const isClickable = ch.type === 0 || ch.type === 5;
+        const isClickable = ch.type === 0 || ch.type === 5 || ch.type === 15;
 
-        const card = document.createElement('div');
-        card.className = 'channel-card';
-        card.dataset.type = ch.type;
-        card.innerHTML = `
-            <div class="channel-card-header">
-                <span class="channel-card-icon">${icon}</span>
-                <span class="channel-card-name">${escapeHtml(ch.name)}</span>
-                <span class="channel-card-type">${typeLabel}</span>
+        const row = document.createElement('div');
+        row.className = 'channel-row';
+        row.dataset.type = ch.type;
+        row.innerHTML = `
+            <span class="channel-row-icon">${icon}</span>
+            <div class="channel-row-info">
+                <div class="channel-row-name">${escapeHtml(ch.name)}</div>
+                ${ch.topic ? `<div class="channel-row-topic">${escapeHtml(ch.topic)}</div>` : ''}
             </div>
-            ${ch.topic ? `<div class="channel-card-topic">${escapeHtml(ch.topic)}</div>` : (isClickable ? '<div class="channel-card-empty">Aucune description</div>' : '<div class="channel-card-vocal">Salon non lisible</div>')}
+            <span class="channel-row-type">${typeLabel}</span>
+            ${isClickable ? '<span class="channel-row-arrow">→</span>' : ''}
         `;
-        if (isClickable) card.onclick = () => selectChannel(ch);
-        else card.style.opacity = '0.6';
-        return card;
+        if (isClickable) row.onclick = () => selectChannel(ch);
+        else row.classList.add('channel-row-disabled');
+        return row;
     };
 
-    // Orphans (sans catégorie)
     if (channelsData.orphans?.length) {
-        const matchingOrphans = channelsData.orphans.map(renderChannelCard).filter(Boolean);
+        const matchingOrphans = channelsData.orphans.map(renderChannelRow).filter(Boolean);
         if (matchingOrphans.length > 0) {
             const section = document.createElement('div');
             section.className = 'channel-category-section';
             section.innerHTML = `<div class="channel-category-title">▸ Sans catégorie</div>`;
+            const list = document.createElement('div');
+            list.className = 'channel-rows-list';
+            matchingOrphans.forEach(c => list.appendChild(c));
             tree.appendChild(section);
-            matchingOrphans.forEach(c => tree.appendChild(c));
+            tree.appendChild(list);
         }
     }
 
-    // Catégories
     for (const cat of channelsData.categories) {
-        const matchingChannels = cat.channels.map(renderChannelCard).filter(Boolean);
+        const matchingChannels = cat.channels.map(renderChannelRow).filter(Boolean);
         if (matchingChannels.length === 0) continue;
 
         const section = document.createElement('div');
         section.className = 'channel-category-section';
         section.innerHTML = `<div class="channel-category-title">▸ ${escapeHtml(cat.name)}</div>`;
+        const list = document.createElement('div');
+        list.className = 'channel-rows-list';
+        matchingChannels.forEach(c => list.appendChild(c));
         tree.appendChild(section);
-        matchingChannels.forEach(c => tree.appendChild(c));
+        tree.appendChild(list);
     }
 
     if (tree.innerHTML === '') {
@@ -454,9 +483,12 @@ function renderChannelsTree(filter = '') {
 }
 
 function backToChannels() {
-    document.getElementById('channelsGridView').style.display = 'grid';
+    document.getElementById('channelsGridView').style.display = 'block';
     document.getElementById('channelMessagesView').style.display = 'none';
     document.getElementById('backToChannelsBtn').style.display = 'none';
+    const inputArea = document.getElementById('messageInputArea');
+    if (inputArea) inputArea.style.display = 'none';
+    closeMentionDropdown();
     currentChannelId = null;
 }
 
@@ -482,6 +514,24 @@ async function selectChannel(ch) {
     document.getElementById('loadMoreBtn').style.display = 'none';
     oldestMessageId = null;
 
+    // Afficher la zone d'envoi sur les salons texte/announcement (pas forum direct, pas vocal)
+    const inputArea = document.getElementById('messageInputArea');
+    if (inputArea) {
+        if (ch.type === 0 || ch.type === 5) {
+            inputArea.style.display = 'block';
+            // Reset le textarea
+            const input = document.getElementById('messageInput');
+            if (input) {
+                input.value = '';
+                input.placeholder = `Écris un message dans #${ch.name}...`;
+                input.style.height = 'auto';
+            }
+            document.getElementById('charCount').textContent = '0/2000';
+        } else {
+            inputArea.style.display = 'none';
+        }
+    }
+
     await loadMessages(ch.id);
 }
 
@@ -497,6 +547,23 @@ async function loadMessages(channelId, before = null) {
             return;
         }
 
+        // Forum : afficher les threads
+        if (data.type === 'forum') {
+            container.style.flexDirection = 'column'; // Pas reverse pour forums
+            container.innerHTML = '';
+            if (data.threads.length === 0) {
+                container.innerHTML = '<p class="empty">Aucun fil dans ce forum</p>';
+            } else {
+                for (const t of data.threads) {
+                    container.appendChild(renderThread(t, channelId));
+                }
+            }
+            document.getElementById('loadMoreBtn').style.display = 'none';
+            return;
+        }
+
+        // Salon texte normal
+        container.style.flexDirection = 'column-reverse';
         if (!before) container.innerHTML = '';
 
         for (const m of data.messages) {
@@ -517,33 +584,111 @@ async function loadMessages(channelId, before = null) {
     }
 }
 
+function renderThread(t, parentId) {
+    const div = document.createElement('div');
+    div.className = 'forum-thread';
+    const date = new Date(t.createdTimestamp).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+
+    let preview = '';
+    if (t.firstMessage) {
+        const fm = t.firstMessage;
+        const avatar = fm.authorAvatar || '';
+        let attachPreview = '';
+        if (fm.attachments && fm.attachments.length > 0) {
+            const firstImg = fm.attachments.find(a => a.isImage);
+            if (firstImg) attachPreview = `<img class="thread-thumbnail" src="${firstImg.url}" alt="">`;
+        }
+        preview = `
+            <div class="thread-preview">
+                ${attachPreview}
+                <div class="thread-preview-content">
+                    <div class="thread-preview-author">
+                        ${avatar ? `<img class="thread-preview-avatar" src="${avatar}" alt="">` : ''}
+                        <span>${escapeHtml(fm.authorName)}</span>
+                    </div>
+                    ${fm.content ? `<div class="thread-preview-text">${escapeHtml(fm.content.substring(0, 200))}${fm.content.length > 200 ? '…' : ''}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    div.innerHTML = `
+        <div class="forum-thread-header">
+            <h4 class="forum-thread-name">${escapeHtml(t.name)}</h4>
+            <div class="forum-thread-meta">
+                ${t.archived ? '<span class="thread-tag">📦 Archivé</span>' : '<span class="thread-tag thread-active">● Actif</span>'}
+                <span>💬 ${t.messageCount} messages</span>
+                <span>👥 ${t.memberCount} membres</span>
+                <span>🕐 ${date}</span>
+            </div>
+        </div>
+        ${preview}
+        <button class="btn-thread-open" onclick="openThread('${t.id}', '${escapeHtml(t.name).replace(/'/g, "\\'")}')">Voir le fil →</button>
+    `;
+    return div;
+}
+
+async function openThread(threadId, threadName) {
+    currentChannelId = threadId;
+    document.getElementById('viewerName').textContent = '🧵 ' + threadName;
+    document.getElementById('channelTimeline').innerHTML = '<p class="empty">Chargement...</p>';
+    oldestMessageId = null;
+
+    // Afficher la zone d'envoi pour les threads aussi
+    const inputArea = document.getElementById('messageInputArea');
+    if (inputArea) {
+        inputArea.style.display = 'block';
+        const input = document.getElementById('messageInput');
+        if (input) {
+            input.value = '';
+            input.placeholder = `Écris dans le fil "${threadName}"...`;
+            input.style.height = 'auto';
+        }
+        document.getElementById('charCount').textContent = '0/2000';
+    }
+
+    await loadMessages(threadId);
+}
+
 function renderMessage(m) {
     const div = document.createElement('div');
     div.className = 'message';
     const date = new Date(m.createdTimestamp);
     const dateStr = date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 
-    const avatar = m.authorAvatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'><rect width='36' height='36' fill='%23262626'/></svg>`;
+    const avatar = m.authorAvatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
 
     let content = escapeHtml(m.content)
         .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')
         .replace(/<@!?(\d+)>/g, (_, id) => {
             const u = m.mentions.users.find(u => u.id === id);
-            return `<span style="color:var(--blue)">@${u?.name || 'inconnu'}</span>`;
+            return `<span class="mention mention-user">@${escapeHtml(u?.name || 'inconnu')}</span>`;
         })
         .replace(/<@&(\d+)>/g, (_, id) => {
             const r = m.mentions.roles.find(r => r.id === id);
-            return `<span style="color:var(--orange)">@${r?.name || 'rôle'}</span>`;
+            const color = r?.color ? `#${r.color.toString(16).padStart(6, '0')}` : null;
+            const style = color ? `style="color:${color};"` : '';
+            return `<span class="mention mention-role" ${style}>@${escapeHtml(r?.name || 'rôle')}</span>`;
         })
-        .replace(/<#(\d+)>/g, '<span style="color:var(--blue)">#salon</span>')
-        .replace(/<a?:(\w+):\d+>/g, ':$1:');
+        .replace(/<#(\d+)>/g, '<span class="mention mention-channel">#salon</span>')
+        // Emojis customs → vraie image
+        .replace(/&lt;(a?):(\w+):(\d+)&gt;/g, (_, animated, name, id) => {
+            const ext = animated === 'a' ? 'gif' : 'png';
+            return `<img class="inline-emoji" src="https://cdn.discordapp.com/emojis/${id}.${ext}" alt=":${name}:" title=":${name}:">`;
+        })
+        // Markdown gras
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        // Markdown italique
+        .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
     let attachmentsHtml = '';
     for (const a of m.attachments) {
         if (a.isImage) {
-            attachmentsHtml += `<img class="message-attachment-img" src="${a.url}" alt="${a.name}" onclick="window.open('${a.url}', '_blank')">`;
+            attachmentsHtml += `<img class="message-attachment-img" src="${a.url}" alt="${escapeHtml(a.name)}" onclick="window.open('${a.url}', '_blank')">`;
+        } else if (a.isVideo) {
+            attachmentsHtml += `<video class="message-attachment-video" src="${a.url}" controls></video>`;
         } else {
-            attachmentsHtml += `<a href="${a.url}" target="_blank" class="message-attachment-file">📎 ${a.name}</a>`;
+            attachmentsHtml += `<a href="${a.url}" target="_blank" class="message-attachment-file">📎 ${escapeHtml(a.name)}</a>`;
         }
     }
 
@@ -561,7 +706,7 @@ function renderMessage(m) {
 
     let reactionsHtml = '';
     for (const r of m.reactions) {
-        reactionsHtml += `<span class="message-reaction">${r.emojiUrl ? `<img src="${r.emojiUrl}">` : r.emoji} ${r.count}</span>`;
+        reactionsHtml += `<span class="message-reaction">${r.emojiUrl ? `<img src="${r.emojiUrl}" alt=":${r.emojiName}:">` : r.emoji} ${r.count}</span>`;
     }
 
     div.innerHTML = `
@@ -636,7 +781,6 @@ function getPointTypeLabel(type) {
 }
 
 function setupMap() {
-    // Boutons mode
     document.querySelectorAll('.map-mode-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const mode = btn.dataset.mode;
@@ -652,11 +796,11 @@ function setupMap() {
     const canvas = document.getElementById('mapCanvas');
     if (!container || !canvas) return;
 
-    // Click sur la carte (mode add)
+    // Click sur la carte (mode add) — seulement si pas drag
     canvas.addEventListener('click', async (e) => {
         if (mapMode !== 'add') return;
         if (e.target.closest('.map-point')) return;
-        if (isDragging) return;
+        if (mapDragMoved) return; // C'était un drag, pas un click
 
         const img = document.getElementById('mapImage');
         const rect = img.getBoundingClientRect();
@@ -668,67 +812,113 @@ function setupMap() {
         pendingPoint = { x, y };
         document.getElementById('pointLabel').value = '';
         document.getElementById('pointType').value = 'weed';
+        document.getElementById('pointCode').value = '';
+        onPointTypeChange(); // Cache le champ code par défaut
         document.getElementById('pointModal').style.display = 'flex';
 
-        // Charger les rôles dans la modal
         await loadRolesForModal();
-
         setTimeout(() => document.getElementById('pointLabel').focus(), 100);
     });
 
-    // Zoom à la molette
+    // Zoom à la molette — centré sur le curseur
     container.addEventListener('wheel', (e) => {
         e.preventDefault();
-        const delta = e.deltaY > 0 ? -1 : 1;
-        mapZoom(delta);
+
+        const rect = container.getBoundingClientRect();
+        // Position du curseur dans le container
+        const mouseX = e.clientX - rect.left + container.scrollLeft;
+        const mouseY = e.clientY - rect.top + container.scrollTop;
+
+        const oldZoom = mapZoomLevel;
+        const delta = e.deltaY > 0 ? -0.15 : 0.15;
+        const newZoom = Math.max(0.3, Math.min(5, oldZoom + delta));
+        if (newZoom === oldZoom) return;
+
+        mapZoomLevel = newZoom;
+        canvas.style.transform = `scale(${mapZoomLevel})`;
+        canvas.style.transformOrigin = '0 0';
+
+        // Ajuster le scroll pour zoomer sur le curseur
+        const scaleFactor = newZoom / oldZoom;
+        container.scrollLeft = mouseX * scaleFactor - (e.clientX - rect.left);
+        container.scrollTop = mouseY * scaleFactor - (e.clientY - rect.top);
+
+        document.getElementById('mapZoomLabel').textContent = Math.round(mapZoomLevel * 100) + '%';
     }, { passive: false });
 
-    // Drag pour déplacer
+    // Drag pour déplacer — uniquement quand on appuie ET maintient
+    let isMouseDown = false;
+    let dragStartX, dragStartY, scrollStartX, scrollStartY;
+
     container.addEventListener('mousedown', (e) => {
         if (e.target.closest('.map-point')) return;
-        if (mapMode === 'add') return;
-        isDragging = false;
-        dragStart = {
-            x: e.clientX,
-            y: e.clientY,
-            scrollX: container.scrollLeft,
-            scrollY: container.scrollTop,
-        };
-        const onMove = (ev) => {
-            const dx = Math.abs(ev.clientX - dragStart.x);
-            const dy = Math.abs(ev.clientY - dragStart.y);
-            if (dx > 3 || dy > 3) isDragging = true;
-            container.scrollLeft = dragStart.scrollX - (ev.clientX - dragStart.x);
-            container.scrollTop = dragStart.scrollY - (ev.clientY - dragStart.y);
-        };
-        const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-            setTimeout(() => { isDragging = false; }, 50);
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
+        if (mapMode === 'add') return; // En mode add, on ne drag pas
+        isMouseDown = true;
+        mapDragMoved = false;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        scrollStartX = container.scrollLeft;
+        scrollStartY = container.scrollTop;
+        container.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isMouseDown) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) mapDragMoved = true;
+        container.scrollLeft = scrollStartX - dx;
+        container.scrollTop = scrollStartY - dy;
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isMouseDown) {
+            isMouseDown = false;
+            container.style.cursor = '';
+            // Reset le flag drag après un court délai
+            setTimeout(() => { mapDragMoved = false; }, 50);
+        }
     });
 }
 
+let mapDragMoved = false;
+
 function mapZoom(delta) {
-    const newZoom = Math.max(0.5, Math.min(5, mapZoomLevel + delta * 0.2));
-    if (newZoom === mapZoomLevel) return;
+    const container = document.getElementById('mapContainer');
+    const canvas = document.getElementById('mapCanvas');
+    if (!container || !canvas) return;
+
+    const oldZoom = mapZoomLevel;
+    const newZoom = Math.max(0.3, Math.min(5, oldZoom + delta * 0.2));
+    if (newZoom === oldZoom) return;
+
+    // Zoom centré sur le centre visible du container
+    const centerX = container.scrollLeft + container.clientWidth / 2;
+    const centerY = container.scrollTop + container.clientHeight / 2;
+
     mapZoomLevel = newZoom;
-    applyMapZoom();
+    canvas.style.transform = `scale(${mapZoomLevel})`;
+    canvas.style.transformOrigin = '0 0';
+
+    const scaleFactor = newZoom / oldZoom;
+    container.scrollLeft = centerX * scaleFactor - container.clientWidth / 2;
+    container.scrollTop = centerY * scaleFactor - container.clientHeight / 2;
+
+    document.getElementById('mapZoomLabel').textContent = Math.round(mapZoomLevel * 100) + '%';
 }
 
 function mapZoomReset() {
-    mapZoomLevel = 1;
-    applyMapZoom();
-}
-
-function applyMapZoom() {
+    const container = document.getElementById('mapContainer');
     const canvas = document.getElementById('mapCanvas');
-    if (!canvas) return;
-    canvas.style.transform = `scale(${mapZoomLevel})`;
+    if (!container || !canvas) return;
+
+    mapZoomLevel = 1;
+    canvas.style.transform = 'scale(1)';
     canvas.style.transformOrigin = '0 0';
-    document.getElementById('mapZoomLabel').textContent = Math.round(mapZoomLevel * 100) + '%';
+    container.scrollLeft = 0;
+    container.scrollTop = 0;
+    document.getElementById('mapZoomLabel').textContent = '100%';
 }
 
 function setMapMode(mode) {
@@ -754,9 +944,49 @@ async function loadMapPoints() {
         const data = await res.json();
         mapPoints = data.points || [];
         renderMapPoints();
+
+        // Auto-fit initial : ajuster zoom pour que la carte rentre dans le container
+        if (!mapInitialized) {
+            mapInitialized = true;
+            setTimeout(() => autoFitMap(), 100);
+        }
     } catch (e) {
         console.error('Map:', e);
     }
+}
+
+let mapInitialized = false;
+
+function autoFitMap() {
+    const container = document.getElementById('mapContainer');
+    const img = document.getElementById('mapImage');
+    if (!container || !img || !img.complete || img.naturalWidth === 0) {
+        // Image pas encore chargée → réessayer
+        if (img) img.onload = () => autoFitMap();
+        return;
+    }
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const imgWidth = img.naturalWidth;
+    const imgHeight = img.naturalHeight;
+
+    const scaleX = containerWidth / imgWidth;
+    const scaleY = containerHeight / imgHeight;
+    const fitScale = Math.min(scaleX, scaleY) * 0.95; // 95% pour avoir un peu de marge
+
+    mapZoomLevel = Math.max(0.3, Math.min(1, fitScale));
+
+    const canvas = document.getElementById('mapCanvas');
+    if (canvas) {
+        canvas.style.transform = `scale(${mapZoomLevel})`;
+        canvas.style.transformOrigin = '0 0';
+    }
+    document.getElementById('mapZoomLabel').textContent = Math.round(mapZoomLevel * 100) + '%';
+
+    // Centrer
+    container.scrollLeft = (imgWidth * mapZoomLevel - containerWidth) / 2;
+    container.scrollTop = (imgHeight * mapZoomLevel - containerHeight) / 2;
 }
 
 function renderMapPoints() {
@@ -831,12 +1061,20 @@ function selectNoRoles() {
     document.querySelectorAll('#pointRolesSelector input[type="checkbox"]').forEach(cb => cb.checked = false);
 }
 
+function onPointTypeChange() {
+    const type = document.getElementById('pointType').value;
+    const codeField = document.getElementById('pointCodeField');
+    if (codeField) {
+        codeField.style.display = (type === 'lab' || type === 'weapon-lab') ? 'block' : 'none';
+    }
+}
+
 async function confirmAddPoint() {
     if (!pendingPoint) return;
     const label = document.getElementById('pointLabel').value.trim() || 'Point sans nom';
     const type = document.getElementById('pointType').value;
+    const code = document.getElementById('pointCode').value.trim();
 
-    // Récupérer les rôles cochés
     const allowedRoles = [...document.querySelectorAll('#pointRolesSelector input[type="checkbox"]:checked')]
         .map(cb => cb.dataset.roleId);
 
@@ -844,7 +1082,7 @@ async function confirmAddPoint() {
         const res = await fetch('/api/map/points', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...pendingPoint, label, type, allowedRoles })
+            body: JSON.stringify({ ...pendingPoint, label, type, allowedRoles, code })
         });
         if (res.ok) {
             const data = await res.json();
@@ -890,8 +1128,20 @@ function showPointDetails(p) {
         ? 'Public (tous)'
         : `${p.allowedRoles.length} rôle(s) autorisé(s)`;
 
+    let codeHtml = '';
+    if (p.code && (p.type === 'lab' || p.type === 'weapon-lab')) {
+        codeHtml = `
+            <div class="point-code-box">
+                <div class="point-code-label">🔐 CODE D'ACCÈS</div>
+                <div class="point-code-value" onclick="copyCodeToClipboard('${escapeHtml(p.code).replace(/'/g, "\\'")}')">${escapeHtml(p.code)}</div>
+                <div class="point-code-hint">Clique pour copier</div>
+            </div>
+        `;
+    }
+
     document.getElementById('detailsTitle').textContent = `${getPointTypeIcon(p.type)} ${p.label}`;
     document.getElementById('detailsContent').innerHTML = `
+        ${codeHtml}
         <div class="detail-row"><span>Type</span><span>${getPointTypeLabel(p.type)}</span></div>
         <div class="detail-row"><span>Position</span><span>${p.x.toFixed(1)}%, ${p.y.toFixed(1)}%</span></div>
         <div class="detail-row"><span>Visibilité</span><span>${visibilityText}</span></div>
@@ -900,6 +1150,14 @@ function showPointDetails(p) {
         ${userPermissions.canEditMap ? `<button class="btn-delete-point" onclick="deletePoint('${p.id}'); closeDetailsModal();">🗑 Supprimer ce point</button>` : ''}
     `;
     document.getElementById('pointDetailsModal').style.display = 'flex';
+}
+
+function copyCodeToClipboard(code) {
+    navigator.clipboard.writeText(code).then(() => {
+        toast('📋 Code copié dans le presse-papier');
+    }).catch(() => {
+        toast('❌ Impossible de copier', 'error');
+    });
 }
 
 function closeDetailsModal() {
@@ -1032,3 +1290,266 @@ async function sendAnnonce() {
         toast(`❌ ${e.message}`, 'error');
     }
 }
+
+// ==========================================
+// ENVOI DE MESSAGES DANS LES SALONS
+// ==========================================
+let mentionDropdownActive = false;
+let mentionStartIndex = -1;
+let mentionSearchQuery = '';
+let mentionSelectedIndex = 0;
+let mentionResults = [];
+
+function setupMessageInput() {
+    const input = document.getElementById('messageInput');
+    if (!input) return;
+
+    // Auto-resize textarea
+    input.addEventListener('input', () => {
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 150) + 'px';
+        document.getElementById('charCount').textContent = `${input.value.length}/2000`;
+
+        // Détecter si on est en train de taper une mention
+        handleMentionInput();
+    });
+
+    // Envoi avec Entrée (sans Maj)
+    input.addEventListener('keydown', (e) => {
+        // Si dropdown mention ouverte
+        if (mentionDropdownActive) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                mentionSelectedIndex = Math.min(mentionSelectedIndex + 1, mentionResults.length - 1);
+                renderMentionDropdown();
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                mentionSelectedIndex = Math.max(mentionSelectedIndex - 1, 0);
+                renderMentionDropdown();
+                return;
+            }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                if (mentionResults[mentionSelectedIndex]) {
+                    e.preventDefault();
+                    selectMention(mentionResults[mentionSelectedIndex]);
+                    return;
+                }
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeMentionDropdown();
+                return;
+            }
+        }
+
+        // Envoi normal
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChannelMessage();
+        }
+    });
+}
+
+async function handleMentionInput() {
+    const input = document.getElementById('messageInput');
+    if (!input) return;
+
+    const value = input.value;
+    const cursorPos = input.selectionStart;
+    const beforeCursor = value.substring(0, cursorPos);
+
+    // Trouver le dernier @ avant le curseur
+    const lastAtIndex = beforeCursor.lastIndexOf('@');
+    if (lastAtIndex === -1) {
+        closeMentionDropdown();
+        return;
+    }
+
+    // Vérifier qu'il n'y a pas d'espace entre @ et le curseur
+    const afterAt = beforeCursor.substring(lastAtIndex + 1);
+    if (afterAt.includes(' ') || afterAt.includes('\n')) {
+        closeMentionDropdown();
+        return;
+    }
+
+    // Vérifier qu'il y a un espace ou début de ligne avant @
+    if (lastAtIndex > 0) {
+        const charBefore = beforeCursor[lastAtIndex - 1];
+        if (charBefore !== ' ' && charBefore !== '\n') {
+            closeMentionDropdown();
+            return;
+        }
+    }
+
+    mentionStartIndex = lastAtIndex;
+    mentionSearchQuery = afterAt;
+
+    if (mentionSearchQuery.length >= 1) {
+        await searchMentions(mentionSearchQuery);
+    } else {
+        closeMentionDropdown();
+    }
+}
+
+async function searchMentions(query) {
+    try {
+        const res = await fetch(`/api/members/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        mentionResults = data.members || [];
+        mentionSelectedIndex = 0;
+        if (mentionResults.length > 0) {
+            mentionDropdownActive = true;
+            renderMentionDropdown();
+        } else {
+            closeMentionDropdown();
+        }
+    } catch {
+        closeMentionDropdown();
+    }
+}
+
+function renderMentionDropdown() {
+    const dropdown = document.getElementById('msgMentionSuggest');
+    if (!dropdown) return;
+
+    dropdown.innerHTML = mentionResults.map((m, i) => `
+        <div class="mention-item ${i === mentionSelectedIndex ? 'selected' : ''}" onclick="selectMention(${JSON.stringify(m).replace(/"/g, '&quot;')})">
+            ${m.avatar ? `<img class="mention-avatar" src="${m.avatar}" alt="">` : '<div class="mention-avatar-placeholder"></div>'}
+            <span class="mention-name">${escapeHtml(m.name)}</span>
+        </div>
+    `).join('');
+    dropdown.style.display = 'block';
+}
+
+function selectMention(member) {
+    const input = document.getElementById('messageInput');
+    if (!input) return;
+    const value = input.value;
+    const before = value.substring(0, mentionStartIndex);
+    const after = value.substring(input.selectionStart);
+
+    // Insérer la mention au format Discord <@id>
+    input.value = before + `<@${member.id}> ` + after;
+    input.focus();
+    const newCursorPos = before.length + `<@${member.id}> `.length;
+    input.setSelectionRange(newCursorPos, newCursorPos);
+
+    closeMentionDropdown();
+}
+
+function closeMentionDropdown() {
+    mentionDropdownActive = false;
+    mentionResults = [];
+    mentionStartIndex = -1;
+    const dropdown = document.getElementById('msgMentionSuggest');
+    if (dropdown) dropdown.style.display = 'none';
+}
+
+function insertMention() {
+    const input = document.getElementById('messageInput');
+    if (!input) return;
+    const cursorPos = input.selectionStart;
+    const value = input.value;
+    input.value = value.substring(0, cursorPos) + '@' + value.substring(cursorPos);
+    input.focus();
+    input.setSelectionRange(cursorPos + 1, cursorPos + 1);
+    handleMentionInput();
+}
+
+// ==========================================
+// EMOJIS dans le message
+// ==========================================
+function toggleMessageEmojiPicker() {
+    const picker = document.getElementById('msgEmojiPicker');
+    if (!picker) return;
+    if (picker.style.display === 'none' || !picker.style.display) {
+        renderMessageEmojiPicker();
+        picker.style.display = 'grid';
+    } else {
+        picker.style.display = 'none';
+    }
+}
+
+function renderMessageEmojiPicker() {
+    const picker = document.getElementById('msgEmojiPicker');
+    if (!picker) return;
+    if (serverEmojis.length === 0) {
+        picker.innerHTML = '<p class="empty" style="padding:12px;grid-column:1/-1;">Aucun emoji custom sur le serveur</p>';
+        return;
+    }
+    picker.innerHTML = serverEmojis.map(e => `
+        <div class="emoji-item" title=":${e.name}:" onclick="insertMessageEmoji('${e.code.replace(/'/g, "\\'")}')">
+            <img src="${e.url}" alt=":${e.name}:">
+        </div>
+    `).join('');
+}
+
+function insertMessageEmoji(code) {
+    const input = document.getElementById('messageInput');
+    if (!input) return;
+    const cursorPos = input.selectionStart;
+    const value = input.value;
+    input.value = value.substring(0, cursorPos) + code + value.substring(cursorPos);
+    input.focus();
+    input.setSelectionRange(cursorPos + code.length, cursorPos + code.length);
+    document.getElementById('msgEmojiPicker').style.display = 'none';
+    document.getElementById('charCount').textContent = `${input.value.length}/2000`;
+}
+
+// ==========================================
+// ENVOI DU MESSAGE
+// ==========================================
+async function sendChannelMessage() {
+    if (!currentChannelId) return;
+    const input = document.getElementById('messageInput');
+    const btn = document.getElementById('sendMessageBtn');
+    if (!input || !btn) return;
+
+    const content = input.value.trim();
+    if (!content) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Envoi...';
+
+    try {
+        const res = await fetch(`/api/channel/${currentChannelId}/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            input.value = '';
+            input.style.height = 'auto';
+            document.getElementById('charCount').textContent = '0/2000';
+            // Rafraîchir les messages
+            setTimeout(() => loadMessages(currentChannelId), 500);
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Envoyer ↗';
+    }
+}
+
+// Charger les emojis serveur au boot pour le picker (réutilise serverEmojis)
+async function ensureServerEmojisLoaded() {
+    if (serverEmojis.length === 0) {
+        try {
+            const r = await fetch('/api/emojis');
+            const data = await r.json();
+            serverEmojis = data.emojis || [];
+        } catch {}
+    }
+}
+
+// Setup au chargement
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(setupMessageInput, 500);
+    ensureServerEmojisLoaded();
+});
