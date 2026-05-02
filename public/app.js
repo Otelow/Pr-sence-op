@@ -753,6 +753,7 @@ let pendingPoint = null;
 let mapZoomLevel = 1;
 let mapTranslateX = 0;
 let mapTranslateY = 0;
+let mapDragMoved = false;
 let isDragging = false;
 let dragStart = { x: 0, y: 0, tx: 0, ty: 0 };
 let allRoles = []; // Cache des rôles pour la modal
@@ -796,11 +797,11 @@ function setupMap() {
     const canvas = document.getElementById('mapCanvas');
     if (!container || !canvas) return;
 
-    // Click sur la carte (mode add) — seulement si pas drag
+    // Click sur la carte (mode add) — détection click vs drag
     canvas.addEventListener('click', async (e) => {
         if (mapMode !== 'add') return;
         if (e.target.closest('.map-point')) return;
-        if (mapDragMoved) return; // C'était un drag, pas un click
+        if (mapDragMoved) return;
 
         const img = document.getElementById('mapImage');
         const rect = img.getBoundingClientRect();
@@ -813,53 +814,56 @@ function setupMap() {
         document.getElementById('pointLabel').value = '';
         document.getElementById('pointType').value = 'weed';
         document.getElementById('pointCode').value = '';
-        onPointTypeChange(); // Cache le champ code par défaut
+        onPointTypeChange();
         document.getElementById('pointModal').style.display = 'flex';
 
         await loadRolesForModal();
         setTimeout(() => document.getElementById('pointLabel').focus(), 100);
     });
 
+    // ====== ZOOM/PAN LOGIC avec transform ======
+    // mapTranslateX/Y = position du canvas (en px)
+    // mapZoomLevel = échelle
+
     // Zoom à la molette — centré sur le curseur
     container.addEventListener('wheel', (e) => {
         e.preventDefault();
 
         const rect = container.getBoundingClientRect();
-        // Position du curseur dans le container
-        const mouseX = e.clientX - rect.left + container.scrollLeft;
-        const mouseY = e.clientY - rect.top + container.scrollTop;
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Position dans la carte avant zoom
+        const cartX = (mouseX - mapTranslateX) / mapZoomLevel;
+        const cartY = (mouseY - mapTranslateY) / mapZoomLevel;
 
         const oldZoom = mapZoomLevel;
-        const delta = e.deltaY > 0 ? -0.15 : 0.15;
-        const newZoom = Math.max(0.3, Math.min(5, oldZoom + delta));
+        const delta = e.deltaY > 0 ? 0.85 : 1.15;
+        const newZoom = Math.max(0.1, Math.min(8, oldZoom * delta));
         if (newZoom === oldZoom) return;
 
         mapZoomLevel = newZoom;
-        canvas.style.transform = `scale(${mapZoomLevel})`;
-        canvas.style.transformOrigin = '0 0';
+        // Repositionner pour que le point sous le curseur reste sous le curseur
+        mapTranslateX = mouseX - cartX * mapZoomLevel;
+        mapTranslateY = mouseY - cartY * mapZoomLevel;
 
-        // Ajuster le scroll pour zoomer sur le curseur
-        const scaleFactor = newZoom / oldZoom;
-        container.scrollLeft = mouseX * scaleFactor - (e.clientX - rect.left);
-        container.scrollTop = mouseY * scaleFactor - (e.clientY - rect.top);
-
-        document.getElementById('mapZoomLabel').textContent = Math.round(mapZoomLevel * 100) + '%';
+        applyMapTransform();
     }, { passive: false });
 
-    // Drag pour déplacer — uniquement quand on appuie ET maintient
+    // Drag pour déplacer
     let isMouseDown = false;
-    let dragStartX, dragStartY, scrollStartX, scrollStartY;
+    let dragStartX, dragStartY, startTranslateX, startTranslateY;
 
     container.addEventListener('mousedown', (e) => {
         if (e.target.closest('.map-point')) return;
-        if (mapMode === 'add') return; // En mode add, on ne drag pas
+        if (mapMode === 'add') return;
         isMouseDown = true;
         mapDragMoved = false;
         dragStartX = e.clientX;
         dragStartY = e.clientY;
-        scrollStartX = container.scrollLeft;
-        scrollStartY = container.scrollTop;
-        container.style.cursor = 'grabbing';
+        startTranslateX = mapTranslateX;
+        startTranslateY = mapTranslateY;
+        container.classList.add('dragging');
         e.preventDefault();
     });
 
@@ -868,66 +872,125 @@ function setupMap() {
         const dx = e.clientX - dragStartX;
         const dy = e.clientY - dragStartY;
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) mapDragMoved = true;
-        container.scrollLeft = scrollStartX - dx;
-        container.scrollTop = scrollStartY - dy;
+        mapTranslateX = startTranslateX + dx;
+        mapTranslateY = startTranslateY + dy;
+        applyMapTransform();
     });
 
     document.addEventListener('mouseup', () => {
         if (isMouseDown) {
             isMouseDown = false;
-            container.style.cursor = '';
-            // Reset le flag drag après un court délai
+            container.classList.remove('dragging');
             setTimeout(() => { mapDragMoved = false; }, 50);
         }
     });
+
+    // Touch support pour mobile/tablette
+    let lastTouchDist = 0;
+    container.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1 && mapMode !== 'add') {
+            isMouseDown = true;
+            mapDragMoved = false;
+            dragStartX = e.touches[0].clientX;
+            dragStartY = e.touches[0].clientY;
+            startTranslateX = mapTranslateX;
+            startTranslateY = mapTranslateY;
+        } else if (e.touches.length === 2) {
+            const t1 = e.touches[0], t2 = e.touches[1];
+            lastTouchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        }
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1 && isMouseDown) {
+            const dx = e.touches[0].clientX - dragStartX;
+            const dy = e.touches[0].clientY - dragStartY;
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) mapDragMoved = true;
+            mapTranslateX = startTranslateX + dx;
+            mapTranslateY = startTranslateY + dy;
+            applyMapTransform();
+        } else if (e.touches.length === 2) {
+            e.preventDefault();
+            const t1 = e.touches[0], t2 = e.touches[1];
+            const newDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+            if (lastTouchDist > 0) {
+                const factor = newDist / lastTouchDist;
+                const rect = container.getBoundingClientRect();
+                const cx = (t1.clientX + t2.clientX) / 2 - rect.left;
+                const cy = (t1.clientY + t2.clientY) / 2 - rect.top;
+                const cartX = (cx - mapTranslateX) / mapZoomLevel;
+                const cartY = (cy - mapTranslateY) / mapZoomLevel;
+                mapZoomLevel = Math.max(0.1, Math.min(8, mapZoomLevel * factor));
+                mapTranslateX = cx - cartX * mapZoomLevel;
+                mapTranslateY = cy - cartY * mapZoomLevel;
+                applyMapTransform();
+            }
+            lastTouchDist = newDist;
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchend', () => {
+        isMouseDown = false;
+        lastTouchDist = 0;
+        setTimeout(() => { mapDragMoved = false; }, 50);
+    });
 }
 
-let mapDragMoved = false;
-
-function mapZoom(delta) {
-    const container = document.getElementById('mapContainer');
+function applyMapTransform() {
     const canvas = document.getElementById('mapCanvas');
-    if (!container || !canvas) return;
+    if (!canvas) return;
+    canvas.style.transform = `translate(${mapTranslateX}px, ${mapTranslateY}px) scale(${mapZoomLevel})`;
 
-    const oldZoom = mapZoomLevel;
-    const newZoom = Math.max(0.3, Math.min(5, oldZoom + delta * 0.2));
-    if (newZoom === oldZoom) return;
-
-    // Zoom centré sur le centre visible du container
-    const centerX = container.scrollLeft + container.clientWidth / 2;
-    const centerY = container.scrollTop + container.clientHeight / 2;
-
-    mapZoomLevel = newZoom;
-    canvas.style.transform = `scale(${mapZoomLevel})`;
-    canvas.style.transformOrigin = '0 0';
-
-    const scaleFactor = newZoom / oldZoom;
-    container.scrollLeft = centerX * scaleFactor - container.clientWidth / 2;
-    container.scrollTop = centerY * scaleFactor - container.clientHeight / 2;
+    // Inverser l'échelle des points pour qu'ils gardent leur taille visible
+    const layer = document.getElementById('mapPointsLayer');
+    if (layer) {
+        const points = layer.querySelectorAll('.map-point');
+        const inverseScale = 1 / mapZoomLevel;
+        points.forEach(p => {
+            // On combine : translate -50% -100% (ancrage) + scale inverse
+            p.style.transform = `scale(${inverseScale})`;
+        });
+    }
 
     document.getElementById('mapZoomLabel').textContent = Math.round(mapZoomLevel * 100) + '%';
 }
 
-function mapZoomReset() {
+function mapZoom(delta) {
     const container = document.getElementById('mapContainer');
-    const canvas = document.getElementById('mapCanvas');
-    if (!container || !canvas) return;
+    if (!container) return;
 
-    mapZoomLevel = 1;
-    canvas.style.transform = 'scale(1)';
-    canvas.style.transformOrigin = '0 0';
-    container.scrollLeft = 0;
-    container.scrollTop = 0;
-    document.getElementById('mapZoomLabel').textContent = '100%';
+    const rect = container.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+
+    const cartX = (cx - mapTranslateX) / mapZoomLevel;
+    const cartY = (cy - mapTranslateY) / mapZoomLevel;
+
+    const factor = delta > 0 ? 1.25 : 0.8;
+    const newZoom = Math.max(0.1, Math.min(8, mapZoomLevel * factor));
+    if (newZoom === mapZoomLevel) return;
+
+    mapZoomLevel = newZoom;
+    mapTranslateX = cx - cartX * mapZoomLevel;
+    mapTranslateY = cy - cartY * mapZoomLevel;
+
+    const canvas = document.getElementById('mapCanvas');
+    if (canvas) canvas.classList.add('smooth-zoom');
+    applyMapTransform();
+    setTimeout(() => { if (canvas) canvas.classList.remove('smooth-zoom'); }, 200);
+}
+
+function mapZoomReset() {
+    autoFitMap();
 }
 
 function setMapMode(mode) {
     mapMode = mode;
     document.querySelectorAll('.map-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-    const canvas = document.getElementById('mapCanvas');
-    canvas.classList.remove('add-mode', 'delete-mode');
-    if (mode === 'add') canvas.classList.add('add-mode');
-    if (mode === 'delete') canvas.classList.add('delete-mode');
+    const container = document.getElementById('mapContainer');
+    container.classList.remove('add-mode', 'delete-mode');
+    if (mode === 'add') container.classList.add('add-mode');
+    if (mode === 'delete') container.classList.add('delete-mode');
 
     const info = document.getElementById('mapInfo');
     const messages = {
@@ -960,9 +1023,10 @@ let mapInitialized = false;
 function autoFitMap() {
     const container = document.getElementById('mapContainer');
     const img = document.getElementById('mapImage');
-    if (!container || !img || !img.complete || img.naturalWidth === 0) {
-        // Image pas encore chargée → réessayer
-        if (img) img.onload = () => autoFitMap();
+    if (!container || !img) return;
+
+    if (!img.complete || img.naturalWidth === 0) {
+        img.onload = () => autoFitMap();
         return;
     }
 
@@ -973,20 +1037,18 @@ function autoFitMap() {
 
     const scaleX = containerWidth / imgWidth;
     const scaleY = containerHeight / imgHeight;
-    const fitScale = Math.min(scaleX, scaleY) * 0.95; // 95% pour avoir un peu de marge
+    const fitScale = Math.min(scaleX, scaleY) * 0.95;
 
-    mapZoomLevel = Math.max(0.3, Math.min(1, fitScale));
+    mapZoomLevel = fitScale;
+
+    // Centrer la carte dans le container
+    mapTranslateX = (containerWidth - imgWidth * mapZoomLevel) / 2;
+    mapTranslateY = (containerHeight - imgHeight * mapZoomLevel) / 2;
 
     const canvas = document.getElementById('mapCanvas');
-    if (canvas) {
-        canvas.style.transform = `scale(${mapZoomLevel})`;
-        canvas.style.transformOrigin = '0 0';
-    }
-    document.getElementById('mapZoomLabel').textContent = Math.round(mapZoomLevel * 100) + '%';
-
-    // Centrer
-    container.scrollLeft = (imgWidth * mapZoomLevel - containerWidth) / 2;
-    container.scrollTop = (imgHeight * mapZoomLevel - containerHeight) / 2;
+    if (canvas) canvas.classList.add('smooth-zoom');
+    applyMapTransform();
+    setTimeout(() => { if (canvas) canvas.classList.remove('smooth-zoom'); }, 200);
 }
 
 function renderMapPoints() {
@@ -1002,18 +1064,22 @@ function renderMapPoints() {
         const pin = document.createElement('div');
         pin.className = 'map-point';
         pin.dataset.type = p.type;
+        // Position en % de l'image (recalculée au render)
         pin.style.left = p.x + '%';
         pin.style.top = p.y + '%';
+        // Scale inverse pour rester de taille fixe à l'écran
+        pin.style.transform = `scale(${1 / mapZoomLevel})`;
+
         pin.innerHTML = `
             <svg class="map-point-pin" viewBox="0 0 24 32" fill="${color}" stroke="#000" stroke-width="1.5">
                 <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z"/>
-                <text x="12" y="16" text-anchor="middle" font-size="11" fill="#000">${icon}</text>
+                <text x="12" y="17" text-anchor="middle" font-size="13" fill="#fff" stroke="none" style="font-family: Arial, sans-serif;">${icon}</text>
             </svg>
             <div class="map-point-label">${escapeHtml(p.label)} • ${label}</div>
         `;
         pin.onclick = (e) => {
             e.stopPropagation();
-            if (isDragging) return;
+            if (mapDragMoved) return;
             if (mapMode === 'delete') {
                 deletePoint(p.id);
             } else {
@@ -1143,7 +1209,6 @@ function showPointDetails(p) {
     document.getElementById('detailsContent').innerHTML = `
         ${codeHtml}
         <div class="detail-row"><span>Type</span><span>${getPointTypeLabel(p.type)}</span></div>
-        <div class="detail-row"><span>Position</span><span>${p.x.toFixed(1)}%, ${p.y.toFixed(1)}%</span></div>
         <div class="detail-row"><span>Visibilité</span><span>${visibilityText}</span></div>
         <div class="detail-row"><span>Placé par</span><span>${escapeHtml(p.createdBy)}</span></div>
         <div class="detail-row"><span>Date</span><span>${date}</span></div>
