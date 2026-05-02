@@ -9,6 +9,9 @@ const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, 
 const cron = require('node-cron');
 const fs = require('fs');
 
+// Helper sleep utilisé partout dans le code
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 // ==========================================
 // CONFIGURATION
 // ==========================================
