@@ -46,6 +46,13 @@ const CONFIG = {
             '1495464200443662366',
             '1497005826114846741',
         ],
+        // Rôles supérieurs : si MEMBRE_3 retiré et remplacé par un de ceux-là dans les 5 min → promotion (pas de relance accueil)
+        PROMOTION_ROLES: [
+            '1485279789253132288',
+            '1485279738212651279',
+            '1485279571531137204',
+            '1485279534650494976',
+        ],
         COMMAND_ROLES: [
             '1485279148246175764',
             '1486744891848654988',
@@ -136,6 +143,7 @@ const WELCOME_KICK_DELAY = 5 * 60 * 1000;
 const renameCheckState = new Map();
 const RENAME_KICK_DELAY = 10 * 60 * 1000;
 const roleRemovalProcessing = new Set();
+const pendingPromotionChecks = new Map(); // userId → timer pour grace period 5min après retrait MEMBRE_3
 let lastRadioMessageId = null;
 
 // Persistance du welcomeState pour survivre aux redéploiements
@@ -884,11 +892,9 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
     if (roleRemovalProcessing.has(newMember.id) || welcomeState.has(newMember.id)) return;
 
-    const lost1 = oldMember.roles.cache.has(CONFIG.ROLES.MEMBRE_1) && !newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_1);
-    const lost2 = oldMember.roles.cache.has(CONFIG.ROLES.MEMBRE_2) && !newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_2);
     const lost3 = oldMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3) && !newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3);
 
-    if (lost1 || lost2 || lost3) {
+    if (lost3) {
         // Ne pas relancer si le membre a un rôle protégé
         const hasProtectedRole = CONFIG.ROLES.PROTECTED_ROLES.some(r => newMember.roles.cache.has(r));
         if (hasProtectedRole) {
@@ -896,14 +902,66 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
             return;
         }
 
-        roleRemovalProcessing.add(newMember.id);
-        setTimeout(() => roleRemovalProcessing.delete(newMember.id), 10_000);
+        // Vérifier si l'utilisateur a déjà un rôle de promotion AU MOMENT du retrait
+        const hasPromotionAlready = CONFIG.ROLES.PROMOTION_ROLES.some(r => newMember.roles.cache.has(r));
+        if (hasPromotionAlready) {
+            console.log(`⬆️ ${newMember.user.tag} : MEMBRE_3 retiré mais a déjà un rôle de promotion → pas de relance accueil`);
+            return;
+        }
 
-        if (newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_1)) await newMember.roles.remove(CONFIG.ROLES.MEMBRE_1).catch(() => {});
-        if (newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_2)) await newMember.roles.remove(CONFIG.ROLES.MEMBRE_2).catch(() => {});
-        if (newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3)) await newMember.roles.remove(CONFIG.ROLES.MEMBRE_3).catch(() => {});
+        // Pas encore promu → on attend 5 minutes pour voir si une promotion arrive
+        const userId = newMember.id;
+        if (pendingPromotionChecks.has(userId)) {
+            // Déjà une vérification en cours, on l'annule pour la remplacer
+            clearTimeout(pendingPromotionChecks.get(userId));
+        }
 
-        await startWelcomeFlow(newMember);
+        console.log(`⏳ ${newMember.user.tag} : MEMBRE_3 retiré → attente 5min pour promotion`);
+
+        const timer = setTimeout(async () => {
+            pendingPromotionChecks.delete(userId);
+            try {
+                const guild = client.guilds.cache.get(newMember.guild.id);
+                if (!guild) return;
+
+                const m = await guild.members.fetch(userId).catch(() => null);
+                if (!m) return; // Quitté le serveur
+
+                // Re-vérifier les conditions APRÈS les 5 minutes
+                const stillLost3 = !m.roles.cache.has(CONFIG.ROLES.MEMBRE_3);
+                const nowHasPromotion = CONFIG.ROLES.PROMOTION_ROLES.some(r => m.roles.cache.has(r));
+                const nowProtected = CONFIG.ROLES.PROTECTED_ROLES.some(r => m.roles.cache.has(r));
+
+                if (!stillLost3) {
+                    console.log(`↩️ ${m.user.tag} : MEMBRE_3 récupéré entre temps → rien à faire`);
+                    return;
+                }
+                if (nowHasPromotion) {
+                    console.log(`⬆️ ${m.user.tag} : promu pendant les 5min → rien à faire`);
+                    return;
+                }
+                if (nowProtected) {
+                    console.log(`🛡️ ${m.user.tag} : protégé → rien à faire`);
+                    return;
+                }
+
+                // Pas de promotion → relance le flow d'accueil
+                console.log(`🔄 ${m.user.tag} : pas de promotion après 5min → relance accueil`);
+
+                roleRemovalProcessing.add(userId);
+                setTimeout(() => roleRemovalProcessing.delete(userId), 10_000);
+
+                // Retirer les autres rôles d'accueil restants
+                if (m.roles.cache.has(CONFIG.ROLES.MEMBRE_1)) await m.roles.remove(CONFIG.ROLES.MEMBRE_1).catch(() => {});
+                if (m.roles.cache.has(CONFIG.ROLES.MEMBRE_2)) await m.roles.remove(CONFIG.ROLES.MEMBRE_2).catch(() => {});
+
+                await startWelcomeFlow(m);
+            } catch (e) {
+                console.error('❌ Erreur vérif promotion:', e.message);
+            }
+        }, 5 * 60 * 1000); // 5 minutes
+
+        pendingPromotionChecks.set(userId, timer);
     }
 });
 
