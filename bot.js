@@ -32,6 +32,7 @@ const CONFIG = {
         BM_NOTIF: '1485636555480502404',
         RAPPELS_PANEL: '1485669809956982984',
         CLIPS: '1485624000569933905',
+        ROLE_ALERT: '1489688278503264428',
     },
 
     ROLES: {
@@ -147,7 +148,8 @@ const WELCOME_KICK_DELAY = 5 * 60 * 1000;
 const renameCheckState = new Map();
 const RENAME_KICK_DELAY = 10 * 60 * 1000;
 const roleRemovalProcessing = new Set();
-const pendingPromotionChecks = new Map(); // userId → timer pour grace period 5min après retrait MEMBRE_3
+const pendingPromotionChecks = new Map(); // (legacy, plus utilisé)
+const recentRoleAlerts = new Set(); // userId → anti-spam alertes rôles manquants
 let lastRadioMessageId = null;
 const botStartTime = Date.now(); // Pour le fallback welcome : ne traiter que les messages antérieurs au démarrage
 
@@ -897,76 +899,58 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
     if (roleRemovalProcessing.has(newMember.id) || welcomeState.has(newMember.id)) return;
 
-    const lost3 = oldMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3) && !newMember.roles.cache.has(CONFIG.ROLES.MEMBRE_3);
+    // ─── Détecter le retrait d'un des 3 rôles d'accueil ────
+    const ACCUEIL_ROLES = [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_2, CONFIG.ROLES.MEMBRE_3];
+    const lostAccueilRoles = ACCUEIL_ROLES.filter(rId =>
+        oldMember.roles.cache.has(rId) && !newMember.roles.cache.has(rId)
+    );
 
-    if (lost3) {
-        // Ne pas relancer si le membre a un rôle protégé
-        const hasProtectedRole = CONFIG.ROLES.PROTECTED_ROLES.some(r => newMember.roles.cache.has(r));
-        if (hasProtectedRole) {
-            console.log(`🛡️ ${newMember.user.tag} a un rôle protégé, pas de relance accueil`);
+    if (lostAccueilRoles.length === 0) return;
+
+    // Ignorer les rôles protégés
+    const hasProtectedRole = CONFIG.ROLES.PROTECTED_ROLES.some(r => newMember.roles.cache.has(r));
+    if (hasProtectedRole) {
+        console.log(`🛡️ ${newMember.user.tag} a un rôle protégé, alerte ignorée`);
+        return;
+    }
+
+    // Ignorer les rôles de promotion (si l'utilisateur a été promu, c'est normal qu'on lui ait retiré des rôles)
+    const hasPromotion = CONFIG.ROLES.PROMOTION_ROLES.some(r => newMember.roles.cache.has(r));
+    if (hasPromotion) {
+        console.log(`⬆️ ${newMember.user.tag} a un rôle de promotion, alerte ignorée`);
+        return;
+    }
+
+    // ─── Anti-spam : un seul message d'alerte par user / 30 secondes ────
+    if (recentRoleAlerts.has(newMember.id)) return;
+    recentRoleAlerts.add(newMember.id);
+    setTimeout(() => recentRoleAlerts.delete(newMember.id), 30_000);
+
+    // ─── Lister tous les rôles d'accueil manquants à l'instant T ────
+    const missingRoles = ACCUEIL_ROLES.filter(rId => !newMember.roles.cache.has(rId));
+    if (missingRoles.length === 0) return;
+
+    // Envoyer le message d'alerte
+    try {
+        const alertChannel = client.channels.cache.get(CONFIG.CHANNELS.ROLE_ALERT);
+        if (!alertChannel) {
+            console.warn(`⚠️ Salon ROLE_ALERT introuvable (${CONFIG.CHANNELS.ROLE_ALERT})`);
             return;
         }
 
-        // Vérifier si l'utilisateur a déjà un rôle de promotion AU MOMENT du retrait
-        const hasPromotionAlready = CONFIG.ROLES.PROMOTION_ROLES.some(r => newMember.roles.cache.has(r));
-        if (hasPromotionAlready) {
-            console.log(`⬆️ ${newMember.user.tag} : MEMBRE_3 retiré mais a déjà un rôle de promotion → pas de relance accueil`);
-            return;
-        }
+        const missingRoleNames = missingRoles.map(rId => {
+            const role = newMember.guild.roles.cache.get(rId);
+            return role ? `<@&${rId}>` : `\`${rId}\``;
+        }).join(', ');
 
-        // Pas encore promu → on attend 5 minutes pour voir si une promotion arrive
-        const userId = newMember.id;
-        if (pendingPromotionChecks.has(userId)) {
-            // Déjà une vérification en cours, on l'annule pour la remplacer
-            clearTimeout(pendingPromotionChecks.get(userId));
-        }
+        await alertChannel.send({
+            content: `${CONFIG.EMOJIS.ATTENTION || '⚠️'} ${newMember} il te manque ${missingRoles.length === 1 ? 'le rôle' : 'les rôles'} : ${missingRoleNames}`,
+            allowedMentions: { parse: [] }, // Ne ping personne
+        });
 
-        console.log(`⏳ ${newMember.user.tag} : MEMBRE_3 retiré → attente 5min pour promotion`);
-
-        const timer = setTimeout(async () => {
-            pendingPromotionChecks.delete(userId);
-            try {
-                const guild = client.guilds.cache.get(newMember.guild.id);
-                if (!guild) return;
-
-                const m = await guild.members.fetch(userId).catch(() => null);
-                if (!m) return; // Quitté le serveur
-
-                // Re-vérifier les conditions APRÈS les 5 minutes
-                const stillLost3 = !m.roles.cache.has(CONFIG.ROLES.MEMBRE_3);
-                const nowHasPromotion = CONFIG.ROLES.PROMOTION_ROLES.some(r => m.roles.cache.has(r));
-                const nowProtected = CONFIG.ROLES.PROTECTED_ROLES.some(r => m.roles.cache.has(r));
-
-                if (!stillLost3) {
-                    console.log(`↩️ ${m.user.tag} : MEMBRE_3 récupéré entre temps → rien à faire`);
-                    return;
-                }
-                if (nowHasPromotion) {
-                    console.log(`⬆️ ${m.user.tag} : promu pendant les 5min → rien à faire`);
-                    return;
-                }
-                if (nowProtected) {
-                    console.log(`🛡️ ${m.user.tag} : protégé → rien à faire`);
-                    return;
-                }
-
-                // Pas de promotion → relance le flow d'accueil
-                console.log(`🔄 ${m.user.tag} : pas de promotion après 5min → relance accueil`);
-
-                roleRemovalProcessing.add(userId);
-                setTimeout(() => roleRemovalProcessing.delete(userId), 10_000);
-
-                // Retirer les autres rôles d'accueil restants
-                if (m.roles.cache.has(CONFIG.ROLES.MEMBRE_1)) await m.roles.remove(CONFIG.ROLES.MEMBRE_1).catch(() => {});
-                if (m.roles.cache.has(CONFIG.ROLES.MEMBRE_2)) await m.roles.remove(CONFIG.ROLES.MEMBRE_2).catch(() => {});
-
-                await startWelcomeFlow(m);
-            } catch (e) {
-                console.error('❌ Erreur vérif promotion:', e.message);
-            }
-        }, 5 * 60 * 1000); // 5 minutes
-
-        pendingPromotionChecks.set(userId, timer);
+        console.log(`📢 Alerte rôles manquants envoyée pour ${newMember.user.tag} (${missingRoles.length} rôle(s))`);
+    } catch (e) {
+        console.error('❌ Erreur envoi alerte rôles:', e.message);
     }
 });
 
