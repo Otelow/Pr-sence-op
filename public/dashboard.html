@@ -297,21 +297,18 @@
                 <div class="comm-card">
                     <div class="comm-field">
                         <label class="comm-label">Utilisateur à sanctionner</label>
-                        <div class="user-picker">
-                            <div class="user-picker-input-wrapper">
-                                <input type="text" id="sanctionUserSearch" class="comm-input user-picker-input" placeholder="Tape le pseudo ou un mot..." autocomplete="off">
-                                <button type="button" class="user-picker-clear" id="sanctionUserClear" style="display:none;" onclick="clearSanctionUser()">✕</button>
-                            </div>
-                            <div class="user-picker-dropdown" id="sanctionUserDropdown" style="display:none;"></div>
-                            <div class="user-picker-selected" id="sanctionUserSelected" style="display:none;">
-                                <img class="user-picker-selected-avatar" id="sanctionSelectedAvatar" alt="">
-                                <div class="user-picker-selected-info">
-                                    <div class="user-picker-selected-name" id="sanctionSelectedName"></div>
-                                    <div class="user-picker-selected-id" id="sanctionSelectedId"></div>
+                        <div class="user-dropdown-wrapper">
+                            <select id="sanctionUser" class="comm-select user-dropdown">
+                                <option value="">— Sélectionne un membre —</option>
+                            </select>
+                            <div class="user-dropdown-preview" id="sanctionUserPreview" style="display:none;">
+                                <img class="user-dropdown-avatar" id="sanctionPreviewAvatar" alt="">
+                                <div class="user-dropdown-info">
+                                    <div class="user-dropdown-name" id="sanctionPreviewName"></div>
+                                    <div class="user-dropdown-id" id="sanctionPreviewId"></div>
                                 </div>
                             </div>
                         </div>
-                        <input type="hidden" id="sanctionUser">
                     </div>
                     <div class="comm-field">
                         <div class="comm-label-row">
