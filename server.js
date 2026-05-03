@@ -295,6 +295,33 @@ function startServer(client, getState) {
                     return res.json({ success: true });
                 }
 
+                case 'rappel': {
+                    const rappelChannel = botClient.channels.cache.get(state.CONFIG.CHANNELS.RAPPELS_PANEL);
+                    if (!rappelChannel) return res.status(500).json({ error: 'Salon rappels introuvable' });
+                    const { roleId, message } = params || {};
+                    if (!roleId || !message) return res.status(400).json({ error: 'roleId et message requis' });
+                    await rappelChannel.send({
+                        content: `${message.replace(/\\n/g, '\n')}\n\n||<@&${roleId}>||`,
+                        allowedMentions: { parse: ['roles'] }
+                    });
+                    return res.json({ success: true });
+                }
+
+                case 'sanction': {
+                    const sanctionChannel = botClient.channels.cache.get(state.CONFIG.CHANNELS.SANCTION);
+                    if (!sanctionChannel) return res.status(500).json({ error: 'Salon sanction introuvable' });
+                    const { userId, raison } = params || {};
+                    if (!userId || !raison) return res.status(400).json({ error: 'userId et raison requis' });
+
+                    const cleanId = userId.replace(/[<@!>]/g, '').trim();
+                    const mention = /^\d{17,20}$/.test(cleanId) ? `<@${cleanId}>` : userId;
+                    const attentionEmoji = state.CONFIG.EMOJIS?.ATTENTION || '⚠️';
+                    const bs21Emoji = state.CONFIG.EMOJIS?.BS21 || '';
+
+                    await sanctionChannel.send(`${mention} Vous avez reçu un **avertissement** pour la raison suivante : ${raison} ${attentionEmoji} ${bs21Emoji}`);
+                    return res.json({ success: true });
+                }
+
                 default:
                     return res.status(400).json({ error: 'Commande inconnue' });
             }
