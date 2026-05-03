@@ -3738,3 +3738,160 @@ html, body {
         padding: 20px;
     }
 }
+
+
+/* ============================================
+   USER PICKER (Sanctions)
+   ============================================ */
+.user-picker {
+    position: relative;
+}
+
+.user-picker-input-wrapper {
+    position: relative;
+}
+
+.user-picker-input {
+    padding-right: 40px;
+}
+
+.user-picker-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+
+.user-picker-clear:hover {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.user-picker-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-hover);
+    border-radius: 6px;
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.user-picker-empty {
+    padding: 16px;
+    color: var(--text-muted);
+    font-style: italic;
+    text-align: center;
+    font-size: 13px;
+}
+
+.user-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 1px solid var(--border);
+}
+
+.user-picker-item:last-child {
+    border-bottom: 0;
+}
+
+.user-picker-item:hover,
+.user-picker-item.selected {
+    background: var(--bg-elevated);
+}
+
+.user-picker-item.selected {
+    border-left: 3px solid var(--accent);
+    padding-left: 9px;
+}
+
+.user-picker-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--bg-elevated);
+}
+
+.user-picker-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.user-picker-name {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-picker-id {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    margin-top: 2px;
+}
+
+/* Affichage de l'utilisateur sélectionné */
+.user-picker-selected {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg-deep);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    box-shadow: 0 0 0 3px rgba(255, 51, 51, 0.1);
+}
+
+.user-picker-selected-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--bg-elevated);
+}
+
+.user-picker-selected-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.user-picker-selected-name {
+    font-size: 15px;
+    color: var(--text);
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.user-picker-selected-id {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
