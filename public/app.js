@@ -1563,7 +1563,9 @@ async function sendSanction() {
         const data = await res.json();
         if (res.ok) {
             toast('⚠️ Sanction envoyée');
-            clearSanctionUser();
+            // Reset dropdown
+            document.getElementById('sanctionUser').value = '';
+            document.getElementById('sanctionUserPreview').style.display = 'none';
             const ta = document.getElementById('sanctionRaison');
             ta.value = '';
             ta.dispatchEvent(new Event('input'));
@@ -1846,115 +1848,49 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-// USER PICKER (Sanction)
+// USER DROPDOWN (Sanction)
 // ==========================================
-let sanctionUserPickerTimeout = null;
-let sanctionPickerResults = [];
-let sanctionPickerIndex = 0;
+let allMembersCache = [];
 
-function setupSanctionUserPicker() {
-    const input = document.getElementById('sanctionUserSearch');
-    if (!input) return;
+async function loadAllMembers() {
+    if (allMembersCache.length > 0) return allMembersCache;
+    try {
+        const res = await fetch('/api/members/all');
+        const data = await res.json();
+        allMembersCache = data.members || [];
+        return allMembersCache;
+    } catch {
+        return [];
+    }
+}
 
-    input.addEventListener('input', () => {
-        clearTimeout(sanctionUserPickerTimeout);
-        const query = input.value.trim();
-        if (query.length < 1) {
-            document.getElementById('sanctionUserDropdown').style.display = 'none';
+async function setupSanctionUserPicker() {
+    const select = document.getElementById('sanctionUser');
+    if (!select) return;
+
+    const members = await loadAllMembers();
+
+    // Remplir le dropdown
+    select.innerHTML = '<option value="">— Sélectionne un membre —</option>' +
+        members.map(m => `<option value="${m.id}" data-name="${escapeHtml(m.name)}" data-avatar="${m.avatar || ''}">${escapeHtml(m.name)}</option>`).join('');
+
+    // Gestionnaire de changement
+    select.addEventListener('change', () => {
+        const selected = select.options[select.selectedIndex];
+        const id = selected.value;
+        const preview = document.getElementById('sanctionUserPreview');
+
+        if (!id) {
+            preview.style.display = 'none';
             return;
         }
-        sanctionUserPickerTimeout = setTimeout(() => searchSanctionUser(query), 200);
-    });
 
-    input.addEventListener('keydown', (e) => {
-        const dropdown = document.getElementById('sanctionUserDropdown');
-        if (dropdown.style.display === 'none' || sanctionPickerResults.length === 0) return;
+        const name = selected.dataset.name || '';
+        const avatar = selected.dataset.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
 
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            sanctionPickerIndex = Math.min(sanctionPickerIndex + 1, sanctionPickerResults.length - 1);
-            renderSanctionDropdown();
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            sanctionPickerIndex = Math.max(sanctionPickerIndex - 1, 0);
-            renderSanctionDropdown();
-        } else if (e.key === 'Enter' || e.key === 'Tab') {
-            if (sanctionPickerResults[sanctionPickerIndex]) {
-                e.preventDefault();
-                selectSanctionUser(sanctionPickerResults[sanctionPickerIndex]);
-            }
-        } else if (e.key === 'Escape') {
-            dropdown.style.display = 'none';
-        }
-    });
-
-    // Click extérieur ferme le dropdown
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.user-picker')) {
-            const dropdown = document.getElementById('sanctionUserDropdown');
-            if (dropdown) dropdown.style.display = 'none';
-        }
+        document.getElementById('sanctionPreviewName').textContent = name;
+        document.getElementById('sanctionPreviewId').textContent = `ID : ${id}`;
+        document.getElementById('sanctionPreviewAvatar').src = avatar;
+        preview.style.display = 'flex';
     });
 }
-
-async function searchSanctionUser(query) {
-    try {
-        const res = await fetch(`/api/members/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        sanctionPickerResults = data.members || [];
-        sanctionPickerIndex = 0;
-        renderSanctionDropdown();
-    } catch (e) {
-        console.error('Sanction user search:', e);
-    }
-}
-
-function renderSanctionDropdown() {
-    const dropdown = document.getElementById('sanctionUserDropdown');
-    if (!dropdown) return;
-    if (sanctionPickerResults.length === 0) {
-        dropdown.innerHTML = '<div class="user-picker-empty">Aucun membre trouvé</div>';
-        dropdown.style.display = 'block';
-        return;
-    }
-    dropdown.innerHTML = sanctionPickerResults.map((m, i) => {
-        const avatar = m.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><rect width='32' height='32' fill='%23262626'/></svg>`;
-        return `
-            <div class="user-picker-item ${i === sanctionPickerIndex ? 'selected' : ''}" data-idx="${i}" onclick="selectSanctionUser(getSanctionPickerResult(${i}))">
-                <img class="user-picker-avatar" src="${avatar}" alt="">
-                <div class="user-picker-meta">
-                    <div class="user-picker-name">${escapeHtml(m.name)}</div>
-                    <div class="user-picker-id">${m.id}</div>
-                </div>
-            </div>
-        `;
-    }).join('');
-    dropdown.style.display = 'block';
-}
-
-function selectSanctionUser(member) {
-    document.getElementById('sanctionUser').value = member.id;
-    document.getElementById('sanctionUserSearch').style.display = 'none';
-    document.getElementById('sanctionUserDropdown').style.display = 'none';
-
-    const selected = document.getElementById('sanctionUserSelected');
-    document.getElementById('sanctionSelectedName').textContent = member.name;
-    document.getElementById('sanctionSelectedId').textContent = `ID : ${member.id}`;
-    document.getElementById('sanctionSelectedAvatar').src = member.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
-    selected.style.display = 'flex';
-    document.getElementById('sanctionUserClear').style.display = 'inline-flex';
-}
-
-function clearSanctionUser() {
-    document.getElementById('sanctionUser').value = '';
-    document.getElementById('sanctionUserSearch').value = '';
-    document.getElementById('sanctionUserSearch').style.display = 'block';
-    document.getElementById('sanctionUserSelected').style.display = 'none';
-    document.getElementById('sanctionUserDropdown').style.display = 'none';
-    document.getElementById('sanctionUserClear').style.display = 'none';
-    document.getElementById('sanctionUserSearch').focus();
-}
-
-window.selectSanctionUser = selectSanctionUser;
-window.clearSanctionUser = clearSanctionUser;
-window.getSanctionPickerResult = (idx) => sanctionPickerResults[idx];
