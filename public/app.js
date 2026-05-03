@@ -86,6 +86,7 @@ async function refreshAll() {
 let commandsLoaded = false;
 async function initCommandsTab() {
     await Promise.all([loadCommands(), loadAnnonceData()]);
+    setupSanctionUserPicker();
     commandsLoaded = true;
 }
 
@@ -323,23 +324,27 @@ async function loadSanctions() {
             const date = new Date(s.timestamp);
             const dateStr = date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 
-            // Trouver l'utilisateur principal (premier mentionné) pour la pp
             const mainUser = s.mentionedUsers && s.mentionedUsers[0];
             const avatar = mainUser?.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
 
-            // Parser le contenu : remplacer @@USER@@, @@ROLE@@, @@EMOJI@@
+            // Parser le contenu
             let content = escapeHtml(s.content);
-            content = content.replace(/@@USER@(\d+)@([^@]+)@@/g, (_, id, name) => {
-                return `<span class="mention mention-user">@${escapeHtml(name)}</span>`;
+            // @@USER@id@name@color@@
+            content = content.replace(/@@USER@(\d+)@([^@]+)@([^@]*)@@/g, (_, id, name, color) => {
+                const style = color ? `style="color:${color};background:${color}22;"` : '';
+                return `<span class="mention mention-user" ${style}>@${escapeHtml(name)}</span>`;
             });
-            content = content.replace(/@@ROLE@([^@]+)@@/g, (_, name) => {
-                return `<span class="mention mention-role">@${escapeHtml(name)}</span>`;
+            // @@ROLE@name@color@@
+            content = content.replace(/@@ROLE@([^@]+)@([^@]*)@@/g, (_, name, color) => {
+                const style = color ? `style="color:${color};background:${color}22;"` : '';
+                return `<span class="mention mention-role" ${style}>@${escapeHtml(name)}</span>`;
             });
+            // Emojis customs
             content = content.replace(/@@EMOJI@(\d+)@([^@]+)@(a?)@@/g, (_, id, name, animated) => {
                 const ext = animated === 'a' ? 'gif' : 'png';
                 return `<img class="inline-emoji" src="https://cdn.discordapp.com/emojis/${id}.${ext}" alt=":${name}:" title=":${name}:">`;
             });
-            // Convertir markdown gras **texte**
+            // Markdown gras
             content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
             return `
@@ -402,6 +407,9 @@ let channelsLoaded = false;
 let channelsData = null;
 let currentChannelId = null;
 let oldestMessageId = null;
+let newestMessageId = null;
+let channelPollTimer = null;
+let isUserScrolledUp = false;
 let loadingMore = false;
 
 async function loadChannels() {
@@ -483,6 +491,7 @@ function renderChannelsTree(filter = '') {
 }
 
 function backToChannels() {
+    stopChannelPolling();
     document.getElementById('channelsGridView').style.display = 'block';
     document.getElementById('channelMessagesView').style.display = 'none';
     document.getElementById('backToChannelsBtn').style.display = 'none';
@@ -500,6 +509,7 @@ function setupChannelSearch() {
 
 async function selectChannel(ch) {
     currentChannelId = ch.id;
+    stopChannelPolling();
 
     // Cacher la grille, montrer la vue messages
     document.getElementById('channelsGridView').style.display = 'none';
@@ -513,13 +523,13 @@ async function selectChannel(ch) {
     document.getElementById('channelTimeline').innerHTML = '<p class="empty">Chargement...</p>';
     document.getElementById('loadMoreBtn').style.display = 'none';
     oldestMessageId = null;
+    newestMessageId = null;
 
-    // Afficher la zone d'envoi sur les salons texte/announcement (pas forum direct, pas vocal)
+    // Afficher la zone d'envoi sur les salons texte/announcement
     const inputArea = document.getElementById('messageInputArea');
     if (inputArea) {
         if (ch.type === 0 || ch.type === 5) {
             inputArea.style.display = 'block';
-            // Reset le textarea
             const input = document.getElementById('messageInput');
             if (input) {
                 input.value = '';
@@ -533,6 +543,11 @@ async function selectChannel(ch) {
     }
 
     await loadMessages(ch.id);
+
+    // Démarrer le polling si c'est un salon texte
+    if (ch.type === 0 || ch.type === 5 || [10, 11, 12].includes(ch.type)) {
+        startChannelPolling();
+    }
 }
 
 async function loadMessages(channelId, before = null) {
@@ -564,7 +579,13 @@ async function loadMessages(channelId, before = null) {
 
         // Salon texte normal
         container.style.flexDirection = 'column-reverse';
-        if (!before) container.innerHTML = '';
+        if (!before) {
+            container.innerHTML = '';
+            // Reset newest pour la première charge
+            if (data.messages.length > 0) {
+                newestMessageId = data.messages[0].id; // [0] = plus récent (Discord renvoie en ordre desc)
+            }
+        }
 
         for (const m of data.messages) {
             container.appendChild(renderMessage(m));
@@ -581,6 +602,58 @@ async function loadMessages(channelId, before = null) {
         }
     } catch (e) {
         console.error('Messages:', e);
+    }
+}
+
+// ==========================================
+// AUTO-REFRESH des salons (polling 5s)
+// ==========================================
+function startChannelPolling() {
+    stopChannelPolling();
+    channelPollTimer = setInterval(async () => {
+        if (!currentChannelId) return;
+        // Skip si l'onglet n'est pas Salons
+        if (currentTab !== 'channels') return;
+        // Skip si la vue messages n'est pas affichée
+        const view = document.getElementById('channelMessagesView');
+        if (!view || view.style.display === 'none') return;
+
+        try {
+            const res = await fetch(`/api/channel/${currentChannelId}/messages?after=${newestMessageId || 0}`);
+            const data = await res.json();
+            if (data.error || !data.messages || data.messages.length === 0) return;
+
+            // Vérifier si on doit auto-scroll (l'utilisateur est en bas)
+            const container = document.getElementById('channelTimeline');
+            // Avec column-reverse, scrollTop = 0 signifie qu'on est en bas
+            const wasAtBottom = Math.abs(container.scrollTop) < 100;
+
+            // Ajouter les nouveaux messages au début (column-reverse)
+            // Discord renvoie [récent, ..., ancien], on les ajoute du plus ancien au plus récent
+            const sorted = [...data.messages].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+            for (const m of sorted) {
+                // Vérifier qu'il n'existe pas déjà
+                if (container.querySelector(`[data-msg-id="${m.id}"]`)) continue;
+                const el = renderMessage(m);
+                container.insertBefore(el, container.firstChild);
+                if (BigInt(m.id) > BigInt(newestMessageId || '0')) {
+                    newestMessageId = m.id;
+                }
+            }
+
+            if (wasAtBottom) {
+                container.scrollTop = 0;
+            }
+        } catch (e) {
+            // Silencieux : on est en polling, pas grave si une requête échoue
+        }
+    }, 5000);
+}
+
+function stopChannelPolling() {
+    if (channelPollTimer) {
+        clearInterval(channelPollTimer);
+        channelPollTimer = null;
     }
 }
 
@@ -686,6 +759,7 @@ async function openThread(threadId, threadName) {
 function renderMessage(m) {
     const div = document.createElement('div');
     div.className = 'message';
+    div.dataset.msgId = m.id;
     const date = new Date(m.createdTimestamp);
     const dateStr = date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -695,12 +769,13 @@ function renderMessage(m) {
         .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')
         .replace(/<@!?(\d+)>/g, (_, id) => {
             const u = m.mentions.users.find(u => u.id === id);
-            return `<span class="mention mention-user">@${escapeHtml(u?.name || 'inconnu')}</span>`;
+            const color = u?.color ? `style="color:${u.color};background:${u.color}22;"` : '';
+            return `<span class="mention mention-user" ${color}>@${escapeHtml(u?.name || 'inconnu')}</span>`;
         })
         .replace(/<@&(\d+)>/g, (_, id) => {
             const r = m.mentions.roles.find(r => r.id === id);
             const color = r?.color ? `#${r.color.toString(16).padStart(6, '0')}` : null;
-            const style = color ? `style="color:${color};"` : '';
+            const style = color ? `style="color:${color};background:${color}22;"` : '';
             return `<span class="mention mention-role" ${style}>@${escapeHtml(r?.name || 'rôle')}</span>`;
         })
         .replace(/<#(\d+)>/g, '<span class="mention mention-channel">#salon</span>')
@@ -746,7 +821,7 @@ function renderMessage(m) {
         <img class="message-avatar" src="${avatar}" alt="">
         <div class="message-body">
             <div class="message-header">
-                <span class="message-author ${m.authorBot ? 'bot' : ''}">${escapeHtml(m.authorName)}</span>
+                <span class="message-author ${m.authorBot ? 'bot' : ''}" ${m.authorColor ? `style="color:${m.authorColor};"` : ''}>${escapeHtml(m.authorName)}</span>
                 ${m.authorBot ? '<span class="message-bot-tag">BOT</span>' : ''}
                 ${m.pinned ? '<span class="message-pinned-tag">📌 ÉPINGLÉ</span>' : ''}
                 <span class="message-time">${dateStr}</span>
@@ -1475,7 +1550,7 @@ async function sendSanction() {
     const userId = document.getElementById('sanctionUser').value.trim();
     const raison = document.getElementById('sanctionRaison').value;
 
-    if (!userId) { toast('❌ Indique un utilisateur', 'error'); return; }
+    if (!userId) { toast('❌ Sélectionne un utilisateur', 'error'); return; }
     if (!raison.trim()) { toast('❌ Indique une raison', 'error'); return; }
     if (!confirm('Envoyer cet avertissement ?')) return;
 
@@ -1488,7 +1563,7 @@ async function sendSanction() {
         const data = await res.json();
         if (res.ok) {
             toast('⚠️ Sanction envoyée');
-            document.getElementById('sanctionUser').value = '';
+            clearSanctionUser();
             const ta = document.getElementById('sanctionRaison');
             ta.value = '';
             ta.dispatchEvent(new Event('input'));
@@ -1769,3 +1844,117 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(setupMessageInput, 500);
     ensureServerEmojisLoaded();
 });
+
+// ==========================================
+// USER PICKER (Sanction)
+// ==========================================
+let sanctionUserPickerTimeout = null;
+let sanctionPickerResults = [];
+let sanctionPickerIndex = 0;
+
+function setupSanctionUserPicker() {
+    const input = document.getElementById('sanctionUserSearch');
+    if (!input) return;
+
+    input.addEventListener('input', () => {
+        clearTimeout(sanctionUserPickerTimeout);
+        const query = input.value.trim();
+        if (query.length < 1) {
+            document.getElementById('sanctionUserDropdown').style.display = 'none';
+            return;
+        }
+        sanctionUserPickerTimeout = setTimeout(() => searchSanctionUser(query), 200);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        const dropdown = document.getElementById('sanctionUserDropdown');
+        if (dropdown.style.display === 'none' || sanctionPickerResults.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            sanctionPickerIndex = Math.min(sanctionPickerIndex + 1, sanctionPickerResults.length - 1);
+            renderSanctionDropdown();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            sanctionPickerIndex = Math.max(sanctionPickerIndex - 1, 0);
+            renderSanctionDropdown();
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+            if (sanctionPickerResults[sanctionPickerIndex]) {
+                e.preventDefault();
+                selectSanctionUser(sanctionPickerResults[sanctionPickerIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    // Click extérieur ferme le dropdown
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.user-picker')) {
+            const dropdown = document.getElementById('sanctionUserDropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }
+    });
+}
+
+async function searchSanctionUser(query) {
+    try {
+        const res = await fetch(`/api/members/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        sanctionPickerResults = data.members || [];
+        sanctionPickerIndex = 0;
+        renderSanctionDropdown();
+    } catch (e) {
+        console.error('Sanction user search:', e);
+    }
+}
+
+function renderSanctionDropdown() {
+    const dropdown = document.getElementById('sanctionUserDropdown');
+    if (!dropdown) return;
+    if (sanctionPickerResults.length === 0) {
+        dropdown.innerHTML = '<div class="user-picker-empty">Aucun membre trouvé</div>';
+        dropdown.style.display = 'block';
+        return;
+    }
+    dropdown.innerHTML = sanctionPickerResults.map((m, i) => {
+        const avatar = m.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32'><rect width='32' height='32' fill='%23262626'/></svg>`;
+        return `
+            <div class="user-picker-item ${i === sanctionPickerIndex ? 'selected' : ''}" data-idx="${i}" onclick="selectSanctionUser(getSanctionPickerResult(${i}))">
+                <img class="user-picker-avatar" src="${avatar}" alt="">
+                <div class="user-picker-meta">
+                    <div class="user-picker-name">${escapeHtml(m.name)}</div>
+                    <div class="user-picker-id">${m.id}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    dropdown.style.display = 'block';
+}
+
+function selectSanctionUser(member) {
+    document.getElementById('sanctionUser').value = member.id;
+    document.getElementById('sanctionUserSearch').style.display = 'none';
+    document.getElementById('sanctionUserDropdown').style.display = 'none';
+
+    const selected = document.getElementById('sanctionUserSelected');
+    document.getElementById('sanctionSelectedName').textContent = member.name;
+    document.getElementById('sanctionSelectedId').textContent = `ID : ${member.id}`;
+    document.getElementById('sanctionSelectedAvatar').src = member.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
+    selected.style.display = 'flex';
+    document.getElementById('sanctionUserClear').style.display = 'inline-flex';
+}
+
+function clearSanctionUser() {
+    document.getElementById('sanctionUser').value = '';
+    document.getElementById('sanctionUserSearch').value = '';
+    document.getElementById('sanctionUserSearch').style.display = 'block';
+    document.getElementById('sanctionUserSelected').style.display = 'none';
+    document.getElementById('sanctionUserDropdown').style.display = 'none';
+    document.getElementById('sanctionUserClear').style.display = 'none';
+    document.getElementById('sanctionUserSearch').focus();
+}
+
+window.selectSanctionUser = selectSanctionUser;
+window.clearSanctionUser = clearSanctionUser;
+window.getSanctionPickerResult = (idx) => sanctionPickerResults[idx];
