@@ -149,6 +149,7 @@ const RENAME_KICK_DELAY = 10 * 60 * 1000;
 const roleRemovalProcessing = new Set();
 const pendingPromotionChecks = new Map(); // userId → timer pour grace period 5min après retrait MEMBRE_3
 let lastRadioMessageId = null;
+const botStartTime = Date.now(); // Pour le fallback welcome : ne traiter que les messages antérieurs au démarrage
 
 // Persistance du welcomeState pour survivre aux redéploiements
 const WELCOME_STATE_FILE = '/data/welcome_state.json';
@@ -1168,69 +1169,74 @@ client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
 
     // ─── Fallback Welcome ─────────────────────────────
-    // Si la réaction est sur un message de welcome ET que c'est le bon utilisateur
-    // (ce handler rattrape le cas où le collector a été perdu suite à un redéploiement)
+    // Ce handler ne sert QU'À rattraper les messages d'avant un redéploiement.
+    // En conditions normales, le createReactionCollector du flow d'accueil traite tout.
+    // Pour éviter les doublons, on n'agit que sur les messages créés AVANT le démarrage du bot.
     try {
-        // 1. Cherche dans le state en mémoire
-        let foundState = null;
-        let foundUserId = null;
-        for (const [userId, state] of welcomeState) {
-            if (state.messageId === reaction.message.id && userId === user.id) {
-                foundState = state;
-                foundUserId = userId;
-                break;
-            }
-        }
+        const msg = reaction.message;
+        const msgCreatedAt = msg.createdTimestamp || 0;
 
-        if (foundState) {
-            await handleWelcomeReactionFallback(reaction, user, foundState);
-            return; // Pas besoin de continuer
-        }
+        // Si le message a été créé APRÈS le démarrage du bot, le collector original est forcément actif
+        // → on ne touche pas, le collector va s'en occuper
+        if (msgCreatedAt >= botStartTime - 1000) {
+            // Continuer vers le traitement normal des réactions présence OP
+        } else {
+            // Message d'avant le démarrage → le collector est mort, on tente le rattrapage
 
-        // 2. Pas de state trouvé : détection automatique
-        // Si la réaction est dans le salon règlement, sur un message du bot,
-        // ET que le message correspond à un step du flow → on reconstruit l'état
-        if (reaction.message.channelId === CONFIG.CHANNELS.REGLEMENT) {
-            // Charger le message complet si partial
-            let msg = reaction.message;
-            if (msg.partial) {
-                try { msg = await msg.fetch(); } catch { return; }
+            // 1. Cherche dans le state restauré
+            let foundState = null;
+            for (const [userId, state] of welcomeState) {
+                if (state.messageId === msg.id && userId === user.id) {
+                    foundState = state;
+                    break;
+                }
             }
 
-            if (msg.author.id !== client.user.id) return;
+            if (foundState) {
+                await handleWelcomeReactionFallback(reaction, user, foundState);
+                return;
+            }
 
-            const content = msg.content || '';
-            // Détecter quel step c'est et si l'utilisateur est mentionné dedans
-            let detectedStep = null;
-            if (/Lis bien le règlement/i.test(content)) detectedStep = 1;
-            else if (/Tu as bien lu le règlement/i.test(content)) detectedStep = 2;
-            else if (/Tu es vraiment sûr/i.test(content)) detectedStep = 3;
-            else if (/tu as compris que ça va être une tyrannie/i.test(content)) detectedStep = 4;
+            // 2. Pas de state : auto-détection par le contenu du message
+            if (msg.channelId === CONFIG.CHANNELS.REGLEMENT) {
+                let fullMsg = msg;
+                if (msg.partial) {
+                    try { fullMsg = await msg.fetch(); } catch { return; }
+                }
 
-            if (!detectedStep) return;
+                if (fullMsg.author.id !== client.user.id) return;
 
-            // Vérifier que l'utilisateur qui réagit est bien celui mentionné
-            if (!content.includes(`<@${user.id}>`) && !content.includes(`<@!${user.id}>`)) return;
+                const content = fullMsg.content || '';
+                let detectedStep = null;
+                if (/Lis bien le règlement/i.test(content)) detectedStep = 1;
+                else if (/Tu as bien lu le règlement/i.test(content)) detectedStep = 2;
+                else if (/Tu es vraiment sûr/i.test(content)) detectedStep = 3;
+                else if (/tu as compris que ça va être une tyrannie/i.test(content)) detectedStep = 4;
 
-            console.log(`🔄 Welcome auto-détecté : step ${detectedStep} pour ${user.tag || user.username}`);
+                if (!detectedStep) return;
 
-            // Reconstruire l'état et traiter
-            const reconstructedState = {
-                step: detectedStep,
-                messageId: msg.id,
-                guildId: msg.guildId || CONFIG.GUILD_ID,
-                createdAt: msg.createdTimestamp,
-            };
-            welcomeState.set(user.id, reconstructedState);
-            saveWelcomeState();
+                if (!content.includes(`<@${user.id}>`) && !content.includes(`<@!${user.id}>`)) return;
 
-            await handleWelcomeReactionFallback(reaction, user, reconstructedState);
-            return;
+                console.log(`🔄 Welcome auto-détecté (msg pré-démarrage) : step ${detectedStep} pour ${user.tag || user.username}`);
+
+                const reconstructedState = {
+                    step: detectedStep,
+                    messageId: fullMsg.id,
+                    guildId: fullMsg.guildId || CONFIG.GUILD_ID,
+                    createdAt: fullMsg.createdTimestamp,
+                };
+                welcomeState.set(user.id, reconstructedState);
+                saveWelcomeState();
+
+                await handleWelcomeReactionFallback(reaction, user, reconstructedState);
+                return;
+            }
         }
     } catch (e) {
         console.error('❌ Fallback welcome:', e.message);
     }
 
+    // ─── Réactions présence OP ────────────────────────
     const msgId = reaction.message.id;
     const map = getReactionMap(msgId);
     if (!map) return;
