@@ -1382,18 +1382,17 @@ async function loadCommands() {
 // ==========================================
 let serverEmojis = [];
 
+let allRolesCache = [];
+
 async function loadAnnonceData() {
-    // Charger rôles dans les 2 selects (annonce + rappel)
+    // Charger rôles
     try {
         const r = await fetch('/api/roles');
         const data = await r.json();
         if (data.roles) {
-            const opts = '<option value="">— Choisir un rôle —</option>' +
-                data.roles.map(role => `<option value="${role.id}">@${escapeHtml(role.name)} (${role.memberCount})</option>`).join('');
-            const annonceSelect = document.getElementById('annonceRole');
-            const rappelSelect = document.getElementById('rappelRole');
-            if (annonceSelect) annonceSelect.innerHTML = opts;
-            if (rappelSelect) rappelSelect.innerHTML = opts;
+            allRolesCache = data.roles;
+            renderRoleDropdown('annonce');
+            renderRoleDropdown('rappel');
         }
     } catch {}
 
@@ -1406,7 +1405,84 @@ async function loadAnnonceData() {
 
     // Initialiser les compteurs de caractères
     setupCharCounters();
+
+    // Setup search dans les dropdowns
+    ['annonceRole', 'rappelRole'].forEach(prefix => {
+        const search = document.getElementById(`${prefix}Search`);
+        if (search) {
+            search.addEventListener('input', () => filterRoleDropdown(prefix.replace('Role', '')));
+        }
+    });
 }
+
+function renderRoleDropdown(type) {
+    const list = document.getElementById(`${type}RoleList`);
+    if (!list) return;
+
+    list.innerHTML = allRolesCache.map(role => {
+        const colorDot = role.color
+            ? `<span class="role-color-dot" style="background:${role.color};"></span>`
+            : `<span class="role-color-dot" style="background:#888;"></span>`;
+        return `
+            <div class="custom-dropdown-item" data-role-id="${role.id}" data-role-name="${escapeHtml(role.name)}" data-role-color="${role.color || ''}" onclick="selectRole('${type}', '${role.id}', '${escapeHtml(role.name).replace(/'/g, "\\'")}', '${role.color || ''}', ${role.memberCount})">
+                ${colorDot}
+                <span class="custom-dropdown-item-label" style="${role.color ? `color:${role.color};` : ''}">@${escapeHtml(role.name)}</span>
+                <span class="custom-dropdown-item-count">${role.memberCount}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function filterRoleDropdown(type) {
+    const query = document.getElementById(`${type}RoleSearch`).value.toLowerCase().trim();
+    const items = document.querySelectorAll(`#${type}RoleList .custom-dropdown-item`);
+    items.forEach(item => {
+        const name = item.dataset.roleName.toLowerCase();
+        item.style.display = !query || name.includes(query) ? 'flex' : 'none';
+    });
+}
+
+function toggleRoleDropdown(type, event) {
+    if (event) event.stopPropagation();
+    closeAllDropdowns();
+    const menu = document.getElementById(`${type}RoleMenu`);
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        if (menu.style.display === 'block') {
+            const search = document.getElementById(`${type}RoleSearch`);
+            if (search) {
+                search.value = '';
+                filterRoleDropdown(type);
+                setTimeout(() => search.focus(), 50);
+            }
+        }
+    }
+}
+
+function selectRole(type, id, name, color, count) {
+    document.getElementById(`${type}Role`).value = id;
+    const label = document.getElementById(`${type}RoleLabel`);
+    if (label) {
+        label.innerHTML = `<span class="role-color-dot" style="background:${color || '#888'};"></span> @${name} <span style="opacity:0.6;font-size:11px;">(${count})</span>`;
+        label.classList.remove('custom-dropdown-placeholder');
+        if (color) label.style.color = color;
+    }
+    document.getElementById(`${type}RoleMenu`).style.display = 'none';
+}
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.style.display = 'none');
+}
+
+// Click extérieur ferme tous les dropdowns
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.custom-dropdown')) {
+        closeAllDropdowns();
+    }
+});
+
+window.toggleRoleDropdown = toggleRoleDropdown;
+window.selectRole = selectRole;
 
 function setupCharCounters() {
     const fields = [
@@ -1510,6 +1586,9 @@ async function sendAnnonce() {
             const ta = document.getElementById('annonceMessage');
             ta.value = '';
             ta.dispatchEvent(new Event('input'));
+            document.getElementById('annonceRole').value = '';
+            const label = document.getElementById('annonceRoleLabel');
+            if (label) { label.innerHTML = '— Choisir un rôle —'; label.style.color = ''; }
         } else {
             toast(`❌ ${data.error}`, 'error');
         }
@@ -1538,6 +1617,9 @@ async function sendRappel() {
             const ta = document.getElementById('rappelMessage');
             ta.value = '';
             ta.dispatchEvent(new Event('input'));
+            document.getElementById('rappelRole').value = '';
+            const label = document.getElementById('rappelRoleLabel');
+            if (label) { label.innerHTML = '— Choisir un rôle —'; label.style.color = ''; }
         } else {
             toast(`❌ ${data.error}`, 'error');
         }
@@ -1563,9 +1645,14 @@ async function sendSanction() {
         const data = await res.json();
         if (res.ok) {
             toast('⚠️ Sanction envoyée');
-            // Reset dropdown
+            // Reset dropdown custom
             document.getElementById('sanctionUser').value = '';
             document.getElementById('sanctionUserPreview').style.display = 'none';
+            const label = document.getElementById('sanctionDropdownLabel');
+            if (label) {
+                label.classList.add('custom-dropdown-placeholder');
+                label.innerHTML = '— Sélectionne un membre —';
+            }
             const ta = document.getElementById('sanctionRaison');
             ta.value = '';
             ta.dispatchEvent(new Event('input'));
@@ -1865,32 +1952,77 @@ async function loadAllMembers() {
 }
 
 async function setupSanctionUserPicker() {
-    const select = document.getElementById('sanctionUser');
-    if (!select) return;
-
     const members = await loadAllMembers();
+    const list = document.getElementById('sanctionDropdownList');
+    if (!list) return;
 
-    // Remplir le dropdown
-    select.innerHTML = '<option value="">— Sélectionne un membre —</option>' +
-        members.map(m => `<option value="${m.id}" data-name="${escapeHtml(m.name)}" data-avatar="${m.avatar || ''}">${escapeHtml(m.name)}</option>`).join('');
+    list.innerHTML = members.map(m => {
+        const avatar = m.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><rect width='28' height='28' fill='%23262626'/></svg>`;
+        const colorStyle = m.color ? `color:${m.color};` : '';
+        return `
+            <div class="custom-dropdown-item user-item" data-name="${escapeHtml(m.name).toLowerCase()}" onclick="selectSanctionUserCustom('${m.id}', '${escapeHtml(m.name).replace(/'/g, "\\'")}', '${m.avatar || ''}', '${m.color || ''}')">
+                <img class="user-item-avatar" src="${avatar}" alt="">
+                <div class="user-item-info">
+                    <div class="user-item-name" style="${colorStyle}">${escapeHtml(m.name)}</div>
+                    <div class="user-item-id">${m.id}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
 
-    // Gestionnaire de changement
-    select.addEventListener('change', () => {
-        const selected = select.options[select.selectedIndex];
-        const id = selected.value;
-        const preview = document.getElementById('sanctionUserPreview');
-
-        if (!id) {
-            preview.style.display = 'none';
-            return;
-        }
-
-        const name = selected.dataset.name || '';
-        const avatar = selected.dataset.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
-
-        document.getElementById('sanctionPreviewName').textContent = name;
-        document.getElementById('sanctionPreviewId').textContent = `ID : ${id}`;
-        document.getElementById('sanctionPreviewAvatar').src = avatar;
-        preview.style.display = 'flex';
-    });
+    const search = document.getElementById('sanctionDropdownSearch');
+    if (search) {
+        search.addEventListener('input', () => {
+            const query = search.value.toLowerCase().trim();
+            list.querySelectorAll('.custom-dropdown-item').forEach(item => {
+                const name = item.dataset.name;
+                item.style.display = !query || name.includes(query) ? 'flex' : 'none';
+            });
+        });
+    }
 }
+
+function toggleSanctionDropdown(event) {
+    if (event) event.stopPropagation();
+    closeAllDropdowns();
+    const menu = document.getElementById('sanctionDropdownMenu');
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        if (menu.style.display === 'block') {
+            const search = document.getElementById('sanctionDropdownSearch');
+            if (search) {
+                search.value = '';
+                // Reset filter
+                document.querySelectorAll('#sanctionDropdownList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
+                setTimeout(() => search.focus(), 50);
+            }
+        }
+    }
+}
+
+function selectSanctionUserCustom(id, name, avatar, color) {
+    document.getElementById('sanctionUser').value = id;
+
+    const label = document.getElementById('sanctionDropdownLabel');
+    if (label) {
+        label.classList.remove('custom-dropdown-placeholder');
+        const avatarHtml = avatar ? `<img class="dropdown-trigger-avatar" src="${avatar}" alt="">` : '';
+        const colorStyle = color ? `color:${color};` : '';
+        label.innerHTML = `${avatarHtml}<span style="${colorStyle}">${escapeHtml(name)}</span>`;
+    }
+
+    // Afficher la preview
+    const preview = document.getElementById('sanctionUserPreview');
+    if (preview) {
+        document.getElementById('sanctionPreviewName').textContent = name;
+        document.getElementById('sanctionPreviewName').style.color = color || '';
+        document.getElementById('sanctionPreviewId').textContent = `ID : ${id}`;
+        document.getElementById('sanctionPreviewAvatar').src = avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
+        preview.style.display = 'flex';
+    }
+
+    document.getElementById('sanctionDropdownMenu').style.display = 'none';
+}
+
+window.toggleSanctionDropdown = toggleSanctionDropdown;
+window.selectSanctionUserCustom = selectSanctionUserCustom;
