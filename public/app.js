@@ -1308,14 +1308,17 @@ async function loadCommands() {
 let serverEmojis = [];
 
 async function loadAnnonceData() {
-    // Charger rôles
+    // Charger rôles dans les 2 selects (annonce + rappel)
     try {
         const r = await fetch('/api/roles');
         const data = await r.json();
-        const select = document.getElementById('annonceRole');
-        if (select && data.roles) {
-            select.innerHTML = '<option value="">— Choisir un rôle —</option>' +
+        if (data.roles) {
+            const opts = '<option value="">— Choisir un rôle —</option>' +
                 data.roles.map(role => `<option value="${role.id}">@${escapeHtml(role.name)} (${role.memberCount})</option>`).join('');
+            const annonceSelect = document.getElementById('annonceRole');
+            const rappelSelect = document.getElementById('rappelRole');
+            if (annonceSelect) annonceSelect.innerHTML = opts;
+            if (rappelSelect) rappelSelect.innerHTML = opts;
         }
     } catch {}
 
@@ -1325,11 +1328,58 @@ async function loadAnnonceData() {
         const data = await r.json();
         serverEmojis = data.emojis || [];
     } catch {}
+
+    // Initialiser les compteurs de caractères
+    setupCharCounters();
 }
 
-function toggleEmojiPicker() {
+function setupCharCounters() {
+    const fields = [
+        ['annonceMessage', 'annonceCharCount'],
+        ['rappelMessage', 'rappelCharCount'],
+        ['sanctionRaison', 'sanctionCharCount'],
+    ];
+    for (const [textareaId, counterId] of fields) {
+        const ta = document.getElementById(textareaId);
+        const counter = document.getElementById(counterId);
+        if (ta && counter) {
+            const update = () => {
+                counter.textContent = `${ta.value.length} / 2000`;
+                counter.classList.toggle('comm-charcount-warn', ta.value.length > 1800);
+            };
+            ta.addEventListener('input', update);
+            update();
+        }
+    }
+}
+
+let activeCommTab = 'annonce';
+let activeEmojiTarget = 'annonceMessage';
+
+function switchCommTab(name) {
+    activeCommTab = name;
+    document.querySelectorAll('.comm-tab').forEach(b => b.classList.toggle('active', b.dataset.comm === name));
+    document.querySelectorAll('.comm-panel').forEach(p => {
+        if (p.id === `commPanel-${name}`) {
+            p.classList.add('active');
+            p.style.display = 'block';
+        } else {
+            p.classList.remove('active');
+            p.style.display = 'none';
+        }
+    });
+    // Cacher le picker emoji quand on change d'onglet
+    const picker = document.getElementById('emojiPicker');
+    if (picker) picker.style.display = 'none';
+}
+
+// Exposer les fonctions globalement pour les onclick inline
+window.switchCommTab = switchCommTab;
+
+function toggleEmojiPicker(targetId) {
     const picker = document.getElementById('emojiPicker');
     if (!picker) return;
+    activeEmojiTarget = targetId || 'annonceMessage';
     if (picker.style.display === 'none') {
         renderEmojiPicker();
         picker.style.display = 'grid';
@@ -1353,7 +1403,7 @@ function renderEmojiPicker() {
 }
 
 function insertEmoji(code) {
-    const textarea = document.getElementById('annonceMessage');
+    const textarea = document.getElementById(activeEmojiTarget);
     if (!textarea) return;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -1361,6 +1411,8 @@ function insertEmoji(code) {
     textarea.value = value.substring(0, start) + code + value.substring(end);
     textarea.focus();
     textarea.setSelectionRange(start + code.length, start + code.length);
+    // Trigger input event pour mettre à jour le compteur
+    textarea.dispatchEvent(new Event('input'));
 }
 
 async function sendAnnonce() {
@@ -1380,7 +1432,9 @@ async function sendAnnonce() {
         const data = await res.json();
         if (res.ok) {
             toast('📤 Annonce envoyée');
-            document.getElementById('annonceMessage').value = '';
+            const ta = document.getElementById('annonceMessage');
+            ta.value = '';
+            ta.dispatchEvent(new Event('input'));
         } else {
             toast(`❌ ${data.error}`, 'error');
         }
@@ -1388,6 +1442,70 @@ async function sendAnnonce() {
         toast(`❌ ${e.message}`, 'error');
     }
 }
+
+async function sendRappel() {
+    const roleId = document.getElementById('rappelRole').value;
+    const message = document.getElementById('rappelMessage').value;
+
+    if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
+    if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
+    if (!confirm('Envoyer ce rappel ?')) return;
+
+    try {
+        const res = await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: 'rappel', params: { roleId, message } })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast('📌 Rappel envoyé');
+            const ta = document.getElementById('rappelMessage');
+            ta.value = '';
+            ta.dispatchEvent(new Event('input'));
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+async function sendSanction() {
+    const userId = document.getElementById('sanctionUser').value.trim();
+    const raison = document.getElementById('sanctionRaison').value;
+
+    if (!userId) { toast('❌ Indique un utilisateur', 'error'); return; }
+    if (!raison.trim()) { toast('❌ Indique une raison', 'error'); return; }
+    if (!confirm('Envoyer cet avertissement ?')) return;
+
+    try {
+        const res = await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command: 'sanction', params: { userId, raison } })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast('⚠️ Sanction envoyée');
+            document.getElementById('sanctionUser').value = '';
+            const ta = document.getElementById('sanctionRaison');
+            ta.value = '';
+            ta.dispatchEvent(new Event('input'));
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+// Exposer toutes les fonctions de communications globalement
+window.sendAnnonce = sendAnnonce;
+window.sendRappel = sendRappel;
+window.sendSanction = sendSanction;
+window.toggleEmojiPicker = toggleEmojiPicker;
+window.insertEmoji = insertEmoji;
 
 // ==========================================
 // ENVOI DE MESSAGES DANS LES SALONS
