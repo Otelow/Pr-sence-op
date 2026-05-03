@@ -48,6 +48,7 @@ const CONFIG = {
             '1495448653945634987',
             '1495464200443662366',
             '1497005826114846741',
+            '1497228404834045972',
         ],
         // Rôles supérieurs : si MEMBRE_3 retiré et remplacé par un de ceux-là dans les 5 min → promotion (pas de relance accueil)
         PROMOTION_ROLES: [
