@@ -784,6 +784,37 @@ function startServer(client, getState) {
         res.json({ members });
     });
 
+    // ==========================================
+    // API — Tous les membres du serveur (pour dropdown)
+    // ==========================================
+    app.get('/api/members/all', requireAuth, async (req, res) => {
+        const state = botState();
+        const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
+        if (!guild) return res.json({ members: [] });
+
+        try {
+            // Forcer un fetch complet
+            await guild.members.fetch().catch(() => {});
+
+            const members = [...guild.members.cache.values()]
+                .filter(m => !m.user.bot)
+                .map(m => ({
+                    id: m.id,
+                    name: m.nickname || m.user.username,
+                    username: m.user.username,
+                    avatar: m.user.avatar
+                        ? `https://cdn.discordapp.com/avatars/${m.id}/${m.user.avatar}.png?size=32`
+                        : null,
+                    color: m.displayHexColor && m.displayHexColor !== '#000000' ? m.displayHexColor : null,
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }));
+
+            res.json({ members });
+        } catch (e) {
+            res.json({ members: [], error: e.message });
+        }
+    });
+
     app.get('/api/channel/:id/pinned', requireAuth, async (req, res) => {
         try {
             const channel = botClient.channels.cache.get(req.params.id);
