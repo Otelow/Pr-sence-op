@@ -346,16 +346,18 @@ function startServer(client, getState) {
                 .map(async m => {
                     let content = m.content;
 
-                    // 1. Résoudre <@&roleId> → @nomDuRole (avec data pour stylisation)
+                    // 1. Résoudre <@&roleId> → @@ROLE@name@color@@
                     content = content.replace(/<@&(\d+)>/g, (match, id) => {
                         const role = guild?.roles.cache.get(id);
-                        return role ? `@@ROLE@${role.name}@@` : match;
+                        if (!role) return match;
+                        const color = role.color ? `#${role.color.toString(16).padStart(6, '0')}` : '';
+                        return `@@ROLE@${role.name}@${color}@@`;
                     });
 
-                    // 2. Résoudre <@!?userId> → @username (avec data pour stylisation)
-                    const userMentions = [...content.matchAll(/<@!?(\d+)>/g)];
-                    const mentionedUsers = []; // Pour avoir les avatars
-                    for (const um of userMentions) {
+                    // 2. Résoudre <@!?userId> → @@USER@id@name@color@@
+                    const userMatches = [...content.matchAll(/<@!?(\d+)>/g)];
+                    const mentionedUsers = [];
+                    for (const um of userMatches) {
                         const userId = um[1];
                         try {
                             const member = await guild?.members.fetch(userId).catch(() => null);
@@ -364,13 +366,14 @@ function startServer(client, getState) {
                                 const avatar = member.user.avatar
                                     ? `https://cdn.discordapp.com/avatars/${userId}/${member.user.avatar}.png?size=32`
                                     : null;
-                                mentionedUsers.push({ id: userId, name, avatar });
-                                content = content.replace(um[0], `@@USER@${userId}@${name}@@`);
+                                const color = member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : '';
+                                mentionedUsers.push({ id: userId, name, avatar, color });
+                                content = content.replace(um[0], `@@USER@${userId}@${name}@${color}@@`);
                             }
                         } catch {}
                     }
 
-                    // 3. Convertir emojis customs <:name:id> → @@EMOJI@id@name@@
+                    // 3. Emojis customs <:name:id> → @@EMOJI@id@name@a@@
                     content = content.replace(/<(a?):(\w+):(\d+)>/g, (match, animated, name, id) => {
                         return `@@EMOJI@${id}@${name}@${animated ? 'a' : ''}@@`;
                     });
@@ -526,6 +529,7 @@ function startServer(client, getState) {
     app.get('/api/channel/:id/messages', requireAuth, async (req, res) => {
         const channelId = req.params.id;
         const before = req.query.before;
+        const after = req.query.after;
 
         try {
             const channel = botClient.channels.cache.get(channelId);
@@ -610,19 +614,26 @@ function startServer(client, getState) {
 
             const fetchOptions = { limit: 100 };
             if (before) fetchOptions.before = before;
+            if (after && after !== '0') fetchOptions.after = after;
 
             const guild = botClient.guilds.cache.get(botState().CONFIG.GUILD_ID);
             const messages = await channel.messages.fetch(fetchOptions);
 
             const result = await Promise.all([...messages.values()].map(async m => {
-                // Construire la liste des mentions avec noms RÉSOLUS
+                // Construire la liste des mentions avec noms RÉSOLUS et couleurs
                 const userMentions = await Promise.all([...m.mentions.users.values()].map(async u => {
                     const member = await guild?.members.fetch(u.id).catch(() => null);
+                    const displayColor = member?.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null;
                     return {
                         id: u.id,
                         name: member?.nickname || u.username,
+                        color: displayColor,
                     };
                 }));
+
+                // Couleur de l'auteur
+                const authorMember = m.member;
+                const authorColor = authorMember?.displayHexColor && authorMember.displayHexColor !== '#000000' ? authorMember.displayHexColor : null;
 
                 return {
                     id: m.id,
@@ -633,6 +644,7 @@ function startServer(client, getState) {
                         ? `https://cdn.discordapp.com/avatars/${m.author.id}/${m.author.avatar}.png?size=64`
                         : null,
                     authorBot: m.author.bot,
+                    authorColor: authorColor,
                     createdTimestamp: m.createdTimestamp,
                     editedTimestamp: m.editedTimestamp,
                     attachments: [...m.attachments.values()].map(a => ({
