@@ -1627,27 +1627,119 @@ async function handleAnnonce(interaction) {
 // /clear + /clearmessage
 // ==========================================
 async function handleClear(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    try {
+        await interaction.reply({ content: '🧹 Suppression en cours...', ephemeral: true });
+    } catch (e) {
+        console.error('❌ /clear reply:', e.message);
+        return;
+    }
+
     const limit = interaction.options.getInteger('nombre') || 100;
-    const count = await clearBotMessages(interaction.channel, limit);
-    await interaction.editReply(`🧹 ${count} message(s) supprimé(s)`);
+
+    try {
+        const count = await clearBotMessages(interaction.channel, limit);
+        await interaction.editReply(`🧹 ${count} message(s) du bot supprimé(s)`).catch(() => {});
+    } catch (e) {
+        console.error('❌ /clear erreur:', e.message);
+        await interaction.editReply(`❌ Erreur : ${e.message}`).catch(() => {});
+    }
 }
 
 async function handleClearMessage(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    try {
+        await interaction.reply({ content: '🧹 Suppression en cours...', ephemeral: true });
+    } catch (e) {
+        console.error('❌ /clearmessage reply:', e.message);
+        return;
+    }
+
     const nombre = interaction.options.getInteger('nombre');
-    const msgs = await interaction.channel.messages.fetch({ limit: nombre });
-    const toDelete = msgs.filter(m => m.author.id !== '952986899667103804');
-    let d = 0;
-    for (const [, m] of toDelete) { await m.delete().catch(() => {}); d++; await sleep(300); }
-    await interaction.editReply(`🧹 ${d} message(s) supprimé(s)`);
+
+    try {
+        const msgs = await interaction.channel.messages.fetch({ limit: Math.min(nombre, 100) });
+        const toDelete = msgs.filter(m => m.author.id !== '952986899667103804');
+
+        // Séparer les messages récents (< 14 jours) des anciens
+        const now = Date.now();
+        const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+        const recent = [];
+        const old = [];
+        for (const [, m] of toDelete) {
+            if (now - m.createdTimestamp < FOURTEEN_DAYS) recent.push(m);
+            else old.push(m);
+        }
+
+        let deleted = 0;
+
+        // Bulk delete pour les récents (plus rapide, pas de rate-limit)
+        if (recent.length >= 2) {
+            try {
+                const bulk = await interaction.channel.bulkDelete(recent, true);
+                deleted += bulk.size;
+            } catch (e) {
+                console.warn('⚠️ bulkDelete fallback:', e.message);
+                // Fallback : un par un
+                for (const m of recent) {
+                    try { await m.delete(); deleted++; } catch {}
+                    await sleep(300);
+                }
+            }
+        } else if (recent.length === 1) {
+            try { await recent[0].delete(); deleted++; } catch {}
+        }
+
+        // Anciens : un par un (Discord interdit le bulk pour > 14 jours)
+        for (const m of old) {
+            try { await m.delete(); deleted++; } catch {}
+            await sleep(500);
+        }
+
+        await interaction.editReply(`🧹 ${deleted} message(s) supprimé(s)${old.length > 0 ? ` (dont ${old.length} > 14 jours)` : ''}`).catch(() => {});
+    } catch (e) {
+        console.error('❌ /clearmessage erreur:', e.message);
+        await interaction.editReply(`❌ Erreur : ${e.message}`).catch(() => {});
+    }
 }
 
 async function clearBotMessages(channel, limit) {
-    let d = 0;
-    const msgs = await channel.messages.fetch({ limit });
-    for (const [, m] of msgs.filter(m => m.author.id === client.user.id)) { await m.delete().catch(() => {}); d++; await sleep(300); }
-    return d;
+    let deleted = 0;
+    const msgs = await channel.messages.fetch({ limit: Math.min(limit, 100) });
+    const botMsgs = msgs.filter(m => m.author.id === client.user.id);
+
+    if (botMsgs.size === 0) return 0;
+
+    const now = Date.now();
+    const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
+    const recent = [];
+    const old = [];
+    for (const [, m] of botMsgs) {
+        if (now - m.createdTimestamp < FOURTEEN_DAYS) recent.push(m);
+        else old.push(m);
+    }
+
+    // Bulk delete pour les récents
+    if (recent.length >= 2) {
+        try {
+            const bulk = await channel.bulkDelete(recent, true);
+            deleted += bulk.size;
+        } catch (e) {
+            console.warn('⚠️ bulkDelete fallback:', e.message);
+            for (const m of recent) {
+                try { await m.delete(); deleted++; } catch {}
+                await sleep(300);
+            }
+        }
+    } else if (recent.length === 1) {
+        try { await recent[0].delete(); deleted++; } catch {}
+    }
+
+    // Anciens : un par un
+    for (const m of old) {
+        try { await m.delete(); deleted++; } catch {}
+        await sleep(500);
+    }
+
+    return deleted;
 }
 
 // ==========================================
