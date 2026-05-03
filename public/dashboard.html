@@ -297,7 +297,21 @@
                 <div class="comm-card">
                     <div class="comm-field">
                         <label class="comm-label">Utilisateur à sanctionner</label>
-                        <input type="text" id="sanctionUser" class="comm-input" placeholder="ID Discord (clic droit → Copier l'identifiant)">
+                        <div class="user-picker">
+                            <div class="user-picker-input-wrapper">
+                                <input type="text" id="sanctionUserSearch" class="comm-input user-picker-input" placeholder="Tape le pseudo ou un mot..." autocomplete="off">
+                                <button type="button" class="user-picker-clear" id="sanctionUserClear" style="display:none;" onclick="clearSanctionUser()">✕</button>
+                            </div>
+                            <div class="user-picker-dropdown" id="sanctionUserDropdown" style="display:none;"></div>
+                            <div class="user-picker-selected" id="sanctionUserSelected" style="display:none;">
+                                <img class="user-picker-selected-avatar" id="sanctionSelectedAvatar" alt="">
+                                <div class="user-picker-selected-info">
+                                    <div class="user-picker-selected-name" id="sanctionSelectedName"></div>
+                                    <div class="user-picker-selected-id" id="sanctionSelectedId"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="sanctionUser">
                     </div>
                     <div class="comm-field">
                         <div class="comm-label-row">
@@ -305,6 +319,11 @@
                             <span class="comm-charcount" id="sanctionCharCount">0 / 2000</span>
                         </div>
                         <textarea id="sanctionRaison" class="comm-textarea" rows="6" maxlength="2000" placeholder="Explique la raison de l'avertissement..."></textarea>
+                        <div class="comm-toolbar">
+                            <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('sanctionRaison')">
+                                <span>😀</span> Emojis
+                            </button>
+                        </div>
                     </div>
                     <div class="comm-actions">
                         <button class="comm-send-btn comm-send-sanction" onclick="sendSanction()">
