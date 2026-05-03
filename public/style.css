@@ -3426,3 +3426,315 @@ html, body {
     padding: 12px 32px;
     font-size: 14px;
 }
+
+
+/* ============================================
+   COMMUNICATIONS V2 — Design moderne
+   ============================================ */
+
+.cmd-section .comm-header {
+    margin-bottom: 24px;
+}
+
+.comm-title {
+    font-family: var(--font-display);
+    font-size: 26px;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.comm-subtitle {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin: 0;
+}
+
+/* ─── Onglets ─── */
+.comm-tabs-wrapper {
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
+}
+
+.comm-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 0;
+}
+
+.comm-tab {
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    color: var(--text-dim);
+    padding: 14px 28px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    transition: all 0.15s;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+
+.comm-tab-icon {
+    font-size: 16px;
+}
+
+.comm-tab-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.comm-tab:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.comm-tab.active {
+    color: var(--text);
+    background: var(--bg-card);
+    border-color: var(--border);
+}
+
+.comm-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--bg-card);
+}
+
+.comm-tab[data-comm="annonce"].active { box-shadow: inset 0 3px 0 var(--accent); }
+.comm-tab[data-comm="rappel"].active { box-shadow: inset 0 3px 0 var(--blue); }
+.comm-tab[data-comm="sanction"].active { box-shadow: inset 0 3px 0 var(--orange); }
+
+/* ─── Panels ─── */
+.comm-panel {
+    display: none;
+    animation: fadeInPanel 0.2s ease-out;
+}
+
+.comm-panel.active {
+    display: block;
+}
+
+@keyframes fadeInPanel {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.comm-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0 8px 8px 8px;
+    padding: 28px;
+}
+
+/* ─── Champs ─── */
+.comm-field {
+    margin-bottom: 22px;
+}
+
+.comm-field:last-of-type {
+    margin-bottom: 0;
+}
+
+.comm-label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.comm-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.comm-label-row .comm-label {
+    margin-bottom: 0;
+}
+
+.comm-charcount {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+}
+
+.comm-charcount-warn {
+    color: var(--orange);
+    font-weight: 700;
+}
+
+/* ─── Inputs / textareas ─── */
+.comm-select,
+.comm-input,
+.comm-textarea {
+    width: 100%;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    padding: 12px 14px;
+    border-radius: 6px;
+    outline: none;
+    transition: all 0.15s;
+}
+
+.comm-select:focus,
+.comm-input:focus,
+.comm-textarea:focus {
+    border-color: var(--accent);
+    background: var(--bg-elevated);
+    box-shadow: 0 0 0 3px rgba(255, 51, 51, 0.1);
+}
+
+.comm-textarea {
+    min-height: 240px;
+    max-height: 600px;
+    resize: vertical;
+    line-height: 1.6;
+    font-family: var(--font-body);
+}
+
+.comm-select {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 40px;
+}
+
+/* ─── Toolbar (emojis serveur) ─── */
+.comm-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+}
+
+.comm-tool-btn {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.comm-tool-btn:hover {
+    border-color: var(--accent);
+    color: var(--text);
+}
+
+.comm-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ─── Bouton d'envoi ─── */
+.comm-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+}
+
+.comm-send-btn {
+    background: var(--accent);
+    color: white;
+    border: 0;
+    padding: 14px 32px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    box-shadow: 0 4px 12px rgba(255, 51, 51, 0.2);
+}
+
+.comm-send-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(255, 51, 51, 0.35);
+}
+
+.comm-send-btn:active {
+    transform: translateY(0);
+}
+
+.comm-send-rappel {
+    background: var(--blue);
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.25);
+}
+
+.comm-send-rappel:hover {
+    box-shadow: 0 6px 18px rgba(88, 101, 242, 0.4);
+}
+
+.comm-send-sanction {
+    background: var(--orange);
+    box-shadow: 0 4px 12px rgba(255, 149, 0, 0.25);
+}
+
+.comm-send-sanction:hover {
+    box-shadow: 0 6px 18px rgba(255, 149, 0, 0.4);
+}
+
+/* ─── Picker emojis ─── */
+.comm-emoji-picker {
+    margin-top: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    max-height: 280px;
+    overflow-y: auto;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: 4px;
+}
+
+.comm-emoji-picker[style*="display:none"],
+.comm-emoji-picker[style*="display: none"] {
+    display: none !important;
+}
+
+/* Override des anciens styles pour ne pas casser */
+.cmd-section .annonce-form { display: none; }
+
+@media (max-width: 768px) {
+    .comm-tab {
+        padding: 12px 16px;
+        font-size: 12px;
+    }
+    .comm-tab-label {
+        display: none;
+    }
+    .comm-card {
+        padding: 20px;
+    }
+}
