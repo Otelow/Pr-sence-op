@@ -242,7 +242,17 @@
                 <div class="comm-card">
                     <div class="comm-field">
                         <label class="comm-label">Rôle à mentionner</label>
-                        <select id="annonceRole" class="comm-select"><option value="">— Choisir un rôle —</option></select>
+                        <div class="custom-dropdown" id="annonceRoleDropdownWrapper">
+                            <button type="button" class="custom-dropdown-trigger" onclick="toggleRoleDropdown('annonce', event)">
+                                <span class="custom-dropdown-placeholder" id="annonceRoleLabel">— Choisir un rôle —</span>
+                                <span class="custom-dropdown-arrow">▾</span>
+                            </button>
+                            <div class="custom-dropdown-menu" id="annonceRoleMenu" style="display:none;">
+                                <input type="text" class="custom-dropdown-search" id="annonceRoleSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                                <div class="custom-dropdown-list" id="annonceRoleList"></div>
+                            </div>
+                            <input type="hidden" id="annonceRole">
+                        </div>
                     </div>
                     <div class="comm-field">
                         <div class="comm-label-row">
@@ -270,7 +280,17 @@
                 <div class="comm-card">
                     <div class="comm-field">
                         <label class="comm-label">Rôle à mentionner</label>
-                        <select id="rappelRole" class="comm-select"><option value="">— Choisir un rôle —</option></select>
+                        <div class="custom-dropdown" id="rappelRoleDropdownWrapper">
+                            <button type="button" class="custom-dropdown-trigger" onclick="toggleRoleDropdown('rappel', event)">
+                                <span class="custom-dropdown-placeholder" id="rappelRoleLabel">— Choisir un rôle —</span>
+                                <span class="custom-dropdown-arrow">▾</span>
+                            </button>
+                            <div class="custom-dropdown-menu" id="rappelRoleMenu" style="display:none;">
+                                <input type="text" class="custom-dropdown-search" id="rappelRoleSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                                <div class="custom-dropdown-list" id="rappelRoleList"></div>
+                            </div>
+                            <input type="hidden" id="rappelRole">
+                        </div>
                     </div>
                     <div class="comm-field">
                         <div class="comm-label-row">
@@ -297,16 +317,22 @@
                 <div class="comm-card">
                     <div class="comm-field">
                         <label class="comm-label">Utilisateur à sanctionner</label>
-                        <div class="user-dropdown-wrapper">
-                            <select id="sanctionUser" class="comm-select user-dropdown">
-                                <option value="">— Sélectionne un membre —</option>
-                            </select>
-                            <div class="user-dropdown-preview" id="sanctionUserPreview" style="display:none;">
-                                <img class="user-dropdown-avatar" id="sanctionPreviewAvatar" alt="">
-                                <div class="user-dropdown-info">
-                                    <div class="user-dropdown-name" id="sanctionPreviewName"></div>
-                                    <div class="user-dropdown-id" id="sanctionPreviewId"></div>
-                                </div>
+                        <div class="custom-dropdown" id="sanctionUserDropdownWrapper">
+                            <button type="button" class="custom-dropdown-trigger" id="sanctionDropdownTrigger" onclick="toggleSanctionDropdown(event)">
+                                <span class="custom-dropdown-placeholder" id="sanctionDropdownLabel">— Sélectionne un membre —</span>
+                                <span class="custom-dropdown-arrow">▾</span>
+                            </button>
+                            <div class="custom-dropdown-menu" id="sanctionDropdownMenu" style="display:none;">
+                                <input type="text" class="custom-dropdown-search" id="sanctionDropdownSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                                <div class="custom-dropdown-list" id="sanctionDropdownList"></div>
+                            </div>
+                            <input type="hidden" id="sanctionUser">
+                        </div>
+                        <div class="user-dropdown-preview" id="sanctionUserPreview" style="display:none;">
+                            <img class="user-dropdown-avatar" id="sanctionPreviewAvatar" alt="">
+                            <div class="user-dropdown-info">
+                                <div class="user-dropdown-name" id="sanctionPreviewName"></div>
+                                <div class="user-dropdown-id" id="sanctionPreviewId"></div>
                             </div>
                         </div>
                     </div>
