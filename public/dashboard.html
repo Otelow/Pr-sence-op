@@ -215,29 +215,82 @@
         </div>
 
         <div class="cmd-section">
-            <h2 class="section-title">📢 Annonces</h2>
-            <div class="annonce-form">
-                <div class="annonce-field">
-                    <label>Rôle à mentionner</label>
-                    <select id="annonceRole">
-                        <option value="">Chargement...</option>
-                    </select>
-                </div>
-                <div class="annonce-field">
-                    <label>Message
-                        <span class="field-hint">(les retours à la ligne et espaces sont conservés)</span>
-                    </label>
-                    <div class="emoji-toolbar">
-                        <button type="button" class="emoji-toolbar-btn" onclick="toggleEmojiPicker()">😀 Emojis serveur</button>
+            <h2 class="section-title">📨 Communications</h2>
+
+            <div class="comm-tabs">
+                <button class="comm-tab active" data-comm="annonce" onclick="switchCommTab('annonce')">📢 Annonce</button>
+                <button class="comm-tab" data-comm="rappel" onclick="switchCommTab('rappel')">📌 Rappel</button>
+                <button class="comm-tab" data-comm="sanction" onclick="switchCommTab('sanction')">⚠️ Sanction</button>
+            </div>
+
+            <!-- ANNONCE -->
+            <div class="comm-panel active" id="commPanel-annonce">
+                <p class="comm-info">Envoie une annonce dans le salon BM avec mention du rôle choisi.</p>
+                <div class="annonce-form">
+                    <div class="annonce-field">
+                        <label>Rôle à mentionner</label>
+                        <select id="annonceRole" class="comm-role-select"><option value="">Chargement...</option></select>
                     </div>
-                    <textarea id="annonceMessage" rows="6" placeholder="Tape ton message ici...&#10;Tu peux faire des retours à la ligne&#10;Et insérer des :emojis: du serveur"></textarea>
-                    <div class="emoji-picker" id="emojiPicker" style="display:none;">
-                        <p class="empty" style="padding:12px;">Chargement des emojis...</p>
+                    <div class="annonce-field">
+                        <label>Message <span class="field-hint">(retours à la ligne et espaces conservés • max 2000 caractères — limite Discord)</span></label>
+                        <div class="emoji-toolbar">
+                            <button type="button" class="emoji-toolbar-btn" onclick="toggleEmojiPicker('annonceMessage')">😀 Emojis serveur</button>
+                            <span class="comm-charcount" id="annonceCharCount">0 / 2000</span>
+                        </div>
+                        <textarea id="annonceMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton message ici...&#10;&#10;Tu peux faire des retours à la ligne&#10;Et insérer des :emojis: du serveur"></textarea>
+                    </div>
+                    <div class="annonce-actions">
+                        <button class="btn-primary" onclick="sendAnnonce()">📤 Envoyer l'annonce</button>
                     </div>
                 </div>
-                <div class="annonce-actions">
-                    <button class="btn-primary" onclick="sendAnnonce()">📤 Envoyer l'annonce</button>
+            </div>
+
+            <!-- RAPPEL -->
+            <div class="comm-panel" id="commPanel-rappel" style="display:none;">
+                <p class="comm-info">Envoie un rappel dans le salon dédié avec mention du rôle choisi.</p>
+                <div class="annonce-form">
+                    <div class="annonce-field">
+                        <label>Rôle à mentionner</label>
+                        <select id="rappelRole" class="comm-role-select"><option value="">Chargement...</option></select>
+                    </div>
+                    <div class="annonce-field">
+                        <label>Message <span class="field-hint">(retours à la ligne et espaces conservés • max 2000 caractères — limite Discord)</span></label>
+                        <div class="emoji-toolbar">
+                            <button type="button" class="emoji-toolbar-btn" onclick="toggleEmojiPicker('rappelMessage')">😀 Emojis serveur</button>
+                            <span class="comm-charcount" id="rappelCharCount">0 / 2000</span>
+                        </div>
+                        <textarea id="rappelMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton rappel ici..."></textarea>
+                    </div>
+                    <div class="annonce-actions">
+                        <button class="btn-primary" onclick="sendRappel()">📤 Envoyer le rappel</button>
+                    </div>
                 </div>
+            </div>
+
+            <!-- SANCTION -->
+            <div class="comm-panel" id="commPanel-sanction" style="display:none;">
+                <p class="comm-info">Envoie un avertissement dans le salon des sanctions.</p>
+                <div class="annonce-form">
+                    <div class="annonce-field">
+                        <label>Utilisateur à sanctionner <span class="field-hint">(ID Discord ou @mention)</span></label>
+                        <input type="text" id="sanctionUser" class="comm-input" placeholder="Ex: 123456789012345678 ou clic droit → Copier l'identifiant">
+                    </div>
+                    <div class="annonce-field">
+                        <label>Raison de l'avertissement <span class="field-hint">(max 2000 caractères)</span></label>
+                        <div class="emoji-toolbar">
+                            <span class="comm-charcount" id="sanctionCharCount">0 / 2000</span>
+                        </div>
+                        <textarea id="sanctionRaison" class="comm-textarea" rows="6" maxlength="2000" placeholder="Explique la raison de l'avertissement..."></textarea>
+                    </div>
+                    <div class="annonce-actions">
+                        <button class="btn-primary" onclick="sendSanction()">⚠️ Envoyer la sanction</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Picker emojis partagé -->
+            <div class="emoji-picker" id="emojiPicker" style="display:none;">
+                <p class="empty" style="padding:12px;grid-column:1/-1;">Chargement des emojis...</p>
             </div>
         </div>
 
