@@ -654,53 +654,6 @@ client.once('ready', async () => {
         console.log('⏰ Boucle de rappels démarrée');
     }
 
-    // Restaurer les flows de welcome en cours (après redéploiement)
-    try {
-        const savedWelcomes = loadWelcomeStateData();
-        const guild = client.guilds.cache.get(CONFIG.GUILD_ID);
-        const now = Date.now();
-        let restored = 0;
-
-        for (const [userId, state] of Object.entries(savedWelcomes)) {
-            // Si le welcome a plus de 10 minutes, on le considère expiré
-            const age = now - (state.createdAt || 0);
-            if (age > 10 * 60 * 1000) continue;
-
-            // Restaurer en mémoire
-            welcomeState.set(userId, state);
-            restored++;
-
-            // Relancer un kick timer pour le délai restant
-            const remainingTime = WELCOME_KICK_DELAY - age;
-            if (remainingTime > 0 && guild) {
-                setTimeout(async () => {
-                    const current = welcomeState.get(userId);
-                    if (!current || current.messageId !== state.messageId) return; // Déjà avancé
-
-                    try {
-                        const channel = guild.channels.cache.get(CONFIG.CHANNELS.REGLEMENT);
-                        const msg = channel ? await channel.messages.fetch(state.messageId).catch(() => null) : null;
-                        if (msg) await msg.delete().catch(() => {});
-
-                        const member = await guild.members.fetch(userId).catch(() => null);
-                        if (member) {
-                            const hasProtected = CONFIG.ROLES.PROTECTED_ROLES.some(r => member.roles.cache.has(r));
-                            if (!hasProtected) await member.kick('Timeout (restauré)').catch(() => {});
-                        }
-                    } catch {}
-                    deleteWelcomeState(userId);
-                }, remainingTime);
-            }
-        }
-
-        // Nettoyer les expirés du fichier
-        if (restored !== Object.keys(savedWelcomes).length) saveWelcomeState();
-
-        if (restored > 0) console.log(`👋 ${restored} flow(s) de welcome restauré(s)`);
-    } catch (e) {
-        console.error('⚠️ Erreur restauration welcome:', e.message);
-    }
-
     // Prefetch membres + absences au boot
     try {
         const guild = client.guilds.cache.get(CONFIG.GUILD_ID);
@@ -838,7 +791,7 @@ client.once('ready', async () => {
 // NOUVEAU MEMBRE
 // ==========================================
 client.on('guildMemberAdd', async (member) => {
-    // Auto-attribution de rôles spécifiques
+    // Auto-attribution de rôles spécifiques (pour des utilisateurs précis listés dans AUTO_ROLE_USERS)
     const autoRoleId = CONFIG.AUTO_ROLE_USERS[member.id];
     if (autoRoleId) {
         try {
@@ -850,9 +803,10 @@ client.on('guildMemberAdd', async (member) => {
         } catch (e) {
             console.error(`❌ Erreur auto-rôle ${member.user.tag}:`, e.message);
         }
+        return;
     }
 
-    // VIP → rôle direct, pas d'accueil
+    // VIP → rôle direct
     if (CONFIG.VIP_USERS.includes(member.id)) {
         try {
             const role = member.guild.roles.cache.get(CONFIG.ROLES.VIP_ROLE);
@@ -861,14 +815,8 @@ client.on('guildMemberAdd', async (member) => {
         return;
     }
 
-    // Rôle protégé → pas d'accueil
-    const hasProtectedRole = CONFIG.ROLES.PROTECTED_ROLES.some(r => member.roles.cache.has(r));
-    if (hasProtectedRole) {
-        console.log(`🛡️ ${member.user.tag} a un rôle protégé, pas de flow d'accueil`);
-        return;
-    }
-
-    await startWelcomeFlow(member);
+    // Pour tous les autres : ne rien faire (procédure d'accueil désactivée)
+    console.log(`👋 ${member.user.tag} a rejoint — aucune action automatique`);
 });
 
 // ==========================================
@@ -1152,75 +1100,7 @@ client.on('messageDelete', async (message) => {
 client.on('messageReactionAdd', async (reaction, user) => {
     if (user.bot) return;
 
-    // ─── Fallback Welcome ─────────────────────────────
-    // Ce handler ne sert QU'À rattraper les messages d'avant un redéploiement.
-    // En conditions normales, le createReactionCollector du flow d'accueil traite tout.
-    // Pour éviter les doublons, on n'agit que sur les messages créés AVANT le démarrage du bot.
-    try {
-        const msg = reaction.message;
-        const msgCreatedAt = msg.createdTimestamp || 0;
-
-        // Si le message a été créé APRÈS le démarrage du bot, le collector original est forcément actif
-        // → on ne touche pas, le collector va s'en occuper
-        if (msgCreatedAt >= botStartTime - 1000) {
-            // Continuer vers le traitement normal des réactions présence OP
-        } else {
-            // Message d'avant le démarrage → le collector est mort, on tente le rattrapage
-
-            // 1. Cherche dans le state restauré
-            let foundState = null;
-            for (const [userId, state] of welcomeState) {
-                if (state.messageId === msg.id && userId === user.id) {
-                    foundState = state;
-                    break;
-                }
-            }
-
-            if (foundState) {
-                await handleWelcomeReactionFallback(reaction, user, foundState);
-                return;
-            }
-
-            // 2. Pas de state : auto-détection par le contenu du message
-            if (msg.channelId === CONFIG.CHANNELS.REGLEMENT) {
-                let fullMsg = msg;
-                if (msg.partial) {
-                    try { fullMsg = await msg.fetch(); } catch { return; }
-                }
-
-                if (fullMsg.author.id !== client.user.id) return;
-
-                const content = fullMsg.content || '';
-                let detectedStep = null;
-                if (/Lis bien le règlement/i.test(content)) detectedStep = 1;
-                else if (/Tu as bien lu le règlement/i.test(content)) detectedStep = 2;
-                else if (/Tu es vraiment sûr/i.test(content)) detectedStep = 3;
-                else if (/tu as compris que ça va être une tyrannie/i.test(content)) detectedStep = 4;
-
-                if (!detectedStep) return;
-
-                if (!content.includes(`<@${user.id}>`) && !content.includes(`<@!${user.id}>`)) return;
-
-                console.log(`🔄 Welcome auto-détecté (msg pré-démarrage) : step ${detectedStep} pour ${user.tag || user.username}`);
-
-                const reconstructedState = {
-                    step: detectedStep,
-                    messageId: fullMsg.id,
-                    guildId: fullMsg.guildId || CONFIG.GUILD_ID,
-                    createdAt: fullMsg.createdTimestamp,
-                };
-                welcomeState.set(user.id, reconstructedState);
-                saveWelcomeState();
-
-                await handleWelcomeReactionFallback(reaction, user, reconstructedState);
-                return;
-            }
-        }
-    } catch (e) {
-        console.error('❌ Fallback welcome:', e.message);
-    }
-
-    // ─── Réactions présence OP ────────────────────────
+    // Réactions présence OP
     const msgId = reaction.message.id;
     const map = getReactionMap(msgId);
     if (!map) return;
