@@ -866,7 +866,7 @@ function startServer(client, getState) {
         if (!guild) return res.json({ roles: [] });
 
         const roles = [...guild.roles.cache.values()]
-            .filter(r => r.name !== '@everyone' && !r.managed)
+            .filter(r => r.name !== '@everyone')
             .sort((a, b) => b.position - a.position)
             .map(r => ({
                 id: r.id,
@@ -874,6 +874,8 @@ function startServer(client, getState) {
                 color: r.color ? `#${r.color.toString(16).padStart(6, '0')}` : null,
                 position: r.position,
                 memberCount: r.members.size,
+                mentionable: r.mentionable,
+                managed: r.managed,
             }));
 
         res.json({ roles });
