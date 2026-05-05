@@ -150,12 +150,19 @@ function renderAdminWeapons() {
         list.innerHTML = '<p class="empty">Aucune arme. Clique sur "+ Ajouter" pour commencer.</p>';
         return;
     }
+
     list.innerHTML = adminWeapons.map(w => `
         <div class="admin-weapon-row">
             ${w.image_url ? `<img class="admin-weapon-img" src="${w.image_url}">` : '<span class="admin-weapon-placeholder">🔫</span>'}
             <div class="admin-weapon-info">
                 <strong>${escapeHtml(w.name)}</strong>
-                <small>${w.craft_time ? formatTime(w.craft_time) : ''} ${w.craft_price ? '· ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''} · ${(w.ingredients || []).length} ingrédients ${w.requires_plan ? '· 📋 Plan requis' : ''}</small>
+                <small>
+                    ${w.craft_time ? formatTime(w.craft_time) : ''}
+                    ${w.craft_price ? ' · Craft : ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''}
+                    ${w.sale_price ? ' · Vente : ' + w.sale_price.toLocaleString('fr-FR') + '$' : ''}
+                    · ${(w.ingredients || []).length} ingrédients
+                    ${w.requires_plan ? ' · 📋 Plan requis' : ''}
+                </small>
             </div>
             <div class="admin-weapon-actions">
                 <button class="btn-secondary btn-small" onclick="openWeaponEditor(${w.id})">✏ Modifier</button>
@@ -174,24 +181,34 @@ function formatTime(s) {
 function openWeaponEditor(id) {
     const modal = document.getElementById('weaponEditorModal');
     const title = document.getElementById('weaponEditorTitle');
+
     document.getElementById('weaponEditorForm').reset();
     document.getElementById('weaponImagePreview').innerHTML = '';
     document.getElementById('weaponPlanImagePreview').innerHTML = '';
     document.getElementById('planImageField').style.display = 'none';
     editingIngredients = [];
 
+    const saleInput = document.getElementById('weaponSalePrice');
+    if (saleInput) saleInput.value = 0;
+
     if (id) {
         const w = adminWeapons.find(w => w.id === id);
         if (!w) return;
+
         title.textContent = `Modifier : ${w.name}`;
         document.getElementById('weaponId').value = w.id;
         document.getElementById('weaponName').value = w.name;
         document.getElementById('weaponCraftTime').value = w.craft_time || 0;
         document.getElementById('weaponCraftPrice').value = w.craft_price || 0;
+
+        // Prix de vente conseillé
+        if (saleInput) saleInput.value = w.sale_price || 0;
+
         document.getElementById('weaponRequiresPlan').checked = !!w.requires_plan;
         if (w.requires_plan) document.getElementById('planImageField').style.display = 'block';
         if (w.image_url) document.getElementById('weaponImagePreview').innerHTML = `<img src="${w.image_url}">`;
         if (w.plan_image_url) document.getElementById('weaponPlanImagePreview').innerHTML = `<img src="${w.plan_image_url}">`;
+
         editingIngredients = (w.ingredients || []).map(ing => ({
             ingredient_id: ing.ingredient_id || null,
             name: ing.name || '',
@@ -201,6 +218,7 @@ function openWeaponEditor(id) {
         title.textContent = 'Ajouter une arme';
         document.getElementById('weaponId').value = '';
     }
+
     renderIngredientsEditor();
     modal.style.display = 'flex';
 }
@@ -266,7 +284,7 @@ window.updateIngredientName = updateIngredientName;
 window.updateIngredientAmount = updateIngredientAmount;
 window.removeIngredient = removeIngredient;
 
-// Toggle plan image field
+// Toggle plan image field + previews images
 document.addEventListener('change', (e) => {
     if (e.target.id === 'weaponRequiresPlan') {
         document.getElementById('planImageField').style.display = e.target.checked ? 'block' : 'none';
@@ -302,11 +320,18 @@ document.addEventListener('change', (e) => {
 
 async function saveWeapon(e) {
     e.preventDefault();
+
     const id = document.getElementById('weaponId').value;
     const formData = new FormData();
+
     formData.append('name', document.getElementById('weaponName').value);
     formData.append('craft_time', document.getElementById('weaponCraftTime').value || '0');
     formData.append('craft_price', document.getElementById('weaponCraftPrice').value || '0');
+
+    // Prix de vente conseillé
+    const saleInput = document.getElementById('weaponSalePrice');
+    formData.append('sale_price', saleInput ? (saleInput.value || '0') : '0');
+
     formData.append('requires_plan', document.getElementById('weaponRequiresPlan').checked ? '1' : '0');
     formData.append('ingredients', JSON.stringify(editingIngredients));
 
@@ -321,6 +346,7 @@ async function saveWeapon(e) {
         const method = id ? 'PUT' : 'POST';
         const res = await fetch(url, { method, body: formData });
         const data = await res.json();
+
         if (res.ok) {
             toast('✅ Arme enregistrée');
             closeWeaponEditor();
@@ -328,7 +354,9 @@ async function saveWeapon(e) {
         } else {
             toast(`❌ ${data.error}`, 'error');
         }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
 }
 window.saveWeapon = saveWeapon;
 
@@ -336,8 +364,13 @@ async function deleteWeapon(id) {
     if (!confirm('Supprimer cette arme ?')) return;
     try {
         const res = await fetch(`/api/crafts/weapons/${id}`, { method: 'DELETE' });
-        if (res.ok) { toast('🗑 Supprimée'); await loadAdminWeapons(); }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+        if (res.ok) {
+            toast('🗑 Supprimée');
+            await loadAdminWeapons();
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
 }
 window.deleteWeapon = deleteWeapon;
 
