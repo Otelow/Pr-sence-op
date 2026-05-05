@@ -76,9 +76,17 @@ function initDB() {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     image_path TEXT,
+                    plan_image_path TEXT,
+                    requires_plan INTEGER DEFAULT 0,
                     craft_time INTEGER DEFAULT 0,
                     craft_price INTEGER DEFAULT 0,
                     ingredients TEXT DEFAULT '[]',
+                    created_at INTEGER DEFAULT (strftime('%s','now'))
+                );
+                CREATE TABLE IF NOT EXISTS ingredients (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    image_path TEXT,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
                 CREATE TABLE IF NOT EXISTS organizations (
@@ -110,17 +118,50 @@ function initDB() {
                 CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
                 CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
             `);
+
+            // Migrations : ajouter les colonnes si elles n'existent pas (pour les bases existantes)
+            try { db.exec(`ALTER TABLE weapons ADD COLUMN plan_image_path TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE weapons ADD COLUMN requires_plan INTEGER DEFAULT 0`); } catch {}
+
+            // Pré-remplir les ingrédients par défaut
+            const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
+            for (const ing of defaultIngredients) {
+                try {
+                    db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)').run(ing);
+                } catch {}
+            }
+
             console.log('💾 DB Crafts initialisée (SQLite)');
         } catch (e) {
             console.error('❌ SQLite init error, fallback JSON:', e.message);
             useSQLite = false;
             loadJSON();
+            seedDefaultIngredientsJSON();
             console.log('💾 DB Crafts initialisée (JSON fallback)');
         }
     } else {
         loadJSON();
+        seedDefaultIngredientsJSON();
         console.log('💾 DB Crafts initialisée (JSON)');
     }
+}
+
+function seedDefaultIngredientsJSON() {
+    const defaults = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
+    if (!jsonData.ingredients) jsonData.ingredients = [];
+    if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
+    for (const name of defaults) {
+        if (!jsonData.ingredients.find(i => i.name === name)) {
+            jsonData.counters.ingredients++;
+            jsonData.ingredients.push({
+                id: jsonData.counters.ingredients,
+                name,
+                image_path: null,
+                created_at: Math.floor(Date.now() / 1000),
+            });
+        }
+    }
+    saveJSON();
 }
 
 function getAllWeapons() {
@@ -133,22 +174,22 @@ function getWeapon(id) {
     return jsonData.weapons.find(w => w.id === id);
 }
 
-function insertWeapon(name, image_path, craft_time, craft_price, ingredients) {
+function insertWeapon(name, image_path, plan_image_path, requires_plan, craft_time, craft_price, ingredients) {
     if (useSQLite) {
-        const r = db.prepare(`INSERT INTO weapons (name, image_path, craft_time, craft_price, ingredients) VALUES (?, ?, ?, ?, ?)`)
-            .run(name, image_path, craft_time, craft_price, ingredients);
+        const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            .run(name, image_path, plan_image_path, requires_plan ? 1 : 0, craft_time, craft_price, ingredients);
         return r.lastInsertRowid;
     }
     const id = nextId('weapons');
-    jsonData.weapons.push({ id, name, image_path, craft_time, craft_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
+    jsonData.weapons.push({ id, name, image_path, plan_image_path, requires_plan: requires_plan ? 1 : 0, craft_time, craft_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
     saveJSON();
     return id;
 }
 
-function updateWeapon(id, name, image_path, craft_time, craft_price, ingredients) {
+function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craft_time, craft_price, ingredients) {
     if (useSQLite) {
-        db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, ingredients = ?, image_path = COALESCE(?, image_path) WHERE id = ?`)
-            .run(name, craft_time, craft_price, ingredients, image_path, id);
+        db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, ingredients = ?, requires_plan = ?, image_path = COALESCE(?, image_path), plan_image_path = COALESCE(?, plan_image_path) WHERE id = ?`)
+            .run(name, craft_time, craft_price, ingredients, requires_plan ? 1 : 0, image_path, plan_image_path, id);
         return;
     }
     const w = jsonData.weapons.find(w => w.id === id);
@@ -157,7 +198,9 @@ function updateWeapon(id, name, image_path, craft_time, craft_price, ingredients
         w.craft_time = craft_time;
         w.craft_price = craft_price;
         w.ingredients = ingredients;
+        w.requires_plan = requires_plan ? 1 : 0;
         if (image_path) w.image_path = image_path;
+        if (plan_image_path) w.plan_image_path = plan_image_path;
         saveJSON();
     }
 }
@@ -165,6 +208,54 @@ function updateWeapon(id, name, image_path, craft_time, craft_price, ingredients
 function deleteWeapon(id) {
     if (useSQLite) { db.prepare('DELETE FROM weapons WHERE id = ?').run(id); return; }
     jsonData.weapons = jsonData.weapons.filter(w => w.id !== id);
+    saveJSON();
+}
+
+// ─── INGREDIENTS ───────────────
+function getAllIngredients() {
+    if (useSQLite) return db.prepare('SELECT * FROM ingredients ORDER BY name ASC').all();
+    return [...(jsonData.ingredients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+}
+
+function getIngredient(id) {
+    if (useSQLite) return db.prepare('SELECT * FROM ingredients WHERE id = ?').get(id);
+    return (jsonData.ingredients || []).find(i => i.id === id);
+}
+
+function insertIngredient(name, image_path) {
+    if (useSQLite) {
+        const r = db.prepare('INSERT OR IGNORE INTO ingredients (name, image_path) VALUES (?, ?)').run(name, image_path);
+        return r.lastInsertRowid;
+    }
+    if (!jsonData.ingredients) jsonData.ingredients = [];
+    if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
+    if (jsonData.ingredients.find(i => i.name === name)) return null;
+    jsonData.counters.ingredients++;
+    jsonData.ingredients.push({
+        id: jsonData.counters.ingredients,
+        name, image_path,
+        created_at: Math.floor(Date.now() / 1000),
+    });
+    saveJSON();
+    return jsonData.counters.ingredients;
+}
+
+function updateIngredient(id, name, image_path) {
+    if (useSQLite) {
+        db.prepare(`UPDATE ingredients SET name = ?, image_path = COALESCE(?, image_path) WHERE id = ?`).run(name, image_path, id);
+        return;
+    }
+    const ing = (jsonData.ingredients || []).find(i => i.id === id);
+    if (ing) {
+        if (name) ing.name = name;
+        if (image_path) ing.image_path = image_path;
+        saveJSON();
+    }
+}
+
+function deleteIngredient(id) {
+    if (useSQLite) { db.prepare('DELETE FROM ingredients WHERE id = ?').run(id); return; }
+    jsonData.ingredients = (jsonData.ingredients || []).filter(i => i.id !== id);
     saveJSON();
 }
 
@@ -313,6 +404,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 ...w,
                 ingredients: typeof w.ingredients === 'string' ? JSON.parse(w.ingredients || '[]') : (w.ingredients || []),
                 image_url: w.image_path ? `/crafts/images/${w.image_path}` : null,
+                plan_image_url: w.plan_image_path ? `/crafts/images/${w.plan_image_path}` : null,
+                requires_plan: !!w.requires_plan,
             }));
             res.json({ weapons: list });
         } catch (e) {
@@ -321,27 +414,43 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         }
     });
 
-    app.post('/api/crafts/weapons', requireAdmin, upload.single('image'), (req, res) => {
+    app.post('/api/crafts/weapons', requireAdmin, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'plan_image', maxCount: 1 }]), (req, res) => {
         try {
-            const { name, craft_time, craft_price, ingredients } = req.body;
+            const { name, craft_time, craft_price, ingredients, requires_plan } = req.body;
             if (!name) return res.status(400).json({ error: 'Nom requis' });
-            const id = insertWeapon(name, req.file ? req.file.filename : null, parseInt(craft_time) || 0, parseInt(craft_price) || 0, ingredients || '[]');
+            const imagePath = req.files?.image?.[0]?.filename || null;
+            const planImagePath = req.files?.plan_image?.[0]?.filename || null;
+            const id = insertWeapon(
+                name, imagePath, planImagePath,
+                requires_plan === '1' || requires_plan === 'true' || requires_plan === true,
+                parseInt(craft_time) || 0, parseInt(craft_price) || 0, ingredients || '[]'
+            );
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.put('/api/crafts/weapons/:id', requireAdmin, upload.single('image'), (req, res) => {
+    app.put('/api/crafts/weapons/:id', requireAdmin, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'plan_image', maxCount: 1 }]), (req, res) => {
         try {
             const id = parseInt(req.params.id);
-            const { name, craft_time, craft_price, ingredients } = req.body;
+            const { name, craft_time, craft_price, ingredients, requires_plan } = req.body;
             const existing = getWeapon(id);
             if (!existing) return res.status(404).json({ error: 'Arme introuvable' });
-            if (req.file && existing.image_path) {
-                const oldPath = path.join(UPLOADS_DIR, existing.image_path);
-                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+
+            const newImage = req.files?.image?.[0]?.filename || null;
+            const newPlan = req.files?.plan_image?.[0]?.filename || null;
+
+            if (newImage && existing.image_path) {
+                const p = path.join(UPLOADS_DIR, existing.image_path);
+                if (fs.existsSync(p)) fs.unlinkSync(p);
             }
+            if (newPlan && existing.plan_image_path) {
+                const p = path.join(UPLOADS_DIR, existing.plan_image_path);
+                if (fs.existsSync(p)) fs.unlinkSync(p);
+            }
+
             updateWeapon(
-                id, name || existing.name, req.file ? req.file.filename : null,
+                id, name || existing.name, newImage, newPlan,
+                requires_plan === '1' || requires_plan === 'true' || requires_plan === true,
                 parseInt(craft_time) || existing.craft_time || 0,
                 parseInt(craft_price) || existing.craft_price || 0,
                 ingredients || (typeof existing.ingredients === 'string' ? existing.ingredients : JSON.stringify(existing.ingredients || []))
@@ -358,7 +467,60 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 const p = path.join(UPLOADS_DIR, existing.image_path);
                 if (fs.existsSync(p)) fs.unlinkSync(p);
             }
+            if (existing && existing.plan_image_path) {
+                const p = path.join(UPLOADS_DIR, existing.plan_image_path);
+                if (fs.existsSync(p)) fs.unlinkSync(p);
+            }
             deleteWeapon(id);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // ─── INGREDIENTS ─────────────
+    app.get('/api/crafts/ingredients', requireAuth, (req, res) => {
+        try {
+            const list = getAllIngredients().map(i => ({
+                ...i,
+                image_url: i.image_path ? `/crafts/images/${i.image_path}` : null,
+            }));
+            res.json({ ingredients: list });
+        } catch (e) { res.json({ ingredients: [], error: e.message }); }
+    });
+
+    app.post('/api/crafts/ingredients', requireAdmin, upload.single('image'), (req, res) => {
+        try {
+            const { name } = req.body;
+            if (!name || !name.trim()) return res.status(400).json({ error: 'Nom requis' });
+            const imagePath = req.file ? req.file.filename : null;
+            const id = insertIngredient(name.trim(), imagePath);
+            res.json({ success: true, id });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.put('/api/crafts/ingredients/:id', requireAdmin, upload.single('image'), (req, res) => {
+        try {
+            const id = parseInt(req.params.id);
+            const { name } = req.body;
+            const existing = getIngredient(id);
+            if (!existing) return res.status(404).json({ error: 'Ingrédient introuvable' });
+            if (req.file && existing.image_path) {
+                const p = path.join(UPLOADS_DIR, existing.image_path);
+                if (fs.existsSync(p)) fs.unlinkSync(p);
+            }
+            updateIngredient(id, name || existing.name, req.file ? req.file.filename : null);
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.delete('/api/crafts/ingredients/:id', requireAdmin, (req, res) => {
+        try {
+            const id = parseInt(req.params.id);
+            const existing = getIngredient(id);
+            if (existing && existing.image_path) {
+                const p = path.join(UPLOADS_DIR, existing.image_path);
+                if (fs.existsSync(p)) fs.unlinkSync(p);
+            }
+            deleteIngredient(id);
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
