@@ -1007,16 +1007,48 @@ function startServer(client, getState) {
     }
 
     app.get('/api/map/points', requireAuth, (req, res) => {
-        const userRoles = req.session.user?.roles || [];
+        const userId = req.session.user?.id;
+        let userRoles = req.session.user?.roles || [];
+
+        // Mode impersonate : remplacer les rôles par celui demandé
+        const impersonateRole = req.query.impersonate;
+        const isAdmin = isUserAdmin(req.session.user);
+        const isImpersonating = !!impersonateRole && isAdmin;
+        const effectiveUserId = isImpersonating ? '__impersonate__' : userId;
+        const effectiveRoles = isImpersonating ? [impersonateRole] : userRoles;
+
+        // Hardcoded : laboratoire d'armes visible uniquement pour ces user IDs spécifiques
+        const LAB_VISIBLE_USERS = ['952986899667103804', '780164840798552066', '769670622380294265'];
+        const canSeeLab = !isImpersonating && LAB_VISIBLE_USERS.includes(userId);
+
         const allPoints = loadMapPoints();
 
-        // Filtrer : si le point a allowedRoles, l'user doit avoir au moins un de ces rôles
         const visiblePoints = allPoints.filter(p => {
-            if (!p.allowedRoles || p.allowedRoles.length === 0) return true; // Public
-            return p.allowedRoles.some(r => userRoles.includes(r));
+            // Type weapon-lab : visibilité réservée
+            if (p.type === 'weapon-lab') {
+                return canSeeLab;
+            }
+
+            // Pas de restriction de rôles → visible
+            if ((!p.allowedRoles || p.allowedRoles.length === 0) &&
+                (!p.allowedUsers || p.allowedUsers.length === 0)) {
+                return true;
+            }
+
+            // Restriction par utilisateur spécifique
+            if (p.allowedUsers && p.allowedUsers.length > 0) {
+                if (p.allowedUsers.includes(effectiveUserId)) return true;
+            }
+
+            // Restriction par rôle
+            if (p.allowedRoles && p.allowedRoles.length > 0) {
+                return p.allowedRoles.some(r => effectiveRoles.includes(r));
+            }
+
+            return false;
         });
 
-        res.json({ points: visiblePoints });
+        res.json({ points: visiblePoints, impersonating: isImpersonating });
     });
 
     // Vérifier permissions de placer des points (mêmes que COMMAND_ROLES par défaut)
@@ -1029,7 +1061,7 @@ function startServer(client, getState) {
     app.post('/api/map/points', requireAuth, (req, res) => {
         if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes pour modifier la carte' });
 
-        const { x, y, label, type, allowedRoles, code } = req.body;
+        const { x, y, label, type, allowedRoles, allowedUsers, code } = req.body;
         if (typeof x !== 'number' || typeof y !== 'number') {
             return res.status(400).json({ error: 'Coordonnées invalides' });
         }
@@ -1040,9 +1072,9 @@ function startServer(client, getState) {
             x, y,
             label: label || 'Point',
             type: type || 'weed',
-            // Code uniquement pour les types qui en ont besoin
             code: ['lab', 'weapon-lab'].includes(type) ? (code || '').trim().slice(0, 50) : null,
             allowedRoles: Array.isArray(allowedRoles) ? allowedRoles : [],
+            allowedUsers: Array.isArray(allowedUsers) ? allowedUsers : [],
             createdBy: req.session.user.username,
             createdById: req.session.user.id,
             createdAt: Date.now(),
