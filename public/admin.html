@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Admin · 21 Block Savage</title>
+<link rel="stylesheet" href="/style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="admin-body">
+
+<header class="admin-header">
+    <div class="admin-header-inner">
+        <a href="/dashboard" class="admin-back">← Retour au dashboard</a>
+        <h1 class="admin-title">🛠 Panneau Admin</h1>
+        <div></div>
+    </div>
+</header>
+
+<main class="admin-main">
+
+    <!-- VUE IMPERSONATE -->
+    <section class="admin-section">
+        <h2 class="section-title">👁 Vue impersonate (Slide to unlock)</h2>
+        <p class="admin-info">Active la simulation et choisis un rôle pour voir ce qu'un membre avec ce rôle verrait.</p>
+
+        <div class="slide-to-unlock" id="slideToUnlock">
+            <div class="slide-track">
+                <div class="slide-handle" id="slideHandle">▶</div>
+                <span class="slide-label">Glisse pour activer la vue impersonate →</span>
+            </div>
+        </div>
+
+        <div class="impersonate-panel" id="impersonatePanel" style="display:none;">
+            <div class="comm-field">
+                <label class="comm-label">Rôle à simuler</label>
+                <select id="impersonateRole" class="comm-input"></select>
+            </div>
+            <button class="btn-primary" onclick="applyImpersonate()">Appliquer la vue</button>
+            <button class="btn-secondary" onclick="resetImpersonate()">Réinitialiser</button>
+        </div>
+    </section>
+
+    <!-- GESTION CATALOGUE D'ARMES -->
+    <section class="admin-section">
+        <h2 class="section-title">🔫 Catalogue des armes craftables</h2>
+        <p class="admin-info">Ajoute, modifie ou supprime des armes du catalogue affiché aux membres.</p>
+
+        <button class="btn-primary" onclick="openWeaponEditor()">+ Ajouter une arme</button>
+
+        <div class="admin-weapons-list" id="adminWeaponsList">
+            <p class="empty">Chargement...</p>
+        </div>
+    </section>
+
+    <!-- ÉDITEUR D'ARME (modale) -->
+    <div class="modal-backdrop" id="weaponEditorModal" style="display:none;">
+        <div class="modal-content modal-large">
+            <h3 class="modal-title" id="weaponEditorTitle">Ajouter une arme</h3>
+
+            <form id="weaponEditorForm" onsubmit="saveWeapon(event)" enctype="multipart/form-data">
+                <input type="hidden" id="weaponId">
+
+                <div class="comm-field">
+                    <label class="comm-label">Nom de l'arme *</label>
+                    <input type="text" id="weaponName" class="comm-input" required placeholder="Ex: Fusil militaire">
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">Image (jpg/png/webp, max 5MB)</label>
+                    <input type="file" id="weaponImage" accept="image/*" class="comm-input">
+                    <div id="weaponImagePreview" class="weapon-image-preview"></div>
+                </div>
+
+                <div class="craft-field-row">
+                    <div class="comm-field" style="flex:1;">
+                        <label class="comm-label">Temps de craft (secondes)</label>
+                        <input type="number" id="weaponCraftTime" class="comm-input" min="0" placeholder="7200">
+                    </div>
+                    <div class="comm-field" style="flex:1;">
+                        <label class="comm-label">Prix de craft ($)</label>
+                        <input type="number" id="weaponCraftPrice" class="comm-input" min="0" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">Ingrédients</label>
+                    <div id="ingredientsList" class="ingredients-editor"></div>
+                    <button type="button" class="btn-secondary btn-small" onclick="addIngredient()">+ Ajouter un ingrédient</button>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeWeaponEditor()">Annuler</button>
+                    <button type="submit" class="btn-primary">💾 Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- GESTION ORGANISATIONS -->
+    <section class="admin-section">
+        <h2 class="section-title">🏢 Organisations</h2>
+        <p class="admin-info">Liste des organisations à qui les armes peuvent être vendues.</p>
+
+        <div class="admin-org-form">
+            <input type="text" id="newOrgName" class="comm-input" placeholder="Nom de l'organisation">
+            <button class="btn-primary" onclick="addOrgFromAdmin()">+ Ajouter</button>
+        </div>
+
+        <div class="admin-orgs-list" id="adminOrgsList"></div>
+    </section>
+
+</main>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/admin.js"></script>
+</body>
+</html>
