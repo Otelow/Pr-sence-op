@@ -19,8 +19,9 @@ let userPermissions = { canEditMap: false };
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
-    // Déplacer tous les modals au niveau body pour qu'ils échappent aux contextes de stacking
-    document.querySelectorAll('.modal-backdrop').forEach(modal => {
+    // Déplacer uniquement les modals racine (avec ID) au body
+    // pour éviter les contextes de stacking parents
+    document.querySelectorAll('.modal-backdrop[id]').forEach(modal => {
         if (modal.parentNode !== document.body) {
             document.body.appendChild(modal);
         }
