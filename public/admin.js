@@ -2,9 +2,10 @@
 // ADMIN PANEL — JS
 // ============================================================
 let adminWeapons = [];
+let adminIngredients = [];
 let adminOrgs = [];
 let adminRoles = [];
-let editingIngredients = [];
+let editingIngredients = []; // [{ ingredient_id, name, amount }]
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Vérifier admin
@@ -20,8 +21,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    initSlideToUnlock();
     loadAdminWeapons();
+    loadAdminIngredients();
     loadAdminOrgs();
     loadAdminRoles();
 });
@@ -39,92 +40,101 @@ function toast(msg, type) {
     setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
 }
 
-// ─── SLIDE TO UNLOCK ────────────────────────────────
-function initSlideToUnlock() {
-    const handle = document.getElementById('slideHandle');
-    const track = handle?.parentElement;
-    if (!handle || !track) return;
-
-    let isDragging = false;
-    let startX = 0;
-    let currentX = 0;
-
-    const startDrag = (clientX) => {
-        isDragging = true;
-        startX = clientX;
-        handle.style.transition = 'none';
-    };
-
-    const moveDrag = (clientX) => {
-        if (!isDragging) return;
-        const trackWidth = track.offsetWidth - handle.offsetWidth - 8;
-        currentX = Math.max(0, Math.min(clientX - startX, trackWidth));
-        handle.style.left = currentX + 'px';
-
-        // Si glissé à plus de 80% → unlock
-        if (currentX >= trackWidth * 0.85) {
-            unlockImpersonate();
-            isDragging = false;
-        }
-    };
-
-    const endDrag = () => {
-        if (!isDragging) return;
-        isDragging = false;
-        handle.style.transition = 'left 0.3s';
-        const trackWidth = track.offsetWidth - handle.offsetWidth - 8;
-        if (currentX < trackWidth * 0.85) {
-            handle.style.left = '0';
-            currentX = 0;
-        }
-    };
-
-    handle.addEventListener('mousedown', e => { e.preventDefault(); startDrag(e.clientX); });
-    window.addEventListener('mousemove', e => moveDrag(e.clientX));
-    window.addEventListener('mouseup', endDrag);
-
-    handle.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e.touches[0].clientX); }, { passive: false });
-    window.addEventListener('touchmove', e => moveDrag(e.touches[0].clientX), { passive: true });
-    window.addEventListener('touchend', endDrag);
+// ─── TABS ───────────────────────────────────────
+function switchAdminTab(name) {
+    document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b.dataset.adminTab === name));
+    document.querySelectorAll('.admin-tab-content').forEach(s => {
+        s.style.display = (s.id === `adminTab-${name}`) ? 'block' : 'none';
+    });
 }
+window.switchAdminTab = switchAdminTab;
 
-function unlockImpersonate() {
-    const handle = document.getElementById('slideHandle');
-    if (handle) {
-        handle.innerHTML = '✓';
-        handle.style.background = 'var(--green)';
-    }
-    document.getElementById('impersonatePanel').style.display = 'block';
-    toast('🔓 Vue impersonate déverrouillée');
-}
-
+// ─── ROLES (impersonate) ────────────────────────
 async function loadAdminRoles() {
     try {
         const r = await fetch('/api/roles');
         const d = await r.json();
         adminRoles = d.roles || [];
-        const select = document.getElementById('impersonateRole');
-        if (select) {
-            select.innerHTML = '<option value="">— Choisir un rôle —</option>' +
-                adminRoles.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
-        }
+        renderImpersonateDropdown();
     } catch {}
 }
 
+function renderImpersonateDropdown() {
+    const list = document.getElementById('impersonateList');
+    if (!list) return;
+    list.innerHTML = adminRoles.map(role => {
+        const colorDot = `<span class="role-color-dot" style="background:${role.color || '#888'};"></span>`;
+        return `
+            <div class="custom-dropdown-item" data-role-name="${escapeHtml(role.name).toLowerCase()}" onclick="selectImpersonateRole('${role.id}', '${escapeHtml(role.name).replace(/'/g, "\\'")}', '${role.color || ''}')">
+                ${colorDot}
+                <span class="custom-dropdown-item-label" style="${role.color ? `color:${role.color};` : ''}">@${escapeHtml(role.name)}</span>
+                <span class="custom-dropdown-item-count">${role.memberCount || 0}</span>
+            </div>
+        `;
+    }).join('');
+
+    const search = document.getElementById('impersonateSearch');
+    if (search) {
+        search.oninput = () => {
+            const q = search.value.toLowerCase().trim();
+            list.querySelectorAll('.custom-dropdown-item').forEach(item => {
+                const name = item.dataset.roleName || '';
+                item.style.display = !q || name.includes(q) ? 'flex' : 'none';
+            });
+        };
+    }
+}
+
+function toggleImpersonateDropdown(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('impersonateMenu');
+    if (!menu) return;
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    if (menu.style.display === 'block') {
+        const search = document.getElementById('impersonateSearch');
+        if (search) {
+            search.value = '';
+            document.querySelectorAll('#impersonateList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
+            setTimeout(() => search.focus(), 50);
+        }
+    }
+}
+
+function selectImpersonateRole(id, name, color) {
+    document.getElementById('impersonateRoleId').value = id;
+    const label = document.getElementById('impersonateLabel');
+    if (label) {
+        label.classList.remove('custom-dropdown-placeholder');
+        label.innerHTML = `<span class="role-color-dot" style="background:${color || '#888'};margin-right:8px;"></span> @${escapeHtml(name)}`;
+        if (color) label.style.color = color;
+    }
+    document.getElementById('impersonateMenu').style.display = 'none';
+}
+
+window.toggleImpersonateDropdown = toggleImpersonateDropdown;
+window.selectImpersonateRole = selectImpersonateRole;
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.custom-dropdown')) {
+        document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.style.display = 'none');
+    }
+});
+
 function applyImpersonate() {
-    const roleId = document.getElementById('impersonateRole').value;
+    const roleId = document.getElementById('impersonateRoleId').value;
     if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
-    // Stocker en localStorage pour le dashboard
     localStorage.setItem('impersonate_role', roleId);
-    toast('✅ Vue impersonate active. Retourne au dashboard pour voir.');
+    toast('✅ Vue impersonate active. Retourne au dashboard.');
 }
 
 function resetImpersonate() {
     localStorage.removeItem('impersonate_role');
     toast('↩ Vue impersonate désactivée');
 }
+window.applyImpersonate = applyImpersonate;
+window.resetImpersonate = resetImpersonate;
 
-// ─── ARMES ─────────────────────────────────────────
+// ─── ARMES ─────────────────────────────────────
 async function loadAdminWeapons() {
     try {
         const r = await fetch('/api/crafts/weapons');
@@ -145,7 +155,7 @@ function renderAdminWeapons() {
             ${w.image_url ? `<img class="admin-weapon-img" src="${w.image_url}">` : '<span class="admin-weapon-placeholder">🔫</span>'}
             <div class="admin-weapon-info">
                 <strong>${escapeHtml(w.name)}</strong>
-                <small>${w.craft_time ? formatTime(w.craft_time) : ''} ${w.craft_price ? '· ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''} · ${(w.ingredients || []).length} ingrédients</small>
+                <small>${w.craft_time ? formatTime(w.craft_time) : ''} ${w.craft_price ? '· ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''} · ${(w.ingredients || []).length} ingrédients ${w.requires_plan ? '· 📋 Plan requis' : ''}</small>
             </div>
             <div class="admin-weapon-actions">
                 <button class="btn-secondary btn-small" onclick="openWeaponEditor(${w.id})">✏ Modifier</button>
@@ -166,6 +176,8 @@ function openWeaponEditor(id) {
     const title = document.getElementById('weaponEditorTitle');
     document.getElementById('weaponEditorForm').reset();
     document.getElementById('weaponImagePreview').innerHTML = '';
+    document.getElementById('weaponPlanImagePreview').innerHTML = '';
+    document.getElementById('planImageField').style.display = 'none';
     editingIngredients = [];
 
     if (id) {
@@ -176,10 +188,15 @@ function openWeaponEditor(id) {
         document.getElementById('weaponName').value = w.name;
         document.getElementById('weaponCraftTime').value = w.craft_time || 0;
         document.getElementById('weaponCraftPrice').value = w.craft_price || 0;
-        if (w.image_url) {
-            document.getElementById('weaponImagePreview').innerHTML = `<img src="${w.image_url}">`;
-        }
-        editingIngredients = [...(w.ingredients || [])];
+        document.getElementById('weaponRequiresPlan').checked = !!w.requires_plan;
+        if (w.requires_plan) document.getElementById('planImageField').style.display = 'block';
+        if (w.image_url) document.getElementById('weaponImagePreview').innerHTML = `<img src="${w.image_url}">`;
+        if (w.plan_image_url) document.getElementById('weaponPlanImagePreview').innerHTML = `<img src="${w.plan_image_url}">`;
+        editingIngredients = (w.ingredients || []).map(ing => ({
+            ingredient_id: ing.ingredient_id || null,
+            name: ing.name || '',
+            amount: ing.amount || 0,
+        }));
     } else {
         title.textContent = 'Ajouter une arme';
         document.getElementById('weaponId').value = '';
@@ -191,30 +208,52 @@ function openWeaponEditor(id) {
 function closeWeaponEditor() {
     document.getElementById('weaponEditorModal').style.display = 'none';
 }
+window.openWeaponEditor = openWeaponEditor;
+window.closeWeaponEditor = closeWeaponEditor;
 
 function addIngredient() {
-    editingIngredients.push({ name: '', amount: 0 });
+    editingIngredients.push({ ingredient_id: null, name: '', amount: 0 });
     renderIngredientsEditor();
 }
 
 function renderIngredientsEditor() {
     const list = document.getElementById('ingredientsList');
     if (!editingIngredients.length) {
-        list.innerHTML = '<p class="empty-small">Aucun ingrédient</p>';
+        list.innerHTML = '<p class="empty-small">Aucun ingrédient — clique sur "+ Ajouter"</p>';
         return;
     }
-    list.innerHTML = editingIngredients.map((ing, i) => `
-        <div class="ingredient-row">
-            <input type="text" placeholder="Nom" value="${escapeHtml(ing.name || '')}" oninput="updateIngredient(${i}, 'name', this.value)">
-            <input type="number" placeholder="Quantité" value="${ing.amount || 0}" oninput="updateIngredient(${i}, 'amount', this.value)" min="0">
-            <button type="button" class="btn-danger btn-small" onclick="removeIngredient(${i})">×</button>
-        </div>
-    `).join('');
+    list.innerHTML = editingIngredients.map((ing, i) => {
+        const options = '<option value="">— Choisir —</option>' +
+            adminIngredients.map(opt => {
+                const selected = ing.name === opt.name ? 'selected' : '';
+                return `<option value="${opt.id}" data-name="${escapeHtml(opt.name)}" data-image="${opt.image_url || ''}" ${selected}>${escapeHtml(opt.name)}</option>`;
+            }).join('');
+
+        const previewImg = ing.name && adminIngredients.find(opt => opt.name === ing.name)?.image_url;
+        const preview = previewImg ? `<img src="${previewImg}" class="ingredient-row-preview" alt="">` : '<span class="ingredient-row-placeholder">🧪</span>';
+
+        return `
+            <div class="ingredient-row">
+                ${preview}
+                <select onchange="updateIngredientName(${i}, this)">${options}</select>
+                <input type="number" placeholder="Quantité" value="${ing.amount || 0}" oninput="updateIngredientAmount(${i}, this.value)" min="0">
+                <button type="button" class="btn-danger btn-small" onclick="removeIngredient(${i})">×</button>
+            </div>
+        `;
+    }).join('');
 }
 
-function updateIngredient(index, field, value) {
+function updateIngredientName(index, selectEl) {
     if (!editingIngredients[index]) return;
-    editingIngredients[index][field] = field === 'amount' ? parseInt(value) || 0 : value;
+    const opt = selectEl.options[selectEl.selectedIndex];
+    editingIngredients[index].name = opt.dataset.name || '';
+    editingIngredients[index].ingredient_id = parseInt(opt.value) || null;
+    renderIngredientsEditor();
+}
+
+function updateIngredientAmount(index, value) {
+    if (!editingIngredients[index]) return;
+    editingIngredients[index].amount = parseInt(value) || 0;
 }
 
 function removeIngredient(index) {
@@ -222,14 +261,40 @@ function removeIngredient(index) {
     renderIngredientsEditor();
 }
 
-// Preview image
+window.addIngredient = addIngredient;
+window.updateIngredientName = updateIngredientName;
+window.updateIngredientAmount = updateIngredientAmount;
+window.removeIngredient = removeIngredient;
+
+// Toggle plan image field
 document.addEventListener('change', (e) => {
+    if (e.target.id === 'weaponRequiresPlan') {
+        document.getElementById('planImageField').style.display = e.target.checked ? 'block' : 'none';
+    }
     if (e.target.id === 'weaponImage') {
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
             document.getElementById('weaponImagePreview').innerHTML = `<img src="${ev.target.result}">`;
+        };
+        reader.readAsDataURL(file);
+    }
+    if (e.target.id === 'weaponPlanImage') {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            document.getElementById('weaponPlanImagePreview').innerHTML = `<img src="${ev.target.result}">`;
+        };
+        reader.readAsDataURL(file);
+    }
+    if (e.target.id === 'ingredientImage') {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            document.getElementById('ingredientImagePreview').innerHTML = `<img src="${ev.target.result}">`;
         };
         reader.readAsDataURL(file);
     }
@@ -242,10 +307,14 @@ async function saveWeapon(e) {
     formData.append('name', document.getElementById('weaponName').value);
     formData.append('craft_time', document.getElementById('weaponCraftTime').value || '0');
     formData.append('craft_price', document.getElementById('weaponCraftPrice').value || '0');
+    formData.append('requires_plan', document.getElementById('weaponRequiresPlan').checked ? '1' : '0');
     formData.append('ingredients', JSON.stringify(editingIngredients));
 
     const file = document.getElementById('weaponImage').files[0];
     if (file) formData.append('image', file);
+
+    const planFile = document.getElementById('weaponPlanImage').files[0];
+    if (planFile) formData.append('plan_image', planFile);
 
     try {
         const url = id ? `/api/crafts/weapons/${id}` : '/api/crafts/weapons';
@@ -261,19 +330,105 @@ async function saveWeapon(e) {
         }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
+window.saveWeapon = saveWeapon;
 
 async function deleteWeapon(id) {
     if (!confirm('Supprimer cette arme ?')) return;
     try {
         const res = await fetch(`/api/crafts/weapons/${id}`, { method: 'DELETE' });
+        if (res.ok) { toast('🗑 Supprimée'); await loadAdminWeapons(); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+window.deleteWeapon = deleteWeapon;
+
+// ─── INGRÉDIENTS ─────────────────────
+async function loadAdminIngredients() {
+    try {
+        const r = await fetch('/api/crafts/ingredients');
+        const d = await r.json();
+        adminIngredients = d.ingredients || [];
+        renderAdminIngredients();
+    } catch {}
+}
+
+function renderAdminIngredients() {
+    const list = document.getElementById('adminIngredientsList');
+    if (!adminIngredients.length) {
+        list.innerHTML = '<p class="empty">Aucun ingrédient.</p>';
+        return;
+    }
+    list.innerHTML = adminIngredients.map(i => `
+        <div class="admin-ingredient-card">
+            ${i.image_url ? `<img class="admin-ingredient-img" src="${i.image_url}">` : '<span class="admin-ingredient-placeholder">🧪</span>'}
+            <div class="admin-ingredient-name">${escapeHtml(i.name)}</div>
+            <div class="admin-ingredient-actions">
+                <button class="btn-secondary btn-small" onclick="openIngredientEditor(${i.id})">✏</button>
+                <button class="btn-danger btn-small" onclick="deleteIngredient(${i.id})">🗑</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function openIngredientEditor(id) {
+    const modal = document.getElementById('ingredientEditorModal');
+    const title = document.getElementById('ingredientEditorTitle');
+    document.getElementById('ingredientEditorForm').reset();
+    document.getElementById('ingredientImagePreview').innerHTML = '';
+
+    if (id) {
+        const ing = adminIngredients.find(i => i.id === id);
+        if (!ing) return;
+        title.textContent = `Modifier : ${ing.name}`;
+        document.getElementById('ingredientId').value = ing.id;
+        document.getElementById('ingredientName').value = ing.name;
+        if (ing.image_url) document.getElementById('ingredientImagePreview').innerHTML = `<img src="${ing.image_url}">`;
+    } else {
+        title.textContent = 'Ajouter un ingrédient';
+        document.getElementById('ingredientId').value = '';
+    }
+    modal.style.display = 'flex';
+}
+
+function closeIngredientEditor() {
+    document.getElementById('ingredientEditorModal').style.display = 'none';
+}
+window.openIngredientEditor = openIngredientEditor;
+window.closeIngredientEditor = closeIngredientEditor;
+
+async function saveIngredient(e) {
+    e.preventDefault();
+    const id = document.getElementById('ingredientId').value;
+    const formData = new FormData();
+    formData.append('name', document.getElementById('ingredientName').value);
+    const file = document.getElementById('ingredientImage').files[0];
+    if (file) formData.append('image', file);
+
+    try {
+        const url = id ? `/api/crafts/ingredients/${id}` : '/api/crafts/ingredients';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, body: formData });
+        const data = await res.json();
         if (res.ok) {
-            toast('🗑 Supprimée');
-            await loadAdminWeapons();
+            toast('✅ Ingrédient enregistré');
+            closeIngredientEditor();
+            await loadAdminIngredients();
+        } else {
+            toast(`❌ ${data.error}`, 'error');
         }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
+window.saveIngredient = saveIngredient;
 
-// ─── ORGANISATIONS ─────────────────────────────────
+async function deleteIngredient(id) {
+    if (!confirm('Supprimer cet ingrédient ?')) return;
+    try {
+        const res = await fetch(`/api/crafts/ingredients/${id}`, { method: 'DELETE' });
+        if (res.ok) { toast('🗑 Supprimé'); await loadAdminIngredients(); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+window.deleteIngredient = deleteIngredient;
+
+// ─── ORGANISATIONS ──────────────────
 async function loadAdminOrgs() {
     try {
         const r = await fetch('/api/crafts/organizations');
@@ -318,8 +473,8 @@ async function deleteOrg(id) {
     if (!confirm('Supprimer cette organisation ?')) return;
     try {
         const res = await fetch(`/api/crafts/organizations/${id}`, { method: 'DELETE' });
-        if (res.ok) {
-            await loadAdminOrgs();
-        }
+        if (res.ok) await loadAdminOrgs();
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
+window.addOrgFromAdmin = addOrgFromAdmin;
+window.deleteOrg = deleteOrg;

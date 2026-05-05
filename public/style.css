@@ -6221,3 +6221,162 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 8px 24px rgba(255, 140, 0, 0.5) !important;
 }
+
+/* ============================================================
+   ADMIN PAGE V2 — Tabs + ingrédients + impersonate dropdown
+   ============================================================ */
+
+.admin-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+    padding: 0 4px;
+    overflow-x: auto;
+}
+
+.admin-tab {
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    padding: 14px 24px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+}
+
+.admin-tab:hover {
+    color: var(--text);
+    background: rgba(255, 140, 0, 0.05);
+}
+
+.admin-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.admin-tab-content {
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* Style fix : select de l'impersonate (utilise custom-dropdown) — déjà OK */
+.impersonate-panel-admin {
+    max-width: 600px;
+}
+
+/* Ingredients grid */
+.admin-ingredients-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+    margin-top: 20px;
+}
+
+.admin-ingredient-card {
+    background: rgba(20, 20, 24, 0.55);
+    backdrop-filter: blur(16px);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.admin-ingredient-card:hover {
+    border-color: rgba(255, 140, 0, 0.25);
+    transform: translateY(-2px);
+}
+
+.admin-ingredient-img {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.admin-ingredient-placeholder {
+    display: inline-flex;
+    width: 80px;
+    height: 80px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    font-size: 32px;
+    opacity: 0.5;
+}
+
+.admin-ingredient-name {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: var(--text);
+    word-break: break-word;
+}
+
+.admin-ingredient-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+
+/* Ingredients editor (dans modal arme) */
+.ingredient-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 100px 40px;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.ingredient-row select {
+    background: rgba(0, 0, 0, 0.4);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 13px;
+}
+
+.ingredient-row select option {
+    background: #1a1a1a;
+    color: var(--text);
+    padding: 6px;
+}
+
+.ingredient-row-preview {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.ingredient-row-placeholder {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+    font-size: 16px;
+    opacity: 0.4;
+}
+
+.ingredient-row input {
+    background: rgba(0, 0, 0, 0.4);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 13px;
+}
