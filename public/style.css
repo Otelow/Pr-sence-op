@@ -4906,15 +4906,19 @@ select:focus {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 140, 0, 0.1);
     z-index: 1000;
     overflow: hidden;
-    max-height: 480px;
+    height: 480px;
+    max-height: 70vh;
     display: flex;
     flex-direction: column;
 }
 
 .custom-dropdown-list {
-    overflow-y: auto !important;
+    overflow-y: scroll !important;
+    overflow-x: hidden !important;
     flex: 1 1 auto !important;
     min-height: 0 !important;
+    height: 100%;
+    padding: 4px 0;
 }
 
 .custom-dropdown-search {
@@ -4932,12 +4936,6 @@ select:focus {
 
 .custom-dropdown-search:focus {
     background: rgba(255, 140, 0, 0.05);
-}
-
-.custom-dropdown-list {
-    overflow-y: auto;
-    flex: 1;
-    padding: 4px 0;
 }
 
 .custom-dropdown-item {
@@ -5013,12 +5011,29 @@ select:focus {
     margin-top: 1px;
 }
 
-/* Scrollbar du dropdown */
+/* Scrollbar du dropdown — bien visible */
 .custom-dropdown-list::-webkit-scrollbar {
-    width: 6px;
+    width: 10px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.custom-dropdown-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
 }
 
 .custom-dropdown-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 140, 0, 0.3);
-    border-radius: 3px;
+    background: rgba(255, 140, 0, 0.5);
+    border-radius: 4px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+}
+
+.custom-dropdown-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 140, 0, 0.8);
+}
+
+/* Firefox */
+.custom-dropdown-list {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 140, 0, 0.5) rgba(0, 0, 0, 0.2);
 }
