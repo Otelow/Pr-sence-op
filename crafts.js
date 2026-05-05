@@ -1,91 +1,299 @@
 // ==========================================
-// MODULE CRAFTS — DB SQLite + Endpoints
+// MODULE CRAFTS — DB SQLite avec fallback JSON
 // ==========================================
 const path = require('path');
 const fs = require('fs');
-const Database = require('better-sqlite3');
 const multer = require('multer');
 
 const DATA_DIR = '/data';
 const DB_PATH = path.join(DATA_DIR, 'crafts.db');
 const UPLOADS_DIR = path.join(DATA_DIR, 'crafts');
+const FALLBACK_PATH = path.join(DATA_DIR, 'crafts.json');
 
 // Assurer l'existence des dossiers
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+} catch (e) {
+    console.error('❌ Erreur création dossiers data:', e.message);
+}
 
-let db;
+// Tenter de charger better-sqlite3, sinon fallback JSON
+let useSQLite = false;
+let db = null;
+let Database = null;
+
+try {
+    Database = require('better-sqlite3');
+    useSQLite = true;
+    console.log('✅ better-sqlite3 chargé');
+} catch (e) {
+    console.warn('⚠️ better-sqlite3 indisponible, fallback JSON activé');
+    useSQLite = false;
+}
+
+let jsonData = {
+    weapons: [],
+    organizations: [],
+    craft_requests: [],
+    counters: { weapons: 0, organizations: 0, requests: 0 },
+};
+
+function loadJSON() {
+    try {
+        if (fs.existsSync(FALLBACK_PATH)) {
+            jsonData = JSON.parse(fs.readFileSync(FALLBACK_PATH, 'utf8'));
+            jsonData.weapons = jsonData.weapons || [];
+            jsonData.organizations = jsonData.organizations || [];
+            jsonData.craft_requests = jsonData.craft_requests || [];
+            jsonData.counters = jsonData.counters || { weapons: 0, organizations: 0, requests: 0 };
+        }
+    } catch (e) {
+        console.error('Erreur chargement crafts.json:', e.message);
+    }
+}
+
+function saveJSON() {
+    try {
+        fs.writeFileSync(FALLBACK_PATH, JSON.stringify(jsonData, null, 2));
+    } catch (e) {
+        console.error('Erreur sauvegarde crafts.json:', e.message);
+    }
+}
+
+function nextId(type) {
+    jsonData.counters[type] = (jsonData.counters[type] || 0) + 1;
+    return jsonData.counters[type];
+}
 
 function initDB() {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-
-    // Catalogue des armes craftables
-    db.exec(`
-        CREATE TABLE IF NOT EXISTS weapons (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            image_path TEXT,
-            craft_time INTEGER DEFAULT 0,
-            craft_price INTEGER DEFAULT 0,
-            ingredients TEXT DEFAULT '[]',
-            created_at INTEGER DEFAULT (strftime('%s','now'))
-        );
-
-        CREATE TABLE IF NOT EXISTS organizations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE,
-            created_at INTEGER DEFAULT (strftime('%s','now'))
-        );
-
-        CREATE TABLE IF NOT EXISTS craft_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            user_name TEXT NOT NULL,
-            weapon_id INTEGER NOT NULL,
-            has_plan INTEGER DEFAULT 0,
-            has_money INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'pending',
-            crafted INTEGER DEFAULT 0,
-            serial_number TEXT,
-            buyer_org TEXT,
-            sale_price INTEGER,
-            craft_date INTEGER,
-            sale_date INTEGER,
-            crafted_by_id TEXT,
-            crafted_by_name TEXT,
-            completed_by_id TEXT,
-            completed_by_name TEXT,
-            posted_to_channel INTEGER DEFAULT 0,
-            created_at INTEGER DEFAULT (strftime('%s','now')),
-            FOREIGN KEY(weapon_id) REFERENCES weapons(id)
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
-        CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
-    `);
-
-    console.log('💾 DB Crafts initialisée');
+    if (useSQLite) {
+        try {
+            db = new Database(DB_PATH);
+            db.pragma('journal_mode = WAL');
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS weapons (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    image_path TEXT,
+                    craft_time INTEGER DEFAULT 0,
+                    craft_price INTEGER DEFAULT 0,
+                    ingredients TEXT DEFAULT '[]',
+                    created_at INTEGER DEFAULT (strftime('%s','now'))
+                );
+                CREATE TABLE IF NOT EXISTS organizations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    created_at INTEGER DEFAULT (strftime('%s','now'))
+                );
+                CREATE TABLE IF NOT EXISTS craft_requests (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    user_name TEXT NOT NULL,
+                    weapon_id INTEGER NOT NULL,
+                    has_plan INTEGER DEFAULT 0,
+                    has_money INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'pending',
+                    crafted INTEGER DEFAULT 0,
+                    serial_number TEXT,
+                    buyer_org TEXT,
+                    sale_price INTEGER,
+                    craft_date INTEGER,
+                    sale_date INTEGER,
+                    crafted_by_id TEXT,
+                    crafted_by_name TEXT,
+                    completed_by_id TEXT,
+                    completed_by_name TEXT,
+                    posted_to_channel INTEGER DEFAULT 0,
+                    created_at INTEGER DEFAULT (strftime('%s','now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
+                CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
+            `);
+            console.log('💾 DB Crafts initialisée (SQLite)');
+        } catch (e) {
+            console.error('❌ SQLite init error, fallback JSON:', e.message);
+            useSQLite = false;
+            loadJSON();
+            console.log('💾 DB Crafts initialisée (JSON fallback)');
+        }
+    } else {
+        loadJSON();
+        console.log('💾 DB Crafts initialisée (JSON)');
+    }
 }
 
-function getDB() {
-    if (!db) initDB();
-    return db;
+function getAllWeapons() {
+    if (useSQLite) return db.prepare('SELECT * FROM weapons ORDER BY name ASC').all();
+    return [...jsonData.weapons].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
-// Multer storage pour les images d'armes
+function getWeapon(id) {
+    if (useSQLite) return db.prepare('SELECT * FROM weapons WHERE id = ?').get(id);
+    return jsonData.weapons.find(w => w.id === id);
+}
+
+function insertWeapon(name, image_path, craft_time, craft_price, ingredients) {
+    if (useSQLite) {
+        const r = db.prepare(`INSERT INTO weapons (name, image_path, craft_time, craft_price, ingredients) VALUES (?, ?, ?, ?, ?)`)
+            .run(name, image_path, craft_time, craft_price, ingredients);
+        return r.lastInsertRowid;
+    }
+    const id = nextId('weapons');
+    jsonData.weapons.push({ id, name, image_path, craft_time, craft_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
+    saveJSON();
+    return id;
+}
+
+function updateWeapon(id, name, image_path, craft_time, craft_price, ingredients) {
+    if (useSQLite) {
+        db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, ingredients = ?, image_path = COALESCE(?, image_path) WHERE id = ?`)
+            .run(name, craft_time, craft_price, ingredients, image_path, id);
+        return;
+    }
+    const w = jsonData.weapons.find(w => w.id === id);
+    if (w) {
+        w.name = name;
+        w.craft_time = craft_time;
+        w.craft_price = craft_price;
+        w.ingredients = ingredients;
+        if (image_path) w.image_path = image_path;
+        saveJSON();
+    }
+}
+
+function deleteWeapon(id) {
+    if (useSQLite) { db.prepare('DELETE FROM weapons WHERE id = ?').run(id); return; }
+    jsonData.weapons = jsonData.weapons.filter(w => w.id !== id);
+    saveJSON();
+}
+
+function getAllOrgs() {
+    if (useSQLite) return db.prepare('SELECT * FROM organizations ORDER BY name ASC').all();
+    return [...jsonData.organizations].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+}
+
+function insertOrg(name) {
+    if (useSQLite) {
+        const r = db.prepare('INSERT OR IGNORE INTO organizations (name) VALUES (?)').run(name);
+        return r.lastInsertRowid;
+    }
+    if (jsonData.organizations.find(o => o.name === name)) return null;
+    const id = nextId('organizations');
+    jsonData.organizations.push({ id, name, created_at: Math.floor(Date.now() / 1000) });
+    saveJSON();
+    return id;
+}
+
+function deleteOrg(id) {
+    if (useSQLite) { db.prepare('DELETE FROM organizations WHERE id = ?').run(id); return; }
+    jsonData.organizations = jsonData.organizations.filter(o => o.id !== id);
+    saveJSON();
+}
+
+function getRequests(status) {
+    if (useSQLite) {
+        let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
+        const params = [];
+        if (status && status !== 'all') { query += ' WHERE r.status = ?'; params.push(status); }
+        query += ' ORDER BY r.created_at DESC';
+        return db.prepare(query).all(...params);
+    }
+    let arr = jsonData.craft_requests;
+    if (status && status !== 'all') arr = arr.filter(r => r.status === status);
+    return [...arr].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => {
+        const w = jsonData.weapons.find(w => w.id === r.weapon_id);
+        return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null };
+    });
+}
+
+function getRequest(id) {
+    if (useSQLite) {
+        return db.prepare(`SELECT r.*, w.name as weapon_name FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id WHERE r.id = ?`).get(id);
+    }
+    const r = jsonData.craft_requests.find(r => r.id === id);
+    if (!r) return null;
+    const w = jsonData.weapons.find(w => w.id === r.weapon_id);
+    return { ...r, weapon_name: w ? w.name : '?' };
+}
+
+function insertRequest(user_id, user_name, weapon_id, has_plan, has_money) {
+    if (useSQLite) {
+        const r = db.prepare(`INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money) VALUES (?, ?, ?, ?, ?)`)
+            .run(user_id, user_name, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0);
+        return r.lastInsertRowid;
+    }
+    const id = nextId('requests');
+    jsonData.craft_requests.push({
+        id, user_id, user_name, weapon_id,
+        has_plan: has_plan ? 1 : 0, has_money: has_money ? 1 : 0,
+        status: 'pending', crafted: 0,
+        created_at: Math.floor(Date.now() / 1000),
+    });
+    saveJSON();
+    return id;
+}
+
+function updateRequestCraft(id, crafted, serial, userId, userName) {
+    const now = Math.floor(Date.now() / 1000);
+    if (useSQLite) {
+        db.prepare(`UPDATE craft_requests SET crafted = ?, serial_number = ?, craft_date = ?, crafted_by_id = ?, crafted_by_name = ?, status = CASE WHEN ? = 1 THEN 'crafted' ELSE 'in_progress' END WHERE id = ?`)
+            .run(crafted ? 1 : 0, serial || null, crafted ? now : null, userId, userName, crafted ? 1 : 0, id);
+        return;
+    }
+    const r = jsonData.craft_requests.find(r => r.id === id);
+    if (r) {
+        r.crafted = crafted ? 1 : 0;
+        r.serial_number = serial || null;
+        r.craft_date = crafted ? now : null;
+        r.crafted_by_id = userId;
+        r.crafted_by_name = userName;
+        r.status = crafted ? 'crafted' : 'in_progress';
+        saveJSON();
+    }
+}
+
+function updateRequestSale(id, buyer_org, sale_price, sale_date, userId, userName) {
+    if (useSQLite) {
+        db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
+            .run(buyer_org || null, sale_price || null, sale_date, userId, userName, id);
+        return;
+    }
+    const r = jsonData.craft_requests.find(r => r.id === id);
+    if (r) {
+        r.buyer_org = buyer_org;
+        r.sale_price = sale_price;
+        r.sale_date = sale_date;
+        r.completed_by_id = userId;
+        r.completed_by_name = userName;
+        r.status = 'completed';
+        saveJSON();
+    }
+}
+
+function markRequestPosted(id) {
+    if (useSQLite) { db.prepare('UPDATE craft_requests SET posted_to_channel = 1 WHERE id = ?').run(id); return; }
+    const r = jsonData.craft_requests.find(r => r.id === id);
+    if (r) { r.posted_to_channel = 1; saveJSON(); }
+}
+
+function deleteRequest(id) {
+    if (useSQLite) { db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id); return; }
+    jsonData.craft_requests = jsonData.craft_requests.filter(r => r.id !== id);
+    saveJSON();
+}
+
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, UPLOADS_DIR),
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
-        const safeName = `weapon_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
-        cb(null, safeName);
+        cb(null, `weapon_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`);
     }
 });
 
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
         const ext = path.extname(file.originalname).toLowerCase();
@@ -95,152 +303,95 @@ const upload = multer({
 });
 
 function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botState) {
+    const express = require('express');
+    app.use('/crafts/images', express.static(UPLOADS_DIR));
 
-    // Servir les images uploadées
-    app.use('/crafts/images', require('express').static(UPLOADS_DIR));
-
-    // ─── CATALOGUE WEAPONS ─────────────────────
     app.get('/api/crafts/weapons', requireAuth, (req, res) => {
-        const db = getDB();
-        const weapons = db.prepare('SELECT * FROM weapons ORDER BY name ASC').all();
-        const list = weapons.map(w => ({
-            ...w,
-            ingredients: JSON.parse(w.ingredients || '[]'),
-            image_url: w.image_path ? `/crafts/images/${w.image_path}` : null,
-        }));
-        res.json({ weapons: list });
+        try {
+            const weapons = getAllWeapons();
+            const list = weapons.map(w => ({
+                ...w,
+                ingredients: typeof w.ingredients === 'string' ? JSON.parse(w.ingredients || '[]') : (w.ingredients || []),
+                image_url: w.image_path ? `/crafts/images/${w.image_path}` : null,
+            }));
+            res.json({ weapons: list });
+        } catch (e) {
+            console.error('GET weapons:', e);
+            res.json({ weapons: [], error: e.message });
+        }
     });
 
     app.post('/api/crafts/weapons', requireAdmin, upload.single('image'), (req, res) => {
         try {
             const { name, craft_time, craft_price, ingredients } = req.body;
             if (!name) return res.status(400).json({ error: 'Nom requis' });
-
-            const db = getDB();
-            const ingredientsJson = ingredients || '[]';
-            const imagePath = req.file ? req.file.filename : null;
-
-            const result = db.prepare(`
-                INSERT INTO weapons (name, image_path, craft_time, craft_price, ingredients)
-                VALUES (?, ?, ?, ?, ?)
-            `).run(name, imagePath, parseInt(craft_time) || 0, parseInt(craft_price) || 0, ingredientsJson);
-
-            res.json({ success: true, id: result.lastInsertRowid });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+            const id = insertWeapon(name, req.file ? req.file.filename : null, parseInt(craft_time) || 0, parseInt(craft_price) || 0, ingredients || '[]');
+            res.json({ success: true, id });
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.put('/api/crafts/weapons/:id', requireAdmin, upload.single('image'), (req, res) => {
         try {
             const id = parseInt(req.params.id);
             const { name, craft_time, craft_price, ingredients } = req.body;
-            const db = getDB();
-
-            const existing = db.prepare('SELECT * FROM weapons WHERE id = ?').get(id);
+            const existing = getWeapon(id);
             if (!existing) return res.status(404).json({ error: 'Arme introuvable' });
-
-            // Si nouvelle image, supprimer l'ancienne
             if (req.file && existing.image_path) {
                 const oldPath = path.join(UPLOADS_DIR, existing.image_path);
                 if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
             }
-
-            db.prepare(`
-                UPDATE weapons
-                SET name = ?, craft_time = ?, craft_price = ?, ingredients = ?,
-                    image_path = COALESCE(?, image_path)
-                WHERE id = ?
-            `).run(
-                name || existing.name,
-                parseInt(craft_time) || existing.craft_time,
-                parseInt(craft_price) || existing.craft_price,
-                ingredients || existing.ingredients,
-                req.file ? req.file.filename : null,
-                id
+            updateWeapon(
+                id, name || existing.name, req.file ? req.file.filename : null,
+                parseInt(craft_time) || existing.craft_time || 0,
+                parseInt(craft_price) || existing.craft_price || 0,
+                ingredients || (typeof existing.ingredients === 'string' ? existing.ingredients : JSON.stringify(existing.ingredients || []))
             );
-
             res.json({ success: true });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.delete('/api/crafts/weapons/:id', requireAdmin, (req, res) => {
         try {
             const id = parseInt(req.params.id);
-            const db = getDB();
-            const existing = db.prepare('SELECT * FROM weapons WHERE id = ?').get(id);
+            const existing = getWeapon(id);
             if (existing && existing.image_path) {
                 const p = path.join(UPLOADS_DIR, existing.image_path);
                 if (fs.existsSync(p)) fs.unlinkSync(p);
             }
-            db.prepare('DELETE FROM weapons WHERE id = ?').run(id);
+            deleteWeapon(id);
             res.json({ success: true });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // ─── ORGANISATIONS ─────────────────────────
     app.get('/api/crafts/organizations', requireAuth, (req, res) => {
-        const db = getDB();
-        const orgs = db.prepare('SELECT * FROM organizations ORDER BY name ASC').all();
-        res.json({ organizations: orgs });
+        try { res.json({ organizations: getAllOrgs() }); }
+        catch (e) { res.json({ organizations: [], error: e.message }); }
     });
 
     app.post('/api/crafts/organizations', requireAuth, (req, res) => {
         try {
             const { name } = req.body;
             if (!name || !name.trim()) return res.status(400).json({ error: 'Nom requis' });
-            const db = getDB();
-            const result = db.prepare('INSERT OR IGNORE INTO organizations (name) VALUES (?)').run(name.trim());
-            res.json({ success: true, id: result.lastInsertRowid });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+            const id = insertOrg(name.trim());
+            res.json({ success: true, id });
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.delete('/api/crafts/organizations/:id', requireAdmin, (req, res) => {
-        try {
-            const id = parseInt(req.params.id);
-            const db = getDB();
-            db.prepare('DELETE FROM organizations WHERE id = ?').run(id);
-            res.json({ success: true });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+        try { deleteOrg(parseInt(req.params.id)); res.json({ success: true }); }
+        catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // ─── DEMANDES DE CRAFT ─────────────────────
     app.get('/api/crafts/requests', requireAuth, (req, res) => {
-        const db = getDB();
-        const status = req.query.status; // 'pending', 'in_progress', 'crafted', 'completed', 'all'
-
-        let query = `
-            SELECT r.*, w.name as weapon_name, w.image_path as weapon_image
-            FROM craft_requests r
-            JOIN weapons w ON r.weapon_id = w.id
-        `;
-        const params = [];
-
-        if (status && status !== 'all') {
-            query += ' WHERE r.status = ?';
-            params.push(status);
-        }
-
-        query += ' ORDER BY r.created_at DESC';
-
-        const requests = db.prepare(query).all(...params);
-        const list = requests.map(r => ({
-            ...r,
-            weapon_image_url: r.weapon_image ? `/crafts/images/${r.weapon_image}` : null,
-            has_plan: !!r.has_plan,
-            has_money: !!r.has_money,
-            crafted: !!r.crafted,
-        }));
-
-        res.json({ requests: list });
+        try {
+            const requests = getRequests(req.query.status);
+            const list = requests.map(r => ({
+                ...r,
+                weapon_image_url: r.weapon_image ? `/crafts/images/${r.weapon_image}` : null,
+                has_plan: !!r.has_plan, has_money: !!r.has_money, crafted: !!r.crafted,
+            }));
+            res.json({ requests: list });
+        } catch (e) { res.json({ requests: [], error: e.message }); }
     });
 
     app.post('/api/crafts/requests', requireAuth, (req, res) => {
@@ -248,49 +399,23 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const { weapon_id, has_plan, has_money } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
-
             if (!weapon_id) return res.status(400).json({ error: 'Arme requise' });
-
-            const db = getDB();
-            const weapon = db.prepare('SELECT * FROM weapons WHERE id = ?').get(weapon_id);
+            const weapon = getWeapon(weapon_id);
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
-
-            const result = db.prepare(`
-                INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money)
-                VALUES (?, ?, ?, ?, ?)
-            `).run(userId, userName, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0);
-
-            res.json({ success: true, id: result.lastInsertRowid });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+            const id = insertRequest(userId, userName, weapon_id, has_plan, has_money);
+            res.json({ success: true, id });
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // Mettre à jour une demande (crafté + N°série + date craft) — Hauts gradés
     app.patch('/api/crafts/requests/:id/craft', requireAdmin, async (req, res) => {
         try {
             const id = parseInt(req.params.id);
             const { crafted, serial_number } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
-
-            const db = getDB();
-            const existing = db.prepare(`
-                SELECT r.*, w.name as weapon_name FROM craft_requests r
-                JOIN weapons w ON r.weapon_id = w.id WHERE r.id = ?
-            `).get(id);
+            const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
-
-            const now = Math.floor(Date.now() / 1000);
-            db.prepare(`
-                UPDATE craft_requests
-                SET crafted = ?, serial_number = ?, craft_date = ?,
-                    crafted_by_id = ?, crafted_by_name = ?,
-                    status = CASE WHEN ? = 1 THEN 'crafted' ELSE 'in_progress' END
-                WHERE id = ?
-            `).run(crafted ? 1 : 0, serial_number || null, crafted ? now : null, userId, userName, crafted ? 1 : 0, id);
-
-            // Si crafté, ping l'utilisateur dans le salon
+            updateRequestCraft(id, crafted, serial_number, userId, userName);
             if (crafted) {
                 const state = botState();
                 const channel = botClient.channels.cache.get(state.CONFIG.CHANNELS.WEAPONS_LOG || '1497021044953845791');
@@ -301,50 +426,23 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     }).catch(e => console.error('Erreur ping craft:', e.message));
                 }
             }
-
             res.json({ success: true });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // Mettre à jour la vente — utilisateur d'origine ou admin
     app.patch('/api/crafts/requests/:id/sale', requireAuth, async (req, res) => {
         try {
             const id = parseInt(req.params.id);
             const { buyer_org, sale_price, sale_date } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
-
-            const db = getDB();
-            const existing = db.prepare(`
-                SELECT r.*, w.name as weapon_name FROM craft_requests r
-                JOIN weapons w ON r.weapon_id = w.id WHERE r.id = ?
-            `).get(id);
+            const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
-
-            // Seul le demandeur ou un admin peut compléter
             const isAdmin = req.session.user.isAdmin;
-            if (existing.user_id !== userId && !isAdmin) {
-                return res.status(403).json({ error: 'Action non autorisée' });
-            }
-
+            if (existing.user_id !== userId && !isAdmin) return res.status(403).json({ error: 'Action non autorisée' });
             const saleTimestamp = sale_date ? Math.floor(new Date(sale_date).getTime() / 1000) : Math.floor(Date.now() / 1000);
-
-            db.prepare(`
-                UPDATE craft_requests
-                SET buyer_org = ?, sale_price = ?, sale_date = ?,
-                    completed_by_id = ?, completed_by_name = ?,
-                    status = 'completed'
-                WHERE id = ?
-            `).run(buyer_org || null, parseInt(sale_price) || null, saleTimestamp, userId, userName, id);
-
-            // Poster le récap dans le salon WEAPONS_LOG
-            const updated = db.prepare(`
-                SELECT r.*, w.name as weapon_name FROM craft_requests r
-                JOIN weapons w ON r.weapon_id = w.id WHERE r.id = ?
-            `).get(id);
-
+            updateRequestSale(id, buyer_org, parseInt(sale_price) || null, saleTimestamp, userId, userName);
+            const updated = getRequest(id);
             if (!existing.posted_to_channel) {
                 const state = botState();
                 const channel = botClient.channels.cache.get(state.CONFIG.CHANNELS.WEAPONS_LOG || '1497021044953845791');
@@ -358,27 +456,17 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                                  `• Date vente : **${saleDate}**`,
                         allowedMentions: { parse: [] }
                     }).catch(e => console.error('Erreur récap:', e.message));
-
-                    db.prepare('UPDATE craft_requests SET posted_to_channel = 1 WHERE id = ?').run(id);
+                    markRequestPosted(id);
                 }
             }
-
             res.json({ success: true });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.delete('/api/crafts/requests/:id', requireAdmin, (req, res) => {
-        try {
-            const id = parseInt(req.params.id);
-            const db = getDB();
-            db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id);
-            res.json({ success: true });
-        } catch (e) {
-            res.status(500).json({ error: e.message });
-        }
+        try { deleteRequest(parseInt(req.params.id)); res.json({ success: true }); }
+        catch (e) { res.status(500).json({ error: e.message }); }
     });
 }
 
-module.exports = { initDB, getDB, registerCraftEndpoints };
+module.exports = { initDB, registerCraftEndpoints };
