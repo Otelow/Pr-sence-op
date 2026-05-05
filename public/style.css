@@ -5037,3 +5037,1100 @@ select:focus {
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 140, 0, 0.5) rgba(0, 0, 0, 0.2);
 }
+
+/* ============================================================
+   PLUS D'ORANGE DANS LES TITRES (override final)
+   ============================================================ */
+.page-title,
+.page-header h1,
+.cmd-section h2.section-title,
+.section-title,
+h2.section-title {
+    background: linear-gradient(90deg, #ffb84d 0%, #ff8c00 50%, #ff6600 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent !important;
+    text-shadow: 0 0 32px rgba(255, 140, 0, 0.3) !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+}
+
+.page-sub,
+.page-header .subtitle {
+    color: rgba(255, 184, 77, 0.7) !important;
+}
+
+/* Les titres "21BS / Centre Contrôle" et autres petits */
+.sidebar-title,
+.sidebar-header h1 {
+    background: linear-gradient(90deg, #ffb84d 0%, #ff8c00 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent !important;
+}
+
+/* Sous-titres des cartes */
+.stat-label {
+    color: rgba(255, 184, 77, 0.65) !important;
+}
+
+/* Titres de cartes/blocs */
+.op-block h3,
+.absences-block h3,
+.stats-block h3,
+.cmd-section .comm-title {
+    background: linear-gradient(135deg, var(--text) 30%, #ff8c00 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent !important;
+}
+
+/* ============================================
+   EMOJI PICKER avec onglets Serveur/Discord
+   ============================================ */
+#emojiPicker.comm-emoji-picker {
+    display: block !important;
+    margin-top: 16px;
+    background: rgba(15, 15, 18, 0.92);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid var(--border-hover);
+    border-radius: 12px;
+    overflow: hidden;
+    max-height: 420px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+#emojiPicker.comm-emoji-picker[style*="display:none"],
+#emojiPicker.comm-emoji-picker[style*="display: none"] {
+    display: none !important;
+}
+
+.emoji-picker-tabs {
+    display: flex;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.emoji-picker-tab {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.15s;
+    border-bottom: 2px solid transparent;
+}
+
+.emoji-picker-tab:hover {
+    background: rgba(255, 140, 0, 0.05);
+    color: var(--text);
+}
+
+.emoji-picker-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: rgba(255, 140, 0, 0.05);
+}
+
+.emoji-picker-content {
+    overflow-y: auto;
+    max-height: 360px;
+    padding: 12px;
+}
+
+.emoji-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 4px;
+    padding: 8px;
+}
+
+.emoji-category-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 12px 8px 4px;
+}
+
+.emoji-item {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.1s;
+    background: transparent;
+}
+
+.emoji-item:hover {
+    background: rgba(255, 140, 0, 0.15);
+    transform: scale(1.15);
+}
+
+.emoji-item img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+}
+
+.emoji-item-unicode {
+    font-size: 22px;
+    line-height: 1;
+    user-select: none;
+}
+
+/* Scrollbar du picker */
+.emoji-picker-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.emoji-picker-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 140, 0, 0.4);
+    border-radius: 4px;
+}
+
+.emoji-picker-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 140, 0, 0.6);
+}
+
+/* ============================================================
+   LIQUID GLASS APPLE STYLE — Renforcement final
+   ============================================================ */
+
+/* Background avec gradient mesh animé */
+body {
+    background:
+        radial-gradient(ellipse 80% 50% at 20% 0%, rgba(255, 140, 0, 0.15), transparent 50%),
+        radial-gradient(ellipse 60% 50% at 80% 100%, rgba(255, 184, 77, 0.08), transparent 50%),
+        radial-gradient(ellipse 70% 60% at 60% 30%, rgba(255, 140, 0, 0.04), transparent 60%),
+        #0a0a0c !important;
+    background-attachment: fixed !important;
+    min-height: 100vh;
+    font-feature-settings: "ss01" on, "cv11" on;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glass effect renforcé sur les blocs principaux */
+.sidebar {
+    background: rgba(10, 10, 12, 0.6) !important;
+    backdrop-filter: blur(40px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+    border-right: 0.5px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow:
+        inset -1px 0 0 rgba(255, 140, 0, 0.05),
+        2px 0 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+.topbar, .header, .page-header {
+    background: rgba(10, 10, 12, 0.5) !important;
+    backdrop-filter: blur(40px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 1px 0 rgba(255, 140, 0, 0.04) !important;
+}
+
+/* Cartes : effet liquid glass plus marqué */
+.stat-card,
+.op-block,
+.absences-block,
+.cmd-section,
+.sanctions-list .sanction,
+.channel-card,
+.comm-card,
+.admin-section,
+.craft-weapon-card,
+.craft-history-item,
+.craft-request-item {
+    background: rgba(20, 20, 24, 0.55) !important;
+    backdrop-filter: blur(24px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(160%) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.06) !important;
+    border-radius: 16px !important;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        inset 0 0 0 0.5px rgba(255, 140, 0, 0.04) !important;
+}
+
+.stat-card:hover,
+.craft-weapon-card:hover {
+    transform: translateY(-3px) !important;
+    border-color: rgba(255, 140, 0, 0.3) !important;
+    box-shadow:
+        0 16px 48px rgba(0, 0, 0, 0.4),
+        0 0 32px rgba(255, 140, 0, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Inputs glass */
+.comm-select,
+.comm-input,
+.comm-textarea,
+.custom-dropdown-trigger {
+    background: rgba(0, 0, 0, 0.35) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 10px !important;
+    transition: all 0.2s ease !important;
+}
+
+.comm-select:focus,
+.comm-input:focus,
+.comm-textarea:focus,
+.custom-dropdown-trigger:focus {
+    border-color: var(--accent) !important;
+    background: rgba(255, 140, 0, 0.05) !important;
+    box-shadow:
+        0 0 0 4px rgba(255, 140, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Modales : glass profond */
+.modal-content {
+    background: rgba(15, 15, 20, 0.82) !important;
+    backdrop-filter: blur(50px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(50px) saturate(200%) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important;
+    box-shadow:
+        0 32px 96px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 0 0 0.5px rgba(255, 140, 0, 0.08) !important;
+}
+
+.modal-backdrop {
+    background: rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+}
+
+/* ============================================================
+   ADMIN LINK SIDEBAR
+   ============================================================ */
+.admin-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(255, 140, 0, 0.15), rgba(255, 184, 77, 0.05));
+    border: 0.5px solid rgba(255, 140, 0, 0.3);
+    border-radius: 10px;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    margin: 8px 0;
+    transition: all 0.2s;
+}
+
+.admin-link:hover {
+    background: linear-gradient(135deg, rgba(255, 140, 0, 0.25), rgba(255, 184, 77, 0.1));
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(255, 140, 0, 0.2);
+}
+
+/* ============================================================
+   ADMIN PAGE
+   ============================================================ */
+.admin-body {
+    background:
+        radial-gradient(ellipse at top, rgba(255, 140, 0, 0.12), transparent 60%),
+        #0a0a0c !important;
+    min-height: 100vh;
+    margin: 0;
+    color: var(--text);
+    font-family: var(--font-body);
+}
+
+.admin-header {
+    background: rgba(10, 10, 12, 0.6);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.admin-header-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 32px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 20px;
+}
+
+.admin-back {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    transition: all 0.2s;
+    width: fit-content;
+}
+
+.admin-back:hover {
+    background: rgba(255, 140, 0, 0.1);
+    border-color: rgba(255, 140, 0, 0.3);
+    color: var(--accent);
+}
+
+.admin-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    margin: 0;
+    background: linear-gradient(135deg, #ffb84d 0%, #ff8c00 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 0.04em;
+}
+
+.admin-main {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 32px;
+}
+
+.admin-section {
+    margin-bottom: 32px;
+    padding: 28px;
+}
+
+.admin-info {
+    color: var(--text-dim);
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+/* Slide to Unlock */
+.slide-to-unlock {
+    margin: 24px 0;
+}
+
+.slide-track {
+    position: relative;
+    height: 64px;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 32px;
+    overflow: hidden;
+    user-select: none;
+}
+
+.slide-handle {
+    position: absolute;
+    top: 4px;
+    left: 0;
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, var(--accent), #ff7700);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 22px;
+    font-weight: 700;
+    cursor: grab;
+    box-shadow:
+        0 4px 16px rgba(255, 140, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    transition: left 0.3s;
+    margin-left: 4px;
+    z-index: 2;
+}
+
+.slide-handle:active {
+    cursor: grabbing;
+}
+
+.slide-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+    pointer-events: none;
+    background: linear-gradient(90deg, var(--text-dim) 0%, var(--accent) 50%, var(--text-dim) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+    to { background-position: 200% center; }
+}
+
+.impersonate-panel {
+    margin-top: 20px;
+    padding: 24px;
+    background: rgba(255, 140, 0, 0.05);
+    border: 0.5px solid rgba(255, 140, 0, 0.2);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Admin weapons list */
+.admin-weapons-list {
+    margin-top: 20px;
+    display: grid;
+    gap: 12px;
+}
+
+.admin-weapon-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    background: rgba(20, 20, 24, 0.55);
+    backdrop-filter: blur(16px);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+.admin-weapon-row:hover {
+    border-color: rgba(255, 140, 0, 0.2);
+    background: rgba(255, 140, 0, 0.03);
+}
+
+.admin-weapon-img {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.admin-weapon-placeholder {
+    width: 56px;
+    height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    font-size: 24px;
+}
+
+.admin-weapon-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.admin-weapon-info small {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.admin-weapon-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-small {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    border-radius: 6px !important;
+}
+
+.btn-danger {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border: 0.5px solid rgba(239, 68, 68, 0.4) !important;
+    color: #fca5a5 !important;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.25) !important;
+    border-color: var(--red) !important;
+}
+
+/* Editor modal */
+.modal-large {
+    max-width: 700px !important;
+    width: 90% !important;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.weapon-image-preview {
+    margin-top: 12px;
+}
+
+.weapon-image-preview img {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 12px;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+}
+
+.ingredients-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.ingredient-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 40px;
+    gap: 8px;
+    align-items: center;
+}
+
+.ingredient-row input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text);
+}
+
+.empty-small {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Admin orgs */
+.admin-org-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    max-width: 500px;
+}
+
+.admin-orgs-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 8px;
+}
+
+.admin-org-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(20, 20, 24, 0.5);
+    backdrop-filter: blur(8px);
+    border: 0.5px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+/* ============================================================
+   CRAFT D'ARMES — Section principale
+   ============================================================ */
+.crafts-subtabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0;
+    overflow-x: auto;
+}
+
+.crafts-subtab {
+    background: transparent;
+    border: 0;
+    color: var(--text-dim);
+    padding: 14px 24px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+}
+
+.crafts-subtab:hover {
+    color: var(--text);
+    background: rgba(255, 140, 0, 0.05);
+}
+
+.crafts-subtab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.crafts-section {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.crafts-section-header {
+    margin-bottom: 24px;
+}
+
+.crafts-section-info {
+    color: var(--text-dim);
+    font-size: 14px;
+}
+
+/* Catalogue grid */
+.crafts-catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 20px;
+}
+
+.craft-weapon-card {
+    padding: 20px;
+    transition: all 0.3s;
+}
+
+.craft-weapon-image {
+    width: 100%;
+    height: 180px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.craft-weapon-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.craft-weapon-placeholder {
+    font-size: 48px;
+    opacity: 0.4;
+}
+
+.craft-weapon-name {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+}
+
+.craft-weapon-meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    color: var(--text-dim);
+    font-size: 13px;
+}
+
+.craft-weapon-time { color: #fca5a5; }
+.craft-weapon-price { color: var(--gold); }
+
+.craft-ingredients-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.craft-ingredient {
+    text-align: center;
+    padding: 8px 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 0.5px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.craft-ingredient-amount {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.craft-ingredient-name {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+/* Demande de craft */
+.craft-request-form {
+    background: rgba(20, 20, 24, 0.55);
+    backdrop-filter: blur(24px) saturate(160%);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.craft-field {
+    margin-bottom: 16px;
+}
+
+.craft-field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.craft-field-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.craft-checkbox-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+    font-size: 14px;
+}
+
+.craft-checkbox-label:hover {
+    background: rgba(255, 140, 0, 0.05);
+    border-color: rgba(255, 140, 0, 0.2);
+}
+
+.craft-checkbox-label input[type="checkbox"]:checked + span {
+    color: var(--accent);
+}
+
+.craft-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.craft-recent-requests h4 {
+    color: var(--accent);
+    margin-bottom: 12px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.craft-requests-list {
+    display: grid;
+    gap: 8px;
+}
+
+.craft-request-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    background: rgba(20, 20, 24, 0.55);
+    backdrop-filter: blur(16px);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+.craft-request-image {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.craft-request-body {
+    flex: 1;
+}
+
+.craft-request-name {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.craft-request-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+}
+
+.craft-tag {
+    background: rgba(255, 140, 0, 0.1);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+.craft-status-badge {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.craft-status-pending {
+    background: rgba(255, 184, 77, 0.15);
+    color: var(--gold);
+    border: 0.5px solid rgba(255, 184, 77, 0.3);
+}
+
+.craft-status-progress {
+    background: rgba(96, 165, 250, 0.15);
+    color: var(--blue);
+    border: 0.5px solid rgba(96, 165, 250, 0.3);
+}
+
+.craft-status-crafted {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--green);
+    border: 0.5px solid rgba(74, 222, 128, 0.3);
+}
+
+.craft-status-done {
+    background: rgba(74, 222, 128, 0.25);
+    color: var(--green);
+    border: 0.5px solid rgba(74, 222, 128, 0.5);
+}
+
+/* Tableau de craft (28 lignes) */
+.craft-board-wrapper {
+    overflow-x: auto;
+    background: rgba(20, 20, 24, 0.55);
+    backdrop-filter: blur(20px);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 4px;
+}
+
+.craft-board-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1100px;
+}
+
+.craft-board-table thead th {
+    background: rgba(255, 140, 0, 0.08);
+    color: var(--accent);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 12px 8px;
+    text-align: left;
+    border-bottom: 0.5px solid rgba(255, 140, 0, 0.2);
+    font-weight: 700;
+}
+
+.craft-board-table tbody td {
+    padding: 8px;
+    border-bottom: 0.5px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+    font-size: 13px;
+}
+
+.craft-board-table tbody tr:hover {
+    background: rgba(255, 140, 0, 0.02);
+}
+
+.craft-board-empty {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.craft-board-completed {
+    opacity: 0.5;
+}
+
+.craft-board-request {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.craft-board-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.craft-board-request strong {
+    display: block;
+    font-size: 13px;
+}
+
+.craft-board-request small {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.craft-input-serial,
+.craft-input-price {
+    background: rgba(0, 0, 0, 0.3);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--text);
+    font-size: 12px;
+    width: 100%;
+    max-width: 120px;
+}
+
+.craft-input-serial:focus,
+.craft-input-price:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
+.craft-input-serial:disabled,
+.craft-input-price:disabled,
+.craft-org-select:disabled,
+.craft-checkbox-crafted:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.craft-org-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 8px;
+    color: var(--text);
+    font-size: 12px;
+}
+
+.craft-org-select option {
+    background: #1a1a1a;
+    color: var(--text);
+}
+
+.btn-craft-validate {
+    background: linear-gradient(135deg, var(--green), #16a34a);
+    color: white;
+    border: 0;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-craft-validate:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+}
+
+/* Historique */
+.craft-history-list {
+    display: grid;
+    gap: 12px;
+}
+
+.craft-history-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+}
+
+.craft-history-image {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.craft-history-body {
+    flex: 1;
+}
+
+.craft-history-name {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.craft-history-serial {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(255, 140, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.craft-history-meta,
+.craft-history-dates {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+/* Toggle embed */
+.comm-embed-toggle {
+    margin-left: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.comm-embed-toggle input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* Dropdown image (craft) */
+.craft-dropdown-image {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+}
