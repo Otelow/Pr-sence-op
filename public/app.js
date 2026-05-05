@@ -10,6 +10,7 @@ const PAGE_TITLES = {
     stats: { title: 'Statistiques', sub: 'Suivi hebdomadaire' },
     sanctions: { title: 'Sanctions', sub: 'Historique des avertissements' },
     crafts: { title: "Craft d'armes", sub: 'Gestion des demandes & production' },
+    myweapons: { title: 'Vos Armes', sub: 'Tes ventes personnelles' },
 };
 
 let currentTab = 'presence';
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupNav();
     setupChannelSearch();
     setupMap();
+    updateImpersonateBanner();
     refreshAll();
     refreshTimer = setInterval(refreshAll, 15_000);
 });
@@ -83,6 +85,8 @@ async function refreshAll() {
         if (!commandsLoaded) await initCommandsTab();
     } else if (currentTab === 'crafts') {
         await initCraftsTab();
+    } else if (currentTab === 'myweapons') {
+        await initMyWeaponsTab();
     }
 }
 
@@ -1114,10 +1118,16 @@ function setMapMode(mode) {
 
 async function loadMapPoints() {
     try {
-        const res = await fetch('/api/map/points');
+        // Si en mode impersonate (admin), passer le rôle
+        const impersonateRole = localStorage.getItem('impersonate_role');
+        const url = impersonateRole ? `/api/map/points?impersonate=${impersonateRole}` : '/api/map/points';
+        const res = await fetch(url);
         const data = await res.json();
         mapPoints = data.points || [];
         renderMapPoints();
+
+        // Bandeau impersonate
+        updateImpersonateBanner();
 
         // Auto-fit initial : ajuster zoom pour que la carte rentre dans le container
         if (!mapInitialized) {
@@ -1128,6 +1138,33 @@ async function loadMapPoints() {
         console.error('Map:', e);
     }
 }
+
+function updateImpersonateBanner() {
+    const role = localStorage.getItem('impersonate_role');
+    let banner = document.getElementById('impersonateBanner');
+
+    if (role) {
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'impersonateBanner';
+            banner.className = 'impersonate-banner';
+            document.body.prepend(banner);
+        }
+        banner.innerHTML = `
+            <span>👁 Vous êtes en mode <strong>impersonate</strong> du rôle ${role}</span>
+            <button onclick="exitImpersonate()" class="btn-impersonate-exit">✗ Quitter</button>
+        `;
+        banner.style.display = 'flex';
+    } else if (banner) {
+        banner.style.display = 'none';
+    }
+}
+
+function exitImpersonate() {
+    localStorage.removeItem('impersonate_role');
+    location.reload();
+}
+window.exitImpersonate = exitImpersonate;
 
 let mapInitialized = false;
 
@@ -2181,9 +2218,13 @@ function renderCraftCatalog() {
         return;
     }
 
-    grid.innerHTML = weaponsCache.map(w => {
+    // Tri DÉCROISSANT par craft_price (déjà trié backend mais on s'assure)
+    const sorted = [...weaponsCache].sort((a, b) => (b.craft_price || 0) - (a.craft_price || 0));
+
+    grid.innerHTML = sorted.map(w => {
         const ingredientsHTML = (w.ingredients || []).map(ing => `
             <div class="craft-ingredient">
+                ${ing.image_url ? `<img src="${ing.image_url}" alt="${escapeHtml(ing.name)}" class="craft-ingredient-img">` : '<div class="craft-ingredient-placeholder">🧪</div>'}
                 <div class="craft-ingredient-amount">${ing.amount || 0}</div>
                 <div class="craft-ingredient-name">${escapeHtml(ing.name || '?')}</div>
             </div>
@@ -2191,6 +2232,7 @@ function renderCraftCatalog() {
 
         const timeStr = w.craft_time > 0 ? formatCraftTime(w.craft_time) : 'N/A';
         const priceStr = w.craft_price > 0 ? w.craft_price.toLocaleString('fr-FR') + '$' : 'Gratuit';
+        const saleStr = w.sale_price > 0 ? `<span class="craft-weapon-saleprice">📈 Vente : ${w.sale_price.toLocaleString('fr-FR')}$</span>` : '';
 
         return `
             <div class="craft-weapon-card">
@@ -2198,10 +2240,11 @@ function renderCraftCatalog() {
                     ${w.image_url ? `<img src="${w.image_url}" alt="${escapeHtml(w.name)}">` : '<span class="craft-weapon-placeholder">🔫</span>'}
                 </div>
                 <div class="craft-weapon-body">
-                    <div class="craft-weapon-name">${escapeHtml(w.name)}</div>
+                    <div class="craft-weapon-name">${escapeHtml(w.name)}${w.requires_plan ? ' <span class="craft-weapon-planbadge">📋 Plan</span>' : ''}</div>
                     <div class="craft-weapon-meta">
                         <span class="craft-weapon-time">⏱ ${timeStr}</span>
-                        <span class="craft-weapon-price">💰 ${priceStr}</span>
+                        <span class="craft-weapon-price">💰 Craft : ${priceStr}</span>
+                        ${saleStr}
                     </div>
                     ${ingredientsHTML ? `<div class="craft-ingredients-grid">${ingredientsHTML}</div>` : ''}
                 </div>
@@ -2325,8 +2368,21 @@ function renderCraftRequestsList() {
     list.innerHTML = recent.map(r => {
         const date = new Date(r.created_at * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
         const status = getCraftStatusBadge(r);
+        const canChangeStatus = canValidateCraftClient();
+        const isSuperAdmin = canDeleteRequestsClient();
+        const rejectedClass = r.status === 'rejected' ? ' craft-request-rejected' : '';
+
+        const statusActions = canChangeStatus ? `
+            <div class="craft-status-actions">
+                ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
+                ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
+                ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
+                ${isSuperAdmin ? `<button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">🗑</button>` : ''}
+            </div>
+        ` : '';
+
         return `
-            <div class="craft-request-item">
+            <div class="craft-request-item${rejectedClass}">
                 ${r.weapon_image_url ? `<img class="craft-request-image" src="${r.weapon_image_url}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
                 <div class="craft-request-body">
                     <div class="craft-request-name">${escapeHtml(r.weapon_name)}</div>
@@ -2336,6 +2392,7 @@ function renderCraftRequestsList() {
                         ${r.has_plan ? '<span class="craft-tag">📋 Plan</span>' : ''}
                         ${r.has_money ? '<span class="craft-tag">💰 Argent</span>' : ''}
                     </div>
+                    ${statusActions}
                 </div>
                 <div class="craft-request-status">${status}</div>
             </div>
@@ -2343,8 +2400,62 @@ function renderCraftRequestsList() {
     }).join('');
 }
 
+function canValidateCraftClient() {
+    const userRoles = window.currentUserRoles || [];
+    if (window.currentUserId === '952986899667103804') return true;
+    return ['1485279148246175764', '1486744891848654988', '1485279534650494976'].some(r => userRoles.includes(r));
+}
+
+function canDeleteRequestsClient() {
+    const userRoles = window.currentUserRoles || [];
+    if (window.currentUserId === '952986899667103804') return true;
+    return userRoles.includes('1485279148246175764');
+}
+
+async function updateRequestStatus(requestId, status) {
+    const labels = { in_progress: 'En cours', rejected: 'Refusé', pending: 'En attente' };
+    if (!confirm(`Changer le statut en "${labels[status]}" ?`)) return;
+    try {
+        const res = await fetch(`/api/crafts/requests/${requestId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast(`✅ Statut → ${labels[status]}`);
+            await loadCraftRequests();
+            renderCraftRequestsList();
+            renderCraftBoard();
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+
+async function deleteCraftRequest(requestId) {
+    if (!confirm('Supprimer définitivement cette demande ?')) return;
+    try {
+        const res = await fetch(`/api/crafts/requests/${requestId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+            toast('🗑 Supprimée');
+            await loadCraftRequests();
+            renderCraftRequestsList();
+            renderCraftBoard();
+            renderCraftHistory();
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+
+window.updateRequestStatus = updateRequestStatus;
+window.deleteCraftRequest = deleteCraftRequest;
+
 function getCraftStatusBadge(r) {
     if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">✓ Finalisé</span>';
+    if (r.status === 'rejected') return '<span class="craft-status-badge craft-status-rejected">✗ Refusé</span>';
     if (r.crafted) return '<span class="craft-status-badge craft-status-crafted">⚒ Crafté</span>';
     if (r.status === 'in_progress') return '<span class="craft-status-badge craft-status-progress">⏳ En cours</span>';
     return '<span class="craft-status-badge craft-status-pending">📋 En attente</span>';
@@ -2666,28 +2777,227 @@ window.toggleEmbedMode = toggleEmbedMode;
 })();
 
 // ============================================================
-// AFFICHER LE LIEN ADMIN
+// AFFICHER LE SLIDE ADMIN + STOCKAGE USER
 // ============================================================
 (async function checkAdminAndShowLink() {
-    // Tente plusieurs fois car le serveur peut prendre du temps à répondre au boot
     for (let i = 0; i < 5; i++) {
         try {
             const r = await fetch('/api/me');
             if (r.ok) {
                 const me = await r.json();
                 window.currentUserId = me.id;
+                window.currentUserRoles = me.roles || [];
 
-                // Auto-detect : Otelow ou rôle admin
                 if (me.id === '952986899667103804' ||
                     (me.roles && me.roles.includes('1485279148246175764')) ||
                     me.isAdmin) {
-                    const link = document.getElementById('adminLink');
-                    if (link) link.style.display = 'flex';
+                    const wrapper = document.getElementById('adminSlideWrapper');
+                    if (wrapper) {
+                        wrapper.style.display = 'block';
+                        setupAdminSlide();
+                    }
                     isAdminUser = true;
                 }
-                return; // Succès
+                return;
             }
         } catch {}
         await new Promise(r => setTimeout(r, 500));
     }
 })();
+
+function setupAdminSlide() {
+    const handle = document.getElementById('adminSlideHandle');
+    const track = document.getElementById('adminSlideTrack');
+    if (!handle || !track) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let currentX = 0;
+
+    const startDrag = (clientX) => {
+        isDragging = true;
+        startX = clientX;
+        handle.style.transition = 'none';
+    };
+    const moveDrag = (clientX) => {
+        if (!isDragging) return;
+        const trackWidth = track.offsetWidth - handle.offsetWidth - 8;
+        currentX = Math.max(0, Math.min(clientX - startX, trackWidth));
+        handle.style.left = currentX + 'px';
+        if (currentX >= trackWidth * 0.85) {
+            isDragging = false;
+            handle.innerHTML = '✓';
+            handle.style.background = 'linear-gradient(135deg, #4ade80, #16a34a)';
+            setTimeout(() => { window.location.href = '/admin'; }, 300);
+        }
+    };
+    const endDrag = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        handle.style.transition = 'left 0.3s';
+        const trackWidth = track.offsetWidth - handle.offsetWidth - 8;
+        if (currentX < trackWidth * 0.85) {
+            handle.style.left = '0';
+            currentX = 0;
+        }
+    };
+
+    handle.addEventListener('mousedown', e => { e.preventDefault(); startDrag(e.clientX); });
+    window.addEventListener('mousemove', e => moveDrag(e.clientX));
+    window.addEventListener('mouseup', endDrag);
+    handle.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e.touches[0].clientX); }, { passive: false });
+    window.addEventListener('touchmove', e => moveDrag(e.touches[0].clientX), { passive: true });
+    window.addEventListener('touchend', endDrag);
+}
+
+// ============================================================
+// VOS ARMES (myweapons)
+// ============================================================
+let myWeaponsCache = [];
+
+async function initMyWeaponsTab() {
+    // Charger orgs si pas déjà fait
+    if (!organizationsCache || organizationsCache.length === 0) {
+        await loadOrganizations();
+    }
+    renderMwBuyerDropdown();
+    await loadMyWeapons();
+    renderMyWeapons();
+}
+
+async function loadMyWeapons() {
+    try {
+        const r = await fetch('/api/crafts/myweapons');
+        const d = await r.json();
+        myWeaponsCache = d.myweapons || [];
+    } catch { myWeaponsCache = []; }
+}
+
+function renderMwBuyerDropdown() {
+    const list = document.getElementById('mwBuyerList');
+    if (!list) return;
+    list.innerHTML = (organizationsCache || []).map(o => `
+        <div class="custom-dropdown-item" data-name="${escapeHtml(o.name).toLowerCase()}" onclick="selectMwBuyer('${escapeHtml(o.name).replace(/'/g, "\\'")}')">
+            <span class="custom-dropdown-item-label">🏢 ${escapeHtml(o.name)}</span>
+        </div>
+    `).join('');
+
+    const search = document.getElementById('mwBuyerSearch');
+    if (search) {
+        search.oninput = () => {
+            const q = search.value.toLowerCase().trim();
+            list.querySelectorAll('.custom-dropdown-item').forEach(item => {
+                const name = item.dataset.name || '';
+                item.style.display = !q || name.includes(q) ? 'flex' : 'none';
+            });
+        };
+    }
+}
+
+function toggleMwBuyerDropdown(event) {
+    if (event) event.stopPropagation();
+    closeAllDropdowns();
+    const menu = document.getElementById('mwBuyerMenu');
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function selectMwBuyer(name) {
+    document.getElementById('mwBuyerOrg').value = name;
+    const label = document.getElementById('mwBuyerLabel');
+    if (label) {
+        label.classList.remove('custom-dropdown-placeholder');
+        label.innerHTML = `🏢 ${escapeHtml(name)}`;
+    }
+    document.getElementById('mwBuyerMenu').style.display = 'none';
+}
+
+function toggleMwCrafted() {
+    const checked = document.getElementById('mwIsCrafted').checked;
+    document.getElementById('mwSerialField').style.display = checked ? 'block' : 'none';
+}
+
+async function submitMyWeapon() {
+    const weapon_name = document.getElementById('mwName').value.trim();
+    const is_crafted = document.getElementById('mwIsCrafted').checked;
+    const serial_number = document.getElementById('mwSerial').value.trim();
+    const buyer_org = document.getElementById('mwBuyerOrg').value;
+    const sale_price = document.getElementById('mwPrice').value;
+
+    if (!weapon_name) { toast('❌ Nom de l\'arme requis', 'error'); return; }
+
+    try {
+        const res = await fetch('/api/crafts/myweapons', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ weapon_name, is_crafted, serial_number, buyer_org, sale_price })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast('✅ Vente enregistrée');
+            // Reset
+            document.getElementById('mwName').value = '';
+            document.getElementById('mwSerial').value = '';
+            document.getElementById('mwBuyerOrg').value = '';
+            document.getElementById('mwPrice').value = '';
+            document.getElementById('mwIsCrafted').checked = false;
+            document.getElementById('mwSerialField').style.display = 'none';
+            const label = document.getElementById('mwBuyerLabel');
+            if (label) {
+                label.classList.add('custom-dropdown-placeholder');
+                label.innerHTML = '— Choisir —';
+            }
+            await loadMyWeapons();
+            renderMyWeapons();
+        } else { toast(`❌ ${data.error}`, 'error'); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+
+function renderMyWeapons() {
+    const list = document.getElementById('myWeaponsList');
+    if (!list) return;
+    if (myWeaponsCache.length === 0) {
+        list.innerHTML = '<p class="empty">Aucune vente enregistrée</p>';
+        return;
+    }
+    list.innerHTML = myWeaponsCache.map(w => {
+        const date = new Date(w.created_at * 1000).toLocaleDateString('fr-FR');
+        return `
+            <div class="myweapons-item">
+                <div class="myweapons-item-icon">🔫</div>
+                <div class="myweapons-item-body">
+                    <div class="myweapons-item-name">
+                        ${escapeHtml(w.weapon_name)}
+                        ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
+                    </div>
+                    <div class="myweapons-item-meta">
+                        ${w.serial_number ? `<span>N°: ${escapeHtml(w.serial_number)}</span>` : ''}
+                        <span>🏢 ${escapeHtml(w.buyer_org || 'N/A')}</span>
+                        <span class="myweapons-item-price">💰 ${(w.sale_price || 0).toLocaleString('fr-FR')}$</span>
+                        <span>📅 ${date}</span>
+                    </div>
+                </div>
+                <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>
+            </div>
+        `;
+    }).join('');
+}
+
+async function deleteMyWeapon(id) {
+    if (!confirm('Supprimer cette vente ?')) return;
+    try {
+        const res = await fetch(`/api/crafts/myweapons/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            toast('🗑 Supprimée');
+            await loadMyWeapons();
+            renderMyWeapons();
+        }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+
+window.toggleMwBuyerDropdown = toggleMwBuyerDropdown;
+window.selectMwBuyer = selectMwBuyer;
+window.toggleMwCrafted = toggleMwCrafted;
+window.submitMyWeapon = submitMyWeapon;
+window.deleteMyWeapon = deleteMyWeapon;

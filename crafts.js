@@ -80,6 +80,7 @@ function initDB() {
                     requires_plan INTEGER DEFAULT 0,
                     craft_time INTEGER DEFAULT 0,
                     craft_price INTEGER DEFAULT 0,
+                    sale_price INTEGER DEFAULT 0,
                     ingredients TEXT DEFAULT '[]',
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
@@ -115,20 +116,30 @@ function initDB() {
                     posted_to_channel INTEGER DEFAULT 0,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
+                CREATE TABLE IF NOT EXISTS my_weapons (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    user_name TEXT NOT NULL,
+                    weapon_name TEXT NOT NULL,
+                    is_crafted INTEGER DEFAULT 0,
+                    serial_number TEXT,
+                    buyer_org TEXT,
+                    sale_price INTEGER,
+                    created_at INTEGER DEFAULT (strftime('%s','now'))
+                );
                 CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
                 CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
+                CREATE INDEX IF NOT EXISTS idx_myweapons_user ON my_weapons(user_id);
             `);
 
-            // Migrations : ajouter les colonnes si elles n'existent pas (pour les bases existantes)
+            // Migrations
             try { db.exec(`ALTER TABLE weapons ADD COLUMN plan_image_path TEXT`); } catch {}
             try { db.exec(`ALTER TABLE weapons ADD COLUMN requires_plan INTEGER DEFAULT 0`); } catch {}
+            try { db.exec(`ALTER TABLE weapons ADD COLUMN sale_price INTEGER DEFAULT 0`); } catch {}
 
-            // Pré-remplir les ingrédients par défaut
             const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
-                try {
-                    db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)').run(ing);
-                } catch {}
+                try { db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)').run(ing); } catch {}
             }
 
             console.log('💾 DB Crafts initialisée (SQLite)');
@@ -174,22 +185,22 @@ function getWeapon(id) {
     return jsonData.weapons.find(w => w.id === id);
 }
 
-function insertWeapon(name, image_path, plan_image_path, requires_plan, craft_time, craft_price, ingredients) {
+function insertWeapon(name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, ingredients) {
     if (useSQLite) {
-        const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-            .run(name, image_path, plan_image_path, requires_plan ? 1 : 0, craft_time, craft_price, ingredients);
+        const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(name, image_path, plan_image_path, requires_plan ? 1 : 0, craft_time, craft_price, sale_price, ingredients);
         return r.lastInsertRowid;
     }
     const id = nextId('weapons');
-    jsonData.weapons.push({ id, name, image_path, plan_image_path, requires_plan: requires_plan ? 1 : 0, craft_time, craft_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
+    jsonData.weapons.push({ id, name, image_path, plan_image_path, requires_plan: requires_plan ? 1 : 0, craft_time, craft_price, sale_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
     saveJSON();
     return id;
 }
 
-function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craft_time, craft_price, ingredients) {
+function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, ingredients) {
     if (useSQLite) {
-        db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, ingredients = ?, requires_plan = ?, image_path = COALESCE(?, image_path), plan_image_path = COALESCE(?, plan_image_path) WHERE id = ?`)
-            .run(name, craft_time, craft_price, ingredients, requires_plan ? 1 : 0, image_path, plan_image_path, id);
+        db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, sale_price = ?, ingredients = ?, requires_plan = ?, image_path = COALESCE(?, image_path), plan_image_path = COALESCE(?, plan_image_path) WHERE id = ?`)
+            .run(name, craft_time, craft_price, sale_price, ingredients, requires_plan ? 1 : 0, image_path, plan_image_path, id);
         return;
     }
     const w = jsonData.weapons.find(w => w.id === id);
@@ -197,6 +208,7 @@ function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craf
         w.name = name;
         w.craft_time = craft_time;
         w.craft_price = craft_price;
+        w.sale_price = sale_price;
         w.ingredients = ingredients;
         w.requires_plan = requires_plan ? 1 : 0;
         if (image_path) w.image_path = image_path;
@@ -400,13 +412,31 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.get('/api/crafts/weapons', requireAuth, (req, res) => {
         try {
             const weapons = getAllWeapons();
-            const list = weapons.map(w => ({
-                ...w,
-                ingredients: typeof w.ingredients === 'string' ? JSON.parse(w.ingredients || '[]') : (w.ingredients || []),
-                image_url: w.image_path ? `/crafts/images/${w.image_path}` : null,
-                plan_image_url: w.plan_image_path ? `/crafts/images/${w.plan_image_path}` : null,
-                requires_plan: !!w.requires_plan,
-            }));
+            const allIngredients = getAllIngredients();
+            const ingrMap = new Map(allIngredients.map(i => [i.name, i]));
+
+            const list = weapons.map(w => {
+                let parsedIngredients = typeof w.ingredients === 'string' ? JSON.parse(w.ingredients || '[]') : (w.ingredients || []);
+                parsedIngredients = parsedIngredients.map(ing => {
+                    const matched = ingrMap.get(ing.name) || (ing.ingredient_id ? allIngredients.find(i => i.id === ing.ingredient_id) : null);
+                    return {
+                        ...ing,
+                        image_url: matched?.image_path ? `/crafts/images/${matched.image_path}` : null,
+                    };
+                });
+
+                return {
+                    ...w,
+                    ingredients: parsedIngredients,
+                    image_url: w.image_path ? `/crafts/images/${w.image_path}` : null,
+                    plan_image_url: w.plan_image_path ? `/crafts/images/${w.plan_image_path}` : null,
+                    requires_plan: !!w.requires_plan,
+                };
+            });
+
+            // Trier par craft_price DÉCROISSANT
+            list.sort((a, b) => (b.craft_price || 0) - (a.craft_price || 0));
+
             res.json({ weapons: list });
         } catch (e) {
             console.error('GET weapons:', e);
@@ -416,14 +446,17 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.post('/api/crafts/weapons', requireAdmin, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'plan_image', maxCount: 1 }]), (req, res) => {
         try {
-            const { name, craft_time, craft_price, ingredients, requires_plan } = req.body;
+            const { name, craft_time, craft_price, sale_price, ingredients, requires_plan } = req.body;
             if (!name) return res.status(400).json({ error: 'Nom requis' });
             const imagePath = req.files?.image?.[0]?.filename || null;
             const planImagePath = req.files?.plan_image?.[0]?.filename || null;
             const id = insertWeapon(
                 name, imagePath, planImagePath,
                 requires_plan === '1' || requires_plan === 'true' || requires_plan === true,
-                parseInt(craft_time) || 0, parseInt(craft_price) || 0, ingredients || '[]'
+                parseInt(craft_time) || 0,
+                parseInt(craft_price) || 0,
+                parseInt(sale_price) || 0,
+                ingredients || '[]'
             );
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -432,7 +465,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.put('/api/crafts/weapons/:id', requireAdmin, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'plan_image', maxCount: 1 }]), (req, res) => {
         try {
             const id = parseInt(req.params.id);
-            const { name, craft_time, craft_price, ingredients, requires_plan } = req.body;
+            const { name, craft_time, craft_price, sale_price, ingredients, requires_plan } = req.body;
             const existing = getWeapon(id);
             if (!existing) return res.status(404).json({ error: 'Arme introuvable' });
 
@@ -453,6 +486,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 requires_plan === '1' || requires_plan === 'true' || requires_plan === true,
                 parseInt(craft_time) || existing.craft_time || 0,
                 parseInt(craft_price) || existing.craft_price || 0,
+                parseInt(sale_price) || existing.sale_price || 0,
                 ingredients || (typeof existing.ingredients === 'string' ? existing.ingredients : JSON.stringify(existing.ingredients || []))
             );
             res.json({ success: true });
@@ -569,8 +603,29 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.patch('/api/crafts/requests/:id/craft', requireAdmin, async (req, res) => {
+    // CRAFT_VALIDATION_ROLES : seuls ces rôles peuvent valider/cocher crafté
+    const CRAFT_VALIDATION_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
+    const SUPER_ADMIN_ROLE = '1485279148246175764';
+    const SUPER_ADMIN_USER = '952986899667103804';
+
+    function canValidateCraft(user) {
+        if (!user) return false;
+        if (user.id === SUPER_ADMIN_USER) return true;
+        const userRoles = user.roles || [];
+        return CRAFT_VALIDATION_ROLES.some(r => userRoles.includes(r));
+    }
+
+    function canDeleteRequests(user) {
+        if (!user) return false;
+        if (user.id === SUPER_ADMIN_USER) return true;
+        return (user.roles || []).includes(SUPER_ADMIN_ROLE);
+    }
+
+    app.patch('/api/crafts/requests/:id/craft', requireAuth, async (req, res) => {
         try {
+            if (!canValidateCraft(req.session.user)) {
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
+            }
             const id = parseInt(req.params.id);
             const { crafted, serial_number } = req.body;
             const userId = req.session.user.id;
@@ -579,14 +634,35 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
             updateRequestCraft(id, crafted, serial_number, userId, userName);
             if (crafted) {
-                const state = botState();
-                const channel = botClient.channels.cache.get(state.CONFIG.CHANNELS.WEAPONS_LOG || '1497021044953845791');
+                // Ping vers le NOUVEAU salon 1496977220097282290
+                const channel = botClient.channels.cache.get('1496977220097282290');
                 if (channel) {
                     await channel.send({
                         content: `<@${existing.user_id}> ton **${existing.weapon_name}** est craft ! ✅\n📋 N°Série : \`${serial_number || 'N/A'}\`\n💡 Pense à compléter le **prix de vente**, **groupe acheteur** et **date de vente** une fois la transaction effectuée.`,
                         allowedMentions: { users: [existing.user_id] }
                     }).catch(e => console.error('Erreur ping craft:', e.message));
                 }
+            }
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // Changement de statut (En cours / Refusé)
+    app.patch('/api/crafts/requests/:id/status', requireAuth, (req, res) => {
+        try {
+            if (!canValidateCraft(req.session.user)) {
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
+            }
+            const id = parseInt(req.params.id);
+            const { status } = req.body;
+            const allowed = ['pending', 'in_progress', 'rejected'];
+            if (!allowed.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
+
+            if (useSQLite) {
+                db.prepare('UPDATE craft_requests SET status = ? WHERE id = ?').run(status, id);
+            } else {
+                const r = jsonData.craft_requests.find(r => r.id === id);
+                if (r) { r.status = status; saveJSON(); }
             }
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -625,9 +701,85 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.delete('/api/crafts/requests/:id', requireAdmin, (req, res) => {
-        try { deleteRequest(parseInt(req.params.id)); res.json({ success: true }); }
-        catch (e) { res.status(500).json({ error: e.message }); }
+    app.delete('/api/crafts/requests/:id', requireAuth, (req, res) => {
+        try {
+            if (!canDeleteRequests(req.session.user)) {
+                return res.status(403).json({ error: 'Action réservée à Otelow / Super Admin' });
+            }
+            deleteRequest(parseInt(req.params.id));
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    // ─── MY WEAPONS ─────────────────────
+    app.get('/api/crafts/myweapons', requireAuth, (req, res) => {
+        try {
+            const userId = req.session.user.id;
+            let list;
+            if (useSQLite) {
+                list = db.prepare('SELECT * FROM my_weapons WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+            } else {
+                const arr = jsonData.my_weapons || [];
+                list = arr.filter(w => w.user_id === userId);
+                list = [...list].sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+            }
+            res.json({ myweapons: list });
+        } catch (e) { res.json({ myweapons: [], error: e.message }); }
+    });
+
+    app.post('/api/crafts/myweapons', requireAuth, (req, res) => {
+        try {
+            const { weapon_name, is_crafted, serial_number, buyer_org, sale_price } = req.body;
+            const userId = req.session.user.id;
+            const userName = req.session.user.username;
+            if (!weapon_name) return res.status(400).json({ error: "Nom de l'arme requis" });
+
+            if (useSQLite) {
+                const r = db.prepare(`INSERT INTO my_weapons (user_id, user_name, weapon_name, is_crafted, serial_number, buyer_org, sale_price) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+                    .run(userId, userName, weapon_name, is_crafted ? 1 : 0, serial_number || null, buyer_org || null, parseInt(sale_price) || null);
+                res.json({ success: true, id: r.lastInsertRowid });
+            } else {
+                if (!jsonData.my_weapons) jsonData.my_weapons = [];
+                if (!jsonData.counters.myweapons) jsonData.counters.myweapons = 0;
+                jsonData.counters.myweapons++;
+                jsonData.my_weapons.push({
+                    id: jsonData.counters.myweapons,
+                    user_id: userId, user_name: userName, weapon_name,
+                    is_crafted: is_crafted ? 1 : 0,
+                    serial_number: serial_number || null,
+                    buyer_org: buyer_org || null,
+                    sale_price: parseInt(sale_price) || null,
+                    created_at: Math.floor(Date.now() / 1000),
+                });
+                saveJSON();
+                res.json({ success: true, id: jsonData.counters.myweapons });
+            }
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.delete('/api/crafts/myweapons/:id', requireAuth, (req, res) => {
+        try {
+            const id = parseInt(req.params.id);
+            const userId = req.session.user.id;
+            if (useSQLite) {
+                const existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
+                if (!existing) return res.status(404).json({ error: 'Introuvable' });
+                if (existing.user_id !== userId && !canDeleteRequests(req.session.user)) {
+                    return res.status(403).json({ error: 'Action non autorisée' });
+                }
+                db.prepare('DELETE FROM my_weapons WHERE id = ?').run(id);
+            } else {
+                const arr = jsonData.my_weapons || [];
+                const existing = arr.find(w => w.id === id);
+                if (!existing) return res.status(404).json({ error: 'Introuvable' });
+                if (existing.user_id !== userId && !canDeleteRequests(req.session.user)) {
+                    return res.status(403).json({ error: 'Action non autorisée' });
+                }
+                jsonData.my_weapons = arr.filter(w => w.id !== id);
+                saveJSON();
+            }
+            res.json({ success: true });
+        } catch (e) { res.status(500).json({ error: e.message }); }
     });
 }
 
