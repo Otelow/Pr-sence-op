@@ -10,7 +10,7 @@ const PAGE_TITLES = {
     stats: { title: 'Statistiques', sub: 'Suivi hebdomadaire' },
     sanctions: { title: 'Sanctions', sub: 'Historique des avertissements' },
     crafts: { title: "Craft d'armes", sub: 'Gestion des demandes & production' },
-    myweapons: { title: 'Vos Armes', sub: 'Tes ventes personnelles' },
+    myweapons: { title: 'Vos Armes', sub: 'Tes armes à vendre' },
 };
 
 let currentTab = 'presence';
@@ -1498,19 +1498,14 @@ function filterRoleDropdown(type) {
 
 function toggleRoleDropdown(type, event) {
     if (event) event.stopPropagation();
-    closeAllDropdowns();
-    const menu = document.getElementById(`${type}RoleMenu`);
-    if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-        if (menu.style.display === 'block') {
-            const search = document.getElementById(`${type}RoleSearch`);
-            if (search) {
-                search.value = '';
-                filterRoleDropdown(type);
-                setTimeout(() => search.focus(), 50);
-            }
+    smartToggleDropdown(`${type}RoleMenu`, () => {
+        const search = document.getElementById(`${type}RoleSearch`);
+        if (search) {
+            search.value = '';
+            filterRoleDropdown(type);
+            setTimeout(() => search.focus(), 50);
         }
-    }
+    });
 }
 
 function selectRole(type, id, name, color, count) {
@@ -1527,6 +1522,23 @@ function selectRole(type, id, name, color, count) {
 function closeAllDropdowns() {
     document.querySelectorAll('.custom-dropdown-menu').forEach(m => m.style.display = 'none');
 }
+
+// Helper : toggle un dropdown intelligemment
+// Si le menu était ouvert → ferme tout (y compris lui)
+// Sinon → ferme tout puis ouvre celui-là
+function smartToggleDropdown(menuId, beforeOpen) {
+    const menu = document.getElementById(menuId);
+    if (!menu) return false;
+    const wasOpen = menu.style.display !== 'none' && menu.style.display !== '';
+    closeAllDropdowns();
+    if (!wasOpen) {
+        menu.style.display = 'block';
+        if (typeof beforeOpen === 'function') beforeOpen(menu);
+        return true;
+    }
+    return false;
+}
+window.smartToggleDropdown = smartToggleDropdown;
 
 // Click extérieur ferme tous les dropdowns
 document.addEventListener('click', (e) => {
@@ -2081,20 +2093,14 @@ async function setupSanctionUserPicker() {
 
 function toggleSanctionDropdown(event) {
     if (event) event.stopPropagation();
-    closeAllDropdowns();
-    const menu = document.getElementById('sanctionDropdownMenu');
-    if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-        if (menu.style.display === 'block') {
-            const search = document.getElementById('sanctionDropdownSearch');
-            if (search) {
-                search.value = '';
-                // Reset filter
-                document.querySelectorAll('#sanctionDropdownList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
-                setTimeout(() => search.focus(), 50);
-            }
+    smartToggleDropdown('sanctionDropdownMenu', () => {
+        const search = document.getElementById('sanctionDropdownSearch');
+        if (search) {
+            search.value = '';
+            document.querySelectorAll('#sanctionDropdownList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
+            setTimeout(() => search.focus(), 50);
         }
-    }
+    });
 }
 
 function selectSanctionUserCustom(id, name, avatar, color) {
@@ -2289,19 +2295,14 @@ function renderCraftWeaponDropdown() {
 
 function toggleCraftWeaponDropdown(event) {
     if (event) event.stopPropagation();
-    closeAllDropdowns();
-    const menu = document.getElementById('craftWeaponMenu');
-    if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-        if (menu.style.display === 'block') {
-            const search = document.getElementById('craftWeaponSearch');
-            if (search) {
-                search.value = '';
-                document.querySelectorAll('#craftWeaponList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
-                setTimeout(() => search.focus(), 50);
-            }
+    smartToggleDropdown('craftWeaponMenu', () => {
+        const search = document.getElementById('craftWeaponSearch');
+        if (search) {
+            search.value = '';
+            document.querySelectorAll('#craftWeaponList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
+            setTimeout(() => search.focus(), 50);
         }
-    }
+    });
 }
 
 function selectCraftWeapon(id, name, imageUrl) {
@@ -2856,11 +2857,10 @@ function setupAdminSlide() {
 let myWeaponsCache = [];
 
 async function initMyWeaponsTab() {
-    // Charger orgs si pas déjà fait
     if (!organizationsCache || organizationsCache.length === 0) {
         await loadOrganizations();
     }
-    renderMwBuyerDropdown();
+    renderMarkSoldBuyerDropdown();
     await loadMyWeapons();
     renderMyWeapons();
 }
@@ -2873,16 +2873,116 @@ async function loadMyWeapons() {
     } catch { myWeaponsCache = []; }
 }
 
-function renderMwBuyerDropdown() {
-    const list = document.getElementById('mwBuyerList');
+function toggleMwCrafted() {
+    const checked = document.getElementById('mwIsCrafted').checked;
+    document.getElementById('mwSerialField').style.display = checked ? 'block' : 'none';
+}
+
+async function submitMyWeapon() {
+    const weapon_name = document.getElementById('mwName').value.trim();
+    const is_crafted = document.getElementById('mwIsCrafted').checked;
+    const serial_number = document.getElementById('mwSerial').value.trim();
+    const asking_price = document.getElementById('mwAskingPrice').value;
+    const min_price = document.getElementById('mwMinPrice').value;
+
+    if (!weapon_name) { toast('❌ Nom de l\'arme requis', 'error'); return; }
+
+    try {
+        const res = await fetch('/api/crafts/myweapons', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ weapon_name, is_crafted, serial_number, asking_price, min_price })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast('✅ Arme mise en vente — annonce postée sur Discord');
+            document.getElementById('mwName').value = '';
+            document.getElementById('mwSerial').value = '';
+            document.getElementById('mwAskingPrice').value = '';
+            document.getElementById('mwMinPrice').value = '';
+            document.getElementById('mwIsCrafted').checked = false;
+            document.getElementById('mwSerialField').style.display = 'none';
+            await loadMyWeapons();
+            renderMyWeapons();
+        } else { toast(`❌ ${data.error}`, 'error'); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+
+function renderMyWeapons() {
+    const list = document.getElementById('myWeaponsList');
+    if (!list) return;
+    if (myWeaponsCache.length === 0) {
+        list.innerHTML = '<p class="empty">Aucune arme en vente</p>';
+        return;
+    }
+    list.innerHTML = myWeaponsCache.map(w => {
+        const date = new Date(w.created_at * 1000).toLocaleDateString('fr-FR');
+        const avatar = w.user_avatar
+            ? `<img class="mw-avatar" src="${w.user_avatar}" alt="${escapeHtml(w.user_name)}">`
+            : `<div class="mw-avatar mw-avatar-fallback">${(w.user_name || '?').substring(0, 1).toUpperCase()}</div>`;
+
+        const isMine = w.is_mine;
+        const isSold = !!w.is_sold;
+
+        const priceBlock = isSold
+            ? `<span class="mw-sold-price">✅ Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '→ ' + escapeHtml(w.sold_to) : ''}</span>`
+            : `
+                <span class="mw-asking-price">💰 Souhaité : ${(w.asking_price || 0).toLocaleString('fr-FR')}$</span>
+                ${w.min_price ? `<span class="mw-min-price">📉 Min : ${w.min_price.toLocaleString('fr-FR')}$</span>` : ''}
+            `;
+
+        const actions = isMine && !isSold ? `
+            <div class="mw-actions">
+                <button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>
+                <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>
+            </div>
+        ` : (isMine && isSold ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>` : '');
+
+        return `
+            <div class="myweapons-item ${isSold ? 'mw-sold-row' : ''} ${isMine ? 'mw-mine' : ''}">
+                ${avatar}
+                <div class="myweapons-item-body">
+                    <div class="myweapons-item-name">
+                        ${escapeHtml(w.weapon_name)}
+                        ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
+                        ${isSold ? '<span class="myweapons-tag-sold">VENDU</span>' : ''}
+                    </div>
+                    <div class="myweapons-item-meta">
+                        <span class="mw-username">👤 ${escapeHtml(w.user_name)}</span>
+                        ${w.serial_number ? `<span>N°: ${escapeHtml(w.serial_number)}</span>` : ''}
+                        ${priceBlock}
+                        <span>📅 ${date}</span>
+                    </div>
+                </div>
+                ${actions}
+            </div>
+        `;
+    }).join('');
+}
+
+// ─── Modal "Marquer comme vendu" ───
+function openMarkSoldModal(id) {
+    document.getElementById('markSoldId').value = id;
+    document.getElementById('markSoldPrice').value = '';
+    const label = document.getElementById('markSoldBuyerLabel');
+    if (label) { label.classList.add('custom-dropdown-placeholder'); label.innerHTML = '— Choisir —'; }
+    document.getElementById('markSoldBuyer').value = '';
+    document.getElementById('markSoldModal').style.display = 'flex';
+}
+
+function closeMarkSoldModal() {
+    document.getElementById('markSoldModal').style.display = 'none';
+}
+
+function renderMarkSoldBuyerDropdown() {
+    const list = document.getElementById('markSoldBuyerList');
     if (!list) return;
     list.innerHTML = (organizationsCache || []).map(o => `
-        <div class="custom-dropdown-item" data-name="${escapeHtml(o.name).toLowerCase()}" onclick="selectMwBuyer('${escapeHtml(o.name).replace(/'/g, "\\'")}')">
+        <div class="custom-dropdown-item" data-name="${escapeHtml(o.name).toLowerCase()}" onclick="selectMarkSoldBuyer('${escapeHtml(o.name).replace(/'/g, "\\'")}')">
             <span class="custom-dropdown-item-label">🏢 ${escapeHtml(o.name)}</span>
         </div>
     `).join('');
-
-    const search = document.getElementById('mwBuyerSearch');
+    const search = document.getElementById('markSoldBuyerSearch');
     if (search) {
         search.oninput = () => {
             const q = search.value.toLowerCase().trim();
@@ -2894,98 +2994,52 @@ function renderMwBuyerDropdown() {
     }
 }
 
-function toggleMwBuyerDropdown(event) {
+function toggleMarkSoldBuyerDropdown(event) {
     if (event) event.stopPropagation();
+    const menu = document.getElementById('markSoldBuyerMenu');
+    if (!menu) return;
+    const wasOpen = menu.style.display !== 'none';
     closeAllDropdowns();
-    const menu = document.getElementById('mwBuyerMenu');
-    if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    if (!wasOpen) {
+        menu.style.display = 'block';
     }
 }
 
-function selectMwBuyer(name) {
-    document.getElementById('mwBuyerOrg').value = name;
-    const label = document.getElementById('mwBuyerLabel');
+function selectMarkSoldBuyer(name) {
+    document.getElementById('markSoldBuyer').value = name;
+    const label = document.getElementById('markSoldBuyerLabel');
     if (label) {
         label.classList.remove('custom-dropdown-placeholder');
         label.innerHTML = `🏢 ${escapeHtml(name)}`;
     }
-    document.getElementById('mwBuyerMenu').style.display = 'none';
+    document.getElementById('markSoldBuyerMenu').style.display = 'none';
 }
 
-function toggleMwCrafted() {
-    const checked = document.getElementById('mwIsCrafted').checked;
-    document.getElementById('mwSerialField').style.display = checked ? 'block' : 'none';
-}
-
-async function submitMyWeapon() {
-    const weapon_name = document.getElementById('mwName').value.trim();
-    const is_crafted = document.getElementById('mwIsCrafted').checked;
-    const serial_number = document.getElementById('mwSerial').value.trim();
-    const buyer_org = document.getElementById('mwBuyerOrg').value;
-    const sale_price = document.getElementById('mwPrice').value;
-
-    if (!weapon_name) { toast('❌ Nom de l\'arme requis', 'error'); return; }
+async function confirmMarkSold(e) {
+    e.preventDefault();
+    const id = document.getElementById('markSoldId').value;
+    const sold_to = document.getElementById('markSoldBuyer').value;
+    const sold_price = document.getElementById('markSoldPrice').value;
+    if (!sold_price) { toast('❌ Prix de vente requis', 'error'); return; }
 
     try {
-        const res = await fetch('/api/crafts/myweapons', {
-            method: 'POST',
+        const res = await fetch(`/api/crafts/myweapons/${id}/sold`, {
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ weapon_name, is_crafted, serial_number, buyer_org, sale_price })
+            body: JSON.stringify({ sold_to, sold_price })
         });
         const data = await res.json();
         if (res.ok) {
-            toast('✅ Vente enregistrée');
-            // Reset
-            document.getElementById('mwName').value = '';
-            document.getElementById('mwSerial').value = '';
-            document.getElementById('mwBuyerOrg').value = '';
-            document.getElementById('mwPrice').value = '';
-            document.getElementById('mwIsCrafted').checked = false;
-            document.getElementById('mwSerialField').style.display = 'none';
-            const label = document.getElementById('mwBuyerLabel');
-            if (label) {
-                label.classList.add('custom-dropdown-placeholder');
-                label.innerHTML = '— Choisir —';
-            }
+            toast('✅ Vente confirmée');
+            closeMarkSoldModal();
             await loadMyWeapons();
             renderMyWeapons();
         } else { toast(`❌ ${data.error}`, 'error'); }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 
-function renderMyWeapons() {
-    const list = document.getElementById('myWeaponsList');
-    if (!list) return;
-    if (myWeaponsCache.length === 0) {
-        list.innerHTML = '<p class="empty">Aucune vente enregistrée</p>';
-        return;
-    }
-    list.innerHTML = myWeaponsCache.map(w => {
-        const date = new Date(w.created_at * 1000).toLocaleDateString('fr-FR');
-        return `
-            <div class="myweapons-item">
-                <div class="myweapons-item-icon">🔫</div>
-                <div class="myweapons-item-body">
-                    <div class="myweapons-item-name">
-                        ${escapeHtml(w.weapon_name)}
-                        ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
-                    </div>
-                    <div class="myweapons-item-meta">
-                        ${w.serial_number ? `<span>N°: ${escapeHtml(w.serial_number)}</span>` : ''}
-                        <span>🏢 ${escapeHtml(w.buyer_org || 'N/A')}</span>
-                        <span class="myweapons-item-price">💰 ${(w.sale_price || 0).toLocaleString('fr-FR')}$</span>
-                        <span>📅 ${date}</span>
-                    </div>
-                </div>
-                <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>
-            </div>
-        `;
-    }).join('');
-}
-
 async function deleteMyWeapon(id) {
-    if (!confirm('Supprimer cette vente ?')) return;
+    if (!confirm('Supprimer cette annonce ?')) return;
     try {
         const res = await fetch(`/api/crafts/myweapons/${id}`, { method: 'DELETE' });
         if (res.ok) {
@@ -2996,8 +3050,11 @@ async function deleteMyWeapon(id) {
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 
-window.toggleMwBuyerDropdown = toggleMwBuyerDropdown;
-window.selectMwBuyer = selectMwBuyer;
 window.toggleMwCrafted = toggleMwCrafted;
 window.submitMyWeapon = submitMyWeapon;
+window.openMarkSoldModal = openMarkSoldModal;
+window.closeMarkSoldModal = closeMarkSoldModal;
+window.toggleMarkSoldBuyerDropdown = toggleMarkSoldBuyerDropdown;
+window.selectMarkSoldBuyer = selectMarkSoldBuyer;
+window.confirmMarkSold = confirmMarkSold;
 window.deleteMyWeapon = deleteMyWeapon;

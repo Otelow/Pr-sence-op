@@ -6840,3 +6840,218 @@ body {
 body:has(#impersonateBanner[style*="flex"]) {
     padding-top: 42px;
 }
+
+/* ============================================================
+   MYWEAPONS V2 — Bandeau shimmer + UI mises en vente
+   ============================================================ */
+
+/* Bandeau d'avertissement vibrant avec shimmer */
+.myweapons-banner-shimmer {
+    position: relative;
+    margin-bottom: 24px;
+    padding: 18px 24px;
+    border-radius: 16px;
+    background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 140, 0, 0.08) 50%, rgba(255, 255, 255, 0.04) 100%),
+        rgba(20, 20, 24, 0.7);
+    border: 0.5px solid rgba(255, 140, 0, 0.3);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    overflow: hidden;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 0 24px rgba(255, 140, 0, 0.15);
+    animation: bannerPulse 4s ease-in-out infinite;
+}
+
+.myweapons-banner-shimmer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.08) 30%,
+        rgba(255, 255, 255, 0.18) 50%,
+        rgba(255, 255, 255, 0.08) 70%,
+        transparent 100%
+    );
+    animation: shimmerWave 3.5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes shimmerWave {
+    0% { left: -100%; }
+    100% { left: 200%; }
+}
+
+@keyframes bannerPulse {
+    0%, 100% {
+        box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08),
+            0 0 24px rgba(255, 140, 0, 0.15);
+    }
+    50% {
+        box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12),
+            0 0 36px rgba(255, 140, 0, 0.3);
+    }
+}
+
+.myweapons-banner-shimmer .banner-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 8px rgba(255, 140, 0, 0.4));
+    animation: iconBob 2s ease-in-out infinite;
+}
+
+@keyframes iconBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+}
+
+.myweapons-banner-shimmer strong {
+    color: var(--accent);
+    font-weight: 700;
+}
+
+/* Liste des armes avec PP utilisateur */
+.myweapons-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: rgba(20, 20, 24, 0.55);
+    backdrop-filter: blur(16px);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    margin-bottom: 10px;
+    transition: all 0.2s;
+}
+
+.myweapons-item.mw-mine {
+    border-color: rgba(255, 140, 0, 0.25);
+    background: rgba(255, 140, 0, 0.04);
+}
+
+.myweapons-item.mw-sold-row {
+    opacity: 0.65;
+    border-color: rgba(74, 222, 128, 0.25);
+}
+
+.mw-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(255, 140, 0, 0.3);
+}
+
+.mw-avatar-fallback {
+    background: linear-gradient(135deg, #ff8c00, #ff6600);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    border: 1.5px solid rgba(255, 140, 0, 0.5);
+}
+
+.myweapons-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.myweapons-item-name {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.myweapons-item-meta {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.mw-username {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.mw-asking-price {
+    color: var(--gold);
+    font-weight: 600;
+}
+
+.mw-min-price {
+    color: var(--text-muted);
+}
+
+.mw-sold-price {
+    color: var(--green);
+    font-weight: 700;
+}
+
+.myweapons-tag-crafted {
+    background: rgba(255, 140, 0, 0.15);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    border: 0.5px solid rgba(255, 140, 0, 0.3);
+}
+
+.myweapons-tag-sold {
+    background: rgba(74, 222, 128, 0.15);
+    color: var(--green);
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    border: 0.5px solid rgba(74, 222, 128, 0.3);
+}
+
+.mw-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-mw-sold {
+    background: linear-gradient(135deg, var(--green), #16a34a);
+    color: white;
+    border: 0;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-mw-sold:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+}
