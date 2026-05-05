@@ -21,41 +21,85 @@
 
 <main class="admin-main">
 
-    <!-- VUE IMPERSONATE -->
-    <section class="admin-section">
-        <h2 class="section-title">👁 Vue impersonate (Slide to unlock)</h2>
-        <p class="admin-info">Active la simulation et choisis un rôle pour voir ce qu'un membre avec ce rôle verrait.</p>
+    <!-- TABS ADMIN -->
+    <nav class="admin-tabs">
+        <button class="admin-tab active" data-admin-tab="weapons" onclick="switchAdminTab('weapons')">🔫 Armes</button>
+        <button class="admin-tab" data-admin-tab="ingredients" onclick="switchAdminTab('ingredients')">🧪 Ingrédients</button>
+        <button class="admin-tab" data-admin-tab="orgs" onclick="switchAdminTab('orgs')">🏢 Organisations</button>
+        <button class="admin-tab" data-admin-tab="impersonate" onclick="switchAdminTab('impersonate')">👁 Vue impersonate</button>
+    </nav>
 
-        <div class="slide-to-unlock" id="slideToUnlock">
-            <div class="slide-track">
-                <div class="slide-handle" id="slideHandle">▶</div>
-                <span class="slide-label">Glisse pour activer la vue impersonate →</span>
+    <!-- ARMES -->
+    <section class="admin-tab-content" id="adminTab-weapons">
+        <div class="admin-section">
+            <h2 class="section-title">🔫 Catalogue des armes craftables</h2>
+            <p class="admin-info">Ajoute, modifie ou supprime des armes du catalogue.</p>
+
+            <button class="btn-primary" onclick="openWeaponEditor()">+ Ajouter une arme</button>
+
+            <div class="admin-weapons-list" id="adminWeaponsList">
+                <p class="empty">Chargement...</p>
             </div>
         </div>
+    </section>
 
-        <div class="impersonate-panel" id="impersonatePanel" style="display:none;">
-            <div class="comm-field">
+    <!-- INGRÉDIENTS -->
+    <section class="admin-tab-content" id="adminTab-ingredients" style="display:none;">
+        <div class="admin-section">
+            <h2 class="section-title">🧪 Bibliothèque d'ingrédients</h2>
+            <p class="admin-info">Ingrédients utilisables dans les recettes d'armes (avec leur visuel).</p>
+
+            <button class="btn-primary" onclick="openIngredientEditor()">+ Ajouter un ingrédient</button>
+
+            <div class="admin-ingredients-grid" id="adminIngredientsList">
+                <p class="empty">Chargement...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ORGANISATIONS -->
+    <section class="admin-tab-content" id="adminTab-orgs" style="display:none;">
+        <div class="admin-section">
+            <h2 class="section-title">🏢 Organisations</h2>
+            <p class="admin-info">Liste des organisations à qui les armes peuvent être vendues.</p>
+
+            <div class="admin-org-form">
+                <input type="text" id="newOrgName" class="comm-input" placeholder="Nom de l'organisation">
+                <button class="btn-primary" onclick="addOrgFromAdmin()">+ Ajouter</button>
+            </div>
+
+            <div class="admin-orgs-list" id="adminOrgsList"></div>
+        </div>
+    </section>
+
+    <!-- IMPERSONATE -->
+    <section class="admin-tab-content" id="adminTab-impersonate" style="display:none;">
+        <div class="admin-section">
+            <h2 class="section-title">👁 Vue impersonate</h2>
+            <p class="admin-info">Choisis un rôle pour voir ce qu'un membre avec ce rôle verrait sur le site.</p>
+
+            <div class="impersonate-panel-admin">
                 <label class="comm-label">Rôle à simuler</label>
-                <select id="impersonateRole" class="comm-input"></select>
+                <div class="custom-dropdown" id="impersonateDropdownWrapper">
+                    <button type="button" class="custom-dropdown-trigger" onclick="toggleImpersonateDropdown(event)">
+                        <span class="custom-dropdown-placeholder" id="impersonateLabel">— Choisir un rôle —</span>
+                        <span class="custom-dropdown-arrow">▾</span>
+                    </button>
+                    <div class="custom-dropdown-menu" id="impersonateMenu" style="display:none;">
+                        <input type="text" class="custom-dropdown-search" id="impersonateSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                        <div class="custom-dropdown-list" id="impersonateList"></div>
+                    </div>
+                    <input type="hidden" id="impersonateRoleId">
+                </div>
+                <div class="modal-actions" style="margin-top:20px;">
+                    <button class="btn-primary" onclick="applyImpersonate()">Appliquer la vue</button>
+                    <button class="btn-secondary" onclick="resetImpersonate()">↩ Réinitialiser</button>
+                </div>
             </div>
-            <button class="btn-primary" onclick="applyImpersonate()">Appliquer la vue</button>
-            <button class="btn-secondary" onclick="resetImpersonate()">Réinitialiser</button>
         </div>
     </section>
 
-    <!-- GESTION CATALOGUE D'ARMES -->
-    <section class="admin-section">
-        <h2 class="section-title">🔫 Catalogue des armes craftables</h2>
-        <p class="admin-info">Ajoute, modifie ou supprime des armes du catalogue affiché aux membres.</p>
-
-        <button class="btn-primary" onclick="openWeaponEditor()">+ Ajouter une arme</button>
-
-        <div class="admin-weapons-list" id="adminWeaponsList">
-            <p class="empty">Chargement...</p>
-        </div>
-    </section>
-
-    <!-- ÉDITEUR D'ARME (modale) -->
+    <!-- ÉDITEUR D'ARME -->
     <div class="modal-backdrop" id="weaponEditorModal" style="display:none;">
         <div class="modal-content modal-large">
             <h3 class="modal-title" id="weaponEditorTitle">Ajouter une arme</h3>
@@ -69,9 +113,22 @@
                 </div>
 
                 <div class="comm-field">
-                    <label class="comm-label">Image (jpg/png/webp, max 5MB)</label>
+                    <label class="comm-label">Image de l'arme (jpg/png/webp, max 5MB)</label>
                     <input type="file" id="weaponImage" accept="image/*" class="comm-input">
                     <div id="weaponImagePreview" class="weapon-image-preview"></div>
+                </div>
+
+                <div class="comm-field">
+                    <label class="craft-checkbox-label">
+                        <input type="checkbox" id="weaponRequiresPlan">
+                        <span>📋 Cette arme nécessite un <strong>plan</strong> pour être craftée</span>
+                    </label>
+                </div>
+
+                <div class="comm-field" id="planImageField" style="display:none;">
+                    <label class="comm-label">Image du plan (jpg/png/webp)</label>
+                    <input type="file" id="weaponPlanImage" accept="image/*" class="comm-input">
+                    <div id="weaponPlanImagePreview" class="weapon-image-preview"></div>
                 </div>
 
                 <div class="craft-field-row">
@@ -87,6 +144,7 @@
 
                 <div class="comm-field">
                     <label class="comm-label">Ingrédients</label>
+                    <p class="empty-small" style="margin-bottom:8px;">Choisis dans la liste et indique la quantité.</p>
                     <div id="ingredientsList" class="ingredients-editor"></div>
                     <button type="button" class="btn-secondary btn-small" onclick="addIngredient()">+ Ajouter un ingrédient</button>
                 </div>
@@ -99,18 +157,32 @@
         </div>
     </div>
 
-    <!-- GESTION ORGANISATIONS -->
-    <section class="admin-section">
-        <h2 class="section-title">🏢 Organisations</h2>
-        <p class="admin-info">Liste des organisations à qui les armes peuvent être vendues.</p>
+    <!-- ÉDITEUR D'INGRÉDIENT -->
+    <div class="modal-backdrop" id="ingredientEditorModal" style="display:none;">
+        <div class="modal-content">
+            <h3 class="modal-title" id="ingredientEditorTitle">Ajouter un ingrédient</h3>
 
-        <div class="admin-org-form">
-            <input type="text" id="newOrgName" class="comm-input" placeholder="Nom de l'organisation">
-            <button class="btn-primary" onclick="addOrgFromAdmin()">+ Ajouter</button>
+            <form id="ingredientEditorForm" onsubmit="saveIngredient(event)" enctype="multipart/form-data">
+                <input type="hidden" id="ingredientId">
+
+                <div class="comm-field">
+                    <label class="comm-label">Nom *</label>
+                    <input type="text" id="ingredientName" class="comm-input" required placeholder="Ex: Bloc de tungstène">
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">Image (jpg/png/webp, max 5MB)</label>
+                    <input type="file" id="ingredientImage" accept="image/*" class="comm-input">
+                    <div id="ingredientImagePreview" class="weapon-image-preview"></div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeIngredientEditor()">Annuler</button>
+                    <button type="submit" class="btn-primary">💾 Enregistrer</button>
+                </div>
+            </form>
         </div>
-
-        <div class="admin-orgs-list" id="adminOrgsList"></div>
-    </section>
+    </div>
 
 </main>
 
