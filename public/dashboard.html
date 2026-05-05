@@ -44,9 +44,16 @@
             <span class="nav-icon">⚠</span>
             <span>Sanctions</span>
         </a>
+        <a href="#" class="nav-item" data-tab="crafts">
+            <span class="nav-icon">⚒</span>
+            <span>Craft d'armes</span>
+        </a>
     </nav>
 
     <div class="sidebar-footer">
+        <a id="adminLink" href="/admin" class="admin-link" style="display:none;">
+            <span>🛠</span> Panneau admin
+        </a>
         <div class="user-card">
             <img id="userAvatar" src="" alt="" class="user-avatar">
             <div class="user-info">
@@ -262,9 +269,12 @@
                         <textarea id="annonceMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton annonce ici...&#10;&#10;Tu peux faire des retours à la ligne et insérer des :emojis: du serveur."></textarea>
                         <div class="comm-toolbar">
                             <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('annonceMessage')">
-                                <span>😀</span> Emojis serveur
+                                <span>😀</span> Emojis
                             </button>
-                            <span class="comm-hint">Limite Discord : 2000 caractères</span>
+                            <label class="comm-embed-toggle">
+                                <input type="checkbox" id="annonceUseEmbed" onchange="toggleEmbedMode('annonce')">
+                                <span>Mode embed (4000 car.)</span>
+                            </label>
                         </div>
                     </div>
                     <div class="comm-actions">
@@ -300,8 +310,12 @@
                         <textarea id="rappelMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton rappel ici..."></textarea>
                         <div class="comm-toolbar">
                             <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('rappelMessage')">
-                                <span>😀</span> Emojis serveur
+                                <span>😀</span> Emojis
                             </button>
+                            <label class="comm-embed-toggle">
+                                <input type="checkbox" id="rappelUseEmbed" onchange="toggleEmbedMode('rappel')">
+                                <span>Mode embed (4000 car.)</span>
+                            </label>
                         </div>
                     </div>
                     <div class="comm-actions">
@@ -537,6 +551,113 @@
             </div>
         </div>
     </div>
+
+    <!-- TAB: CRAFTS D'ARMES -->
+    <section class="tab-content" id="tab-crafts">
+        <div class="crafts-subtabs">
+            <button class="crafts-subtab active" data-subtab="catalog" onclick="switchCraftSubtab('catalog')">📦 Catalogue</button>
+            <button class="crafts-subtab" data-subtab="request" onclick="switchCraftSubtab('request')">📝 Faire une demande</button>
+            <button class="crafts-subtab" data-subtab="board" onclick="switchCraftSubtab('board')">⚒ Tableau de craft</button>
+            <button class="crafts-subtab" data-subtab="history" onclick="switchCraftSubtab('history')">✓ Historique</button>
+        </div>
+
+        <!-- Sous-section : Catalogue -->
+        <div class="crafts-section" id="craftSection-catalog">
+            <div class="crafts-section-header">
+                <h3 class="section-title">📦 Catalogue des armes craftables</h3>
+                <p class="crafts-section-info">Visualise toutes les armes que tu peux faire crafter, avec leurs ingrédients et prix.</p>
+            </div>
+            <div class="crafts-catalog-grid" id="craftsCatalogGrid">
+                <p class="empty">Chargement...</p>
+            </div>
+        </div>
+
+        <!-- Sous-section : Demande de craft -->
+        <div class="crafts-section" id="craftSection-request" style="display:none;">
+            <div class="crafts-section-header">
+                <h3 class="section-title">📝 Faire une demande de craft</h3>
+                <p class="crafts-section-info">Sélectionne l'arme que tu souhaites, indique si tu as le plan et l'argent.</p>
+            </div>
+
+            <div class="craft-request-form">
+                <div class="craft-field">
+                    <label>Arme souhaitée</label>
+                    <div class="custom-dropdown" id="craftWeaponDropdownWrapper">
+                        <button type="button" class="custom-dropdown-trigger" onclick="toggleCraftWeaponDropdown(event)">
+                            <span class="custom-dropdown-placeholder" id="craftWeaponLabel">— Choisir une arme —</span>
+                            <span class="custom-dropdown-arrow">▾</span>
+                        </button>
+                        <div class="custom-dropdown-menu" id="craftWeaponMenu" style="display:none;">
+                            <input type="text" class="custom-dropdown-search" id="craftWeaponSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                            <div class="custom-dropdown-list" id="craftWeaponList"></div>
+                        </div>
+                        <input type="hidden" id="craftWeaponId">
+                    </div>
+                </div>
+
+                <div class="craft-field-row">
+                    <label class="craft-checkbox-label">
+                        <input type="checkbox" id="craftHasPlan">
+                        <span>📋 J'ai le <strong>plan</strong></span>
+                    </label>
+                    <label class="craft-checkbox-label">
+                        <input type="checkbox" id="craftHasMoney">
+                        <span>💰 J'ai l'<strong>argent</strong></span>
+                    </label>
+                </div>
+
+                <div class="craft-actions">
+                    <button class="btn-primary" onclick="submitCraftRequest()">✅ Soumettre la demande</button>
+                    <button class="btn-secondary" onclick="goToCraftBoard()">→ Aller au tableau</button>
+                </div>
+            </div>
+
+            <div class="craft-recent-requests">
+                <h4>📜 Demandes récentes</h4>
+                <div class="craft-requests-list" id="craftRequestsList">
+                    <p class="empty">Aucune demande</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sous-section : Tableau de craft (28 lignes) -->
+        <div class="crafts-section" id="craftSection-board" style="display:none;">
+            <div class="crafts-section-header">
+                <h3 class="section-title">⚒ Tableau de craft</h3>
+                <p class="crafts-section-info">Tableau pour les <strong>hauts gradés</strong> : remplir <strong>Armes crafté / N°Série</strong> ping automatiquement le demandeur. La <strong>vente</strong> est complétée par le demandeur.</p>
+            </div>
+
+            <div class="craft-board-wrapper">
+                <table class="craft-board-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Demande</th>
+                            <th>Crafté ?</th>
+                            <th>N°Série</th>
+                            <th>Vendu à</th>
+                            <th>Prix</th>
+                            <th>Date craft</th>
+                            <th>Date vente</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="craftBoardBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Sous-section : Historique -->
+        <div class="crafts-section" id="craftSection-history" style="display:none;">
+            <div class="crafts-section-header">
+                <h3 class="section-title">✓ Historique des crafts finalisés</h3>
+                <p class="crafts-section-info">Récap de toutes les demandes complétées (craftées + vendues).</p>
+            </div>
+            <div class="craft-history-list" id="craftHistoryList">
+                <p class="empty">Chargement...</p>
+            </div>
+        </div>
+    </section>
 
 </main>
 
