@@ -6,6 +6,7 @@ const express = require('express');
 const session = require('express-session');
 const axios = require('axios');
 const path = require('path');
+const { initDB, registerCraftEndpoints } = require('./crafts');
 
 const PORT = process.env.PORT || 3000;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -115,9 +116,34 @@ function startServer(client, getState) {
     // ==========================================
     // Middleware d'auth
     // ==========================================
+    const ADMIN_USER_ID = '952986899667103804';
+    const ADMIN_ROLE_ID = '1485279148246175764';
+
     function requireAuth(req, res, next) {
         if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
         next();
+    }
+
+    function isUserAdmin(user) {
+        if (!user) return false;
+        if (user.id === ADMIN_USER_ID) return true;
+        if (user.roles && user.roles.includes(ADMIN_ROLE_ID)) return true;
+        return false;
+    }
+
+    function requireAdmin(req, res, next) {
+        if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
+        if (!isUserAdmin(req.session.user)) return res.status(403).json({ error: 'Accès admin requis' });
+        // Marquer pour usage downstream
+        req.session.user.isAdmin = true;
+        next();
+    }
+
+    // Initialiser la DB crafts
+    try {
+        initDB();
+    } catch (e) {
+        console.error('❌ Erreur init DB crafts:', e.message);
     }
 
     // ==========================================
@@ -133,11 +159,34 @@ function startServer(client, getState) {
         res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
     });
 
+    app.get('/admin', (req, res) => {
+        if (!req.session.user) return res.redirect('/');
+        if (!isUserAdmin(req.session.user)) return res.redirect('/dashboard');
+        res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    });
+
+    // Marquer isAdmin dans la session user
+    app.use((req, res, next) => {
+        if (req.session.user) {
+            req.session.user.isAdmin = isUserAdmin(req.session.user);
+        }
+        next();
+    });
+
+    // Enregistrer les endpoints crafts
+    try {
+        registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botState);
+        console.log('🔫 Endpoints crafts enregistrés');
+    } catch (e) {
+        console.error('❌ Erreur endpoints crafts:', e.message);
+    }
+
     // ==========================================
     // API
     // ==========================================
     app.get('/api/me', requireAuth, (req, res) => {
-        res.json(req.session.user);
+        const user = { ...req.session.user, isAdmin: isUserAdmin(req.session.user) };
+        res.json(user);
     });
 
     // Données présence en temps réel
@@ -286,24 +335,58 @@ function startServer(client, getState) {
 
                 case 'annonce': {
                     if (!bmChannel) return res.status(500).json({ error: 'Salon BM introuvable' });
-                    const { roleId, message } = params || {};
+                    const { roleId, message, useEmbed } = params || {};
                     if (!roleId || !message) return res.status(400).json({ error: 'roleId et message requis' });
-                    await bmChannel.send({
-                        content: `${message.replace(/\\n/g, '\n')}\n\n||<@&${roleId}>||`,
-                        allowedMentions: { parse: ['roles'] }
-                    });
+
+                    if (useEmbed) {
+                        // Mode embed : jusqu'à 4096 caractères dans description
+                        if (message.length > 4000) return res.status(400).json({ error: 'Message trop long (max 4000)' });
+                        const { EmbedBuilder } = require('discord.js');
+                        const embed = new EmbedBuilder()
+                            .setDescription(message.replace(/\\n/g, '\n'))
+                            .setColor(0xff8c00)
+                            .setTimestamp();
+                        await bmChannel.send({
+                            content: `||<@&${roleId}>||`,
+                            embeds: [embed],
+                            allowedMentions: { parse: ['roles'] }
+                        });
+                    } else {
+                        // Mode message classique : 2000 max
+                        if (message.length > 2000) return res.status(400).json({ error: 'Message trop long (max 2000)' });
+                        await bmChannel.send({
+                            content: `${message.replace(/\\n/g, '\n')}\n\n||<@&${roleId}>||`,
+                            allowedMentions: { parse: ['roles'] }
+                        });
+                    }
                     return res.json({ success: true });
                 }
 
                 case 'rappel': {
                     const rappelChannel = botClient.channels.cache.get(state.CONFIG.CHANNELS.RAPPELS_PANEL);
                     if (!rappelChannel) return res.status(500).json({ error: 'Salon rappels introuvable' });
-                    const { roleId, message } = params || {};
+                    const { roleId, message, useEmbed } = params || {};
                     if (!roleId || !message) return res.status(400).json({ error: 'roleId et message requis' });
-                    await rappelChannel.send({
-                        content: `${message.replace(/\\n/g, '\n')}\n\n||<@&${roleId}>||`,
-                        allowedMentions: { parse: ['roles'] }
-                    });
+
+                    if (useEmbed) {
+                        if (message.length > 4000) return res.status(400).json({ error: 'Message trop long (max 4000)' });
+                        const { EmbedBuilder } = require('discord.js');
+                        const embed = new EmbedBuilder()
+                            .setDescription(message.replace(/\\n/g, '\n'))
+                            .setColor(0x5865f2)
+                            .setTimestamp();
+                        await rappelChannel.send({
+                            content: `||<@&${roleId}>||`,
+                            embeds: [embed],
+                            allowedMentions: { parse: ['roles'] }
+                        });
+                    } else {
+                        if (message.length > 2000) return res.status(400).json({ error: 'Message trop long (max 2000)' });
+                        await rappelChannel.send({
+                            content: `${message.replace(/\\n/g, '\n')}\n\n||<@&${roleId}>||`,
+                            allowedMentions: { parse: ['roles'] }
+                        });
+                    }
                     return res.json({ success: true });
                 }
 
@@ -1007,7 +1090,13 @@ function startServer(client, getState) {
     app.get('/api/me/permissions', requireAuth, (req, res) => {
         res.json({
             canEditMap: canEditMap(req),
+            isAdmin: isUserAdmin(req.session.user),
         });
+    });
+
+    // Vérifier si l'user actuel est admin
+    app.get('/api/admin/check', requireAuth, (req, res) => {
+        res.json({ isAdmin: isUserAdmin(req.session.user) });
     });
 
     app.listen(PORT, () => {
