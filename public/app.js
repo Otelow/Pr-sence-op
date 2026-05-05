@@ -9,6 +9,7 @@ const PAGE_TITLES = {
     map: { title: 'Carte du Laboratoire', sub: 'Marquage de zones' },
     stats: { title: 'Statistiques', sub: 'Suivi hebdomadaire' },
     sanctions: { title: 'Sanctions', sub: 'Historique des avertissements' },
+    crafts: { title: "Craft d'armes", sub: 'Gestion des demandes & production' },
 };
 
 let currentTab = 'presence';
@@ -80,6 +81,8 @@ async function refreshAll() {
         await loadMapPoints();
     } else if (currentTab === 'commands') {
         if (!commandsLoaded) await initCommandsTab();
+    } else if (currentTab === 'crafts') {
+        await initCraftsTab();
     }
 }
 
@@ -1159,6 +1162,20 @@ function autoFitMap() {
     setTimeout(() => { if (canvas) canvas.classList.remove('smooth-zoom'); }, 200);
 }
 
+// Re-fitter la carte automatiquement quand la fenêtre est redimensionnée
+let mapResizeTimer = null;
+window.addEventListener('resize', () => {
+    if (currentTab !== 'map') return;
+    clearTimeout(mapResizeTimer);
+    mapResizeTimer = setTimeout(() => autoFitMap(), 150);
+});
+
+// Aussi quand on entre/sort du plein écran
+document.addEventListener('fullscreenchange', () => {
+    if (currentTab !== 'map') return;
+    setTimeout(() => autoFitMap(), 200);
+});
+
 function renderMapPoints() {
     const layer = document.getElementById('mapPointsLayer');
     if (!layer) return;
@@ -1527,31 +1544,74 @@ function switchCommTab(name) {
 // Exposer les fonctions globalement pour les onclick inline
 window.switchCommTab = switchCommTab;
 
+let emojiPickerCategory = 'server'; // 'server' ou 'discord'
+
+const DISCORD_EMOJIS = {
+    'Visages': ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'],
+    'Gestes': ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🦷', '🦴', '👀', '👁️', '👅', '👄', '💋'],
+    'Cœurs & Symboles': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴', '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', '🉐', '㊙️', '㊗️'],
+    'Objets': ['💎', '💍', '🔫', '🔪', '⚔️', '🛡️', '🚬', '⚰️', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠', '🧫', '🧪', '🌡️', '🧹', '🪒', '🧽', '🧴', '🛎️', '🔑', '🗝️', '🚪', '🪑', '🛋️', '🛏️', '🛌', '🧸', '🖼️', '🛍️', '🛒', '🎁', '🎈', '🎏', '🎀', '🎊', '🎉', '🎎', '🏮', '🎐', '✉️', '📩', '📨', '📧', '💌', '📥', '📤', '📦', '🏷️', '📪', '📫', '📬', '📭', '📮', '📯', '📜', '📃', '📄', '📑', '🧾', '📊', '📈', '📉', '🗒️', '🗓️', '📆', '📅', '🗑️', '📇', '🗃️', '🗳️', '🗄️', '📋', '📁', '📂', '🗂️', '🗞️', '📰', '📓', '📔', '📒', '📕', '📗', '📘', '📙', '📚', '📖', '🔖', '🧷', '🔗', '📎', '🖇️', '📐', '📏', '🧮', '📌', '📍', '✂️', '🖊️', '🖋️', '✒️', '🖌️', '🖍️', '📝', '✏️', '🔍', '🔎', '🔏', '🔐', '🔒', '🔓'],
+    'Drapeaux & Statut': ['🚩', '🏁', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '✅', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗', '❓', '❕', '❔', '‼️', '⁉️', '🔅', '🔆', '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✳️', '❇️', '🔵', '🟣', '🟢', '🟡', '🟠', '🔴', '⚫', '⚪', '🟤'],
+};
+
 function toggleEmojiPicker(targetId) {
     const picker = document.getElementById('emojiPicker');
     if (!picker) return;
     activeEmojiTarget = targetId || 'annonceMessage';
-    if (picker.style.display === 'none') {
+    if (picker.style.display === 'none' || !picker.style.display) {
         renderEmojiPicker();
-        picker.style.display = 'grid';
+        picker.style.display = 'block';
     } else {
         picker.style.display = 'none';
     }
 }
 
+function switchEmojiCategory(cat) {
+    emojiPickerCategory = cat;
+    renderEmojiPicker();
+}
+
 function renderEmojiPicker() {
     const picker = document.getElementById('emojiPicker');
     if (!picker) return;
-    if (serverEmojis.length === 0) {
-        picker.innerHTML = '<p class="empty" style="padding:12px;grid-column:1/-1;">Aucun emoji custom sur le serveur</p>';
-        return;
-    }
-    picker.innerHTML = serverEmojis.map(e => `
-        <div class="emoji-item" title=":${e.name}:" onclick="insertEmoji('${e.code.replace(/'/g, "\\'")}')">
-            <img src="${e.url}" alt=":${e.name}:">
+
+    const tabsHTML = `
+        <div class="emoji-picker-tabs">
+            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'server' ? 'active' : ''}" onclick="switchEmojiCategory('server')">🎨 Serveur</button>
+            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'discord' ? 'active' : ''}" onclick="switchEmojiCategory('discord')">😀 Discord</button>
         </div>
-    `).join('');
+    `;
+
+    let contentHTML = '';
+
+    if (emojiPickerCategory === 'server') {
+        if (serverEmojis.length === 0) {
+            contentHTML = '<p class="empty" style="padding:24px;text-align:center;">Aucun emoji custom sur le serveur</p>';
+        } else {
+            contentHTML = `<div class="emoji-picker-grid">` + serverEmojis.map(e => `
+                <div class="emoji-item" title=":${e.name}:" onclick="insertEmoji('${e.code.replace(/'/g, "\\'")}')">
+                    <img src="${e.url}" alt=":${e.name}:">
+                </div>
+            `).join('') + `</div>`;
+        }
+    } else {
+        // Emojis Discord par catégorie
+        contentHTML = '<div class="emoji-picker-content">';
+        for (const [catName, emojis] of Object.entries(DISCORD_EMOJIS)) {
+            contentHTML += `<div class="emoji-category-title">${catName}</div>`;
+            contentHTML += '<div class="emoji-picker-grid">';
+            for (const emoji of emojis) {
+                contentHTML += `<div class="emoji-item emoji-item-unicode" title="${emoji}" onclick="insertEmoji('${emoji}')">${emoji}</div>`;
+            }
+            contentHTML += '</div>';
+        }
+        contentHTML += '</div>';
+    }
+
+    picker.innerHTML = tabsHTML + contentHTML;
 }
+
+window.switchEmojiCategory = switchEmojiCategory;
 
 function insertEmoji(code) {
     const textarea = document.getElementById(activeEmojiTarget);
@@ -2026,3 +2086,608 @@ function selectSanctionUserCustom(id, name, avatar, color) {
 
 window.toggleSanctionDropdown = toggleSanctionDropdown;
 window.selectSanctionUserCustom = selectSanctionUserCustom;
+
+// ============================================================
+// SECTION CRAFT D'ARMES
+// ============================================================
+let craftsLoaded = false;
+let weaponsCache = [];
+let organizationsCache = [];
+let craftRequestsCache = [];
+let isAdminUser = false;
+
+async function initCraftsTab() {
+    // Afficher tout de suite un état d'attente cohérent
+    renderCraftCatalog();
+    renderCraftRequestsList();
+    renderCraftBoard();
+    renderCraftHistory();
+
+    // Charger les données en arrière-plan
+    try {
+        await Promise.all([
+            loadWeaponsCatalog(),
+            loadOrganizations(),
+            loadCraftRequests(),
+        ]);
+    } catch (e) {
+        console.error('Init crafts:', e);
+    }
+
+    craftsLoaded = true;
+
+    // Re-render avec les vraies données
+    renderCraftCatalog();
+    renderCraftRequestsList();
+    renderCraftBoard();
+    renderCraftHistory();
+    renderCraftWeaponDropdown();
+}
+
+async function loadWeaponsCatalog() {
+    try {
+        const r = await fetch('/api/crafts/weapons');
+        if (!r.ok) {
+            console.error('Weapons fetch failed:', r.status);
+            weaponsCache = [];
+            return;
+        }
+        const d = await r.json();
+        weaponsCache = d.weapons || [];
+    } catch (e) {
+        console.error('Weapons catalog:', e);
+        weaponsCache = [];
+    }
+}
+
+async function loadOrganizations() {
+    try {
+        const r = await fetch('/api/crafts/organizations');
+        const d = await r.json();
+        organizationsCache = d.organizations || [];
+    } catch {
+        organizationsCache = [];
+    }
+}
+
+async function loadCraftRequests() {
+    try {
+        const r = await fetch('/api/crafts/requests');
+        const d = await r.json();
+        craftRequestsCache = d.requests || [];
+    } catch {
+        craftRequestsCache = [];
+    }
+}
+
+function switchCraftSubtab(subtab) {
+    document.querySelectorAll('.crafts-subtab').forEach(b => b.classList.toggle('active', b.dataset.subtab === subtab));
+    document.querySelectorAll('.crafts-section').forEach(s => {
+        s.style.display = (s.id === `craftSection-${subtab}`) ? 'block' : 'none';
+    });
+
+    if (subtab === 'catalog') renderCraftCatalog();
+    else if (subtab === 'request') renderCraftRequestsList();
+    else if (subtab === 'board') renderCraftBoard();
+    else if (subtab === 'history') renderCraftHistory();
+}
+
+function renderCraftCatalog() {
+    const grid = document.getElementById('craftsCatalogGrid');
+    if (!grid) return;
+
+    if (weaponsCache.length === 0) {
+        grid.innerHTML = `<p class="empty">Aucune arme dans le catalogue.${isAdminUser ? ' <a href="/admin">→ Ajouter depuis le panneau admin</a>' : ''}</p>`;
+        return;
+    }
+
+    grid.innerHTML = weaponsCache.map(w => {
+        const ingredientsHTML = (w.ingredients || []).map(ing => `
+            <div class="craft-ingredient">
+                <div class="craft-ingredient-amount">${ing.amount || 0}</div>
+                <div class="craft-ingredient-name">${escapeHtml(ing.name || '?')}</div>
+            </div>
+        `).join('');
+
+        const timeStr = w.craft_time > 0 ? formatCraftTime(w.craft_time) : 'N/A';
+        const priceStr = w.craft_price > 0 ? w.craft_price.toLocaleString('fr-FR') + '$' : 'Gratuit';
+
+        return `
+            <div class="craft-weapon-card">
+                <div class="craft-weapon-image">
+                    ${w.image_url ? `<img src="${w.image_url}" alt="${escapeHtml(w.name)}">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+                </div>
+                <div class="craft-weapon-body">
+                    <div class="craft-weapon-name">${escapeHtml(w.name)}</div>
+                    <div class="craft-weapon-meta">
+                        <span class="craft-weapon-time">⏱ ${timeStr}</span>
+                        <span class="craft-weapon-price">💰 ${priceStr}</span>
+                    </div>
+                    ${ingredientsHTML ? `<div class="craft-ingredients-grid">${ingredientsHTML}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function formatCraftTime(seconds) {
+    if (seconds < 60) return `${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m < 60) return s ? `${m}m ${s}s` : `${m}m`;
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    return mm ? `${h}h ${mm}m` : `${h}h`;
+}
+
+function renderCraftWeaponDropdown() {
+    const list = document.getElementById('craftWeaponList');
+    if (!list) return;
+
+    list.innerHTML = weaponsCache.map(w => `
+        <div class="custom-dropdown-item" data-name="${escapeHtml(w.name).toLowerCase()}" onclick="selectCraftWeapon(${w.id}, '${escapeHtml(w.name).replace(/'/g, "\\'")}', '${w.image_url || ''}')">
+            ${w.image_url ? `<img class="craft-dropdown-image" src="${w.image_url}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+            <span class="custom-dropdown-item-label">${escapeHtml(w.name)}</span>
+        </div>
+    `).join('');
+
+    // Search filter
+    const search = document.getElementById('craftWeaponSearch');
+    if (search) {
+        search.oninput = () => {
+            const q = search.value.toLowerCase().trim();
+            list.querySelectorAll('.custom-dropdown-item').forEach(item => {
+                const name = item.dataset.name || '';
+                item.style.display = !q || name.includes(q) ? 'flex' : 'none';
+            });
+        };
+    }
+}
+
+function toggleCraftWeaponDropdown(event) {
+    if (event) event.stopPropagation();
+    closeAllDropdowns();
+    const menu = document.getElementById('craftWeaponMenu');
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        if (menu.style.display === 'block') {
+            const search = document.getElementById('craftWeaponSearch');
+            if (search) {
+                search.value = '';
+                document.querySelectorAll('#craftWeaponList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
+                setTimeout(() => search.focus(), 50);
+            }
+        }
+    }
+}
+
+function selectCraftWeapon(id, name, imageUrl) {
+    document.getElementById('craftWeaponId').value = id;
+    const label = document.getElementById('craftWeaponLabel');
+    if (label) {
+        label.classList.remove('custom-dropdown-placeholder');
+        label.innerHTML = imageUrl ? `<img class="dropdown-trigger-avatar" src="${imageUrl}"> ${escapeHtml(name)}` : escapeHtml(name);
+    }
+    document.getElementById('craftWeaponMenu').style.display = 'none';
+}
+
+async function submitCraftRequest() {
+    const weaponId = document.getElementById('craftWeaponId').value;
+    const hasPlan = document.getElementById('craftHasPlan').checked;
+    const hasMoney = document.getElementById('craftHasMoney').checked;
+
+    if (!weaponId) { toast('❌ Choisis une arme', 'error'); return; }
+
+    try {
+        const res = await fetch('/api/crafts/requests', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ weapon_id: parseInt(weaponId), has_plan: hasPlan, has_money: hasMoney })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast('✅ Demande soumise');
+            // Reset form
+            document.getElementById('craftWeaponId').value = '';
+            document.getElementById('craftHasPlan').checked = false;
+            document.getElementById('craftHasMoney').checked = false;
+            const label = document.getElementById('craftWeaponLabel');
+            if (label) {
+                label.classList.add('custom-dropdown-placeholder');
+                label.innerHTML = '— Choisir une arme —';
+            }
+            await loadCraftRequests();
+            renderCraftRequestsList();
+            renderCraftBoard();
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+function goToCraftBoard() {
+    switchCraftSubtab('board');
+}
+
+function renderCraftRequestsList() {
+    const list = document.getElementById('craftRequestsList');
+    if (!list) return;
+
+    const recent = craftRequestsCache.filter(r => r.status !== 'completed').slice(0, 20);
+
+    if (recent.length === 0) {
+        list.innerHTML = '<p class="empty">Aucune demande en cours</p>';
+        return;
+    }
+
+    list.innerHTML = recent.map(r => {
+        const date = new Date(r.created_at * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+        const status = getCraftStatusBadge(r);
+        return `
+            <div class="craft-request-item">
+                ${r.weapon_image_url ? `<img class="craft-request-image" src="${r.weapon_image_url}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+                <div class="craft-request-body">
+                    <div class="craft-request-name">${escapeHtml(r.weapon_name)}</div>
+                    <div class="craft-request-meta">
+                        <span>👤 ${escapeHtml(r.user_name)}</span>
+                        <span>📅 ${date}</span>
+                        ${r.has_plan ? '<span class="craft-tag">📋 Plan</span>' : ''}
+                        ${r.has_money ? '<span class="craft-tag">💰 Argent</span>' : ''}
+                    </div>
+                </div>
+                <div class="craft-request-status">${status}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getCraftStatusBadge(r) {
+    if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">✓ Finalisé</span>';
+    if (r.crafted) return '<span class="craft-status-badge craft-status-crafted">⚒ Crafté</span>';
+    if (r.status === 'in_progress') return '<span class="craft-status-badge craft-status-progress">⏳ En cours</span>';
+    return '<span class="craft-status-badge craft-status-pending">📋 En attente</span>';
+}
+
+function renderCraftBoard() {
+    const tbody = document.getElementById('craftBoardBody');
+    if (!tbody) return;
+
+    // 28 lignes : on prend les 28 demandes les plus récentes (non finalisées en priorité)
+    const active = craftRequestsCache.filter(r => r.status !== 'completed').slice(0, 28);
+    const lines = [];
+
+    for (let i = 0; i < 28; i++) {
+        const r = active[i];
+        if (r) {
+            lines.push(renderCraftBoardLine(i + 1, r));
+        } else {
+            lines.push(`<tr class="craft-board-empty"><td>${i + 1}</td><td colspan="8"><em>— Emplacement libre —</em></td></tr>`);
+        }
+    }
+
+    tbody.innerHTML = lines.join('');
+
+    // Charger les organisations dans les selects
+    document.querySelectorAll('.craft-org-select').forEach(select => {
+        select.innerHTML = '<option value="">— Choisir —</option>' +
+            organizationsCache.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('') +
+            '<option value="__add__">+ Ajouter une organisation</option>';
+    });
+}
+
+function renderCraftBoardLine(num, r) {
+    const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : '—';
+    const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : '—';
+    const isMine = r.user_id === window.currentUserId;
+    const canEditCraft = isAdminUser; // Hauts gradés peuvent cocher crafté + remplir N°série
+    const canEditSale = isMine || isAdminUser;
+    const completed = r.status === 'completed';
+
+    return `
+        <tr data-request-id="${r.id}" class="${completed ? 'craft-board-completed' : ''}">
+            <td>${num}</td>
+            <td>
+                <div class="craft-board-request">
+                    ${r.weapon_image_url ? `<img class="craft-board-img" src="${r.weapon_image_url}">` : '🔫'}
+                    <div>
+                        <strong>${escapeHtml(r.weapon_name)}</strong>
+                        <small>par ${escapeHtml(r.user_name)}</small>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <input type="checkbox" class="craft-checkbox-crafted" ${r.crafted ? 'checked' : ''} ${canEditCraft ? '' : 'disabled'} onchange="toggleCraftCrafted(${r.id}, this.checked)">
+            </td>
+            <td>
+                <input type="text" class="craft-input-serial" placeholder="N°Série" value="${r.serial_number || ''}" ${canEditCraft ? '' : 'disabled'} onblur="updateCraftSerial(${r.id}, this.value)">
+            </td>
+            <td>
+                <select class="craft-org-select" ${canEditSale && r.crafted ? '' : 'disabled'} onchange="handleOrgChange(${r.id}, this)">
+                    <option value="${escapeHtml(r.buyer_org || '')}">${escapeHtml(r.buyer_org || '— Choisir —')}</option>
+                </select>
+            </td>
+            <td>
+                <input type="number" class="craft-input-price" placeholder="Prix" value="${r.sale_price || ''}" ${canEditSale && r.crafted ? '' : 'disabled'} onblur="updateCraftSalePrice(${r.id}, this.value)">
+            </td>
+            <td>${craftDate}</td>
+            <td>${saleDate}</td>
+            <td>
+                ${canEditSale && r.crafted && !completed ? `<button class="btn-craft-validate" onclick="validateCraftSale(${r.id})">✓ Valider</button>` : ''}
+            </td>
+        </tr>
+    `;
+}
+
+async function toggleCraftCrafted(requestId, crafted) {
+    if (crafted) {
+        const serial = prompt('N° de série de l\'arme craftée :');
+        if (!serial) {
+            // Annule si pas de N°série
+            const checkbox = document.querySelector(`tr[data-request-id="${requestId}"] .craft-checkbox-crafted`);
+            if (checkbox) checkbox.checked = false;
+            return;
+        }
+        await updateCraftRequestCraft(requestId, true, serial);
+    } else {
+        await updateCraftRequestCraft(requestId, false, null);
+    }
+}
+
+async function updateCraftSerial(requestId, value) {
+    if (!value) return;
+    await updateCraftRequestCraft(requestId, true, value);
+}
+
+async function updateCraftRequestCraft(requestId, crafted, serial) {
+    try {
+        const res = await fetch(`/api/crafts/requests/${requestId}/craft`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ crafted, serial_number: serial })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast(crafted ? '⚒ Craft validé, demandeur ping' : '↩ Annulé');
+            await loadCraftRequests();
+            renderCraftBoard();
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+function handleOrgChange(requestId, select) {
+    const value = select.value;
+    if (value === '__add__') {
+        const newOrg = prompt('Nom de la nouvelle organisation :');
+        if (newOrg && newOrg.trim()) {
+            addOrganization(newOrg.trim()).then(() => {
+                renderCraftBoard();
+            });
+        } else {
+            select.value = '';
+        }
+        return;
+    }
+    // Stocker temporairement, sera envoyé à la validation
+    select.dataset.value = value;
+}
+
+async function addOrganization(name) {
+    try {
+        const res = await fetch('/api/crafts/organizations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        if (res.ok) {
+            await loadOrganizations();
+            toast('✅ Organisation ajoutée');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+function updateCraftSalePrice(requestId, value) {
+    // Stocké en local, sera envoyé à la validation finale
+    const tr = document.querySelector(`tr[data-request-id="${requestId}"]`);
+    if (tr) tr.dataset.salePrice = value;
+}
+
+async function validateCraftSale(requestId) {
+    const tr = document.querySelector(`tr[data-request-id="${requestId}"]`);
+    if (!tr) return;
+
+    const select = tr.querySelector('.craft-org-select');
+    const priceInput = tr.querySelector('.craft-input-price');
+
+    const buyerOrg = select.value;
+    const salePrice = priceInput.value;
+
+    if (!buyerOrg || buyerOrg === '__add__') { toast('❌ Choisis une organisation', 'error'); return; }
+    if (!salePrice) { toast('❌ Entre un prix de vente', 'error'); return; }
+
+    if (!confirm('Valider cette vente ?\nUn récap sera posté dans le salon.')) return;
+
+    try {
+        const res = await fetch(`/api/crafts/requests/${requestId}/sale`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                buyer_org: buyerOrg,
+                sale_price: parseInt(salePrice),
+                sale_date: new Date().toISOString(),
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast('✅ Vente validée, récap posté');
+            await loadCraftRequests();
+            renderCraftBoard();
+            renderCraftHistory();
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+function renderCraftHistory() {
+    const list = document.getElementById('craftHistoryList');
+    if (!list) return;
+
+    const completed = craftRequestsCache.filter(r => r.status === 'completed');
+
+    if (completed.length === 0) {
+        list.innerHTML = '<p class="empty">Aucun craft finalisé</p>';
+        return;
+    }
+
+    list.innerHTML = completed.map(r => {
+        const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
+        const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
+        return `
+            <div class="craft-history-item">
+                ${r.weapon_image_url ? `<img class="craft-history-image" src="${r.weapon_image_url}">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+                <div class="craft-history-body">
+                    <div class="craft-history-name">${escapeHtml(r.weapon_name)} <span class="craft-history-serial">[${r.serial_number || 'N/A'}]</span></div>
+                    <div class="craft-history-meta">
+                        <span>👤 ${escapeHtml(r.user_name)}</span>
+                        <span>🏢 ${escapeHtml(r.buyer_org || 'N/A')}</span>
+                        <span>💰 ${(r.sale_price || 0).toLocaleString('fr-FR')}$</span>
+                    </div>
+                    <div class="craft-history-dates">
+                        <span>⚒ Craft : ${craftDate}</span>
+                        <span>📅 Vente : ${saleDate}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+window.switchCraftSubtab = switchCraftSubtab;
+window.toggleCraftWeaponDropdown = toggleCraftWeaponDropdown;
+window.selectCraftWeapon = selectCraftWeapon;
+window.submitCraftRequest = submitCraftRequest;
+window.goToCraftBoard = goToCraftBoard;
+window.toggleCraftCrafted = toggleCraftCrafted;
+window.updateCraftSerial = updateCraftSerial;
+window.handleOrgChange = handleOrgChange;
+window.updateCraftSalePrice = updateCraftSalePrice;
+window.validateCraftSale = validateCraftSale;
+
+// ============================================================
+// EMBED MODE TOGGLE (annonce/rappel)
+// ============================================================
+function toggleEmbedMode(type) {
+    const checkbox = document.getElementById(`${type}UseEmbed`);
+    const textarea = document.getElementById(`${type}Message`);
+    const counter = document.getElementById(`${type}CharCount`);
+    if (!checkbox || !textarea) return;
+
+    const useEmbed = checkbox.checked;
+    const limit = useEmbed ? 4000 : 2000;
+    textarea.maxLength = limit;
+    if (counter) counter.textContent = `${textarea.value.length} / ${limit}`;
+}
+
+window.toggleEmbedMode = toggleEmbedMode;
+
+// Patch sendAnnonce et sendRappel pour passer useEmbed
+(function patchSendAnnonce() {
+    if (typeof window.sendAnnonce === 'function') {
+        const orig = window.sendAnnonce;
+        window.sendAnnonce = async function() {
+            const useEmbed = document.getElementById('annonceUseEmbed')?.checked;
+            const roleId = document.getElementById('annonceRole').value;
+            const message = document.getElementById('annonceMessage').value;
+            if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
+            if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
+            if (!confirm('Envoyer cette annonce ?')) return;
+
+            try {
+                const res = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: 'annonce', params: { roleId, message, useEmbed } })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    toast('📤 Annonce envoyée');
+                    const ta = document.getElementById('annonceMessage');
+                    ta.value = '';
+                    ta.dispatchEvent(new Event('input'));
+                    document.getElementById('annonceRole').value = '';
+                    const label = document.getElementById('annonceRoleLabel');
+                    if (label) { label.innerHTML = '— Choisir un rôle —'; label.style.color = ''; }
+                } else {
+                    toast(`❌ ${data.error}`, 'error');
+                }
+            } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+        };
+    }
+})();
+
+(function patchSendRappel() {
+    if (typeof window.sendRappel === 'function') {
+        window.sendRappel = async function() {
+            const useEmbed = document.getElementById('rappelUseEmbed')?.checked;
+            const roleId = document.getElementById('rappelRole').value;
+            const message = document.getElementById('rappelMessage').value;
+            if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
+            if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
+            if (!confirm('Envoyer ce rappel ?')) return;
+            try {
+                const res = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: 'rappel', params: { roleId, message, useEmbed } })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    toast('📌 Rappel envoyé');
+                    const ta = document.getElementById('rappelMessage');
+                    ta.value = '';
+                    ta.dispatchEvent(new Event('input'));
+                    document.getElementById('rappelRole').value = '';
+                    const label = document.getElementById('rappelRoleLabel');
+                    if (label) { label.innerHTML = '— Choisir un rôle —'; label.style.color = ''; }
+                } else { toast(`❌ ${data.error}`, 'error'); }
+            } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+        };
+    }
+})();
+
+// ============================================================
+// AFFICHER LE LIEN ADMIN
+// ============================================================
+(async function checkAdminAndShowLink() {
+    // Tente plusieurs fois car le serveur peut prendre du temps à répondre au boot
+    for (let i = 0; i < 5; i++) {
+        try {
+            const r = await fetch('/api/me');
+            if (r.ok) {
+                const me = await r.json();
+                window.currentUserId = me.id;
+
+                // Auto-detect : Otelow ou rôle admin
+                if (me.id === '952986899667103804' ||
+                    (me.roles && me.roles.includes('1485279148246175764')) ||
+                    me.isAdmin) {
+                    const link = document.getElementById('adminLink');
+                    if (link) link.style.display = 'flex';
+                    isAdminUser = true;
+                }
+                return; // Succès
+            }
+        } catch {}
+        await new Promise(r => setTimeout(r, 500));
+    }
+})();
