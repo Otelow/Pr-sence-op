@@ -7062,54 +7062,8 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 /* ============================================================
-   FIX MODALS GLOBAUX — Force position fixed pleine page
+   FIX MODALS — supprimé, redéfini ci-dessous
    ============================================================ */
-body > .modal-backdrop,
-.modal-backdrop {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    margin: 0 !important;
-    padding: 20px !important;
-    background: rgba(0, 0, 0, 0.75) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-    z-index: 999999 !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-sizing: border-box !important;
-}
-
-.modal-backdrop[style*="display: flex"],
-.modal-backdrop[style*="display:flex"] {
-    display: flex !important;
-}
-
-.modal-backdrop > .modal-content {
-    position: relative !important;
-    background: rgba(15, 15, 20, 0.92) !important;
-    backdrop-filter: blur(50px) saturate(200%) !important;
-    -webkit-backdrop-filter: blur(50px) saturate(200%) !important;
-    border: 0.5px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 20px !important;
-    padding: 32px !important;
-    width: 100% !important;
-    max-width: 520px !important;
-    max-height: 85vh !important;
-    overflow-y: auto !important;
-    margin: auto !important;
-    box-shadow:
-        0 32px 96px rgba(0, 0, 0, 0.7),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-}
-
-.modal-backdrop > .modal-large {
-    max-width: 700px !important;
-}
 
 /* Admin saleprice field — plus visible */
 .admin-saleprice-field {
@@ -7177,4 +7131,54 @@ body > .modal-backdrop,
     background: rgba(239, 68, 68, 0.2);
     border-color: var(--red);
     transform: scale(1.05);
+}
+
+/* ============================================================
+   FIX MODAL FINAL — propre et safe
+   ============================================================ */
+
+/* Cibler uniquement les modal-backdrop avec un ID (modals racine, pas les sous-éléments) */
+.modal-backdrop[id] {
+    display: none;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    background: rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    z-index: 999999 !important;
+    box-sizing: border-box !important;
+}
+
+/* Quand l'inline style force flex */
+.modal-backdrop[id][style*="display: flex"],
+.modal-backdrop[id][style*="display:flex"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.modal-backdrop[id] > .modal-content {
+    position: relative !important;
+    background: rgba(15, 15, 20, 0.92) !important;
+    backdrop-filter: blur(50px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(50px) saturate(200%) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important;
+    padding: 32px !important;
+    width: 100% !important;
+    max-width: 520px !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    margin: auto !important;
+    box-shadow:
+        0 32px 96px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.modal-backdrop[id] > .modal-large {
+    max-width: 700px !important;
 }
