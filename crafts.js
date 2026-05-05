@@ -919,7 +919,77 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 }
             } catch (e) { console.error('Erreur update Discord:', e.message); }
 
-            res.json({ success: true });
+            // Auto-remplir Tableau de craft si l'arme est craftée 21BS et a un N°Série
+            let autoFilledCraft = null;
+            if (existing.is_crafted && existing.serial_number) {
+                try {
+                    let matchedRequest;
+                    if (useSQLite) {
+                        // Chercher demande par : user_id + N°Série + status (crafted/in_progress/pending)
+                        matchedRequest = db.prepare(`
+                            SELECT r.*, w.name as weapon_name FROM craft_requests r
+                            JOIN weapons w ON r.weapon_id = w.id
+                            WHERE r.user_id = ? AND r.serial_number = ? AND r.status != 'completed'
+                            ORDER BY r.created_at DESC LIMIT 1
+                        `).get(existing.user_id, existing.serial_number);
+                    } else {
+                        const req = (jsonData.craft_requests || []).find(r =>
+                            r.user_id === existing.user_id &&
+                            r.serial_number === existing.serial_number &&
+                            r.status !== 'completed'
+                        );
+                        if (req) {
+                            const w = jsonData.weapons.find(w => w.id === req.weapon_id);
+                            matchedRequest = { ...req, weapon_name: w ? w.name : '?' };
+                        }
+                    }
+
+                    if (matchedRequest) {
+                        // Compléter la demande craft avec les infos de vente
+                        if (useSQLite) {
+                            db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
+                                .run(sold_to || null, soldPrice, now, userId, existing.user_name, matchedRequest.id);
+                        } else {
+                            const r = jsonData.craft_requests.find(r => r.id === matchedRequest.id);
+                            if (r) {
+                                r.buyer_org = sold_to || null;
+                                r.sale_price = soldPrice;
+                                r.sale_date = now;
+                                r.completed_by_id = userId;
+                                r.completed_by_name = existing.user_name;
+                                r.status = 'completed';
+                                saveJSON();
+                            }
+                        }
+                        autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
+
+                        // Posté le récap dans le salon WEAPONS_LOG
+                        try {
+                            const stateData = botState();
+                            const recapChannel = botClient.channels.cache.get((stateData?.CONFIG?.CHANNELS?.WEAPONS_LOG) || '1497021044953845791');
+                            if (recapChannel && !matchedRequest.posted_to_channel) {
+                                const saleDate = new Date(now * 1000).toLocaleDateString('fr-FR');
+                                await recapChannel.send({
+                                    content: `📋 **Récap craft & vente** par <@${existing.user_id}> (auto)\n` +
+                                             `• **${matchedRequest.weapon_name}** (craft) [${existing.serial_number || 'N/A'}]\n` +
+                                             `• Vendu à : **${sold_to || 'N/A'}**\n` +
+                                             `• Prix : **${soldPrice ? soldPrice.toLocaleString('fr-FR') + '$' : 'N/A'}**\n` +
+                                             `• Date vente : **${saleDate}**`,
+                                    allowedMentions: { parse: [] }
+                                });
+                                if (useSQLite) {
+                                    db.prepare('UPDATE craft_requests SET posted_to_channel = 1 WHERE id = ?').run(matchedRequest.id);
+                                } else {
+                                    const r = jsonData.craft_requests.find(r => r.id === matchedRequest.id);
+                                    if (r) { r.posted_to_channel = 1; saveJSON(); }
+                                }
+                            }
+                        } catch (e) { console.error('Erreur récap auto:', e.message); }
+                    }
+                } catch (e) { console.error('Erreur auto-fill craft:', e.message); }
+            }
+
+            res.json({ success: true, autoFilledCraft });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 

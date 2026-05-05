@@ -19,6 +19,13 @@ let userPermissions = { canEditMap: false };
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
+    // Déplacer tous les modals au niveau body pour qu'ils échappent aux contextes de stacking
+    document.querySelectorAll('.modal-backdrop').forEach(modal => {
+        if (modal.parentNode !== document.body) {
+            document.body.appendChild(modal);
+        }
+    });
+
     await loadUser();
     await loadPermissions();
     setupNav();
@@ -2359,7 +2366,10 @@ function renderCraftRequestsList() {
     const list = document.getElementById('craftRequestsList');
     if (!list) return;
 
-    const recent = craftRequestsCache.filter(r => r.status !== 'completed').slice(0, 20);
+    // Exclure rejected et completed
+    const recent = craftRequestsCache
+        .filter(r => r.status !== 'completed' && r.status !== 'rejected')
+        .slice(0, 20);
 
     if (recent.length === 0) {
         list.innerHTML = '<p class="empty">Aucune demande en cours</p>';
@@ -2466,10 +2476,31 @@ function renderCraftBoard() {
     const tbody = document.getElementById('craftBoardBody');
     if (!tbody) return;
 
-    // 28 lignes : on prend les 28 demandes les plus récentes (non finalisées en priorité)
-    const active = craftRequestsCache.filter(r => r.status !== 'completed').slice(0, 28);
-    const lines = [];
+    // Filtrer : exclure rejected et completed
+    const active = craftRequestsCache
+        .filter(r => r.status !== 'completed' && r.status !== 'rejected')
+        .slice(0, 28);
 
+    // Compter les "En cours" pour le bandeau de notification
+    const inProgressCount = active.filter(r => r.status === 'in_progress').length;
+    const wrapper = document.querySelector('#craftSection-board .craft-board-wrapper');
+    let banner = document.getElementById('craftBoardInProgressBanner');
+    if (inProgressCount > 0) {
+        if (!banner && wrapper) {
+            banner = document.createElement('div');
+            banner.id = 'craftBoardInProgressBanner';
+            banner.className = 'craft-board-banner';
+            wrapper.parentNode.insertBefore(banner, wrapper);
+        }
+        if (banner) {
+            banner.innerHTML = `⏳ <strong>${inProgressCount}</strong> demande${inProgressCount > 1 ? 's' : ''} actuellement <strong>en cours de craft</strong>`;
+            banner.style.display = 'flex';
+        }
+    } else if (banner) {
+        banner.style.display = 'none';
+    }
+
+    const lines = [];
     for (let i = 0; i < 28; i++) {
         const r = active[i];
         if (r) {
@@ -2655,6 +2686,7 @@ function renderCraftHistory() {
     if (!list) return;
 
     const completed = craftRequestsCache.filter(r => r.status === 'completed');
+    const isSuperAdmin = canDeleteRequestsClient();
 
     if (completed.length === 0) {
         list.innerHTML = '<p class="empty">Aucun craft finalisé</p>';
@@ -2664,6 +2696,9 @@ function renderCraftHistory() {
     list.innerHTML = completed.map(r => {
         const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
         const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
+        const deleteBtn = isSuperAdmin
+            ? `<button class="btn-history-delete" onclick="deleteHistoryEntry(${r.id})" title="Supprimer">🗑</button>`
+            : '';
         return `
             <div class="craft-history-item">
                 ${r.weapon_image_url ? `<img class="craft-history-image" src="${r.weapon_image_url}">` : '<span class="craft-weapon-placeholder">🔫</span>'}
@@ -2679,10 +2714,28 @@ function renderCraftHistory() {
                         <span>📅 Vente : ${saleDate}</span>
                     </div>
                 </div>
+                ${deleteBtn}
             </div>
         `;
     }).join('');
 }
+
+async function deleteHistoryEntry(id) {
+    if (!confirm('Supprimer définitivement cette entrée de l\'historique ?\n\nLe craft restera tracé dans Discord mais sera retiré du dashboard.')) return;
+    try {
+        const res = await fetch(`/api/crafts/requests/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+            toast('🗑 Entrée supprimée');
+            await loadCraftRequests();
+            renderCraftHistory();
+            renderCraftBoard();
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+window.deleteHistoryEntry = deleteHistoryEntry;
 
 window.switchCraftSubtab = switchCraftSubtab;
 window.toggleCraftWeaponDropdown = toggleCraftWeaponDropdown;
@@ -3030,10 +3083,18 @@ async function confirmMarkSold(e) {
         });
         const data = await res.json();
         if (res.ok) {
-            toast('✅ Vente confirmée');
+            if (data.auto_completed_craft) {
+                toast('✅ Vente confirmée — Tableau de craft auto-rempli !');
+            } else {
+                toast('✅ Vente confirmée');
+            }
             closeMarkSoldModal();
             await loadMyWeapons();
             renderMyWeapons();
+            // Recharger aussi les crafts en cache pour cohérence
+            if (typeof loadCraftRequests === 'function') {
+                await loadCraftRequests();
+            }
         } else { toast(`❌ ${data.error}`, 'error'); }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }

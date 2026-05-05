@@ -1597,10 +1597,14 @@ html, body {
 }
 
 .modal-backdrop {
-    position: absolute;
+    position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
     animation: fadeIn 0.2s;
 }
 
@@ -1611,6 +1615,7 @@ html, body {
     padding: 32px;
     width: 90%;
     max-width: 460px;
+    z-index: 10001;
     animation: modalIn 0.2s;
 }
 
@@ -7054,4 +7059,122 @@ body:has(#impersonateBanner[style*="flex"]) {
 .btn-mw-sold:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+}
+
+/* ============================================================
+   FIX MODALS GLOBAUX — Force position fixed pleine page
+   ============================================================ */
+body > .modal-backdrop,
+.modal-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    background: rgba(0, 0, 0, 0.75) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    z-index: 999999 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+}
+
+.modal-backdrop[style*="display: flex"],
+.modal-backdrop[style*="display:flex"] {
+    display: flex !important;
+}
+
+.modal-backdrop > .modal-content {
+    position: relative !important;
+    background: rgba(15, 15, 20, 0.92) !important;
+    backdrop-filter: blur(50px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(50px) saturate(200%) !important;
+    border: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 20px !important;
+    padding: 32px !important;
+    width: 100% !important;
+    max-width: 520px !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    margin: auto !important;
+    box-shadow:
+        0 32px 96px rgba(0, 0, 0, 0.7),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.modal-backdrop > .modal-large {
+    max-width: 700px !important;
+}
+
+/* Admin saleprice field — plus visible */
+.admin-saleprice-field {
+    background: rgba(74, 222, 128, 0.04);
+    border-left: 3px solid var(--green);
+    padding-left: 14px;
+    border-radius: 4px;
+}
+
+.admin-saleprice-hint {
+    color: var(--text-muted);
+    font-weight: 400;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+/* ============================================================
+   BANNER "EN COURS" + BOUTON SUPPRIMER HISTORIQUE
+   ============================================================ */
+.craft-board-banner {
+    margin-bottom: 16px;
+    padding: 14px 20px;
+    background: linear-gradient(90deg, rgba(96, 165, 250, 0.12), rgba(96, 165, 250, 0.04));
+    border: 0.5px solid rgba(96, 165, 250, 0.35);
+    border-radius: 12px;
+    color: var(--blue);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 4px 16px rgba(96, 165, 250, 0.12);
+    animation: banner-glow 3s ease-in-out infinite;
+}
+
+@keyframes banner-glow {
+    0%, 100% { box-shadow: 0 4px 16px rgba(96, 165, 250, 0.12); }
+    50% { box-shadow: 0 4px 24px rgba(96, 165, 250, 0.25); }
+}
+
+.craft-board-banner strong {
+    color: #93c5fd;
+}
+
+/* Bouton supprimer historique */
+.btn-history-delete {
+    background: rgba(239, 68, 68, 0.1);
+    border: 0.5px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.btn-history-delete:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: var(--red);
+    transform: scale(1.05);
 }
