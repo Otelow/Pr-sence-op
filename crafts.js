@@ -150,6 +150,7 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_price INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_at INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN discord_message_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
 
             const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
@@ -604,7 +605,110 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.json({ requests: [], error: e.message }); }
     });
 
-    app.post('/api/crafts/requests', requireAuth, (req, res) => {
+    // Salons crafts
+    const CRAFT_REQUEST_CHANNEL = '1501593802014720061';
+    const CRAFT_STATUS_CHANNEL = '1496977220097282290';
+    const CRAFT_PLAN_PROVIDER_ROLE = '1490361524408291459';
+
+    // Helper : créer/éditer le message de demande de craft sur Discord
+    async function postOrUpdateCraftRequestMessage(requestId) {
+        try {
+            const fullReq = getRequest(requestId);
+            if (!fullReq) return;
+
+            const channel = botClient.channels.cache.get(CRAFT_REQUEST_CHANNEL);
+            if (!channel) return;
+
+            const statusEmoji = {
+                'pending': '⏳ En attente',
+                'in_progress': '🔧 En cours',
+                'crafted': '⚒ Crafté',
+                'completed': '✅ Finalisé',
+                'rejected': '❌ Refusé',
+            };
+            const statusLabel = statusEmoji[fullReq.status] || fullReq.status;
+
+            const { EmbedBuilder } = require('discord.js');
+            const embed = new EmbedBuilder()
+                .setTitle(`📝 Demande de craft : ${fullReq.weapon_name}`)
+                .setColor(fullReq.status === 'rejected' ? 0xef4444 : (fullReq.status === 'in_progress' ? 0x60a5fa : (fullReq.status === 'crafted' || fullReq.status === 'completed' ? 0x4ade80 : 0xffb84d)))
+                .addFields(
+                    { name: '👤 Demandeur', value: `<@${fullReq.user_id}>`, inline: true },
+                    { name: '📊 Statut', value: statusLabel, inline: true },
+                    { name: '📋 Plan', value: fullReq.has_plan ? '✅' : '❌', inline: true },
+                    { name: '💰 Argent', value: fullReq.has_money ? '✅' : '❌', inline: true },
+                    ...(fullReq.serial_number ? [{ name: '🔢 N°Série', value: `\`${fullReq.serial_number}\``, inline: true }] : []),
+                )
+                .setTimestamp()
+                .setFooter({ text: '21 Block Savage — Demande de craft' });
+
+            // Message body avec ping initial
+            const isInitial = !fullReq.discord_message_id;
+            const content = isInitial
+                ? `🆕 Nouvelle demande de craft de <@${fullReq.user_id}>\n` +
+                  `**Craft :** ${fullReq.weapon_name}\n` +
+                  `**Statut :** ⏳ En attente\n\n` +
+                  `<@&${CRAFT_PLAN_PROVIDER_ROLE}> merci de fournir rapidement le plan d'arme et les Corps le plus rapidement possible.`
+                : null;
+
+            // Si message existe → édit, sinon créer
+            if (fullReq.discord_message_id) {
+                try {
+                    const msg = await channel.messages.fetch(fullReq.discord_message_id);
+                    await msg.edit({ embeds: [embed] });
+                    return;
+                } catch (e) {
+                    console.error('Édition message craft échouée, création nouveau:', e.message);
+                }
+            }
+
+            const msg = await channel.send({
+                content,
+                embeds: [embed],
+                allowedMentions: { users: [fullReq.user_id], roles: [CRAFT_PLAN_PROVIDER_ROLE] },
+            });
+
+            // Stocker l'ID
+            if (useSQLite) {
+                db.prepare('UPDATE craft_requests SET discord_message_id = ? WHERE id = ?').run(msg.id, requestId);
+            } else {
+                const r = jsonData.craft_requests.find(r => r.id === requestId);
+                if (r) { r.discord_message_id = msg.id; saveJSON(); }
+            }
+        } catch (e) {
+            console.error('Erreur postOrUpdateCraftRequestMessage:', e.message);
+        }
+    }
+
+    // Helper : message de notification de changement de statut dans CRAFT_STATUS_CHANNEL
+    async function postCraftStatusUpdate(requestId, newStatus) {
+        try {
+            const fullReq = getRequest(requestId);
+            if (!fullReq) return;
+            const channel = botClient.channels.cache.get(CRAFT_STATUS_CHANNEL);
+            if (!channel) return;
+
+            let message = '';
+            if (newStatus === 'in_progress') {
+                message = `<@${fullReq.user_id}> ta demande de craft de **${fullReq.weapon_name}** est maintenant **en cours de craft** 🔧`;
+            } else if (newStatus === 'rejected') {
+                message = `<@${fullReq.user_id}> ta demande de craft de **${fullReq.weapon_name}** a été **refusée** ❌`;
+            } else if (newStatus === 'pending') {
+                message = `<@${fullReq.user_id}> ta demande de craft de **${fullReq.weapon_name}** est repassée **en attente** ⏳`;
+            } else {
+                return; // Pas de notif pour les autres statuts
+            }
+
+            await channel.send({
+                content: message,
+                allowedMentions: { users: [fullReq.user_id] },
+            });
+        } catch (e) {
+            console.error('Erreur postCraftStatusUpdate:', e.message);
+        }
+    }
+
+    app.post('/api/crafts/requests', requireAuth, async (req, res) => {
         try {
             const { weapon_id, has_plan, has_money } = req.body;
             const userId = req.session.user.id;
@@ -613,6 +717,10 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const weapon = getWeapon(weapon_id);
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
             const id = insertRequest(userId, userName, weapon_id, has_plan, has_money);
+
+            // Message Discord
+            await postOrUpdateCraftRequestMessage(id);
+
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -647,9 +755,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
             updateRequestCraft(id, crafted, serial_number, userId, userName);
+
+            // Mettre à jour le message Discord original
+            await postOrUpdateCraftRequestMessage(id);
+
             if (crafted) {
-                // Ping vers le NOUVEAU salon 1496977220097282290
-                const channel = botClient.channels.cache.get('1496977220097282290');
+                // Ping dans le salon de statut
+                const channel = botClient.channels.cache.get(CRAFT_STATUS_CHANNEL);
                 if (channel) {
                     await channel.send({
                         content: `<@${existing.user_id}> ton **${existing.weapon_name}** est craft ! ✅\n📋 N°Série : \`${serial_number || 'N/A'}\`\n💡 Pense à compléter le **prix de vente**, **groupe acheteur** et **date de vente** une fois la transaction effectuée.`,
@@ -662,7 +774,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     });
 
     // Changement de statut (En cours / Refusé)
-    app.patch('/api/crafts/requests/:id/status', requireAuth, (req, res) => {
+    app.patch('/api/crafts/requests/:id/status', requireAuth, async (req, res) => {
         try {
             if (!canValidateCraft(req.session.user)) {
                 return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
@@ -678,6 +790,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 const r = jsonData.craft_requests.find(r => r.id === id);
                 if (r) { r.status = status; saveJSON(); }
             }
+
+            // Mettre à jour le message Discord original (édition embed)
+            await postOrUpdateCraftRequestMessage(id);
+
+            // Notification dans le salon de statut
+            await postCraftStatusUpdate(id, status);
+
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
