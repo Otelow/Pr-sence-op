@@ -35,7 +35,10 @@
             <h2 class="section-title">🔫 Catalogue des armes craftables</h2>
             <p class="admin-info">Ajoute, modifie ou supprime des armes du catalogue.</p>
 
-            <button class="btn-primary" onclick="openWeaponEditor()">+ Ajouter une arme</button>
+            <div class="admin-toolbar">
+                <input type="search" id="adminWeaponSearch" class="admin-search-input" placeholder="Rechercher une arme, ingrédient, prix...">
+                <button class="btn-primary" onclick="openWeaponEditor()">+ Ajouter une arme</button>
+            </div>
 
             <div class="admin-weapons-list" id="adminWeaponsList">
                 <p class="empty">Chargement...</p>
@@ -49,7 +52,10 @@
             <h2 class="section-title">🧪 Bibliothèque d'ingrédients</h2>
             <p class="admin-info">Ingrédients utilisables dans les recettes d'armes (avec leur visuel).</p>
 
-            <button class="btn-primary" onclick="openIngredientEditor()">+ Ajouter un ingrédient</button>
+            <div class="admin-toolbar">
+                <input type="search" id="adminIngredientSearch" class="admin-search-input" placeholder="Rechercher un ingrédient...">
+                <button class="btn-primary" onclick="openIngredientEditor()">+ Ajouter un ingrédient</button>
+            </div>
 
             <div class="admin-ingredients-grid" id="adminIngredientsList">
                 <p class="empty">Chargement...</p>
