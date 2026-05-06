@@ -1017,9 +1017,13 @@ function startServer(client, getState) {
         const effectiveUserId = isImpersonating ? '__impersonate__' : userId;
         const effectiveRoles = isImpersonating ? [impersonateRole] : userRoles;
 
-        // Hardcoded : laboratoire d'armes visible uniquement pour ces user IDs spécifiques
+        // Laboratoire d'armes : visible pour les 3 user IDs OU les 3 rôles hauts gradés
         const LAB_VISIBLE_USERS = ['952986899667103804', '780164840798552066', '769670622380294265'];
-        const canSeeLab = !isImpersonating && LAB_VISIBLE_USERS.includes(userId);
+        const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
+        const canSeeLab = !isImpersonating && (
+            LAB_VISIBLE_USERS.includes(userId) ||
+            FULL_ACCESS_ROLES.some(r => userRoles.includes(r))
+        );
 
         const allPoints = loadMapPoints();
 
@@ -1053,9 +1057,11 @@ function startServer(client, getState) {
 
     // Vérifier permissions de placer des points (mêmes que COMMAND_ROLES par défaut)
     function canEditMap(req) {
-        const state = botState();
+        const userId = req.session.user?.id;
+        if (userId === '952986899667103804') return true;
         const userRoles = req.session.user?.roles || [];
-        return state.CONFIG.ROLES.COMMAND_ROLES.some(r => userRoles.includes(r));
+        const FULL_ACCESS = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
+        return FULL_ACCESS.some(r => userRoles.includes(r));
     }
 
     app.post('/api/map/points', requireAuth, (req, res) => {

@@ -1078,23 +1078,13 @@ function scheduleAbsencePanelRefresh() {
 }
 
 client.on('messageDelete', async (message) => {
-    // Si le message de la 2ème OP est supprimé manuellement → stop la présence
+    // On NE stoppe PAS la présence si le message Discord est supprimé manuellement
+    // Le panel reste affiché sur le site jusqu'à 2h du matin (cron de cleanup)
     if (presence2Data.messageId === message.id) {
-        console.log('🗑️ Message 2ème OP supprimé manuellement → arrêt présence');
-        presence2Data = { messageId: null, active: false };
-        reactionsOP2.clear();
-        savePresenceState();
-        await refreshAbsencePanel();
+        console.log('🗑️ Message 2ème OP supprimé sur Discord, mais panel site conservé jusqu\'à 2h');
     }
-
-    // Idem pour la 1ère OP
     if (presenceData.messageId === message.id) {
-        console.log('🗑️ Message 1ère OP supprimé manuellement → arrêt présence');
-        if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
-        presenceData = { messageId: null, reminderIds: [], reminderInterval: null, active: false };
-        reactionsOP1.clear();
-        savePresenceState();
-        await refreshAbsencePanel();
+        console.log('🗑️ Message 1ère OP supprimé sur Discord, mais panel site conservé jusqu\'à 2h');
     }
 });
 
@@ -1710,20 +1700,41 @@ async function startPresenceReminders(channel, presenceMsg) {
                 } catch {}
             }, { timezone: 'Europe/Paris' });
 
-            // 22h00 — Nettoyage complet
+            // 22h00 — Nettoyage des messages Discord (présence reste visible sur le site)
             cron.schedule('0 22 * * *', async () => {
-                if (!presenceData.active) return;
+                if (!presenceData.active && !presence2Data.active) return;
+                console.log('🌙 22h — Nettoyage messages Discord (le panel site reste actif jusqu\'à 2h)');
                 stopAbsencePanelRefresh();
-                await cleanupPresence(channel);
 
+                // Supprimer les messages Discord mais garder l'état actif
+                if (presenceData.messageId) {
+                    try { const m = await channel.messages.fetch(presenceData.messageId); await m.delete(); } catch {}
+                    if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+                    presenceData.reminderInterval = null;
+                    presenceData.reminderIds = [];
+                }
                 if (presence2Data.messageId) {
                     try { const m = await channel.messages.fetch(presence2Data.messageId); await m.delete(); } catch {}
                 }
-                presence2Data = { messageId: null, active: false }; reactionsOP2.clear(); savePresenceState();
+                // L'état reste 'active' avec les données de réactions pour que le site continue à les montrer
+                savePresenceState();
+            }, { timezone: 'Europe/Paris' });
+
+            // 2h00 du matin — Reset complet (présence disparaît du site)
+            cron.schedule('0 2 * * *', async () => {
+                console.log('🌃 2h — Reset complet présence (site + état)');
+                stopAbsencePanelRefresh();
+                if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+                presenceData = { messageId: null, reminderIds: [], reminderInterval: null, active: false };
+                reactionsOP1.clear();
+                presence2Data = { messageId: null, active: false };
+                reactionsOP2.clear();
+                savePresenceState();
+                try { await refreshAbsencePanel(); } catch {}
             }, { timezone: 'Europe/Paris' });
 
             presenceCronsScheduled = true;
-            console.log('🔔 Crons présence programmés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup 22h');
+            console.log('🔔 Crons présence programmés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, reset complet 2h');
         }
 
         // Mode TEST/TURBO : on lance des crons * * * * * temporaires

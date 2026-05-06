@@ -20,7 +20,6 @@ let userPermissions = { canEditMap: false };
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
     // Déplacer uniquement les modals racine (avec ID) au body
-    // pour éviter les contextes de stacking parents
     document.querySelectorAll('.modal-backdrop[id]').forEach(modal => {
         if (modal.parentNode !== document.body) {
             document.body.appendChild(modal);
@@ -33,6 +32,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupChannelSearch();
     setupMap();
     updateImpersonateBanner();
+    applyPermissionsUI();
+    restoreLastTab();
     refreshAll();
     refreshTimer = setInterval(refreshAll, 15_000);
 });
@@ -49,11 +50,23 @@ async function loadUser() {
         const res = await fetch('/api/me');
         if (!res.ok) { window.location = '/'; return; }
         const user = await res.json();
+        window.currentUser = user;
+        window.currentUserId = user.id;
         document.getElementById('userName').textContent = user.username;
         if (user.avatar) document.getElementById('userAvatar').src = user.avatar;
     } catch {
         window.location = '/';
     }
+}
+
+function restoreLastTab() {
+    try {
+        const last = localStorage.getItem('lastTab');
+        if (last && document.getElementById(`tab-${last}`) && PAGE_TITLES[last]) {
+            // Rôle non autorisé sur tab verrouillé → reste sur presence (qui sera flouté)
+            switchTab(last);
+        }
+    } catch {}
 }
 
 function setupNav() {
@@ -66,14 +79,48 @@ function setupNav() {
     });
 }
 
+// Permissions UI
+const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
+let userHasFullAccess = false;
+
+function checkUserAccess() {
+    if (!window.currentUser) return false;
+    if (window.currentUser.id === '952986899667103804') return true;
+    const roles = window.currentUser.roles || [];
+    return FULL_ACCESS_ROLES.some(r => roles.includes(r));
+}
+
+function applyPermissionsUI() {
+    userHasFullAccess = checkUserAccess();
+    // Tabs verrouillés pour les rôles non autorisés : presence + commands
+    const lockedTabs = ['presence', 'commands'];
+    if (!userHasFullAccess) {
+        lockedTabs.forEach(tabName => {
+            const sec = document.getElementById(`tab-${tabName}`);
+            if (sec && !sec.querySelector('.access-locked-overlay')) {
+                const overlay = document.createElement('div');
+                overlay.className = 'access-locked-overlay';
+                overlay.innerHTML = '<span class="confidential-text">CONFIDENTIEL</span>';
+                sec.appendChild(overlay);
+                sec.classList.add('access-locked');
+            }
+        });
+    }
+}
+
 function switchTab(tab) {
     currentTab = tab;
+    // Persister dans localStorage pour survivre au refresh
+    try { localStorage.setItem('lastTab', tab); } catch {}
+
     document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.tab === tab));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === `tab-${tab}`));
 
     const titles = PAGE_TITLES[tab];
-    document.getElementById('pageTitle').textContent = titles.title;
-    document.getElementById('pageSub').textContent = titles.sub;
+    if (titles) {
+        document.getElementById('pageTitle').textContent = titles.title;
+        document.getElementById('pageSub').textContent = titles.sub;
+    }
 
     refreshAll();
 }
@@ -2367,10 +2414,17 @@ function renderCraftRequestsList() {
     const list = document.getElementById('craftRequestsList');
     if (!list) return;
 
-    // Exclure rejected et completed
-    const recent = craftRequestsCache
-        .filter(r => r.status !== 'completed' && r.status !== 'rejected')
-        .slice(0, 20);
+    const u = window.currentUser || {};
+    const hasFullAccess = canValidateCraftClient();
+    const myUserId = u.id;
+
+    // Hauts gradés voient tout, les autres voient uniquement leurs propres demandes
+    let recent = craftRequestsCache
+        .filter(r => r.status !== 'completed' && r.status !== 'rejected');
+    if (!hasFullAccess) {
+        recent = recent.filter(r => r.user_id === myUserId);
+    }
+    recent = recent.slice(0, 20);
 
     if (recent.length === 0) {
         list.innerHTML = '<p class="empty">Aucune demande en cours</p>';
@@ -2380,18 +2434,30 @@ function renderCraftRequestsList() {
     list.innerHTML = recent.map(r => {
         const date = new Date(r.created_at * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
         const status = getCraftStatusBadge(r);
-        const canChangeStatus = canValidateCraftClient();
+        const canChangeStatus = hasFullAccess;
         const isSuperAdmin = canDeleteRequestsClient();
+        const isMine = r.user_id === myUserId;
         const rejectedClass = r.status === 'rejected' ? ' craft-request-rejected' : '';
 
-        const statusActions = canChangeStatus ? `
-            <div class="craft-status-actions">
-                ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
-                ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
-                ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
-                ${isSuperAdmin ? `<button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">🗑</button>` : ''}
-            </div>
-        ` : '';
+        // Hauts gradés : peuvent changer statut + supprimer
+        // User normal : peut juste annuler/supprimer SA demande tant que pas craftée
+        let statusActions = '';
+        if (canChangeStatus) {
+            statusActions = `
+                <div class="craft-status-actions">
+                    ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
+                    ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
+                    ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
+                    ${isSuperAdmin ? `<button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">🗑</button>` : ''}
+                </div>
+            `;
+        } else if (isMine && r.status !== 'crafted' && r.status !== 'completed') {
+            statusActions = `
+                <div class="craft-status-actions">
+                    <button class="btn-status-delete" onclick="cancelMyCraftRequest(${r.id})">🗑 Annuler ma demande</button>
+                </div>
+            `;
+        }
 
         return `
             <div class="craft-request-item${rejectedClass}">
@@ -2412,16 +2478,32 @@ function renderCraftRequestsList() {
     }).join('');
 }
 
+async function cancelMyCraftRequest(id) {
+    if (!confirm('Annuler ta demande de craft ?')) return;
+    try {
+        const res = await fetch(`/api/crafts/requests/${id}/cancel`, { method: 'DELETE' });
+        const data = await res.json();
+        if (res.ok) {
+            toast('🗑 Demande annulée');
+            await loadCraftRequests();
+            renderCraftRequestsList();
+            renderCraftBoard();
+        } else { toast(`❌ ${data.error}`, 'error'); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+}
+window.cancelMyCraftRequest = cancelMyCraftRequest;
+
 function canValidateCraftClient() {
-    const userRoles = window.currentUserRoles || [];
-    if (window.currentUserId === '952986899667103804') return true;
+    const u = window.currentUser || {};
+    if (u.id === '952986899667103804') return true;
+    const userRoles = u.roles || [];
     return ['1485279148246175764', '1486744891848654988', '1485279534650494976'].some(r => userRoles.includes(r));
 }
 
 function canDeleteRequestsClient() {
-    const userRoles = window.currentUserRoles || [];
-    if (window.currentUserId === '952986899667103804') return true;
-    return userRoles.includes('1485279148246175764');
+    const u = window.currentUser || {};
+    if (u.id === '952986899667103804') return true;
+    return (u.roles || []).includes('1485279148246175764');
 }
 
 async function updateRequestStatus(requestId, status) {
@@ -2477,10 +2559,18 @@ function renderCraftBoard() {
     const tbody = document.getElementById('craftBoardBody');
     if (!tbody) return;
 
+    const u = window.currentUser || {};
+    const hasFullAccess = canValidateCraftClient();
+
     // Filtrer : exclure rejected et completed
-    const active = craftRequestsCache
-        .filter(r => r.status !== 'completed' && r.status !== 'rejected')
-        .slice(0, 28);
+    let active = craftRequestsCache
+        .filter(r => r.status !== 'completed' && r.status !== 'rejected');
+
+    // Hauts gradés voient toutes les demandes, les autres seulement les leurs
+    if (!hasFullAccess) {
+        active = active.filter(r => r.user_id === u.id);
+    }
+    active = active.slice(0, 28);
 
     // Compter les "En cours" pour le bandeau de notification
     const inProgressCount = active.filter(r => r.status === 'in_progress').length;
