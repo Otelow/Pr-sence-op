@@ -426,7 +426,11 @@ async function loadSanctions() {
 
 // ===== COMMANDES =====
 async function runCmd(command) {
-    if (!confirm(`Lancer la commande "${command}" ?`)) return;
+    if (!await confirmAction({
+        title: 'Lancer la commande',
+        message: `Lancer la commande "${command}" ?`,
+        confirmText: 'Lancer',
+    })) return;
 
     try {
         const res = await fetch('/api/command', {
@@ -460,6 +464,70 @@ function toast(message, type = 'success') {
         t.style.transform = 'translateX(100%)';
         setTimeout(() => t.remove(), 300);
     }, 4000);
+}
+
+function confirmAction(options = {}) {
+    const {
+        title = 'Confirmer',
+        message = 'Confirmer cette action ?',
+        confirmText = 'Confirmer',
+        cancelText = 'Annuler',
+        danger = false,
+    } = options;
+
+    return new Promise(resolve => {
+        let modal = document.getElementById('confirmActionModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'confirmActionModal';
+            modal.className = 'confirm-action-modal';
+            modal.innerHTML = `
+                <div class="confirm-action-backdrop" data-confirm-cancel></div>
+                <div class="confirm-action-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmActionTitle">
+                    <div class="confirm-action-icon">!</div>
+                    <h3 id="confirmActionTitle" class="confirm-action-title"></h3>
+                    <p class="confirm-action-message"></p>
+                    <div class="confirm-action-buttons">
+                        <button type="button" class="btn-secondary" data-confirm-cancel></button>
+                        <button type="button" class="btn-primary" data-confirm-ok></button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const titleNode = modal.querySelector('.confirm-action-title');
+        const messageNode = modal.querySelector('.confirm-action-message');
+        const okButton = modal.querySelector('[data-confirm-ok]');
+        const cancelButtons = modal.querySelectorAll('[data-confirm-cancel]');
+        const cancelButton = modal.querySelector('.confirm-action-buttons [data-confirm-cancel]');
+
+        titleNode.textContent = title;
+        messageNode.textContent = message;
+        okButton.textContent = confirmText;
+        cancelButton.textContent = cancelText;
+        modal.classList.toggle('danger', !!danger);
+        modal.style.display = 'flex';
+        okButton.focus();
+
+        const cleanup = value => {
+            modal.style.display = 'none';
+            okButton.removeEventListener('click', onOk);
+            cancelButtons.forEach(btn => btn.removeEventListener('click', onCancel));
+            document.removeEventListener('keydown', onKey);
+            resolve(value);
+        };
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        const onKey = e => {
+            if (e.key === 'Escape') cleanup(false);
+            if (e.key === 'Enter') cleanup(true);
+        };
+
+        okButton.addEventListener('click', onOk);
+        cancelButtons.forEach(btn => btn.addEventListener('click', onCancel));
+        document.addEventListener('keydown', onKey);
+    });
 }
 
 // ==========================================
@@ -901,6 +969,27 @@ function escapeHtml(s) {
     const d = document.createElement('div');
     d.textContent = s || '';
     return d.innerHTML;
+}
+
+function escapeJsArg(value) {
+    return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+}
+
+function safeImageUrl(url) {
+    const value = String(url || '').trim();
+    if (!value) return '';
+    if (value.startsWith('/') && !value.startsWith('//')) return value;
+    try {
+        const parsed = new URL(value, window.location.origin);
+        if (['http:', 'https:'].includes(parsed.protocol)) return parsed.href;
+        if (parsed.protocol === 'data:' && /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(value)) return value;
+    } catch {}
+    return '';
+}
+
+function safeColor(color) {
+    const value = String(color || '').trim();
+    return /^#[0-9a-f]{3,8}$/i.test(value) ? value : '';
 }
 
 // Bouton "Charger plus"
@@ -1389,7 +1478,12 @@ function closePointModal() {
 }
 
 async function deletePoint(id) {
-    if (!confirm('Supprimer ce point ?')) return;
+    if (!await confirmAction({
+        title: 'Supprimer le point',
+        message: 'Supprimer ce point de la carte ?',
+        confirmText: 'Supprimer',
+        danger: true,
+    })) return;
     try {
         const res = await fetch(`/api/map/points/${id}`, { method: 'DELETE' });
         if (res.ok) {
@@ -1529,13 +1623,14 @@ function renderRoleDropdown(type) {
     if (!list) return;
 
     list.innerHTML = allRolesCache.map(role => {
-        const colorDot = role.color
-            ? `<span class="role-color-dot" style="background:${role.color};"></span>`
+        const color = safeColor(role.color);
+        const colorDot = color
+            ? `<span class="role-color-dot" style="background:${color};"></span>`
             : `<span class="role-color-dot" style="background:#888;"></span>`;
         return `
-            <div class="custom-dropdown-item" data-role-id="${role.id}" data-role-name="${escapeHtml(role.name)}" data-role-color="${role.color || ''}" onclick="selectRole('${type}', '${role.id}', '${escapeHtml(role.name).replace(/'/g, "\\'")}', '${role.color || ''}', ${role.memberCount})">
+            <div class="custom-dropdown-item" data-role-id="${escapeHtml(role.id)}" data-role-name="${escapeHtml(role.name)}" data-role-color="${color}" onclick="selectRole('${type}', '${escapeJsArg(role.id)}', '${escapeJsArg(role.name)}', '${color}', ${role.memberCount})">
                 ${colorDot}
-                <span class="custom-dropdown-item-label" style="${role.color ? `color:${role.color};` : ''}">@${escapeHtml(role.name)}</span>
+                <span class="custom-dropdown-item-label" style="${color ? `color:${color};` : ''}">@${escapeHtml(role.name)}</span>
                 <span class="custom-dropdown-item-count">${role.memberCount}</span>
             </div>
         `;
@@ -1566,10 +1661,11 @@ function toggleRoleDropdown(type, event) {
 function selectRole(type, id, name, color, count) {
     document.getElementById(`${type}Role`).value = id;
     const label = document.getElementById(`${type}RoleLabel`);
+    const safe = safeColor(color);
     if (label) {
-        label.innerHTML = `<span class="role-color-dot" style="background:${color || '#888'};"></span> @${name} <span style="opacity:0.6;font-size:11px;">(${count})</span>`;
+        label.innerHTML = `<span class="role-color-dot" style="background:${safe || '#888'};"></span> @${escapeHtml(name)} <span style="opacity:0.6;font-size:11px;">(${count})</span>`;
         label.classList.remove('custom-dropdown-placeholder');
-        if (color) label.style.color = color;
+        if (safe) label.style.color = safe;
     }
     document.getElementById(`${type}RoleMenu`).style.display = 'none';
 }
@@ -1736,7 +1832,7 @@ async function sendAnnonce() {
 
     if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
     if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
-    if (!confirm('Envoyer cette annonce ?')) return;
+    if (!await confirmAction({ title: 'Envoyer l’annonce', message: 'Envoyer cette annonce sur Discord ?', confirmText: 'Envoyer' })) return;
 
     try {
         const res = await fetch('/api/command', {
@@ -1767,7 +1863,7 @@ async function sendRappel() {
 
     if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
     if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
-    if (!confirm('Envoyer ce rappel ?')) return;
+    if (!await confirmAction({ title: 'Envoyer le rappel', message: 'Envoyer ce rappel sur Discord ?', confirmText: 'Envoyer' })) return;
 
     try {
         const res = await fetch('/api/command', {
@@ -1798,7 +1894,7 @@ async function sendSanction() {
 
     if (!userId) { toast('❌ Sélectionne un utilisateur', 'error'); return; }
     if (!raison.trim()) { toast('❌ Indique une raison', 'error'); return; }
-    if (!confirm('Envoyer cet avertissement ?')) return;
+    if (!await confirmAction({ title: 'Envoyer l’avertissement', message: 'Envoyer cet avertissement sur Discord ?', confirmText: 'Envoyer', danger: true })) return;
 
     try {
         const res = await fetch('/api/command', {
@@ -2121,10 +2217,11 @@ async function setupSanctionUserPicker() {
     if (!list) return;
 
     list.innerHTML = members.map(m => {
-        const avatar = m.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><rect width='28' height='28' fill='%23262626'/></svg>`;
-        const colorStyle = m.color ? `color:${m.color};` : '';
+        const avatar = safeImageUrl(m.avatar) || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><rect width='28' height='28' fill='%23262626'/></svg>`;
+        const color = safeColor(m.color);
+        const colorStyle = color ? `color:${color};` : '';
         return `
-            <div class="custom-dropdown-item user-item" data-name="${escapeHtml(m.name).toLowerCase()}" onclick="selectSanctionUserCustom('${m.id}', '${escapeHtml(m.name).replace(/'/g, "\\'")}', '${m.avatar || ''}', '${m.color || ''}')">
+            <div class="custom-dropdown-item user-item" data-name="${escapeHtml(m.name).toLowerCase()}" onclick="selectSanctionUserCustom('${escapeJsArg(m.id)}', '${escapeJsArg(m.name)}', '${escapeJsArg(avatar)}', '${color}')">
                 <img class="user-item-avatar" src="${avatar}" alt="">
                 <div class="user-item-info">
                     <div class="user-item-name" style="${colorStyle}">${escapeHtml(m.name)}</div>
@@ -2164,8 +2261,10 @@ function selectSanctionUserCustom(id, name, avatar, color) {
     const label = document.getElementById('sanctionDropdownLabel');
     if (label) {
         label.classList.remove('custom-dropdown-placeholder');
-        const avatarHtml = avatar ? `<img class="dropdown-trigger-avatar" src="${avatar}" alt="">` : '';
-        const colorStyle = color ? `color:${color};` : '';
+        const avatarUrl = safeImageUrl(avatar);
+        const safe = safeColor(color);
+        const avatarHtml = avatarUrl ? `<img class="dropdown-trigger-avatar" src="${avatarUrl}" alt="">` : '';
+        const colorStyle = safe ? `color:${safe};` : '';
         label.innerHTML = `${avatarHtml}<span style="${colorStyle}">${escapeHtml(name)}</span>`;
     }
 
@@ -2193,8 +2292,15 @@ let weaponsCache = [];
 let organizationsCache = [];
 let craftRequestsCache = [];
 let isAdminUser = false;
+let craftCatalogFilters = {
+    search: '',
+    sort: 'craft_desc',
+    planOnly: false,
+};
+let craftCatalogFiltersReady = false;
 
 async function initCraftsTab() {
+    setupCraftCatalogFilters();
     // Afficher tout de suite un état d'attente cohérent
     renderCraftCatalog();
     renderCraftRequestsList();
@@ -2270,41 +2376,95 @@ function switchCraftSubtab(subtab) {
     else if (subtab === 'history') renderCraftHistory();
 }
 
+function setupCraftCatalogFilters() {
+    if (craftCatalogFiltersReady) return;
+    const search = document.getElementById('craftCatalogSearch');
+    const sort = document.getElementById('craftCatalogSort');
+    const planOnly = document.getElementById('craftCatalogPlanOnly');
+    if (!search && !sort && !planOnly) return;
+
+    craftCatalogFiltersReady = true;
+    search?.addEventListener('input', e => {
+        craftCatalogFilters.search = e.target.value.trim().toLowerCase();
+        renderCraftCatalog();
+    });
+    sort?.addEventListener('change', e => {
+        craftCatalogFilters.sort = e.target.value;
+        renderCraftCatalog();
+    });
+    planOnly?.addEventListener('change', e => {
+        craftCatalogFilters.planOnly = e.target.checked;
+        renderCraftCatalog();
+    });
+}
+
 function renderCraftCatalog() {
     const grid = document.getElementById('craftsCatalogGrid');
+    const count = document.getElementById('craftCatalogCount');
     if (!grid) return;
 
     if (weaponsCache.length === 0) {
-        grid.innerHTML = `<p class="empty">Aucune arme dans le catalogue.${isAdminUser ? ' <a href="/admin">→ Ajouter depuis le panneau admin</a>' : ''}</p>`;
+        if (count) count.textContent = '';
+        grid.innerHTML = `<p class="empty">Aucune arme dans le catalogue.${isAdminUser ? ' <a href="/admin">Ajouter depuis le panneau admin</a>' : ''}</p>`;
         return;
     }
 
-    // Tri DÉCROISSANT par craft_price (déjà trié backend mais on s'assure)
-    const sorted = [...weaponsCache].sort((a, b) => (b.craft_price || 0) - (a.craft_price || 0));
+    const q = craftCatalogFilters.search;
+    let items = weaponsCache.filter(w => {
+        if (craftCatalogFilters.planOnly && !w.requires_plan) return false;
+        if (!q) return true;
+        const haystack = [
+            w.name,
+            w.craft_price,
+            w.sale_price,
+            ...(w.ingredients || []).map(ing => ing.name),
+        ].join(' ').toLowerCase();
+        return haystack.includes(q);
+    });
 
-    grid.innerHTML = sorted.map(w => {
-        const ingredientsHTML = (w.ingredients || []).map(ing => `
+    const sorters = {
+        craft_desc: (a, b) => (b.craft_price || 0) - (a.craft_price || 0),
+        craft_asc: (a, b) => (a.craft_price || 0) - (b.craft_price || 0),
+        sale_desc: (a, b) => (b.sale_price || 0) - (a.sale_price || 0),
+        time_asc: (a, b) => (a.craft_time || 0) - (b.craft_time || 0),
+        name_asc: (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'fr'),
+    };
+    items = [...items].sort(sorters[craftCatalogFilters.sort] || sorters.craft_desc);
+
+    if (count) count.textContent = `${items.length} / ${weaponsCache.length} armes`;
+
+    if (!items.length) {
+        grid.innerHTML = '<p class="empty">Aucune arme ne correspond aux filtres.</p>';
+        return;
+    }
+
+    grid.innerHTML = items.map(w => {
+        const ingredientsHTML = (w.ingredients || []).map(ing => {
+            const ingImageUrl = safeImageUrl(ing.image_url);
+            return `
             <div class="craft-ingredient">
-                ${ing.image_url ? `<img src="${ing.image_url}" alt="${escapeHtml(ing.name)}" class="craft-ingredient-img">` : '<div class="craft-ingredient-placeholder">🧪</div>'}
+                ${ingImageUrl ? `<img src="${ingImageUrl}" alt="${escapeHtml(ing.name)}" class="craft-ingredient-img">` : '<div class="craft-ingredient-placeholder">Ingredient</div>'}
                 <div class="craft-ingredient-amount">${ing.amount || 0}</div>
                 <div class="craft-ingredient-name">${escapeHtml(ing.name || '?')}</div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
+        const imageUrl = safeImageUrl(w.image_url);
         const timeStr = w.craft_time > 0 ? formatCraftTime(w.craft_time) : 'N/A';
         const priceStr = w.craft_price > 0 ? w.craft_price.toLocaleString('fr-FR') + '$' : 'Gratuit';
-        const saleStr = w.sale_price > 0 ? `<span class="craft-weapon-saleprice">📈 Vente : ${w.sale_price.toLocaleString('fr-FR')}$</span>` : '';
+        const saleStr = w.sale_price > 0 ? `<span class="craft-weapon-saleprice">Vente : ${w.sale_price.toLocaleString('fr-FR')}$</span>` : '';
 
         return `
             <div class="craft-weapon-card">
                 <div class="craft-weapon-image">
-                    ${w.image_url ? `<img src="${w.image_url}" alt="${escapeHtml(w.name)}">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+                    ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(w.name)}">` : '<span class="craft-weapon-placeholder">Arme</span>'}
                 </div>
                 <div class="craft-weapon-body">
-                    <div class="craft-weapon-name">${escapeHtml(w.name)}${w.requires_plan ? ' <span class="craft-weapon-planbadge">📋 Plan</span>' : ''}</div>
+                    <div class="craft-weapon-name">${escapeHtml(w.name)}${w.requires_plan ? ' <span class="craft-weapon-planbadge">Plan</span>' : ''}</div>
                     <div class="craft-weapon-meta">
-                        <span class="craft-weapon-time">⏱ ${timeStr}</span>
-                        <span class="craft-weapon-price">💰 Craft : ${priceStr}</span>
+                        <span class="craft-weapon-time">? ${timeStr}</span>
+                        <span class="craft-weapon-price">Craft : ${priceStr}</span>
                         ${saleStr}
                     </div>
                     ${ingredientsHTML ? `<div class="craft-ingredients-grid">${ingredientsHTML}</div>` : ''}
@@ -2327,37 +2487,16 @@ function formatCraftTime(seconds) {
 function renderCraftWeaponDropdown() {
     const list = document.getElementById('craftWeaponList');
     if (!list) return;
-
-    list.innerHTML = weaponsCache.map(w => `
-        <div class="custom-dropdown-item" data-name="${escapeHtml(w.name).toLowerCase()}" onclick="selectCraftWeapon(${w.id}, '${escapeHtml(w.name).replace(/'/g, "\\'")}', '${w.image_url || ''}')">
-            ${w.image_url ? `<img class="craft-dropdown-image" src="${w.image_url}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+    list.innerHTML = weaponsCache.map(w => {
+        const imageUrl = safeImageUrl(w.image_url);
+        return `
+        <div class="custom-dropdown-item" data-name="${escapeHtml(w.name).toLowerCase()}" onclick="selectCraftWeapon(${w.id}, '${escapeJsArg(w.name)}', '${escapeJsArg(imageUrl)}')">
+            ${imageUrl ? `<img class="craft-dropdown-image" src="${imageUrl}" alt="">` : '<span class="craft-weapon-placeholder">Arme</span>'}
             <span class="custom-dropdown-item-label">${escapeHtml(w.name)}</span>
+            ${w.requires_plan ? '<span class="craft-plan-mini">Plan</span>' : ''}
         </div>
-    `).join('');
-
-    // Search filter
-    const search = document.getElementById('craftWeaponSearch');
-    if (search) {
-        search.oninput = () => {
-            const q = search.value.toLowerCase().trim();
-            list.querySelectorAll('.custom-dropdown-item').forEach(item => {
-                const name = item.dataset.name || '';
-                item.style.display = !q || name.includes(q) ? 'flex' : 'none';
-            });
-        };
-    }
-}
-
-function toggleCraftWeaponDropdown(event) {
-    if (event) event.stopPropagation();
-    smartToggleDropdown('craftWeaponMenu', () => {
-        const search = document.getElementById('craftWeaponSearch');
-        if (search) {
-            search.value = '';
-            document.querySelectorAll('#craftWeaponList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
-            setTimeout(() => search.focus(), 50);
-        }
-    });
+    `;
+    }).join('');
 }
 
 function selectCraftWeapon(id, name, imageUrl) {
@@ -2438,6 +2577,7 @@ function renderCraftRequestsList() {
         const isSuperAdmin = canDeleteRequestsClient();
         const isMine = r.user_id === myUserId;
         const rejectedClass = r.status === 'rejected' ? ' craft-request-rejected' : '';
+        const weaponImageUrl = safeImageUrl(r.weapon_image_url);
 
         // Hauts gradés : peuvent changer statut + supprimer
         // User normal : peut juste annuler/supprimer SA demande tant que pas craftée
@@ -2461,7 +2601,7 @@ function renderCraftRequestsList() {
 
         return `
             <div class="craft-request-item${rejectedClass}">
-                ${r.weapon_image_url ? `<img class="craft-request-image" src="${r.weapon_image_url}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+                ${weaponImageUrl ? `<img class="craft-request-image" src="${weaponImageUrl}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
                 <div class="craft-request-body">
                     <div class="craft-request-name">${escapeHtml(r.weapon_name)}</div>
                     <div class="craft-request-meta">
@@ -2479,7 +2619,7 @@ function renderCraftRequestsList() {
 }
 
 async function cancelMyCraftRequest(id) {
-    if (!confirm('Annuler ta demande de craft ?')) return;
+    if (!await confirmAction({ title: 'Annuler la demande', message: 'Annuler ta demande de craft ?', confirmText: 'Annuler la demande', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/requests/${id}/cancel`, { method: 'DELETE' });
         const data = await res.json();
@@ -2508,7 +2648,7 @@ function canDeleteRequestsClient() {
 
 async function updateRequestStatus(requestId, status) {
     const labels = { in_progress: 'En cours', rejected: 'Refusé', pending: 'En attente' };
-    if (!confirm(`Changer le statut en "${labels[status]}" ?`)) return;
+    if (!await confirmAction({ title: 'Changer le statut', message: `Passer cette demande en "${labels[status]}" ?`, confirmText: 'Changer le statut', danger: status === 'rejected' })) return;
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}/status`, {
             method: 'PATCH',
@@ -2528,7 +2668,7 @@ async function updateRequestStatus(requestId, status) {
 }
 
 async function deleteCraftRequest(requestId) {
-    if (!confirm('Supprimer définitivement cette demande ?')) return;
+    if (!await confirmAction({ title: 'Supprimer la demande', message: 'Supprimer définitivement cette demande ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}`, { method: 'DELETE' });
         const data = await res.json();
@@ -2624,7 +2764,7 @@ function renderCraftBoardLine(num, r) {
             <td>${num}</td>
             <td>
                 <div class="craft-board-request">
-                    ${r.weapon_image_url ? `<img class="craft-board-img" src="${r.weapon_image_url}">` : '🔫'}
+                    ${safeImageUrl(r.weapon_image_url) ? `<img class="craft-board-img" src="${safeImageUrl(r.weapon_image_url)}" alt="">` : '🔫'}
                     <div>
                         <strong>${escapeHtml(r.weapon_name)}</strong>
                         <small>par ${escapeHtml(r.user_name)}</small>
@@ -2746,7 +2886,7 @@ async function validateCraftSale(requestId) {
     if (!buyerOrg || buyerOrg === '__add__') { toast('❌ Choisis une organisation', 'error'); return; }
     if (!salePrice) { toast('❌ Entre un prix de vente', 'error'); return; }
 
-    if (!confirm('Valider cette vente ?\nUn récap sera posté dans le salon.')) return;
+    if (!await confirmAction({ title: 'Valider la vente', message: 'Valider cette vente ? Un récap sera posté dans le salon.', confirmText: 'Valider la vente' })) return;
 
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}/sale`, {
@@ -2792,7 +2932,7 @@ function renderCraftHistory() {
             : '';
         return `
             <div class="craft-history-item">
-                ${r.weapon_image_url ? `<img class="craft-history-image" src="${r.weapon_image_url}">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+                ${safeImageUrl(r.weapon_image_url) ? `<img class="craft-history-image" src="${safeImageUrl(r.weapon_image_url)}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
                 <div class="craft-history-body">
                     <div class="craft-history-name">${escapeHtml(r.weapon_name)} <span class="craft-history-serial">[${r.serial_number || 'N/A'}]</span></div>
                     <div class="craft-history-meta">
@@ -2812,7 +2952,7 @@ function renderCraftHistory() {
 }
 
 async function deleteHistoryEntry(id) {
-    if (!confirm('Supprimer définitivement cette entrée de l\'historique ?\n\nLe craft restera tracé dans Discord mais sera retiré du dashboard.')) return;
+    if (!await confirmAction({ title: 'Supprimer l’historique', message: 'Supprimer définitivement cette entrée de l’historique ? Le craft restera tracé dans Discord mais sera retiré du dashboard.', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/requests/${id}`, { method: 'DELETE' });
         const data = await res.json();
@@ -2866,7 +3006,7 @@ window.toggleEmbedMode = toggleEmbedMode;
             const message = document.getElementById('annonceMessage').value;
             if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
             if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
-            if (!confirm('Envoyer cette annonce ?')) return;
+            if (!await confirmAction({ title: 'Envoyer l’annonce', message: 'Envoyer cette annonce sur Discord ?', confirmText: 'Envoyer' })) return;
 
             try {
                 const res = await fetch('/api/command', {
@@ -2899,7 +3039,7 @@ window.toggleEmbedMode = toggleEmbedMode;
             const message = document.getElementById('rappelMessage').value;
             if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
             if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
-            if (!confirm('Envoyer ce rappel ?')) return;
+            if (!await confirmAction({ title: 'Envoyer le rappel', message: 'Envoyer ce rappel sur Discord ?', confirmText: 'Envoyer' })) return;
             try {
                 const res = await fetch('/api/command', {
                     method: 'POST',
@@ -3061,8 +3201,9 @@ function renderMyWeapons() {
     }
     list.innerHTML = myWeaponsCache.map(w => {
         const date = new Date(w.created_at * 1000).toLocaleDateString('fr-FR');
-        const avatar = w.user_avatar
-            ? `<img class="mw-avatar" src="${w.user_avatar}" alt="${escapeHtml(w.user_name)}">`
+        const avatarUrl = safeImageUrl(w.user_avatar);
+        const avatar = avatarUrl
+            ? `<img class="mw-avatar" src="${avatarUrl}" alt="${escapeHtml(w.user_name)}">`
             : `<div class="mw-avatar mw-avatar-fallback">${(w.user_name || '?').substring(0, 1).toUpperCase()}</div>`;
 
         const isMine = w.is_mine;
@@ -3122,7 +3263,7 @@ function renderMarkSoldBuyerDropdown() {
     const list = document.getElementById('markSoldBuyerList');
     if (!list) return;
     list.innerHTML = (organizationsCache || []).map(o => `
-        <div class="custom-dropdown-item" data-name="${escapeHtml(o.name).toLowerCase()}" onclick="selectMarkSoldBuyer('${escapeHtml(o.name).replace(/'/g, "\\'")}')">
+        <div class="custom-dropdown-item" data-name="${escapeHtml(o.name).toLowerCase()}" onclick="selectMarkSoldBuyer('${escapeJsArg(o.name)}')">
             <span class="custom-dropdown-item-label">🏢 ${escapeHtml(o.name)}</span>
         </div>
     `).join('');
@@ -3191,7 +3332,7 @@ async function confirmMarkSold(e) {
 }
 
 async function deleteMyWeapon(id) {
-    if (!confirm('Supprimer cette annonce ?')) return;
+    if (!await confirmAction({ title: 'Supprimer l’annonce', message: 'Supprimer cette annonce de vente ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/myweapons/${id}`, { method: 'DELETE' });
         if (res.ok) {

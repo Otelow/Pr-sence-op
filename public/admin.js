@@ -6,6 +6,8 @@ let adminIngredients = [];
 let adminOrgs = [];
 let adminRoles = [];
 let editingIngredients = []; // [{ ingredient_id, name, amount }]
+let adminWeaponQuery = '';
+let adminIngredientQuery = '';
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Vérifier admin
@@ -25,10 +27,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadAdminIngredients();
     loadAdminOrgs();
     loadAdminRoles();
+
+    document.getElementById('adminWeaponSearch')?.addEventListener('input', e => {
+        adminWeaponQuery = e.target.value.trim().toLowerCase();
+        renderAdminWeapons();
+    });
+    document.getElementById('adminIngredientSearch')?.addEventListener('input', e => {
+        adminIngredientQuery = e.target.value.trim().toLowerCase();
+        renderAdminIngredients();
+    });
 });
 
 function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function escapeJsArg(value) {
+    return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
+}
+
+function safeImageUrl(url) {
+    const value = String(url || '').trim();
+    if (!value) return '';
+    if (value.startsWith('/') && !value.startsWith('//')) return value;
+    try {
+        const parsed = new URL(value, window.location.origin);
+        if (['http:', 'https:'].includes(parsed.protocol)) return parsed.href;
+        if (parsed.protocol === 'data:' && /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(value)) return value;
+    } catch {}
+    return '';
+}
+
+function safeColor(color) {
+    const value = String(color || '').trim();
+    return /^#[0-9a-f]{3,8}$/i.test(value) ? value : '#888';
 }
 
 function toast(msg, type) {
@@ -38,6 +70,65 @@ function toast(msg, type) {
     t.textContent = msg;
     c.appendChild(t);
     setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+function confirmAction(options = {}) {
+    const {
+        title = 'Confirmer',
+        message = 'Confirmer cette action ?',
+        confirmText = 'Confirmer',
+        cancelText = 'Annuler',
+        danger = false,
+    } = options;
+
+    return new Promise(resolve => {
+        let modal = document.getElementById('confirmActionModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'confirmActionModal';
+            modal.className = 'confirm-action-modal';
+            modal.innerHTML = `
+                <div class="confirm-action-backdrop" data-confirm-cancel></div>
+                <div class="confirm-action-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmActionTitle">
+                    <div class="confirm-action-icon">!</div>
+                    <h3 id="confirmActionTitle" class="confirm-action-title"></h3>
+                    <p class="confirm-action-message"></p>
+                    <div class="confirm-action-buttons">
+                        <button type="button" class="btn-secondary" data-confirm-cancel></button>
+                        <button type="button" class="btn-primary" data-confirm-ok></button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const okButton = modal.querySelector('[data-confirm-ok]');
+        const cancelButtons = modal.querySelectorAll('[data-confirm-cancel]');
+        modal.querySelector('.confirm-action-title').textContent = title;
+        modal.querySelector('.confirm-action-message').textContent = message;
+        modal.querySelector('.confirm-action-buttons [data-confirm-cancel]').textContent = cancelText;
+        okButton.textContent = confirmText;
+        modal.classList.toggle('danger', !!danger);
+        modal.style.display = 'flex';
+        okButton.focus();
+
+        const cleanup = value => {
+            modal.style.display = 'none';
+            okButton.removeEventListener('click', onOk);
+            cancelButtons.forEach(btn => btn.removeEventListener('click', onCancel));
+            document.removeEventListener('keydown', onKey);
+            resolve(value);
+        };
+        const onOk = () => cleanup(true);
+        const onCancel = () => cleanup(false);
+        const onKey = e => {
+            if (e.key === 'Escape') cleanup(false);
+            if (e.key === 'Enter') cleanup(true);
+        };
+        okButton.addEventListener('click', onOk);
+        cancelButtons.forEach(btn => btn.addEventListener('click', onCancel));
+        document.addEventListener('keydown', onKey);
+    });
 }
 
 // ─── TABS ───────────────────────────────────────
@@ -63,11 +154,12 @@ function renderImpersonateDropdown() {
     const list = document.getElementById('impersonateList');
     if (!list) return;
     list.innerHTML = adminRoles.map(role => {
-        const colorDot = `<span class="role-color-dot" style="background:${role.color || '#888'};"></span>`;
+        const color = safeColor(role.color);
+        const colorDot = `<span class="role-color-dot" style="background:${color};"></span>`;
         return `
-            <div class="custom-dropdown-item" data-role-name="${escapeHtml(role.name).toLowerCase()}" onclick="selectImpersonateRole('${role.id}', '${escapeHtml(role.name).replace(/'/g, "\\'")}', '${role.color || ''}')">
+            <div class="custom-dropdown-item" data-role-name="${escapeHtml(role.name).toLowerCase()}" onclick="selectImpersonateRole('${escapeJsArg(role.id)}', '${escapeJsArg(role.name)}', '${color}')">
                 ${colorDot}
-                <span class="custom-dropdown-item-label" style="${role.color ? `color:${role.color};` : ''}">@${escapeHtml(role.name)}</span>
+                <span class="custom-dropdown-item-label" style="color:${color};">@${escapeHtml(role.name)}</span>
                 <span class="custom-dropdown-item-count">${role.memberCount || 0}</span>
             </div>
         `;
@@ -103,10 +195,11 @@ function toggleImpersonateDropdown(event) {
 function selectImpersonateRole(id, name, color) {
     document.getElementById('impersonateRoleId').value = id;
     const label = document.getElementById('impersonateLabel');
+    const safe = safeColor(color);
     if (label) {
         label.classList.remove('custom-dropdown-placeholder');
-        label.innerHTML = `<span class="role-color-dot" style="background:${color || '#888'};margin-right:8px;"></span> @${escapeHtml(name)}`;
-        if (color) label.style.color = color;
+        label.innerHTML = `<span class="role-color-dot" style="background:${safe};margin-right:8px;"></span> @${escapeHtml(name)}`;
+        label.style.color = safe;
     }
     document.getElementById('impersonateMenu').style.display = 'none';
 }
@@ -150,19 +243,45 @@ function renderAdminWeapons() {
         list.innerHTML = '<p class="empty">Aucune arme. Clique sur "+ Ajouter" pour commencer.</p>';
         return;
     }
-    list.innerHTML = adminWeapons.map(w => `
+
+    const filtered = adminWeapons.filter(w => {
+        if (!adminWeaponQuery) return true;
+        const haystack = [
+            w.name,
+            w.craft_price,
+            w.sale_price,
+            ...(w.ingredients || []).map(i => i.name),
+        ].join(' ').toLowerCase();
+        return haystack.includes(adminWeaponQuery);
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<p class="empty">Aucune arme ne correspond a la recherche.</p>';
+        return;
+    }
+
+    list.innerHTML = filtered.map(w => {
+        const imageUrl = safeImageUrl(w.image_url);
+        return `
         <div class="admin-weapon-row">
-            ${w.image_url ? `<img class="admin-weapon-img" src="${w.image_url}">` : '<span class="admin-weapon-placeholder">🔫</span>'}
+            ${imageUrl ? `<img class="admin-weapon-img" src="${imageUrl}" alt="${escapeHtml(w.name)}">` : '<span class="admin-weapon-placeholder">Arme</span>'}
             <div class="admin-weapon-info">
                 <strong>${escapeHtml(w.name)}</strong>
-                <small>${w.craft_time ? formatTime(w.craft_time) : ''} ${w.craft_price ? '· ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''} · ${(w.ingredients || []).length} ingrédients ${w.requires_plan ? '· 📋 Plan requis' : ''}</small>
+                <small>
+                    ${w.craft_time ? formatTime(w.craft_time) : ''}
+                    ${w.craft_price ? ' - Craft : ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''}
+                    ${w.sale_price ? ' - Vente : ' + w.sale_price.toLocaleString('fr-FR') + '$' : ''}
+                    - ${(w.ingredients || []).length} ingredients
+                    ${w.requires_plan ? ' - Plan requis' : ''}
+                </small>
             </div>
             <div class="admin-weapon-actions">
-                <button class="btn-secondary btn-small" onclick="openWeaponEditor(${w.id})">✏ Modifier</button>
-                <button class="btn-danger btn-small" onclick="deleteWeapon(${w.id})">🗑</button>
+                <button class="btn-secondary btn-small" onclick="openWeaponEditor(${w.id})">Modifier</button>
+                <button class="btn-danger btn-small" onclick="deleteWeapon(${w.id})">Supprimer</button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function formatTime(s) {
@@ -174,24 +293,34 @@ function formatTime(s) {
 function openWeaponEditor(id) {
     const modal = document.getElementById('weaponEditorModal');
     const title = document.getElementById('weaponEditorTitle');
+
     document.getElementById('weaponEditorForm').reset();
     document.getElementById('weaponImagePreview').innerHTML = '';
     document.getElementById('weaponPlanImagePreview').innerHTML = '';
     document.getElementById('planImageField').style.display = 'none';
     editingIngredients = [];
 
+    const saleInput = document.getElementById('weaponSalePrice');
+    if (saleInput) saleInput.value = 0;
+
     if (id) {
         const w = adminWeapons.find(w => w.id === id);
         if (!w) return;
+
         title.textContent = `Modifier : ${w.name}`;
         document.getElementById('weaponId').value = w.id;
         document.getElementById('weaponName').value = w.name;
         document.getElementById('weaponCraftTime').value = w.craft_time || 0;
         document.getElementById('weaponCraftPrice').value = w.craft_price || 0;
+
+        // Prix de vente conseillé
+        if (saleInput) saleInput.value = w.sale_price || 0;
+
         document.getElementById('weaponRequiresPlan').checked = !!w.requires_plan;
         if (w.requires_plan) document.getElementById('planImageField').style.display = 'block';
-        if (w.image_url) document.getElementById('weaponImagePreview').innerHTML = `<img src="${w.image_url}">`;
-        if (w.plan_image_url) document.getElementById('weaponPlanImagePreview').innerHTML = `<img src="${w.plan_image_url}">`;
+        if (safeImageUrl(w.image_url)) document.getElementById('weaponImagePreview').innerHTML = `<img src="${safeImageUrl(w.image_url)}" alt="">`;
+        if (safeImageUrl(w.plan_image_url)) document.getElementById('weaponPlanImagePreview').innerHTML = `<img src="${safeImageUrl(w.plan_image_url)}" alt="">`;
+
         editingIngredients = (w.ingredients || []).map(ing => ({
             ingredient_id: ing.ingredient_id || null,
             name: ing.name || '',
@@ -201,6 +330,7 @@ function openWeaponEditor(id) {
         title.textContent = 'Ajouter une arme';
         document.getElementById('weaponId').value = '';
     }
+
     renderIngredientsEditor();
     modal.style.display = 'flex';
 }
@@ -266,7 +396,7 @@ window.updateIngredientName = updateIngredientName;
 window.updateIngredientAmount = updateIngredientAmount;
 window.removeIngredient = removeIngredient;
 
-// Toggle plan image field
+// Toggle plan image field + previews images
 document.addEventListener('change', (e) => {
     if (e.target.id === 'weaponRequiresPlan') {
         document.getElementById('planImageField').style.display = e.target.checked ? 'block' : 'none';
@@ -302,11 +432,18 @@ document.addEventListener('change', (e) => {
 
 async function saveWeapon(e) {
     e.preventDefault();
+
     const id = document.getElementById('weaponId').value;
     const formData = new FormData();
+
     formData.append('name', document.getElementById('weaponName').value);
     formData.append('craft_time', document.getElementById('weaponCraftTime').value || '0');
     formData.append('craft_price', document.getElementById('weaponCraftPrice').value || '0');
+
+    // Prix de vente conseillé
+    const saleInput = document.getElementById('weaponSalePrice');
+    formData.append('sale_price', saleInput ? (saleInput.value || '0') : '0');
+
     formData.append('requires_plan', document.getElementById('weaponRequiresPlan').checked ? '1' : '0');
     formData.append('ingredients', JSON.stringify(editingIngredients));
 
@@ -321,6 +458,7 @@ async function saveWeapon(e) {
         const method = id ? 'PUT' : 'POST';
         const res = await fetch(url, { method, body: formData });
         const data = await res.json();
+
         if (res.ok) {
             toast('✅ Arme enregistrée');
             closeWeaponEditor();
@@ -328,16 +466,23 @@ async function saveWeapon(e) {
         } else {
             toast(`❌ ${data.error}`, 'error');
         }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
 }
 window.saveWeapon = saveWeapon;
 
 async function deleteWeapon(id) {
-    if (!confirm('Supprimer cette arme ?')) return;
+    if (!await confirmAction({ title: 'Supprimer l’arme', message: 'Supprimer cette arme du catalogue ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/weapons/${id}`, { method: 'DELETE' });
-        if (res.ok) { toast('🗑 Supprimée'); await loadAdminWeapons(); }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+        if (res.ok) {
+            toast('🗑 Supprimée');
+            await loadAdminWeapons();
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
 }
 window.deleteWeapon = deleteWeapon;
 
@@ -354,19 +499,29 @@ async function loadAdminIngredients() {
 function renderAdminIngredients() {
     const list = document.getElementById('adminIngredientsList');
     if (!adminIngredients.length) {
-        list.innerHTML = '<p class="empty">Aucun ingrédient.</p>';
+        list.innerHTML = '<p class="empty">Aucun ingredient.</p>';
         return;
     }
-    list.innerHTML = adminIngredients.map(i => `
+
+    const filtered = adminIngredients.filter(i => !adminIngredientQuery || String(i.name || '').toLowerCase().includes(adminIngredientQuery));
+    if (!filtered.length) {
+        list.innerHTML = '<p class="empty">Aucun ingredient ne correspond a la recherche.</p>';
+        return;
+    }
+
+    list.innerHTML = filtered.map(i => {
+        const imageUrl = safeImageUrl(i.image_url);
+        return `
         <div class="admin-ingredient-card">
-            ${i.image_url ? `<img class="admin-ingredient-img" src="${i.image_url}">` : '<span class="admin-ingredient-placeholder">🧪</span>'}
+            ${imageUrl ? `<img class="admin-ingredient-img" src="${imageUrl}" alt="${escapeHtml(i.name)}">` : '<span class="admin-ingredient-placeholder">Ingredient</span>'}
             <div class="admin-ingredient-name">${escapeHtml(i.name)}</div>
             <div class="admin-ingredient-actions">
-                <button class="btn-secondary btn-small" onclick="openIngredientEditor(${i.id})">✏</button>
-                <button class="btn-danger btn-small" onclick="deleteIngredient(${i.id})">🗑</button>
+                <button class="btn-secondary btn-small" onclick="openIngredientEditor(${i.id})">Modifier</button>
+                <button class="btn-danger btn-small" onclick="deleteIngredient(${i.id})">Supprimer</button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function openIngredientEditor(id) {
@@ -381,7 +536,7 @@ function openIngredientEditor(id) {
         title.textContent = `Modifier : ${ing.name}`;
         document.getElementById('ingredientId').value = ing.id;
         document.getElementById('ingredientName').value = ing.name;
-        if (ing.image_url) document.getElementById('ingredientImagePreview').innerHTML = `<img src="${ing.image_url}">`;
+        if (safeImageUrl(ing.image_url)) document.getElementById('ingredientImagePreview').innerHTML = `<img src="${safeImageUrl(ing.image_url)}" alt="">`;
     } else {
         title.textContent = 'Ajouter un ingrédient';
         document.getElementById('ingredientId').value = '';
@@ -420,7 +575,7 @@ async function saveIngredient(e) {
 window.saveIngredient = saveIngredient;
 
 async function deleteIngredient(id) {
-    if (!confirm('Supprimer cet ingrédient ?')) return;
+    if (!await confirmAction({ title: 'Supprimer l’ingrédient', message: 'Supprimer cet ingrédient ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/ingredients/${id}`, { method: 'DELETE' });
         if (res.ok) { toast('🗑 Supprimé'); await loadAdminIngredients(); }
@@ -470,7 +625,7 @@ async function addOrgFromAdmin() {
 }
 
 async function deleteOrg(id) {
-    if (!confirm('Supprimer cette organisation ?')) return;
+    if (!await confirmAction({ title: 'Supprimer l’organisation', message: 'Supprimer cette organisation ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/organizations/${id}`, { method: 'DELETE' });
         if (res.ok) await loadAdminOrgs();

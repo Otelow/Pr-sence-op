@@ -491,7 +491,7 @@
 
         <div class="map-container" id="mapContainer">
             <div class="map-canvas" id="mapCanvas">
-                <img src="/map.png" alt="Carte" class="map-image" id="mapImage" onerror="this.style.display='none';document.getElementById('mapPlaceholder').style.display='flex';">
+                <img src="/map-optimized.jpg" alt="Carte" class="map-image" id="mapImage" onerror="this.onerror=null;this.src='/map.png';">
                 <div class="map-placeholder" id="mapPlaceholder" style="display:none;">
                     <p>📍 Upload <code>public/map.png</code> sur GitHub pour voir ta carte</p>
                 </div>
@@ -573,6 +573,21 @@
             <div class="crafts-section-header">
                 <h3 class="section-title">📦 Catalogue des armes craftables</h3>
                 <p class="crafts-section-info">Visualise toutes les armes que tu peux faire crafter, avec leurs ingrédients et prix.</p>
+            </div>
+            <div class="craft-catalog-toolbar">
+                <input type="search" id="craftCatalogSearch" class="craft-filter-input" placeholder="Rechercher une arme ou un ingrédient...">
+                <select id="craftCatalogSort" class="craft-filter-select">
+                    <option value="craft_desc">Craft le plus cher</option>
+                    <option value="craft_asc">Craft le moins cher</option>
+                    <option value="sale_desc">Vente la plus chère</option>
+                    <option value="time_asc">Craft le plus rapide</option>
+                    <option value="name_asc">Nom A-Z</option>
+                </select>
+                <label class="craft-filter-toggle">
+                    <input type="checkbox" id="craftCatalogPlanOnly">
+                    <span>Plan requis</span>
+                </label>
+                <span class="craft-filter-count" id="craftCatalogCount"></span>
             </div>
             <div class="crafts-catalog-grid" id="craftsCatalogGrid">
                 <p class="empty">Chargement...</p>

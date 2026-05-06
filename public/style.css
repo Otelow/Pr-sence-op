@@ -7247,3 +7247,269 @@ body:has(#impersonateBanner[style*="flex"]) {
 @media (max-width: 768px) {
     .confidential-text { font-size: 56px; }
 }
+
+/* ============================================================
+   CONFIRMATION MODAL + UX CRAFT/ADMIN
+   ============================================================ */
+.confirm-action-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+}
+
+.confirm-action-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.76);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.confirm-action-dialog {
+    position: relative;
+    width: min(430px, 100%);
+    background: rgba(17, 19, 27, 0.96);
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.62);
+}
+
+.confirm-action-icon {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(96, 165, 250, 0.14);
+    border: 0.5px solid rgba(96, 165, 250, 0.32);
+    color: #bfdbfe;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
+.confirm-action-modal.danger .confirm-action-icon {
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.36);
+    color: #fecaca;
+}
+
+.confirm-action-title {
+    margin: 0 0 8px;
+    font-size: 20px;
+    line-height: 1.2;
+}
+
+.confirm-action-message {
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.confirm-action-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 22px;
+}
+
+.confirm-action-modal.danger [data-confirm-ok] {
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    box-shadow: 0 10px 26px rgba(239, 68, 68, 0.22);
+}
+
+.craft-catalog-toolbar,
+.admin-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+}
+
+.craft-filter-input,
+.craft-filter-select,
+.admin-search-input {
+    min-height: 42px;
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.055);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 0 12px;
+    outline: none;
+}
+
+.craft-filter-input,
+.admin-search-input {
+    flex: 1 1 260px;
+}
+
+.craft-filter-select {
+    flex: 0 0 190px;
+}
+
+.craft-filter-toggle {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.055);
+    border-radius: 8px;
+    padding: 0 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.craft-filter-count {
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    margin-left: auto;
+}
+
+.admin-toolbar .btn-primary {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 768px) {
+    body {
+        overflow-x: hidden;
+    }
+
+    .sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: auto !important;
+        width: 100% !important;
+        height: 64px !important;
+        padding: 8px 10px !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        overflow-x: auto !important;
+        z-index: 1000 !important;
+    }
+
+    .sidebar-header,
+    .sidebar-footer,
+    .sidebar-title,
+    .nav-item span:not(.nav-icon),
+    .user-info {
+        display: none !important;
+    }
+
+    .nav-menu,
+    .nav {
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 8px !important;
+        width: max-content !important;
+        min-width: 100% !important;
+        overflow-x: auto !important;
+    }
+
+    .nav-item {
+        width: 48px !important;
+        min-width: 48px !important;
+        height: 48px !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        border-radius: 8px !important;
+    }
+
+    .main,
+    .main-content,
+    .content {
+        margin-left: 0 !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+        padding-top: 78px !important;
+    }
+
+    .topbar,
+    .header,
+    .page-header {
+        left: 0 !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .craft-catalog-toolbar,
+    .admin-toolbar,
+    .crafts-subtabs,
+    .map-toolbar,
+    .map-controls {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        padding-bottom: 4px;
+    }
+
+    .craft-filter-input,
+    .admin-search-input {
+        min-width: 230px;
+    }
+
+    .craft-filter-select {
+        min-width: 180px;
+        flex-basis: 180px;
+    }
+
+    .craft-filter-toggle,
+    .craft-filter-count,
+    .crafts-subtab {
+        flex: 0 0 auto;
+    }
+
+    .crafts-catalog-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .craft-request-item,
+    .craft-history-item,
+    .myweapons-item,
+    .admin-weapon-row {
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .craft-status-actions,
+    .mw-actions,
+    .admin-weapon-actions {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    .craft-board-wrapper,
+    .channels-table-wrap,
+    .table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .craft-board-table {
+        min-width: 920px;
+    }
+
+    .modal-content,
+    .modal-backdrop[id] > .modal-content {
+        width: calc(100vw - 24px) !important;
+        max-width: calc(100vw - 24px) !important;
+        max-height: calc(100vh - 28px) !important;
+        padding: 20px !important;
+    }
+
+    .confirm-action-buttons {
+        flex-direction: column-reverse;
+    }
+
+    .confirm-action-buttons button {
+        width: 100%;
+    }
+}
