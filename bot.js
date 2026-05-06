@@ -16,7 +16,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // CONFIGURATION
 // ==========================================
 const CONFIG = {
-    TOKEN: process.env.DISCORD_TOKEN || 'MTQ4NTI2ODY5NzUyMTA2NTk5NA.G-ZutD.dJCX8T7nszQaXqMgnoHXfbC6oqJu2L6oURe0Vc',
+TOKEN: process.env.DISCORD_TOKEN,
     GUILD_ID: process.env.GUILD_ID || '1485254310894895282',
 
     CHANNELS: {
