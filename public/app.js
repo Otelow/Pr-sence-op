@@ -2501,16 +2501,28 @@ function openCraftWeaponDetails(id) {
                 ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(weapon.name)}">` : '<span class="craft-weapon-placeholder">Arme</span>'}
             </div>
             <div class="craft-detail-summary">
-                <div class="detail-row"><span>Temps craft</span><span>${escapeHtml(timeStr)}</span></div>
-                <div class="detail-row"><span>Prix craft</span><span>${escapeHtml(craftPrice)}</span></div>
-                <div class="detail-row"><span>Prix vente</span><span>${escapeHtml(salePrice)}</span></div>
-                <div class="detail-row"><span>Plan</span><span>${planUrl ? 'Disponible' : 'Plan requis'}</span></div>
+                <div class="craft-detail-stat craft-detail-time">
+                    <span>Temps craft</span>
+                    <strong>${escapeHtml(timeStr)}</strong>
+                </div>
+                <div class="craft-detail-stat craft-detail-craft-price">
+                    <span>Prix craft</span>
+                    <strong>${escapeHtml(craftPrice)}</strong>
+                </div>
+                <div class="craft-detail-stat craft-detail-sale-price">
+                    <span>Prix vente</span>
+                    <strong>${escapeHtml(salePrice)}</strong>
+                </div>
             </div>
         </div>
-        ${planUrl ? `
-            <h4 class="craft-detail-section-title">Plan</h4>
-            <div class="craft-detail-plan"><img src="${planUrl}" alt="Plan ${escapeHtml(weapon.name)}"></div>
-        ` : ''}
+        <h4 class="craft-detail-section-title">Plan</h4>
+        <div class="craft-detail-plan-grid">
+            <div class="craft-detail-ingredient craft-detail-plan-card">
+                ${planUrl ? `<img src="${planUrl}" alt="Plan ${escapeHtml(weapon.name)}">` : '<div class="craft-ingredient-placeholder">Plan</div>'}
+                <strong>${planUrl ? 'Disponible' : 'Requis'}</strong>
+                <span>Plan d'arme</span>
+            </div>
+        </div>
         <h4 class="craft-detail-section-title">Composants</h4>
         <div class="craft-detail-ingredients">
             ${ingredients.length ? ingredients.map(ing => {
