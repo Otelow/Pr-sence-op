@@ -1223,9 +1223,9 @@ client.on('interactionCreate', async (interaction) => {
         case 'defense': return handleSimpleAlert(interaction, `<@&${CONFIG.ROLES.MEMBRE_1}> 🚨 Notre **laboratoire se fait attaquer** ! Tous au Hood dans 5 Minutes ! ${CONFIG.EMOJIS.BS21}`, true);
         case 'weed': return handleSimpleAlert(interaction, `🚨 On va aller sur la weed ! Branchez-vous sur la radio ! ${CONFIG.EMOJIS.BS21}`);
         case 'traitement-weed': return handleSimpleAlert(interaction, `🚨 On va aller sur le traitement de la weed ! Branchez-vous sur la radio ! ${CONFIG.EMOJIS.BS21}`);
-        case 'yellowjack': return handleSimpleAlert(interaction, `🚨 Merci de venir à côté du Yellow Jack ${CONFIG.EMOJIS.BS21}`);
-        case 'megamall': return handleSimpleAlert(interaction, `🚨 Merci de venir au parking Mega Mall ${CONFIG.EMOJIS.BS21}`);
-        case 'ile': return handleSimpleAlert(interaction, `🚨 Merci de venir à côté de l'Ile ${CONFIG.EMOJIS.BS21}`);
+        case 'yellowjack': return handleSimpleAlert(interaction, `<@&${CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir à côté du Yellow Jack ${CONFIG.EMOJIS.BS21}`, true);
+        case 'megamall': return handleSimpleAlert(interaction, `<@&${CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir au parking Mega Mall ${CONFIG.EMOJIS.BS21}`, true);
+        case 'ile': return handleSimpleAlert(interaction, `<@&${CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir à côté de l'Ile ${CONFIG.EMOJIS.BS21}`, true);
         case 'trash': return handleSimpleAlert(interaction, `🚨 Celui qui trash sera ban sans sommation ! ${CONFIG.EMOJIS.BS21}`);
         case 'radio': return handleRadio(interaction);
         case 'presence-test': return handlePresenceTest(interaction);

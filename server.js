@@ -393,9 +393,9 @@ body.login-body { overflow: hidden; }
                         defense: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Notre **laboratoire se fait attaquer** ! Tous au Hood dans 5 Minutes ! ${state.CONFIG.EMOJIS.BS21}`,
                         weed: `🚨 On va aller sur la weed ! Branchez-vous sur la radio ! ${state.CONFIG.EMOJIS.BS21}`,
                         'traitement-weed': `🚨 On va aller sur le traitement de la weed ! Branchez-vous sur la radio ! ${state.CONFIG.EMOJIS.BS21}`,
-                        yellowjack: `🚨 Merci de venir à côté du Yellow Jack ${state.CONFIG.EMOJIS.BS21}`,
-                        megamall: `🚨 Merci de venir au parking Mega Mall ${state.CONFIG.EMOJIS.BS21}`,
-                        ile: `🚨 Merci de venir à côté de l'Ile ${state.CONFIG.EMOJIS.BS21}`,
+                        yellowjack: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir à côté du Yellow Jack ${state.CONFIG.EMOJIS.BS21}`,
+                        megamall: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir au parking Mega Mall ${state.CONFIG.EMOJIS.BS21}`,
+                        ile: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir à côté de l'Ile ${state.CONFIG.EMOJIS.BS21}`,
                         trash: `🚨 Celui qui trash sera ban sans sommation ! ${state.CONFIG.EMOJIS.BS21}`,
                     };
 
