@@ -85,6 +85,8 @@ let userHasFullAccess = false;
 
 function checkUserAccess() {
     if (!window.currentUser) return false;
+    const impersonateRole = localStorage.getItem('impersonate_role');
+    if (impersonateRole) return FULL_ACCESS_ROLES.includes(impersonateRole);
     if (window.currentUser.id === '952986899667103804') return true;
     const roles = window.currentUser.roles || [];
     return FULL_ACCESS_ROLES.some(r => roles.includes(r));
@@ -92,22 +94,28 @@ function checkUserAccess() {
 
 function applyPermissionsUI() {
     userHasFullAccess = checkUserAccess();
-    // Tabs verrouillés pour les rôles non autorisés : presence + commands
     const lockedTabs = ['presence', 'commands'];
-    if (!userHasFullAccess) {
-        lockedTabs.forEach(tabName => {
-            const sec = document.getElementById(`tab-${tabName}`);
-            if (sec && !sec.querySelector('.access-locked-overlay')) {
-                const overlay = document.createElement('div');
-                overlay.className = 'access-locked-overlay';
-                overlay.innerHTML = '<span class="confidential-text">CONFIDENTIEL</span>';
-                sec.appendChild(overlay);
-                sec.classList.add('access-locked');
-            }
-        });
-    }
-}
+    lockedTabs.forEach(tabName => {
+        const sec = document.getElementById(`tab-${tabName}`);
+        if (!sec) return;
+        if (userHasFullAccess) {
+            sec.classList.remove('access-locked');
+            sec.querySelector('.access-locked-overlay')?.remove();
+        } else if (!sec.querySelector('.access-locked-overlay')) {
+            const overlay = document.createElement('div');
+            overlay.className = 'access-locked-overlay';
+            overlay.innerHTML = '<span class="confidential-text">CONFIDENCIAL</span>';
+            sec.appendChild(overlay);
+            sec.classList.add('access-locked');
+        }
+    });
 
+    ['mapAddBtn', 'mapDeleteBtn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.style.display = userPermissions.canEditMap ? '' : 'none';
+    });
+    if (!userPermissions.canEditMap && ['add', 'delete'].includes(mapMode)) setMapMode('view');
+}
 function switchTab(tab) {
     currentTab = tab;
     // Persister dans localStorage pour survivre au refresh
@@ -126,6 +134,10 @@ function switchTab(tab) {
 }
 
 async function refreshAll() {
+    if (!checkUserAccess() && ['presence', 'commands'].includes(currentTab)) {
+        applyPermissionsUI();
+        return;
+    }
     if (currentTab === 'presence') {
         await Promise.all([loadStats(), loadPresence()]);
     } else if (currentTab === 'stats') {
@@ -544,7 +556,8 @@ let loadingMore = false;
 
 async function loadChannels() {
     try {
-        const res = await fetch('/api/channels');
+        const impersonateRole = localStorage.getItem('impersonate_role');
+        const res = await fetch(impersonateRole ? `/api/channels?impersonate=${encodeURIComponent(impersonateRole)}` : '/api/channels');
         const data = await res.json();
         channelsData = data;
         channelsLoaded = true;
@@ -2294,7 +2307,6 @@ let craftRequestsCache = [];
 let isAdminUser = false;
 let craftCatalogFilters = {
     search: '',
-    sort: 'craft_desc',
 };
 let craftCatalogFiltersReady = false;
 
@@ -2378,16 +2390,11 @@ function switchCraftSubtab(subtab) {
 function setupCraftCatalogFilters() {
     if (craftCatalogFiltersReady) return;
     const search = document.getElementById('craftCatalogSearch');
-    const sort = document.getElementById('craftCatalogSort');
-    if (!search && !sort) return;
+    if (!search) return;
 
     craftCatalogFiltersReady = true;
     search?.addEventListener('input', e => {
         craftCatalogFilters.search = e.target.value.trim().toLowerCase();
-        renderCraftCatalog();
-    });
-    sort?.addEventListener('change', e => {
-        craftCatalogFilters.sort = e.target.value;
         renderCraftCatalog();
     });
 }
@@ -2415,14 +2422,11 @@ function renderCraftCatalog() {
         return haystack.includes(q);
     });
 
-    const sorters = {
-        craft_desc: (a, b) => (b.craft_price || 0) - (a.craft_price || 0),
-        craft_asc: (a, b) => (a.craft_price || 0) - (b.craft_price || 0),
-        sale_desc: (a, b) => (b.sale_price || 0) - (a.sale_price || 0),
-        time_asc: (a, b) => (a.craft_time || 0) - (b.craft_time || 0),
-        name_asc: (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'fr'),
-    };
-    items = [...items].sort(sorters[craftCatalogFilters.sort] || sorters.craft_desc);
+    items = [...items].sort((a, b) => {
+        const priceDiff = (Number(b.craft_price) || 0) - (Number(a.craft_price) || 0);
+        if (priceDiff !== 0) return priceDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'fr');
+    });
 
     if (count) count.textContent = `${items.length} / ${weaponsCache.length} armes`;
 

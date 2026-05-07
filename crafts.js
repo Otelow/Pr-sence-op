@@ -5,7 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 
-const DATA_DIR = '/data';
+const isRailway = !!(process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_PROJECT_ID);
+const DATA_DIR = process.env.DATA_DIR || (isRailway ? '/data' : path.join(__dirname, 'data'));
 const DB_PATH = path.join(DATA_DIR, 'crafts.db');
 const UPLOADS_DIR = path.join(DATA_DIR, 'crafts');
 const FALLBACK_PATH = path.join(DATA_DIR, 'crafts.json');
@@ -450,7 +451,11 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             });
 
             // Trier par craft_price DÉCROISSANT
-            list.sort((a, b) => (b.craft_price || 0) - (a.craft_price || 0));
+            list.sort((a, b) => {
+                const priceDiff = (Number(b.craft_price) || 0) - (Number(a.craft_price) || 0);
+                if (priceDiff !== 0) return priceDiff;
+                return String(a.name || '').localeCompare(String(b.name || ''), 'fr');
+            });
 
             res.json({ weapons: list });
         } catch (e) {
@@ -648,7 +653,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 ? `🆕 Nouvelle demande de craft de <@${fullReq.user_id}>\n` +
                   `**Craft :** ${fullReq.weapon_name}\n` +
                   `**Statut :** ⏳ En attente\n\n` +
-                  `<@&${CRAFT_PLAN_PROVIDER_ROLE}> merci de fournir rapidement le plan d'arme et les Corps le plus rapidement possible.`
+                  `Merci de fournir rapidement le plan d'arme et les Corps le plus rapidement possible.\n` +
+                  `||<@&${CRAFT_PLAN_PROVIDER_ROLE}>||`
                 : null;
 
             // Si message existe → édit, sinon créer

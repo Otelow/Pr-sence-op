@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `http://localhost:${PORT}/auth/callback`;
-const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-please-' + Math.random();
+const SESSION_SECRET = process.env.SESSION_SECRET;
 
 let botClient;
 let botState;
@@ -118,6 +118,7 @@ function startServer(client, getState) {
     // ==========================================
     const ADMIN_USER_ID = '952986899667103804';
     const ADMIN_ROLE_ID = '1485279148246175764';
+    const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
 
     function requireAuth(req, res, next) {
         if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
@@ -127,8 +128,21 @@ function startServer(client, getState) {
     function isUserAdmin(user) {
         if (!user) return false;
         if (user.id === ADMIN_USER_ID) return true;
-        if (user.roles && user.roles.includes(ADMIN_ROLE_ID)) return true;
+        if (user.roles && FULL_ACCESS_ROLES.some(roleId => user.roles.includes(roleId))) return true;
         return false;
+    }
+
+    function hasFullSiteAccess(user) {
+        if (!user) return false;
+        if (user.id === ADMIN_USER_ID) return true;
+        return FULL_ACCESS_ROLES.some(roleId => (user.roles || []).includes(roleId));
+    }
+
+    function requireFullSiteAccess(req, res, next) {
+        if (!hasFullSiteAccess(req.session.user)) {
+            return res.status(403).json({ error: 'Accès confidentiel réservé aux hauts gradés' });
+        }
+        next();
     }
 
     function requireAdmin(req, res, next) {
@@ -190,7 +204,7 @@ function startServer(client, getState) {
     });
 
     // Données présence en temps réel
-    app.get('/api/presence', requireAuth, async (req, res) => {
+    app.get('/api/presence', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
         if (!guild) return res.json({ error: 'Guild not found' });
@@ -267,7 +281,7 @@ function startServer(client, getState) {
     });
 
     // Lancer une commande / alerte
-    app.post('/api/command', requireAuth, async (req, res) => {
+    app.post('/api/command', requireAuth, requireFullSiteAccess, async (req, res) => {
         const { command, params } = req.body;
         const state = botState();
 
@@ -538,6 +552,14 @@ function startServer(client, getState) {
 
         try {
             const channels = guild.channels.cache;
+            const impersonateRole = req.query.impersonate;
+            const canImpersonate = !!impersonateRole && isUserAdmin(req.session.user);
+            const impersonatedRole = canImpersonate ? guild.roles.cache.get(impersonateRole) : null;
+            const canSeeChannel = (ch) => {
+                if (!canImpersonate) return true;
+                if (!impersonatedRole || !ch?.permissionsFor) return false;
+                return ch.permissionsFor(impersonatedRole)?.has('ViewChannel') ?? false;
+            };
             const categories = [];
             const orphans = [];
 
@@ -559,6 +581,7 @@ function startServer(client, getState) {
             // Assigner les salons aux catégories
             for (const [, ch] of channels) {
                 if (ch.type === 4) continue; // Skip catégories elles-mêmes
+                if (!canSeeChannel(ch)) continue;
 
                 const channelData = {
                     id: ch.id,
@@ -585,7 +608,7 @@ function startServer(client, getState) {
             }
             orphans.sort((a, b) => a.position - b.position);
 
-            res.json({ categories, orphans, guildId: state.CONFIG.GUILD_ID });
+            res.json({ categories: categories.filter(cat => cat.channels.length > 0 || canSeeChannel(channels.get(cat.id))), orphans, guildId: state.CONFIG.GUILD_ID });
         } catch (e) {
             res.json({ error: e.message, categories: [] });
         }
@@ -1020,10 +1043,12 @@ function startServer(client, getState) {
         // Laboratoire d'armes : visible pour les 3 user IDs OU les 3 rôles hauts gradés
         const LAB_VISIBLE_USERS = ['952986899667103804', '780164840798552066', '769670622380294265'];
         const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
-        const canSeeLab = !isImpersonating && (
-            LAB_VISIBLE_USERS.includes(userId) ||
-            FULL_ACCESS_ROLES.some(r => userRoles.includes(r))
-        );
+        const canSeeLab = isImpersonating
+            ? FULL_ACCESS_ROLES.includes(impersonateRole)
+            : (
+                LAB_VISIBLE_USERS.includes(userId) ||
+                FULL_ACCESS_ROLES.some(r => userRoles.includes(r))
+            );
 
         const allPoints = loadMapPoints();
 
