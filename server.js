@@ -130,7 +130,7 @@ body.login-body { overflow: hidden; }
 <body class="login-body">
 <div class="grain"></div>
 <div class="darknet-denial">
-    <div class="denial-scan">TRACE REFUSÉE</div>
+    <div class="denial-scan">ACCÈS BLOQUÉ</div>
     ${image ? `<img class="denial-art" src="${image}" alt="">` : '<div class="error-icon">⚠</div>'}
     <h1 class="denial-title">${title}</h1>
     <p class="denial-subtitle">${subtitle}</p>
@@ -513,13 +513,23 @@ body.login-body { overflow: hidden; }
     app.get('/api/sanctions', requireAuth, async (req, res) => {
         const state = botState();
         try {
-            const channel = botClient.channels.cache.get(state.CONFIG.CHANNELS.AVERTISSEMENT);
-            if (!channel) return res.json({ sanctions: [] });
-
             const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
-            const messages = await channel.messages.fetch({ limit: 50 });
+            const channelIds = [
+                state.CONFIG.CHANNELS.AVERTISSEMENT,
+                state.CONFIG.CHANNELS.SANCTION,
+            ].filter(Boolean);
+            const seen = new Set();
+            const allMessages = [];
+            for (const channelId of channelIds) {
+                if (seen.has(channelId)) continue;
+                seen.add(channelId);
+                const channel = botClient.channels.cache.get(channelId);
+                if (!channel) continue;
+                const messages = await channel.messages.fetch({ limit: 100 });
+                allMessages.push(...messages.values());
+            }
 
-            const sanctions = await Promise.all([...messages.values()]
+            const sanctions = await Promise.all(allMessages
                 .filter(m => m.author.bot)
                 .map(async m => {
                     let content = m.content;
@@ -563,8 +573,10 @@ body.login-body { overflow: hidden; }
                         mentionedUsers,
                         createdAt: m.createdAt,
                         timestamp: m.createdTimestamp,
+                        channelId: m.channelId,
                     };
                 }));
+            sanctions.sort((a, b) => b.timestamp - a.timestamp);
 
             res.json({ sanctions });
         } catch (e) {

@@ -559,6 +559,18 @@
         </div>
     </div>
 
+    <!-- Modal détails d'une arme -->
+    <div class="modal" id="craftWeaponDetailsModal" style="display:none;">
+        <div class="modal-backdrop" onclick="closeCraftWeaponDetails()"></div>
+        <div class="modal-content craft-detail-modal">
+            <h3 class="modal-title" id="craftWeaponDetailsTitle">Arme</h3>
+            <div id="craftWeaponDetailsContent"></div>
+            <div class="modal-actions">
+                <button onclick="closeCraftWeaponDetails()" class="btn-secondary">Fermer</button>
+            </div>
+        </div>
+    </div>
+
     <!-- TAB: CRAFTS D'ARMES -->
     <section class="tab-content" id="tab-crafts">
         <div class="crafts-subtabs">

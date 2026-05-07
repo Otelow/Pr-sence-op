@@ -1514,9 +1514,6 @@ async function deletePoint(id) {
 
 function showPointDetails(p) {
     const date = new Date(p.createdAt).toLocaleString('fr-FR');
-    const visibilityText = !p.allowedRoles || p.allowedRoles.length === 0
-        ? 'Public (tous)'
-        : `${p.allowedRoles.length} rôle(s) autorisé(s)`;
 
     let codeHtml = '';
     if (p.code && (p.type === 'lab' || p.type === 'weapon-lab')) {
@@ -1533,8 +1530,7 @@ function showPointDetails(p) {
     document.getElementById('detailsContent').innerHTML = `
         ${codeHtml}
         <div class="detail-row"><span>Type</span><span>${getPointTypeLabel(p.type)}</span></div>
-        <div class="detail-row"><span>Visibilité</span><span>${visibilityText}</span></div>
-        <div class="detail-row"><span>Placé par</span><span>${escapeHtml(p.createdBy)}</span></div>
+        <div class="detail-row"><span>Placé par</span><span>${escapeHtml(displayName(p.createdBy))}</span></div>
         <div class="detail-row"><span>Date</span><span>${date}</span></div>
         ${userPermissions.canEditMap ? `<button class="btn-delete-point" onclick="deletePoint('${p.id}'); closeDetailsModal();">🗑 Supprimer ce point</button>` : ''}
     `;
@@ -1558,6 +1554,7 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
         closePointModal();
         closeDetailsModal();
+        closeCraftWeaponDetails();
     }
 });
 
@@ -2316,6 +2313,14 @@ function compareWeaponsBySalePrice(a, b) {
     if (craftDiff !== 0) return craftDiff;
     return String(a.name || '').localeCompare(String(b.name || ''), 'fr');
 }
+
+function displayName(name) {
+    return String(name || '')
+        .trim()
+        .split(/\s+/)
+        .map(part => part ? part.charAt(0).toUpperCase() + part.slice(1) : '')
+        .join(' ');
+}
 let craftCatalogFiltersReady = false;
 
 async function initCraftsTab() {
@@ -2457,7 +2462,7 @@ function renderCraftCatalog() {
         const saleStr = w.sale_price > 0 ? `<span class="craft-weapon-saleprice">Vente : ${w.sale_price.toLocaleString('fr-FR')}$</span>` : '';
 
         return `
-            <div class="craft-weapon-card">
+            <button type="button" class="craft-weapon-card craft-weapon-card-button" onclick="openCraftWeaponDetails(${w.id})">
                 <div class="craft-weapon-image">
                     ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(w.name)}">` : '<span class="craft-weapon-placeholder">Arme</span>'}
                 </div>
@@ -2470,9 +2475,62 @@ function renderCraftCatalog() {
                     </div>
                     ${ingredientsHTML ? `<div class="craft-ingredients-grid">${ingredientsHTML}</div>` : ''}
                 </div>
-            </div>
+            </button>
         `;
     }).join('');
+}
+
+function openCraftWeaponDetails(id) {
+    const weapon = weaponsCache.find(w => Number(w.id) === Number(id));
+    const modal = document.getElementById('craftWeaponDetailsModal');
+    const title = document.getElementById('craftWeaponDetailsTitle');
+    const content = document.getElementById('craftWeaponDetailsContent');
+    if (!weapon || !modal || !title || !content) return;
+
+    const imageUrl = safeImageUrl(weapon.image_url);
+    const planUrl = safeImageUrl(weapon.plan_image_url);
+    const timeStr = weapon.craft_time > 0 ? formatCraftTime(weapon.craft_time) : 'N/A';
+    const craftPrice = weapon.craft_price > 0 ? weapon.craft_price.toLocaleString('fr-FR') + '$' : 'Gratuit';
+    const salePrice = weapon.sale_price > 0 ? weapon.sale_price.toLocaleString('fr-FR') + '$' : 'N/A';
+    const ingredients = weapon.ingredients || [];
+
+    title.textContent = weapon.name || 'Arme';
+    content.innerHTML = `
+        <div class="craft-detail-layout">
+            <div class="craft-detail-media">
+                ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(weapon.name)}">` : '<span class="craft-weapon-placeholder">Arme</span>'}
+            </div>
+            <div class="craft-detail-summary">
+                <div class="detail-row"><span>Temps craft</span><span>${escapeHtml(timeStr)}</span></div>
+                <div class="detail-row"><span>Prix craft</span><span>${escapeHtml(craftPrice)}</span></div>
+                <div class="detail-row"><span>Prix vente</span><span>${escapeHtml(salePrice)}</span></div>
+                <div class="detail-row"><span>Plan</span><span>${planUrl ? 'Disponible' : 'Plan requis'}</span></div>
+            </div>
+        </div>
+        ${planUrl ? `
+            <h4 class="craft-detail-section-title">Plan</h4>
+            <div class="craft-detail-plan"><img src="${planUrl}" alt="Plan ${escapeHtml(weapon.name)}"></div>
+        ` : ''}
+        <h4 class="craft-detail-section-title">Composants</h4>
+        <div class="craft-detail-ingredients">
+            ${ingredients.length ? ingredients.map(ing => {
+                const ingImageUrl = safeImageUrl(ing.image_url);
+                return `
+                    <div class="craft-detail-ingredient">
+                        ${ingImageUrl ? `<img src="${ingImageUrl}" alt="${escapeHtml(ing.name)}">` : '<div class="craft-ingredient-placeholder">Ingredient</div>'}
+                        <strong>${ing.amount || 0}</strong>
+                        <span>${escapeHtml(ing.name || '?')}</span>
+                    </div>
+                `;
+            }).join('') : '<p class="empty">Aucun composant renseigné</p>'}
+        </div>
+    `;
+    modal.style.display = 'flex';
+}
+
+function closeCraftWeaponDetails() {
+    const modal = document.getElementById('craftWeaponDetailsModal');
+    if (modal) modal.style.display = 'none';
 }
 
 function formatCraftTime(seconds) {
@@ -2989,6 +3047,8 @@ async function deleteHistoryEntry(id) {
 window.deleteHistoryEntry = deleteHistoryEntry;
 
 window.switchCraftSubtab = switchCraftSubtab;
+window.openCraftWeaponDetails = openCraftWeaponDetails;
+window.closeCraftWeaponDetails = closeCraftWeaponDetails;
 window.toggleCraftWeaponDropdown = toggleCraftWeaponDropdown;
 window.selectCraftWeapon = selectCraftWeapon;
 window.submitCraftRequest = submitCraftRequest;

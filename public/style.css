@@ -152,6 +152,23 @@ html, body {
     text-align: center;
 }
 
+.login-brand-lock {
+    margin: 0 auto 18px;
+    font-family: var(--font-display);
+    font-size: clamp(34px, 6vw, 58px);
+    line-height: .9;
+    text-align: center;
+    color: #fff;
+    letter-spacing: 0;
+    text-shadow: 0 0 28px rgba(255, 140, 0, .32);
+}
+
+.login-brand-lock span,
+.login-brand-lock strong {
+    color: var(--orange);
+    font-weight: 400;
+}
+
 .login-desc {
     color: var(--text-dim);
     font-size: 13px;
@@ -5724,6 +5741,20 @@ body {
     transition: all 0.3s;
 }
 
+.craft-weapon-card-button {
+    width: 100%;
+    border: 1px solid var(--border);
+    color: inherit;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.craft-weapon-card-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
 .craft-weapon-image {
     width: 100%;
     height: 180px;
@@ -5745,6 +5776,91 @@ body {
 .craft-weapon-placeholder {
     font-size: 48px;
     opacity: 0.4;
+}
+
+.craft-detail-modal {
+    width: min(92vw, 900px);
+}
+
+.craft-detail-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 360px) 1fr;
+    gap: 22px;
+    align-items: stretch;
+}
+
+.craft-detail-media,
+.craft-detail-plan {
+    background: rgba(0, 0, 0, .55);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+}
+
+.craft-detail-media {
+    min-height: 260px;
+}
+
+.craft-detail-media img,
+.craft-detail-plan img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 18px;
+}
+
+.craft-detail-summary {
+    display: grid;
+    align-content: center;
+    gap: 10px;
+}
+
+.craft-detail-section-title {
+    margin: 24px 0 12px;
+    color: var(--accent);
+    font-family: var(--font-display);
+    font-size: 22px;
+}
+
+.craft-detail-plan {
+    height: min(46vh, 420px);
+}
+
+.craft-detail-ingredients {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+}
+
+.craft-detail-ingredient {
+    min-height: 140px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, .42);
+    display: grid;
+    place-items: center;
+    text-align: center;
+    gap: 8px;
+}
+
+.craft-detail-ingredient img {
+    width: 58px;
+    height: 58px;
+    object-fit: contain;
+}
+
+.craft-detail-ingredient strong {
+    color: var(--accent);
+    font-size: 18px;
+}
+
+@media (max-width: 760px) {
+    .craft-detail-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
 .craft-weapon-name {
