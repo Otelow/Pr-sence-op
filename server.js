@@ -44,71 +44,101 @@ function startServer(client, getState) {
         const code = req.query.code;
         if (!code) return res.redirect('/');
 
-        const errorPage = (msg) => `
+        const errorPage = (msg, opts = {}) => {
+            const title = opts.title || 'ACCÈS REFUSÉ';
+            const subtitle = opts.subtitle || 'PASSERELLE BLOQUÉE';
+            const image = opts.image || null;
+            return `
 <!DOCTYPE html>
 <html lang="fr"><head><meta charset="UTF-8">
 <title>Accès refusé — 21 Block Savage</title>
 <link rel="stylesheet" href="/style.css">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-.error-title {
+body.login-body { overflow: hidden; }
+.darknet-denial {
+    width: min(92vw, 760px);
+    min-height: 620px;
+    margin: 7vh auto;
+    padding: 34px;
+    border: 1px solid rgba(255, 138, 0, .32);
+    background:
+        radial-gradient(circle at 50% 0%, rgba(255, 138, 0, .22), transparent 42%),
+        linear-gradient(180deg, rgba(19, 15, 10, .96), rgba(3, 3, 3, .98));
+    box-shadow: 0 0 80px rgba(255, 138, 0, .16), inset 0 1px 0 rgba(255,255,255,.08);
+}
+.denial-scan {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 138, 0, .28);
+    color: #ffb84d;
+    background: rgba(255, 138, 0, .08);
+    font: 700 12px/1 "JetBrains Mono", monospace;
+    letter-spacing: .18em;
+}
+.denial-art {
+    width: min(340px, 66vw);
+    aspect-ratio: 1;
+    display: block;
+    margin: 26px auto 22px;
+    object-fit: cover;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 184, 77, .25);
+    box-shadow: 0 22px 70px rgba(255, 138, 0, .22);
+}
+.denial-title {
     position: relative;
-    min-height: 96px;
+    margin: 0;
+    color: #fff3d6;
+    font-family: "Bebas Neue", sans-serif;
+    font-size: clamp(54px, 10vw, 96px);
+    line-height: .9;
+    text-align: center;
+    letter-spacing: 0;
+    text-shadow: 0 0 28px rgba(255, 138, 0, .42);
+    animation: deniedShake .22s infinite steps(2, end);
+}
+.denial-subtitle {
+    margin: 12px 0 0;
+    color: #ff8a00;
+    font: 700 13px/1.5 "JetBrains Mono", monospace;
+    text-align: center;
+    letter-spacing: .2em;
+}
+.denial-message {
+    margin: 28px auto 0;
+    max-width: 540px;
+    padding: 20px 22px;
+    border-left: 4px solid #ff8a00;
+    color: #f8f0df;
+    background: rgba(0, 0, 0, .62);
+    font: 500 18px/1.65 "JetBrains Mono", monospace;
+}
+.btn-back.denial-back {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #120900;
-    background: linear-gradient(135deg, #ff8a00, #ffbd3d);
-    text-shadow: 2px 2px 0 rgba(255,255,255,.18), -2px 0 0 rgba(255,68,68,.35);
-    animation: deniedPulse 1.4s infinite, deniedShake .18s infinite steps(2, end);
-}
-.error-title::before,
-.error-title::after {
-    content: attr(data-text);
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-}
-.error-title::before {
-    color: rgba(255, 255, 255, .28);
-    transform: translate(-3px, 0);
-    clip-path: inset(0 0 55% 0);
-}
-.error-title::after {
-    color: rgba(255, 0, 66, .34);
-    transform: translate(3px, 0);
-    clip-path: inset(55% 0 0 0);
-}
-@keyframes deniedPulse {
-    0%, 100% { filter: saturate(1); }
-    50% { filter: saturate(1.6) brightness(1.08); }
+    width: fit-content;
+    margin: 28px auto 0;
 }
 @keyframes deniedShake {
-    0% { transform: translateX(0); }
-    50% { transform: translateX(2px); }
-    100% { transform: translateX(-2px); }
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(2px, -1px); }
 }
 </style>
 </head>
 <body class="login-body">
 <div class="grain"></div>
-<div class="login-container">
-    <div class="login-card error-card">
-        <div class="login-header">
-            <div class="error-icon">⚠</div>
-            <h1 class="error-title" data-text="ACCÈS REFUSÉ">ACCÈS REFUSÉ</h1>
-            <div class="divider"></div>
-        </div>
-        <div class="login-content">
-            <p class="error-message">${msg}</p>
-            <a href="/" class="btn-back">← Retour</a>
-        </div>
+<div class="darknet-denial">
+    <div class="denial-scan">TRACE REFUSÉE</div>
+    ${image ? `<img class="denial-art" src="${image}" alt="">` : '<div class="error-icon">⚠</div>'}
+    <h1 class="denial-title">${title}</h1>
+    <p class="denial-subtitle">${subtitle}</p>
+    <p class="denial-message">${msg}</p>
+    <a href="/" class="btn-back denial-back">← Retour</a>
     </div>
-</div>
 </body></html>`;
+        };
 
         try {
             const tokenRes = await axios.post('https://discord.com/api/oauth2/token',
@@ -134,14 +164,17 @@ function startServer(client, getState) {
             const member = await guild.members.fetch(user.id).catch(() => null);
             if (!member) return res.send(errorPage('Tu n\'es pas membre du serveur Discord 21 Block Savage'));
 
-            const dashboardAccessRoles = [
-                ...state.CONFIG.ROLES.COMMAND_ROLES,
-                state.CONFIG.ROLES.MEMBRE_1,
-                state.CONFIG.ROLES.MEMBRE_2,
-                state.CONFIG.ROLES.MEMBRE_3,
-            ].filter(Boolean);
-            const hasPermission = dashboardAccessRoles.some(r => member.roles.cache.has(r));
-            if (!hasPermission) return res.send(errorPage('Tu n\'as pas les permissions pour accéder au dashboard'));
+            const blackMarketRole = state.CONFIG.ROLES.VIP_ROLE || '1489336767097208922';
+            if (member.roles.cache.has(blackMarketRole)) {
+                return res.send(errorPage(
+                    'Le BlackMarket n\'a pas les autorisations d\'accès sur le Darknet des 21BS.',
+                    {
+                        title: 'BLACKMARKET',
+                        subtitle: 'ACCÈS DARKNET BLOQUÉ',
+                        image: '/blackmarket-denied.png',
+                    }
+                ));
+            }
 
             req.session.user = {
                 id: user.id,

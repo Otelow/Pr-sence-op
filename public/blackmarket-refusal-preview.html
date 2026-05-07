@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preview BlackMarket - 21BS</title>
+    <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body.login-body { overflow: hidden; }
+        .darknet-denial {
+            width: min(92vw, 760px);
+            min-height: 620px;
+            margin: 7vh auto;
+            padding: 34px;
+            border: 1px solid rgba(255, 138, 0, .32);
+            background: radial-gradient(circle at 50% 0%, rgba(255, 138, 0, .22), transparent 42%), linear-gradient(180deg, rgba(19, 15, 10, .96), rgba(3, 3, 3, .98));
+            box-shadow: 0 0 80px rgba(255, 138, 0, .16), inset 0 1px 0 rgba(255,255,255,.08);
+        }
+        .denial-scan {
+            display: inline-flex;
+            padding: 8px 12px;
+            border: 1px solid rgba(255, 138, 0, .28);
+            color: #ffb84d;
+            background: rgba(255, 138, 0, .08);
+            font: 700 12px/1 "JetBrains Mono", monospace;
+            letter-spacing: .18em;
+        }
+        .denial-art {
+            width: min(340px, 66vw);
+            aspect-ratio: 1;
+            display: block;
+            margin: 26px auto 22px;
+            object-fit: cover;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 184, 77, .25);
+            box-shadow: 0 22px 70px rgba(255, 138, 0, .22);
+        }
+        .denial-title {
+            margin: 0;
+            color: #fff3d6;
+            font-family: "Bebas Neue", sans-serif;
+            font-size: clamp(54px, 10vw, 96px);
+            line-height: .9;
+            text-align: center;
+            text-shadow: 0 0 28px rgba(255, 138, 0, .42);
+            animation: deniedShake .22s infinite steps(2, end);
+        }
+        .denial-subtitle {
+            margin: 12px 0 0;
+            color: #ff8a00;
+            font: 700 13px/1.5 "JetBrains Mono", monospace;
+            text-align: center;
+            letter-spacing: .2em;
+        }
+        .denial-message {
+            margin: 28px auto 0;
+            max-width: 540px;
+            padding: 20px 22px;
+            border-left: 4px solid #ff8a00;
+            color: #f8f0df;
+            background: rgba(0, 0, 0, .62);
+            font: 500 18px/1.65 "JetBrains Mono", monospace;
+        }
+        .btn-back.denial-back {
+            display: flex;
+            width: fit-content;
+            margin: 28px auto 0;
+        }
+        @keyframes deniedShake {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(2px, -1px); }
+        }
+    </style>
+</head>
+<body class="login-body">
+    <div class="grain"></div>
+    <div class="darknet-denial">
+        <div class="denial-scan">TRACE REFUSÉE</div>
+        <img class="denial-art" src="/blackmarket-denied.png" alt="">
+        <h1 class="denial-title">BLACKMARKET</h1>
+        <p class="denial-subtitle">ACCÈS DARKNET BLOQUÉ</p>
+        <p class="denial-message">Le BlackMarket n'a pas les autorisations d'accès sur le Darknet des 21BS.</p>
+        <a href="/" class="btn-back denial-back">← Retour</a>
+    </div>
+</body>
+</html>
