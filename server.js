@@ -50,6 +50,48 @@ function startServer(client, getState) {
 <title>Accès refusé — 21 Block Savage</title>
 <link rel="stylesheet" href="/style.css">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+.error-title {
+    position: relative;
+    min-height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #120900;
+    background: linear-gradient(135deg, #ff8a00, #ffbd3d);
+    text-shadow: 2px 2px 0 rgba(255,255,255,.18), -2px 0 0 rgba(255,68,68,.35);
+    animation: deniedPulse 1.4s infinite, deniedShake .18s infinite steps(2, end);
+}
+.error-title::before,
+.error-title::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+.error-title::before {
+    color: rgba(255, 255, 255, .28);
+    transform: translate(-3px, 0);
+    clip-path: inset(0 0 55% 0);
+}
+.error-title::after {
+    color: rgba(255, 0, 66, .34);
+    transform: translate(3px, 0);
+    clip-path: inset(55% 0 0 0);
+}
+@keyframes deniedPulse {
+    0%, 100% { filter: saturate(1); }
+    50% { filter: saturate(1.6) brightness(1.08); }
+}
+@keyframes deniedShake {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(2px); }
+    100% { transform: translateX(-2px); }
+}
+</style>
 </head>
 <body class="login-body">
 <div class="grain"></div>
@@ -57,7 +99,7 @@ function startServer(client, getState) {
     <div class="login-card error-card">
         <div class="login-header">
             <div class="error-icon">⚠</div>
-            <h1 class="error-title">ACCÈS<br>REFUSÉ</h1>
+            <h1 class="error-title" data-text="ACCÈS REFUSÉ">ACCÈS REFUSÉ</h1>
             <div class="divider"></div>
         </div>
         <div class="login-content">
@@ -92,7 +134,13 @@ function startServer(client, getState) {
             const member = await guild.members.fetch(user.id).catch(() => null);
             if (!member) return res.send(errorPage('Tu n\'es pas membre du serveur Discord 21 Block Savage'));
 
-            const hasPermission = state.CONFIG.ROLES.COMMAND_ROLES.some(r => member.roles.cache.has(r));
+            const dashboardAccessRoles = [
+                ...state.CONFIG.ROLES.COMMAND_ROLES,
+                state.CONFIG.ROLES.MEMBRE_1,
+                state.CONFIG.ROLES.MEMBRE_2,
+                state.CONFIG.ROLES.MEMBRE_3,
+            ].filter(Boolean);
+            const hasPermission = dashboardAccessRoles.some(r => member.roles.cache.has(r));
             if (!hasPermission) return res.send(errorPage('Tu n\'as pas les permissions pour accéder au dashboard'));
 
             req.session.user = {

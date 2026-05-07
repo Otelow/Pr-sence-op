@@ -2308,6 +2308,14 @@ let isAdminUser = false;
 let craftCatalogFilters = {
     search: '',
 };
+
+function compareWeaponsBySalePrice(a, b) {
+    const saleDiff = (Number(b.sale_price) || 0) - (Number(a.sale_price) || 0);
+    if (saleDiff !== 0) return saleDiff;
+    const craftDiff = (Number(b.craft_price) || 0) - (Number(a.craft_price) || 0);
+    if (craftDiff !== 0) return craftDiff;
+    return String(a.name || '').localeCompare(String(b.name || ''), 'fr');
+}
 let craftCatalogFiltersReady = false;
 
 async function initCraftsTab() {
@@ -2422,11 +2430,7 @@ function renderCraftCatalog() {
         return haystack.includes(q);
     });
 
-    items = [...items].sort((a, b) => {
-        const priceDiff = (Number(b.craft_price) || 0) - (Number(a.craft_price) || 0);
-        if (priceDiff !== 0) return priceDiff;
-        return String(a.name || '').localeCompare(String(b.name || ''), 'fr');
-    });
+    items = [...items].sort(compareWeaponsBySalePrice);
 
     if (count) count.textContent = `${items.length} / ${weaponsCache.length} armes`;
 
@@ -2484,7 +2488,7 @@ function formatCraftTime(seconds) {
 function renderCraftWeaponDropdown() {
     const list = document.getElementById('craftWeaponList');
     if (!list) return;
-    list.innerHTML = weaponsCache.map(w => {
+    list.innerHTML = [...weaponsCache].sort(compareWeaponsBySalePrice).map(w => {
         const imageUrl = safeImageUrl(w.image_url);
         return `
         <div class="custom-dropdown-item" data-name="${escapeHtml(w.name).toLowerCase()}" onclick="selectCraftWeapon(${w.id}, '${escapeJsArg(w.name)}', '${escapeJsArg(imageUrl)}')">

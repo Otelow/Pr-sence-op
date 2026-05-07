@@ -450,10 +450,12 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 };
             });
 
-            // Trier par craft_price DÉCROISSANT
+            // Trier par prix de vente décroissant, puis prix craft.
             list.sort((a, b) => {
-                const priceDiff = (Number(b.craft_price) || 0) - (Number(a.craft_price) || 0);
-                if (priceDiff !== 0) return priceDiff;
+                const saleDiff = (Number(b.sale_price) || 0) - (Number(a.sale_price) || 0);
+                if (saleDiff !== 0) return saleDiff;
+                const craftDiff = (Number(b.craft_price) || 0) - (Number(a.craft_price) || 0);
+                if (craftDiff !== 0) return craftDiff;
                 return String(a.name || '').localeCompare(String(b.name || ''), 'fr');
             });
 
