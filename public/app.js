@@ -104,7 +104,13 @@ function applyPermissionsUI() {
         } else if (!sec.querySelector('.access-locked-overlay')) {
             const overlay = document.createElement('div');
             overlay.className = 'access-locked-overlay';
-            overlay.innerHTML = '<span class="confidential-text">CONFIDENCIAL</span>';
+            overlay.innerHTML = `
+                <div class="danger-lock-panel">
+                    <span class="danger-lock-kicker">CONNEXION INTERROMPUE</span>
+                    <span class="confidential-text">CONFIDENCIAL</span>
+                    <span class="danger-lock-sub">ZONE CHIFFRÉE 21BS • ACCÈS NON AUTORISÉ</span>
+                </div>
+            `;
             sec.appendChild(overlay);
             sec.classList.add('access-locked');
         }
@@ -2519,7 +2525,6 @@ function openCraftWeaponDetails(id) {
         <div class="craft-detail-plan-grid">
             <div class="craft-detail-ingredient craft-detail-plan-card">
                 ${planUrl ? `<img src="${planUrl}" alt="Plan ${escapeHtml(weapon.name)}">` : '<div class="craft-ingredient-placeholder">Plan</div>'}
-                <strong>${planUrl ? 'Disponible' : 'Requis'}</strong>
                 <span>Plan d'arme</span>
             </div>
         </div>

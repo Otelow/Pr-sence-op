@@ -5786,7 +5786,7 @@ body {
 
 .craft-detail-layout {
     display: grid;
-    grid-template-columns: minmax(220px, 360px) 1fr;
+    grid-template-columns: minmax(280px, 430px) 1fr;
     gap: 22px;
     align-items: stretch;
 }
@@ -5801,7 +5801,7 @@ body {
 }
 
 .craft-detail-media {
-    min-height: 260px;
+    min-height: 340px;
 }
 
 .craft-detail-media img,
@@ -5809,7 +5809,7 @@ body {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    padding: 18px;
+    padding: 10px;
 }
 
 .craft-detail-summary {
@@ -5870,12 +5870,12 @@ body {
 }
 
 .craft-detail-plan-grid {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 220px));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
 }
 
 .craft-detail-ingredient {
-    min-height: 140px;
-    padding: 14px;
+    min-height: 180px;
+    padding: 18px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: rgba(0, 0, 0, .42);
@@ -5886,19 +5886,24 @@ body {
 }
 
 .craft-detail-ingredient img {
-    width: 58px;
-    height: 58px;
+    width: 82px;
+    height: 82px;
     object-fit: contain;
 }
 
 .craft-detail-plan-card img {
-    width: 82px;
-    height: 82px;
+    width: 148px;
+    height: 148px;
 }
 
 .craft-detail-ingredient strong {
     color: var(--accent);
-    font-size: 18px;
+    font-size: 24px;
+}
+
+.craft-detail-ingredient span {
+    font-size: 17px;
+    line-height: 1.25;
 }
 
 @media (max-width: 760px) {
@@ -7366,15 +7371,70 @@ body:has(#impersonateBanner[style*="flex"]) {
     position: absolute;
     inset: 0;
     z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(ellipse at center, rgba(255, 140, 0, 0.08) 0%, rgba(0, 0, 0, 0.5) 60%, rgba(0, 0, 0, 0.85) 100%);
-    backdrop-filter: blur(2px);
+    display: grid;
+    place-items: center;
+    background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 6px),
+        radial-gradient(ellipse at center, rgba(255, 38, 38, 0.14) 0%, rgba(0, 0, 0, 0.55) 58%, rgba(0, 0, 0, 0.9) 100%);
+    backdrop-filter: blur(3px) contrast(1.15);
     pointer-events: auto;
 }
 
+.access-locked-overlay::before,
+.access-locked-overlay::after {
+    content: "";
+    position: absolute;
+    inset: 22px;
+    border: 1px solid rgba(239, 68, 68, .32);
+    pointer-events: none;
+}
+
+.access-locked-overlay::after {
+    inset: 34px;
+    border-color: rgba(255, 140, 0, .26);
+    animation: danger-frame 1.8s infinite steps(2, end);
+}
+
+.danger-lock-panel {
+    position: relative;
+    display: grid;
+    gap: 14px;
+    justify-items: center;
+    padding: 34px 42px;
+    border: 1px solid rgba(239, 68, 68, .42);
+    background:
+        linear-gradient(135deg, rgba(239, 68, 68, .14), rgba(255, 140, 0, .08)),
+        rgba(0, 0, 0, .62);
+    box-shadow: 0 0 70px rgba(239, 68, 68, .22), inset 0 0 28px rgba(255, 140, 0, .08);
+    overflow: hidden;
+}
+
+.danger-lock-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);
+    transform: translateX(-100%);
+    animation: danger-sweep 2.6s infinite;
+}
+
+.danger-lock-kicker,
+.danger-lock-sub {
+    position: relative;
+    font-family: var(--font-mono);
+    color: #fca5a5;
+    letter-spacing: .18em;
+    text-align: center;
+    font-size: 12px;
+}
+
+.danger-lock-sub {
+    color: var(--accent);
+    font-size: 11px;
+}
+
 .confidential-text {
+    position: relative;
     font-family: var(--font-display, 'Bebas Neue', sans-serif);
     font-size: 96px;
     font-weight: 800;
@@ -7394,6 +7454,16 @@ body:has(#impersonateBanner[style*="flex"]) {
     animation: confidential-vibrate 2s linear infinite, confidential-shimmer 3s linear infinite;
     text-align: center;
     user-select: none;
+}
+
+@keyframes danger-frame {
+    0%, 100% { transform: translate(0, 0); opacity: .65; }
+    50% { transform: translate(3px, -2px); opacity: 1; }
+}
+
+@keyframes danger-sweep {
+    0% { transform: translateX(-120%); }
+    55%, 100% { transform: translateX(120%); }
 }
 
 @keyframes confidential-vibrate {
