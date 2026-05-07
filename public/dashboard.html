@@ -91,23 +91,23 @@
     <section class="tab-content active" id="tab-presence">
 
         <div class="stats-grid">
-            <div class="stat-card">
+            <button type="button" class="stat-card stat-card-action" onclick="openPresenceStatDetails('members')">
                 <div class="stat-label">Membres total</div>
                 <div class="stat-value" id="statTotal">—</div>
-            </div>
-            <div class="stat-card stat-info">
+            </button>
+            <button type="button" class="stat-card stat-card-action stat-info" onclick="openPresenceStatDetails('op')">
                 <div class="stat-label">Inscrits OP</div>
                 <div class="stat-value" id="statInscrits">—</div>
                 <div class="stat-sub">Rôle 21BS</div>
-            </div>
-            <div class="stat-card">
+            </button>
+            <button type="button" class="stat-card stat-card-action" onclick="openPresenceStatDetails('absences')">
                 <div class="stat-label">Absences semaine</div>
                 <div class="stat-value" id="statAbsences">—</div>
-            </div>
-            <div class="stat-card stat-warning" id="statConsecutiveCard">
+            </button>
+            <button type="button" class="stat-card stat-card-action stat-warning" id="statConsecutiveCard" onclick="openPresenceStatDetails('kp')">
                 <div class="stat-label">Alertes KP</div>
                 <div class="stat-value" id="statConsecutive">—</div>
-            </div>
+            </button>
         </div>
 
         <div class="op-grid">
@@ -567,6 +567,18 @@
             <div id="craftWeaponDetailsContent"></div>
             <div class="modal-actions">
                 <button onclick="closeCraftWeaponDetails()" class="btn-secondary">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal détails stats présence -->
+    <div class="modal" id="presenceStatDetailsModal" style="display:none;">
+        <div class="modal-backdrop" onclick="closePresenceStatDetails()"></div>
+        <div class="modal-content presence-stat-modal">
+            <h3 class="modal-title" id="presenceStatDetailsTitle">Détails</h3>
+            <div id="presenceStatDetailsContent"></div>
+            <div class="modal-actions">
+                <button onclick="closePresenceStatDetails()" class="btn-secondary">Fermer</button>
             </div>
         </div>
     </div>

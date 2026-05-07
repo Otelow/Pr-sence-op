@@ -16,6 +16,7 @@ const PAGE_TITLES = {
 let currentTab = 'presence';
 let refreshTimer = null;
 let userPermissions = { canEditMap: false };
+let presenceStatsCache = null;
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -175,6 +176,7 @@ async function loadStats() {
     try {
         const res = await fetch('/api/stats');
         const s = await res.json();
+        presenceStatsCache = s;
         document.getElementById('statTotal').textContent = s.totalMembers;
         document.getElementById('statInscrits').textContent = s.inscritsOP || 0;
         document.getElementById('statAbsences').textContent = s.totalUnjustified;
@@ -183,6 +185,59 @@ async function loadStats() {
     } catch (e) {
         console.error('Stats:', e);
     }
+}
+
+function renderPresenceMemberList(items, emptyText, showAbsences = false) {
+    if (!items || items.length === 0) return `<p class="empty">${emptyText}</p>`;
+    return `<div class="presence-detail-list">${items.map(m => {
+        const avatar = safeImageUrl(m.avatar) || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' fill='%23262626'/></svg>`;
+        const color = safeColor(m.color);
+        const detail = showAbsences
+            ? `<span>${m.count || 0} absence(s)${m.consecutiveDays >= 2 ? ` • ${m.consecutiveDays}j consécutifs` : ''}</span>`
+            : `<span>ID ${escapeHtml(m.id || '')}</span>`;
+        const dates = showAbsences && m.dates?.length
+            ? `<div class="presence-detail-dates">${m.dates.map(d => `<code>${escapeHtml(d)}</code>`).join('')}</div>`
+            : '';
+        return `
+            <div class="presence-detail-member">
+                <img src="${avatar}" alt="">
+                <div class="presence-detail-body">
+                    <strong style="${color ? `color:${color};` : ''}">${escapeHtml(m.username || m.name || '?')}</strong>
+                    ${detail}
+                    ${dates}
+                </div>
+            </div>
+        `;
+    }).join('')}</div>`;
+}
+
+async function openPresenceStatDetails(type) {
+    if (!presenceStatsCache) await loadStats();
+    const modal = document.getElementById('presenceStatDetailsModal');
+    const title = document.getElementById('presenceStatDetailsTitle');
+    const content = document.getElementById('presenceStatDetailsContent');
+    if (!modal || !title || !content) return;
+
+    const s = presenceStatsCache || {};
+    if (type === 'members') {
+        title.textContent = 'Membres 21BS';
+        content.innerHTML = renderPresenceMemberList(s.totalMembersList, 'Aucun membre trouvé');
+    } else if (type === 'op') {
+        title.textContent = 'Inscrits OP';
+        content.innerHTML = renderPresenceMemberList(s.inscritsList, 'Aucun inscrit OP trouvé');
+    } else if (type === 'absences') {
+        title.textContent = 'Absences semaine';
+        content.innerHTML = renderPresenceMemberList(s.absenceMembers, 'Aucune absence cette semaine', true);
+    } else {
+        title.textContent = 'Alertes KP';
+        content.innerHTML = renderPresenceMemberList(s.kpMembers, 'Aucun membre à KP', true);
+    }
+    modal.style.display = 'flex';
+}
+
+function closePresenceStatDetails() {
+    const modal = document.getElementById('presenceStatDetailsModal');
+    if (modal) modal.style.display = 'none';
 }
 
 // ===== PRÉSENCE =====
@@ -1561,6 +1616,7 @@ document.addEventListener('keydown', e => {
         closePointModal();
         closeDetailsModal();
         closeCraftWeaponDetails();
+        closePresenceStatDetails();
     }
 });
 
@@ -3066,6 +3122,8 @@ window.deleteHistoryEntry = deleteHistoryEntry;
 window.switchCraftSubtab = switchCraftSubtab;
 window.openCraftWeaponDetails = openCraftWeaponDetails;
 window.closeCraftWeaponDetails = closeCraftWeaponDetails;
+window.openPresenceStatDetails = openPresenceStatDetails;
+window.closePresenceStatDetails = closePresenceStatDetails;
 window.toggleCraftWeaponDropdown = toggleCraftWeaponDropdown;
 window.selectCraftWeapon = selectCraftWeapon;
 window.submitCraftRequest = submitCraftRequest;

@@ -481,6 +481,19 @@ html, body {
     overflow: hidden;
 }
 
+.stat-card-action {
+    width: 100%;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.stat-card-action:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
 .stat-card::before {
     content: '';
     position: absolute;
@@ -5779,15 +5792,16 @@ body {
 }
 
 .craft-detail-modal {
-    width: min(92vw, 900px);
+    width: min(98vw, 1320px);
+    max-width: 1320px !important;
     max-height: 88vh;
     overflow: auto;
 }
 
 .craft-detail-layout {
     display: grid;
-    grid-template-columns: minmax(280px, 430px) 1fr;
-    gap: 22px;
+    grid-template-columns: minmax(420px, 660px) minmax(280px, 1fr);
+    gap: 36px;
     align-items: stretch;
 }
 
@@ -5801,7 +5815,7 @@ body {
 }
 
 .craft-detail-media {
-    min-height: 340px;
+    min-height: 460px;
 }
 
 .craft-detail-media img,
@@ -5904,6 +5918,67 @@ body {
 .craft-detail-ingredient span {
     font-size: 17px;
     line-height: 1.25;
+}
+
+.presence-stat-modal {
+    width: min(92vw, 760px);
+    max-width: 760px !important;
+}
+
+.presence-detail-list {
+    display: grid;
+    gap: 10px;
+    max-height: min(62vh, 620px);
+    overflow: auto;
+    padding-right: 6px;
+}
+
+.presence-detail-member {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, .38);
+}
+
+.presence-detail-member img {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.presence-detail-body {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.presence-detail-body strong {
+    font-size: 15px;
+}
+
+.presence-detail-body span {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.presence-detail-dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.presence-detail-dates code {
+    color: var(--accent);
+    background: rgba(255, 140, 0, .08);
+    border: 1px solid rgba(255, 140, 0, .18);
+    padding: 3px 6px;
+    border-radius: 4px;
 }
 
 @media (max-width: 760px) {

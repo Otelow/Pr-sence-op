@@ -380,6 +380,9 @@ body.login-body { overflow: hidden; }
                 case 'defense':
                 case 'weed':
                 case 'traitement-weed':
+                case 'yellowjack':
+                case 'megamall':
+                case 'ile':
                 case 'trash': {
                     const messages = {
                         qg: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Rendez-vous au Hood ! Vous avez 5 minutes ! ${state.CONFIG.EMOJIS.BS21}`,
@@ -390,6 +393,9 @@ body.login-body { overflow: hidden; }
                         defense: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Notre **laboratoire se fait attaquer** ! Tous au Hood dans 5 Minutes ! ${state.CONFIG.EMOJIS.BS21}`,
                         weed: `🚨 On va aller sur la weed ! Branchez-vous sur la radio ! ${state.CONFIG.EMOJIS.BS21}`,
                         'traitement-weed': `🚨 On va aller sur le traitement de la weed ! Branchez-vous sur la radio ! ${state.CONFIG.EMOJIS.BS21}`,
+                        yellowjack: `🚨 Merci de venir à côté du Yellow Jack ${state.CONFIG.EMOJIS.BS21}`,
+                        megamall: `🚨 Merci de venir au parking Mega Mall ${state.CONFIG.EMOJIS.BS21}`,
+                        ile: `🚨 Merci de venir à côté de l'Ile ${state.CONFIG.EMOJIS.BS21}`,
                         trash: `🚨 Celui qui trash sera ban sans sommation ! ${state.CONFIG.EMOJIS.BS21}`,
                     };
 
@@ -606,8 +612,19 @@ body.login-body { overflow: hidden; }
             try { await guild.members.fetch(); } catch {}
         }
 
+        const summarizeMember = (member, extra = {}) => ({
+            id: member.id,
+            username: member.nickname || member.user.username,
+            avatar: member.user.avatar
+                ? `https://cdn.discordapp.com/avatars/${member.id}/${member.user.avatar}.png?size=64`
+                : null,
+            color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
+            ...extra,
+        });
+
         // Total = membres ayant MEMBRE_1 OU MEMBRE_2
         let totalMembers = 0;
+        let totalMembersList = [];
         if (guild) {
             const counted = new Set();
             const role1 = guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_1);
@@ -615,14 +632,40 @@ body.login-body { overflow: hidden; }
             if (role1) for (const [id, m] of role1.members) if (!m.user.bot) counted.add(id);
             if (role2) for (const [id, m] of role2.members) if (!m.user.bot) counted.add(id);
             totalMembers = counted.size;
+            totalMembersList = [...counted]
+                .map(id => guild.members.cache.get(id))
+                .filter(Boolean)
+                .map(member => summarizeMember(member))
+                .sort((a, b) => a.username.localeCompare(b.username, 'fr'));
         }
 
         const role = guild ? guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_1) : null;
         const inscritsOP = role ? role.members.filter(m => !m.user.bot).size : 0;
+        const inscritsList = role
+            ? [...role.members.values()]
+                .filter(m => !m.user.bot)
+                .map(member => summarizeMember(member))
+                .sort((a, b) => a.username.localeCompare(b.username, 'fr'))
+            : [];
 
-        const tracking = [...state.absenceTracking.values()];
+        const trackingEntries = [...state.absenceTracking.entries()];
+        const tracking = trackingEntries.map(([, t]) => t);
         const totalUnjustified = tracking.reduce((sum, t) => sum + t.count, 0);
         const withConsecutive = tracking.filter(t => state.getConsecutiveDays(t) >= 2).length;
+        const absenceMembers = trackingEntries.map(([id, t]) => {
+            const member = guild?.members.cache.get(id);
+            return {
+                id,
+                username: t.username || member?.nickname || member?.user?.username || id,
+                avatar: member?.user?.avatar ? `https://cdn.discordapp.com/avatars/${id}/${member.user.avatar}.png?size=64` : null,
+                color: member?.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
+                count: t.count || 0,
+                consecutiveDays: state.getConsecutiveDays(t),
+                dates: t.dates || [],
+                details: t.details || [],
+            };
+        }).sort((a, b) => (b.count - a.count) || a.username.localeCompare(b.username, 'fr'));
+        const kpMembers = absenceMembers.filter(m => m.consecutiveDays >= 2);
 
         res.json({
             totalMembers,
@@ -630,6 +673,10 @@ body.login-body { overflow: hidden; }
             totalUnjustified,
             membersWithAbsences: tracking.length,
             membersWithConsecutive: withConsecutive,
+            totalMembersList,
+            inscritsList,
+            absenceMembers,
+            kpMembers,
             op1Active: state.presenceData.active,
             op2Active: state.presence2Data.active,
         });
@@ -1047,6 +1094,9 @@ body.login-body { overflow: hidden; }
             { id: 'tir', icon: '✋', name: 'Stop Tir', desc: 'Arrêter de tirer', category: 'alert' },
             { id: 'weed', icon: '🌿', name: 'Weed', desc: 'Aller sur la weed', category: 'alert' },
             { id: 'traitement-weed', icon: '⚗', name: 'Traitement', desc: 'Traitement de la weed', category: 'alert' },
+            { id: 'yellowjack', icon: '🟡', name: 'Yellow Jack', desc: 'Rassemblement Yellow Jack', category: 'alert' },
+            { id: 'megamall', icon: '🅿', name: 'Mega Mall', desc: 'Parking Mega Mall', category: 'alert' },
+            { id: 'ile', icon: '🏝', name: 'Ile', desc: 'Rassemblement près de l’Ile', category: 'alert' },
             { id: 'trash', icon: '🚫', name: 'Anti-Trash', desc: 'Avertissement trash', category: 'alert' },
             // Communications
             { id: 'radio', icon: '📻', name: 'Nouvelle Radio', desc: 'Fréquence aléatoire', category: 'comm', info: true },
