@@ -1940,6 +1940,9 @@ html, body {
     cursor: pointer;
     border-radius: 3px;
     transition: background 0.1s;
+    font-family: var(--font-body);
+    font-size: 13px;
+    line-height: 1.25;
 }
 
 .role-checkbox:hover {
@@ -1960,6 +1963,7 @@ html, body {
     height: 8px;
     border-radius: 50%;
     background: var(--text-muted);
+    flex: 0 0 8px;
 }
 
 .roles-quick-actions {
@@ -4979,6 +4983,7 @@ select:focus {
     height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
+    flex-basis: 10px;
     box-shadow: 0 0 6px currentColor;
 }
 
@@ -7350,6 +7355,11 @@ body:has(#impersonateBanner[style*="flex"]) {
 
 .craft-filter-select {
     flex: 0 0 190px;
+}
+
+.craft-filter-select option {
+    background: #151518;
+    color: #f5f5f5;
 }
 
 .craft-filter-toggle {

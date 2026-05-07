@@ -244,7 +244,25 @@ function renderAdminWeapons() {
         return;
     }
 
-    list.innerHTML = adminWeapons.map(w => `
+    const filtered = adminWeapons.filter(w => {
+        if (!adminWeaponQuery) return true;
+        const haystack = [
+            w.name,
+            w.craft_price,
+            w.sale_price,
+            ...(w.ingredients || []).map(i => i.name),
+        ].join(' ').toLowerCase();
+        return haystack.includes(adminWeaponQuery);
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<p class="empty">Aucune arme ne correspond a la recherche.</p>';
+        return;
+    }
+
+    list.innerHTML = filtered.map(w => {
+        const imageUrl = safeImageUrl(w.image_url);
+        return `
         <div class="admin-weapon-row">
             ${imageUrl ? `<img class="admin-weapon-img" src="${imageUrl}" alt="${escapeHtml(w.name)}">` : '<span class="admin-weapon-placeholder">Arme</span>'}
             <div class="admin-weapon-info">
@@ -254,11 +272,6 @@ function renderAdminWeapons() {
                     ${w.craft_price ? ' - Craft : ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''}
                     ${w.sale_price ? ' - Vente : ' + w.sale_price.toLocaleString('fr-FR') + '$' : ''}
                     - ${(w.ingredients || []).length} ingredients
-                    ${w.requires_plan ? ' - Plan requis' : ''}
-                    ${w.craft_price ? ' · Craft : ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''}
-                    ${w.sale_price ? ' · Vente : ' + w.sale_price.toLocaleString('fr-FR') + '$' : ''}
-                    · ${(w.ingredients || []).length} ingrédients
-                    ${w.requires_plan ? ' · 📋 Plan requis' : ''}
                 </small>
             </div>
             <div class="admin-weapon-actions">
@@ -306,8 +319,6 @@ function openWeaponEditor(id) {
         if (w.requires_plan) document.getElementById('planImageField').style.display = 'block';
         if (safeImageUrl(w.image_url)) document.getElementById('weaponImagePreview').innerHTML = `<img src="${safeImageUrl(w.image_url)}" alt="">`;
         if (safeImageUrl(w.plan_image_url)) document.getElementById('weaponPlanImagePreview').innerHTML = `<img src="${safeImageUrl(w.plan_image_url)}" alt="">`;
-        if (w.image_url) document.getElementById('weaponImagePreview').innerHTML = `<img src="${w.image_url}">`;
-        if (w.plan_image_url) document.getElementById('weaponPlanImagePreview').innerHTML = `<img src="${w.plan_image_url}">`;
 
         editingIngredients = (w.ingredients || []).map(ing => ({
             ingredient_id: ing.ingredient_id || null,

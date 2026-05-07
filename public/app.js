@@ -2295,7 +2295,6 @@ let isAdminUser = false;
 let craftCatalogFilters = {
     search: '',
     sort: 'craft_desc',
-    planOnly: false,
 };
 let craftCatalogFiltersReady = false;
 
@@ -2380,8 +2379,7 @@ function setupCraftCatalogFilters() {
     if (craftCatalogFiltersReady) return;
     const search = document.getElementById('craftCatalogSearch');
     const sort = document.getElementById('craftCatalogSort');
-    const planOnly = document.getElementById('craftCatalogPlanOnly');
-    if (!search && !sort && !planOnly) return;
+    if (!search && !sort) return;
 
     craftCatalogFiltersReady = true;
     search?.addEventListener('input', e => {
@@ -2390,10 +2388,6 @@ function setupCraftCatalogFilters() {
     });
     sort?.addEventListener('change', e => {
         craftCatalogFilters.sort = e.target.value;
-        renderCraftCatalog();
-    });
-    planOnly?.addEventListener('change', e => {
-        craftCatalogFilters.planOnly = e.target.checked;
         renderCraftCatalog();
     });
 }
@@ -2411,7 +2405,6 @@ function renderCraftCatalog() {
 
     const q = craftCatalogFilters.search;
     let items = weaponsCache.filter(w => {
-        if (craftCatalogFilters.planOnly && !w.requires_plan) return false;
         if (!q) return true;
         const haystack = [
             w.name,
@@ -2461,9 +2454,9 @@ function renderCraftCatalog() {
                     ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(w.name)}">` : '<span class="craft-weapon-placeholder">Arme</span>'}
                 </div>
                 <div class="craft-weapon-body">
-                    <div class="craft-weapon-name">${escapeHtml(w.name)}${w.requires_plan ? ' <span class="craft-weapon-planbadge">Plan</span>' : ''}</div>
+                    <div class="craft-weapon-name">${escapeHtml(w.name)}</div>
                     <div class="craft-weapon-meta">
-                        <span class="craft-weapon-time">? ${timeStr}</span>
+                        <span class="craft-weapon-time">&#9201; ${timeStr}</span>
                         <span class="craft-weapon-price">Craft : ${priceStr}</span>
                         ${saleStr}
                     </div>
@@ -2493,10 +2486,29 @@ function renderCraftWeaponDropdown() {
         <div class="custom-dropdown-item" data-name="${escapeHtml(w.name).toLowerCase()}" onclick="selectCraftWeapon(${w.id}, '${escapeJsArg(w.name)}', '${escapeJsArg(imageUrl)}')">
             ${imageUrl ? `<img class="craft-dropdown-image" src="${imageUrl}" alt="">` : '<span class="craft-weapon-placeholder">Arme</span>'}
             <span class="custom-dropdown-item-label">${escapeHtml(w.name)}</span>
-            ${w.requires_plan ? '<span class="craft-plan-mini">Plan</span>' : ''}
         </div>
     `;
     }).join('');
+}
+
+function toggleCraftWeaponDropdown(event) {
+    if (event) event.stopPropagation();
+    smartToggleDropdown('craftWeaponMenu', () => {
+        renderCraftWeaponDropdown();
+        const search = document.getElementById('craftWeaponSearch');
+        if (search) {
+            search.value = '';
+            document.querySelectorAll('#craftWeaponList .custom-dropdown-item').forEach(i => i.style.display = 'flex');
+            search.oninput = () => {
+                const q = search.value.toLowerCase().trim();
+                document.querySelectorAll('#craftWeaponList .custom-dropdown-item').forEach(item => {
+                    const name = item.dataset.name || '';
+                    item.style.display = !q || name.includes(q) ? 'flex' : 'none';
+                });
+            };
+            setTimeout(() => search.focus(), 50);
+        }
+    });
 }
 
 function selectCraftWeapon(id, name, imageUrl) {
