@@ -3387,6 +3387,9 @@ async function initMyWeaponsTab() {
     if (!organizationsCache || organizationsCache.length === 0) {
         await loadOrganizations();
     }
+    await loadAllMembers();
+    populateMyWeaponsMemberSelects();
+    toggleMwCrafted();
     renderMarkSoldBuyerDropdown();
     await loadMyWeapons();
     renderMyWeapons();
@@ -3401,7 +3404,34 @@ async function loadMyWeapons() {
 }
 
 function toggleMwCrafted() {
-    // Conservé pour compatibilité avec les anciens handlers inline éventuels.
+    const origin = document.querySelector('input[name="mwOrigin"]:checked')?.value;
+    const field = document.getElementById('mwCraftedByField');
+    const select = document.getElementById('mwCraftedBy');
+    const crafted = origin === 'crafted';
+    if (field) field.style.display = crafted ? 'block' : 'none';
+    if (select) select.required = crafted;
+}
+
+function populateMyWeaponsMemberSelects() {
+    const members = allMembersCache || [];
+    const currentId = window.currentUser?.id || window.currentUserId || '';
+    const options = '<option value="">— Choisir un membre —</option>' + members.map(m => (
+        `<option value="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`
+    )).join('');
+
+    ['mwCraftedBy', 'markSoldBy'].forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        select.innerHTML = options;
+        if (currentId && members.some(m => m.id === currentId)) select.value = currentId;
+    });
+}
+
+function getSelectedMember(selectId) {
+    const select = document.getElementById(selectId);
+    if (!select || !select.value) return { id: '', name: '' };
+    const opt = select.options[select.selectedIndex];
+    return { id: select.value, name: opt?.dataset?.name || opt?.textContent || '' };
 }
 
 async function submitMyWeapon() {
@@ -3414,16 +3444,26 @@ async function submitMyWeapon() {
         .filter(Boolean);
     const asking_price = document.getElementById('mwAskingPrice').value;
     const min_price = document.getElementById('mwMinPrice').value;
+    const craftedBy = getSelectedMember('mwCraftedBy');
 
     if (!weapon_name) { toast('❌ Nom de l\'arme requis', 'error'); return; }
     if (!origin) { toast('❌ Origine de l\'arme requise', 'error'); return; }
+    if (is_crafted && !craftedBy.id) { toast('❌ Choisis qui a crafté l\'arme', 'error'); return; }
     if (!serial_numbers.length) { toast('❌ N° de série obligatoire pour chaque arme', 'error'); return; }
 
     try {
         const res = await fetch('/api/crafts/myweapons', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ weapon_name, is_crafted, serial_numbers, asking_price, min_price })
+            body: JSON.stringify({
+                weapon_name,
+                is_crafted,
+                serial_numbers,
+                asking_price,
+                min_price,
+                crafted_by_id: craftedBy.id,
+                crafted_by_name: craftedBy.name
+            })
         });
         const data = await res.json();
         if (res.ok) {
@@ -3434,6 +3474,7 @@ async function submitMyWeapon() {
             document.getElementById('mwMinPrice').value = '';
             const defaultOrigin = document.querySelector('input[name="mwOrigin"][value="crafted"]');
             if (defaultOrigin) defaultOrigin.checked = true;
+            toggleMwCrafted();
             await loadMyWeapons();
             renderMyWeapons();
         } else { toast(`❌ ${data.error}`, 'error'); }
@@ -3460,9 +3501,12 @@ function renderMyWeapons() {
         const serials = Array.isArray(w.serials) ? w.serials : [];
         const isSold = availableQty <= 0;
         const serialPreview = serials.length
-            ? serials.slice(0, 6).map(s => `${s.is_sold ? 'Vendu' : 'Dispo'}: ${escapeHtml(s.serial_number || '')}`).join(' • ')
+            ? serials.slice(0, 6).map(s => `${s.is_sold ? 'Vendu' : 'Dispo'}: ${escapeHtml(s.serial_number || '')}${s.sold_by_name ? ` par ${escapeHtml(s.sold_by_name)}` : ''}`).join(' • ')
             : (w.serial_number ? escapeHtml(w.serial_number) : '');
         const moreSerials = serials.length > 6 ? ` +${serials.length - 6}` : '';
+        const craftedByLine = w.is_crafted && w.crafted_by_name
+            ? `<span>⚒ ${escapeHtml(w.crafted_by_name)}</span>`
+            : '';
 
         const priceBlock = isSold
             ? `<span class="mw-sold-price">✅ Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '→ ' + escapeHtml(w.sold_to) : ''}</span>`
@@ -3490,6 +3534,7 @@ function renderMyWeapons() {
                     </div>
                     <div class="myweapons-item-meta">
                         <span class="mw-username">👤 ${escapeHtml(w.user_name)}</span>
+                        ${craftedByLine}
                         ${serialPreview ? `<span>N°: ${serialPreview}${moreSerials}</span>` : ''}
                         ${priceBlock}
                         <span>📅 ${date}</span>
@@ -3521,6 +3566,11 @@ function openMarkSoldModal(id) {
         serialSelect.onchange = () => { soldIdInput.value = serialSelect.value; };
     }
     document.getElementById('markSoldModal').style.display = 'flex';
+    const soldBySelect = document.getElementById('markSoldBy');
+    if (soldBySelect) {
+        const currentId = window.currentUser?.id || window.currentUserId || '';
+        soldBySelect.value = currentId || '';
+    }
 }
 
 function closeMarkSoldModal() {
@@ -3573,13 +3623,15 @@ async function confirmMarkSold(e) {
     const id = document.getElementById('markSoldId').value;
     const sold_to = document.getElementById('markSoldBuyer').value;
     const sold_price = document.getElementById('markSoldPrice').value;
+    const soldBy = getSelectedMember('markSoldBy');
     if (!sold_price) { toast('❌ Prix de vente requis', 'error'); return; }
+    if (!soldBy.id) { toast('❌ Choisis qui a vendu l\'arme', 'error'); return; }
 
     try {
         const res = await fetch(`/api/crafts/myweapons/${id}/sold`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sold_to, sold_price })
+            body: JSON.stringify({ sold_to, sold_price, sold_by_id: soldBy.id, sold_by_name: soldBy.name })
         });
         const data = await res.json();
         if (res.ok) {

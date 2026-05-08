@@ -757,14 +757,21 @@
                     <label class="comm-label">Origine de l'arme *</label>
                     <div class="myweapons-origin-choice">
                         <label class="myweapons-origin-option">
-                            <input type="radio" name="mwOrigin" value="crafted" checked>
+                            <input type="radio" name="mwOrigin" value="crafted" checked onchange="toggleMwCrafted()">
                             <span>⚒ Arme craftée par les <strong>21 Block Savage</strong></span>
                         </label>
                         <label class="myweapons-origin-option">
-                            <input type="radio" name="mwOrigin" value="external">
+                            <input type="radio" name="mwOrigin" value="external" onchange="toggleMwCrafted()">
                             <span>⛔ Arme non craftée par les <strong>21 Block Savage</strong></span>
                         </label>
                     </div>
+                </div>
+
+                <div class="comm-field" id="mwCraftedByField">
+                    <label class="comm-label">Craftée par *</label>
+                    <select id="mwCraftedBy" class="comm-input">
+                        <option value="">Chargement des membres...</option>
+                    </select>
                 </div>
 
                 <div class="comm-field" id="mwSerialField">
@@ -807,6 +814,13 @@
                 <div class="comm-field" id="markSoldSerialField" style="display:none;">
                     <label class="comm-label">N° de série vendue</label>
                     <select id="markSoldSerial" class="comm-input"></select>
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">Vendue par *</label>
+                    <select id="markSoldBy" class="comm-input" required>
+                        <option value="">Chargement des membres...</option>
+                    </select>
                 </div>
 
                 <div class="comm-field">

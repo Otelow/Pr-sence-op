@@ -133,6 +133,10 @@ function initDB() {
                     sold_to TEXT,
                     sold_price INTEGER,
                     sold_at INTEGER,
+                    crafted_by_id TEXT,
+                    crafted_by_name TEXT,
+                    sold_by_id TEXT,
+                    sold_by_name TEXT,
                     discord_message_id TEXT,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
@@ -152,6 +156,10 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_to TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_price INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_at INTEGER`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN crafted_by_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN crafted_by_name TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_by_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_by_name TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN discord_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
@@ -1312,6 +1320,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 sold_to: item.sold_to,
                 sold_price: item.sold_price,
                 sold_at: item.sold_at,
+                sold_by_id: item.sold_by_id,
+                sold_by_name: item.sold_by_name,
             };
             group.serials.push(serialEntry);
             if (item.is_sold) group.sold_serials.push(serialEntry);
@@ -1335,9 +1345,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         const { EmbedBuilder } = require('discord.js');
         const total = rows.length;
         const available = rows.filter(w => !w.is_sold).length;
-        const serials = rows
-            .map(w => `${w.is_sold ? 'VENDU' : 'DISPO'} - ${w.serial_number}${w.sold_to ? ` -> ${w.sold_to}` : ''}`)
-            .join('\n')
+    const serials = rows
+        .map(w => `${w.is_sold ? 'VENDU' : 'DISPO'} - ${w.serial_number}${w.sold_to ? ` -> ${w.sold_to}` : ''}${w.sold_by_name ? ` par ${w.sold_by_name}` : ''}`)
+        .join('\n')
             .slice(0, 1000) || 'N/A';
 
         return new EmbedBuilder()
@@ -1345,11 +1355,12 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             .setDescription(available > 0 ? `${available}/${total} arme(s) encore en vente.` : `Lot vendu entièrement.`)
             .setColor(available > 0 ? 0xff8c00 : 0x4ade80)
             .addFields(
-                { name: 'Vendeur', value: weapon.user_name || 'N/A', inline: true },
-                { name: 'Origine', value: weapon.is_crafted ? 'Craft 21BS validé' : 'Arme externe', inline: true },
-                { name: 'Stock', value: `${available}/${total} disponible(s)`, inline: true },
-                { name: 'Prix affiché', value: moneyLabel(weapon.asking_price), inline: true },
-                { name: 'Seuil minimum', value: moneyLabel(weapon.min_price), inline: true },
+            { name: 'Vendeur', value: weapon.user_name || 'N/A', inline: true },
+            { name: 'Origine', value: weapon.is_crafted ? 'Craft 21BS validé' : 'Arme externe', inline: true },
+            { name: 'Crafté par', value: weapon.is_crafted ? (weapon.crafted_by_name || 'Non renseigné') : 'Arme externe', inline: true },
+            { name: 'Stock', value: `${available}/${total} disponible(s)`, inline: true },
+            { name: 'Prix affiché', value: moneyLabel(weapon.asking_price), inline: true },
+            { name: 'Seuil minimum', value: moneyLabel(weapon.min_price), inline: true },
                 { name: 'N° série', value: serials, inline: false },
             )
             .setTimestamp()
@@ -1414,25 +1425,28 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.post('/api/crafts/myweapons', requireAuth, async (req, res, next) => {
         try {
-            const { weapon_name, is_crafted, serial_number, serial_numbers, asking_price, min_price } = req.body;
+            const { weapon_name, is_crafted, serial_number, serial_numbers, asking_price, min_price, crafted_by_id, crafted_by_name } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
             const userAvatar = req.session.user.avatar || null;
             if (!weapon_name) return res.status(400).json({ error: "Nom de l'arme requis" });
             if (typeof is_crafted === 'undefined') return res.status(400).json({ error: "Origine de l'arme obligatoire" });
+            if (is_crafted && !crafted_by_id) return res.status(400).json({ error: "Armurier obligatoire" });
 
             const serials = normalizeSerialList(serial_numbers || serial_number);
             if (!serials.length) return res.status(400).json({ error: 'N° de série obligatoire pour chaque arme' });
 
             const askingPrice = parseInt(asking_price) || null;
             const minPrice = parseInt(min_price) || null;
+            const craftedById = is_crafted ? String(crafted_by_id || '').trim() : null;
+            const craftedByName = is_crafted ? String(crafted_by_name || '').trim() : null;
             const batchId = `mw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             let id;
 
             if (useSQLite) {
-                const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price, batch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+                const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price, batch_id, crafted_by_id, crafted_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
                 for (const serial of serials) {
-                    const r = stmt.run(userId, userName, userAvatar, weapon_name, is_crafted ? 1 : 0, serial, askingPrice, minPrice, batchId);
+                    const r = stmt.run(userId, userName, userAvatar, weapon_name, is_crafted ? 1 : 0, serial, askingPrice, minPrice, batchId, craftedById, craftedByName);
                     if (!id) id = r.lastInsertRowid;
                 }
             } else {
@@ -1455,6 +1469,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         min_price: minPrice,
                         is_sold: 0,
                         batch_id: batchId,
+                        crafted_by_id: craftedById,
+                        crafted_by_name: craftedByName,
                         created_at: createdAt,
                     });
                 }
@@ -1550,7 +1566,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.patch('/api/crafts/myweapons/:id/sold', requireAuth, async (req, res) => {
         try {
             const id = parseInt(req.params.id);
-            const { sold_to, sold_price } = req.body;
+            const { sold_to, sold_price, sold_by_id, sold_by_name } = req.body;
             const userId = req.session.user.id;
 
             // Récupérer
@@ -1567,10 +1583,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             const now = Math.floor(Date.now() / 1000);
             const soldPrice = parseInt(sold_price) || null;
+            const soldById = String(sold_by_id || '').trim();
+            const soldByName = String(sold_by_name || '').trim();
+            if (!soldById) return res.status(400).json({ error: 'Vendeur obligatoire' });
 
             if (useSQLite) {
-                db.prepare(`UPDATE my_weapons SET is_sold = 1, sold_to = ?, sold_price = ?, sold_at = ? WHERE id = ?`)
-                    .run(sold_to || null, soldPrice, now, id);
+                db.prepare(`UPDATE my_weapons SET is_sold = 1, sold_to = ?, sold_price = ?, sold_at = ?, sold_by_id = ?, sold_by_name = ? WHERE id = ?`)
+                    .run(sold_to || null, soldPrice, now, soldById, soldByName, id);
             } else {
                 const w = jsonData.my_weapons.find(w => w.id === id);
                 if (w) {
@@ -1578,6 +1597,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     w.sold_to = sold_to || null;
                     w.sold_price = soldPrice;
                     w.sold_at = now;
+                    w.sold_by_id = soldById;
+                    w.sold_by_name = soldByName;
                     saveJSON();
                 }
             }
