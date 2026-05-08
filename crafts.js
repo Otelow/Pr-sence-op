@@ -635,24 +635,151 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         return 'image/png';
     }
 
+    function escapeXml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+    }
+
+    function fitCertificateTitle(value) {
+        const text = String(value || 'ARME').trim().toUpperCase();
+        if (text.length <= 18) return { text, size: 58 };
+        if (text.length <= 24) return { text, size: 48 };
+        return { text, size: 40 };
+    }
+
+    async function renderCraftCertificateImage(request, serialNumber, craftDate) {
+        let sharp;
+        try {
+            sharp = require('sharp');
+        } catch (e) {
+            console.warn('sharp indisponible, fallback OpenAI certificat:', e.message);
+            return null;
+        }
+
+        const weaponImagePath = request.weapon_image ? path.join(UPLOADS_DIR, request.weapon_image) : null;
+        const weaponDataUri = weaponImagePath && fs.existsSync(weaponImagePath)
+            ? `data:${mimeFromImagePath(weaponImagePath)};base64,${fs.readFileSync(weaponImagePath).toString('base64')}`
+            : '';
+        const weaponName = fitCertificateTitle(request.weapon_name);
+        const serial = String(serialNumber || 'N/A').trim();
+        const dust = Array.from({ length: 70 }, (_, i) => {
+            const x = (i * 137) % 990 + 12;
+            const y = (i * 211) % 1490 + 18;
+            const o = 0.08 + ((i * 17) % 30) / 250;
+            return `<circle cx="${x}" cy="${y}" r="${(i % 3) + 0.4}" fill="#e6d6b8" opacity="${o.toFixed(2)}"/>`;
+        }).join('');
+        const scratches = Array.from({ length: 34 }, (_, i) => {
+            const x1 = (i * 83) % 1024;
+            const y1 = (i * 149) % 1536;
+            const x2 = Math.min(1024, x1 + 30 + (i % 5) * 22);
+            const y2 = Math.max(0, y1 - 18 + (i % 7) * 6);
+            return `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="#d8c7a6" stroke-width="${i % 4 === 0 ? 2 : 1}" opacity="0.12"/>`;
+        }).join('');
+
+        const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1536" viewBox="0 0 1024 1536">
+  <defs>
+    <radialGradient id="paperGlow" cx="50%" cy="36%" r="72%">
+      <stop offset="0%" stop-color="#1b1711"/>
+      <stop offset="52%" stop-color="#080807"/>
+      <stop offset="100%" stop-color="#030303"/>
+    </radialGradient>
+    <filter id="rough">
+      <feTurbulence type="fractalNoise" baseFrequency="0.88" numOctaves="4" seed="21"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="table" tableValues="0 0.18"/></feComponentTransfer>
+    </filter>
+    <filter id="weaponShadow">
+      <feColorMatrix type="matrix" values="0.05 0 0 0 0  0 0.045 0 0 0  0 0 0.04 0 0  0 0 0 0.92 0"/>
+      <feGaussianBlur stdDeviation="0.35"/>
+    </filter>
+    <filter id="textWear">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" seed="8"/>
+      <feDisplacementMap in="SourceGraphic" scale="1.5"/>
+    </filter>
+    <style>
+      .title { font-family: Impact, Haettenschweiler, 'Arial Black', sans-serif; font-weight: 900; letter-spacing: 8px; }
+      .block { font-family: Impact, Haettenschweiler, 'Arial Black', sans-serif; font-weight: 900; letter-spacing: 3px; }
+      .mono { font-family: 'Arial Narrow', Arial, sans-serif; font-weight: 900; letter-spacing: 5px; }
+      .small { font-family: 'Arial Narrow', Arial, sans-serif; font-weight: 800; letter-spacing: 3px; }
+    </style>
+  </defs>
+  <rect width="1024" height="1536" fill="url(#paperGlow)"/>
+  <rect width="1024" height="1536" filter="url(#rough)" opacity="0.55"/>
+  ${dust}
+  ${scratches}
+  <rect x="15" y="15" width="994" height="1506" rx="10" fill="none" stroke="#d8c7a6" stroke-width="6" opacity="0.55"/>
+  <rect x="28" y="28" width="968" height="1480" rx="7" fill="none" stroke="#6e6049" stroke-width="2" opacity="0.55"/>
+  <path d="M20 86 C76 20 128 18 191 22 M935 20 C985 32 1004 65 1007 123 M18 1426 C54 1498 121 1517 196 1514 M828 1512 C933 1504 996 1460 1005 1378" fill="none" stroke="#d8c7a6" stroke-width="3" opacity="0.45"/>
+  <text x="512" y="176" text-anchor="middle" class="title" font-size="118" fill="#d8cfba" filter="url(#textWear)">CERTIFICAT</text>
+  <line x1="130" y1="276" x2="300" y2="276" stroke="#c55b0a" stroke-width="5" opacity="0.82"/>
+  <text x="512" y="320" text-anchor="middle" class="title" font-size="96" fill="#bd570b" filter="url(#textWear)">D&#39;ARME</text>
+  <line x1="724" y1="276" x2="894" y2="276" stroke="#c55b0a" stroke-width="5" opacity="0.82"/>
+  <text x="250" y="278" text-anchor="middle" class="block" font-size="48" fill="#bd570b">&#9733;</text>
+  <text x="774" y="278" text-anchor="middle" class="block" font-size="48" fill="#bd570b">&#9733;</text>
+  <text x="512" y="407" text-anchor="middle" class="small" font-size="31" fill="#d8cfba">CE DOCUMENT ATTESTE QUE L&#39;ARME CI-DESSOUS</text>
+  <text x="512" y="452" text-anchor="middle" class="small" font-size="31" fill="#d8cfba">A ETE CONTROLEE, APPROUVEE ET ENREGISTREE.</text>
+  <path d="M246 930 C178 797 177 637 246 515 C305 626 304 809 246 930 Z" fill="none" stroke="#4a473d" stroke-width="15" opacity="0.23"/>
+  <path d="M778 930 C846 797 847 637 778 515 C719 626 720 809 778 930 Z" fill="none" stroke="#4a473d" stroke-width="15" opacity="0.23"/>
+  ${weaponDataUri ? `<image href="${weaponDataUri}" x="150" y="510" width="724" height="385" preserveAspectRatio="xMidYMid meet" opacity="0.32" filter="url(#weaponShadow)"/>` : `<path d="M248 710 L776 618 L797 694 L280 812 Z" fill="#0a0a09" opacity="0.30"/>`}
+  <path d="M116 942 L908 942 L930 964 L930 1037 L908 1059 L116 1059 L94 1037 L94 964 Z" fill="#080807" stroke="#bd570b" stroke-width="4"/>
+  <path d="M131 957 L893 957 L913 977 L913 1024 L893 1044 L131 1044 L111 1024 L111 977 Z" fill="none" stroke="#bd570b" stroke-width="1.5" opacity="0.8"/>
+  <text x="512" y="1020" text-anchor="middle" class="block" font-size="${weaponName.size}" fill="#d8cfba" filter="url(#textWear)">${escapeXml(weaponName.text)}</text>
+  <rect x="82" y="1130" width="386" height="126" fill="#080807" stroke="#bd570b" stroke-width="2.5"/>
+  <rect x="556" y="1130" width="386" height="126" fill="#080807" stroke="#bd570b" stroke-width="2.5"/>
+  <line x1="82" y1="1182" x2="468" y2="1182" stroke="#bd570b" stroke-width="2"/>
+  <line x1="556" y1="1182" x2="942" y2="1182" stroke="#bd570b" stroke-width="2"/>
+  <text x="116" y="1169" class="small" font-size="28" fill="#d8cfba">N&#176;</text>
+  <text x="588" y="1169" class="small" font-size="28" fill="#d8cfba">DATE DE CONSTRUCTION</text>
+  <text x="116" y="1232" class="mono" font-size="34" fill="#bd570b">${escapeXml(serial)}</text>
+  <text x="748" y="1232" text-anchor="middle" class="mono" font-size="38" fill="#bd570b">${escapeXml(craftDate)}</text>
+  <g transform="translate(756 1208) rotate(-10)" opacity="0.72">
+    <circle cx="95" cy="95" r="88" fill="none" stroke="#d8cfba" stroke-width="4"/>
+    <circle cx="95" cy="95" r="67" fill="none" stroke="#d8cfba" stroke-width="2"/>
+    <text x="95" y="108" text-anchor="middle" class="block" font-size="34" fill="#d8cfba">APPROUVE</text>
+  </g>
+  <text x="512" y="1364" text-anchor="middle" class="title" font-size="112" fill="#d8cfba" filter="url(#textWear)">21BS</text>
+  <line x1="322" y1="1408" x2="405" y2="1408" stroke="#bd570b" stroke-width="4"/>
+  <text x="512" y="1421" text-anchor="middle" class="small" font-size="34" fill="#d8cfba">21 BLOCK SAVAGE</text>
+  <line x1="619" y1="1408" x2="702" y2="1408" stroke="#bd570b" stroke-width="4"/>
+</svg>`;
+
+        return sharp(Buffer.from(svg)).png().toBuffer();
+    }
+
     async function generateCraftCertificateImage(request, serialNumber, craftedByName) {
+        const craftDate = new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
+        const renderedCertificate = await renderCraftCertificateImage(request, serialNumber, craftDate);
+        if (renderedCertificate) return renderedCertificate;
         if (!process.env.OPENAI_API_KEY) return null;
 
-        const craftDate = new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
         const prompt = [
-            'Créer une image PNG portrait de certificat d’arme 21BS.',
-            'Reproduire le style de référence suivant : grand certificat vertical noir, texture papier ancien usé, coins abîmés, fissures blanches, typographie militaire massive, orange brûlé et blanc cassé, étoiles orange, lignes décoratives orange, lauriers sombres, tampon APPROUVÉ rond au centre bas, logo texte 21BS en bas.',
-            'Le résultat doit ressembler à une affiche officielle “CERTIFICAT D’ARME”, sombre, propre, premium, intimidante, exactement dans l’esprit 21 Block Savage.',
-            'Composition obligatoire :',
-            'Très grand titre en haut : CERTIFICAT en blanc cassé, très usé.',
-            'Sous-titre juste dessous : D’ARME en orange.',
-            'Phrase : CE DOCUMENT ATTESTE QUE L’ARME CI-DESSOUS A ÉTÉ CONTRÔLÉE, APPROUVÉE ET ENREGISTRÉE.',
-            `Nom de l’arme au centre/bas dans un cadre orange : ${request.weapon_name}`,
-            `Numéro de série dans un encadré : ${serialNumber || 'N/A'}`,
-            `Date de construction dans un encadré : ${craftDate}`,
-            'Logo texte en bas : 21BS puis 21 BLOCK SAVAGE',
-            'Utiliser l’image d’arme fournie comme référence visuelle principale : placer cette arme au centre du certificat, en version sombre, intégrée au style, avec la même silhouette générale et les mêmes accents de couleur si visibles.',
-            'Le texte doit être net, lisible, correctement orthographié en français, avec accents.',
+            'Créer une image PNG portrait 1024x1536 de certificat d’arme 21BS.',
+            'Style visuel strict : vieux certificat vertical noir, papier usé, bordures abîmées blanc cassé, coins craquelés, texture poussière/grunge, typographie militaire massive, couleurs noir + blanc cassé + orange brûlé. Le rendu doit être proche de l’image de référence correcte : propre, sombre, premium, menaçant, officiel.',
+            '',
+            'Composition obligatoire, de haut en bas :',
+            '1. Très grand titre exact : CERTIFICAT',
+            '2. Sous-titre exact juste dessous : D’ARME',
+            '3. Phrase exacte, sur deux lignes si besoin : CE DOCUMENT ATTESTE QUE L’ARME CI-DESSOUS A ÉTÉ CONTRÔLÉE, APPROUVÉE ET ENREGISTRÉE.',
+            '4. Au centre : l’arme fournie doit être une ombre sombre, presque noire, intégrée dans le papier, faible contraste, comme une silhouette fantôme. Ne pas la rendre brillante, ne pas la rendre trop nette, ne pas la mettre sur fond gris.',
+            '5. Derrière l’arme : deux lauriers noirs très discrets.',
+            `6. Grand cadre orange avec le nom exact de l’arme : ${request.weapon_name}`,
+            '7. En bas, deux encadrés fins orange :',
+            `   - encadré gauche : label exact "N°" puis valeur exacte "${serialNumber || 'N/A'}"`,
+            `   - encadré droit : label exact "DATE DE CONSTRUCTION" puis valeur exacte "${craftDate}"`,
+            '8. Tampon rond APPROUVÉ en orange ou blanc cassé, discret, près du bas.',
+            '9. Logo texte en bas : 21BS puis 21 BLOCK SAVAGE.',
+            '',
+            'Règles texte très importantes :',
+            'Ne jamais écrire "Numéro de série", "Numéro dé seplé", "Date Dé Construction" ou une variante.',
+            'Le seul label autorisé pour le numéro est exactement : N°',
+            'Le seul label autorisé pour la date est exactement : DATE DE CONSTRUCTION',
+            `La date doit être exactement : ${craftDate}. Ne pas inventer une autre date, ne pas remplacer les chiffres par des lettres.`,
+            'Tout le texte doit être net, lisible, correctement orthographié en français.',
             'Ne pas ajouter de personnes, de scène de violence, de sang, ni de marque réelle.',
         ].join('\n');
 
