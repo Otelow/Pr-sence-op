@@ -649,6 +649,7 @@
 
             <div class="craft-recent-requests">
                 <h4>📜 Demandes récentes</h4>
+                <div class="craft-requests-pagination" id="craftRequestsPagination"></div>
                 <div class="craft-requests-list" id="craftRequestsList">
                     <p class="empty">Aucune demande</p>
                 </div>
@@ -711,17 +712,17 @@
                 <div class="manual-craft-head">
                     <div>
                         <h4>Ajouter un craft manuel</h4>
-                        <p>Pour les armes craftÃ©es avant le dÃ©ploiement du suivi automatique.</p>
+                        <p>Pour les armes craftées avant le déploiement du suivi automatique.</p>
                     </div>
                     <span>Archivage 21BS</span>
                 </div>
                 <div class="manual-craft-grid">
                     <div class="comm-field">
-                        <label class="comm-label">ModÃ¨le de l'arme *</label>
+                        <label class="comm-label">Modèle de l'arme *</label>
                         <select id="manualCraftWeapon" class="comm-input"></select>
                     </div>
                     <div class="comm-field">
-                        <label class="comm-label">NÂ° sÃ©rie *</label>
+                        <label class="comm-label">N° série *</label>
                         <input type="text" id="manualCraftSerial" class="comm-input" placeholder="Ex: ABC123XYZ">
                     </div>
                     <div class="comm-field">
@@ -732,11 +733,11 @@
                         <label class="comm-label">Statut vente</label>
                         <select id="manualCraftSold" class="comm-input" onchange="toggleManualCraftSaleFields()">
                             <option value="0">Non vendu</option>
-                            <option value="1">DÃ©jÃ  vendu</option>
+                            <option value="1">Déjà vendu</option>
                         </select>
                     </div>
                     <div class="comm-field manual-craft-sale-field" style="display:none;">
-                        <label class="comm-label">Vendu Ã  qui</label>
+                        <label class="comm-label">Vendu à qui</label>
                         <select id="manualCraftBuyer" class="comm-input"></select>
                     </div>
                     <div class="comm-field manual-craft-sale-field" style="display:none;">

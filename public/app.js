@@ -2396,6 +2396,11 @@ let craftBoardState = {
     sortBy: 'created',
     sortDir: 'asc',
 };
+let craftRequestsListState = {
+    page: 1,
+    pageSize: 10,
+};
+const MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
 
 function compareWeaponsBySalePrice(a, b) {
     const saleDiff = (Number(b.sale_price) || 0) - (Number(a.sale_price) || 0);
@@ -2729,6 +2734,41 @@ function goToCraftBoard() {
     switchCraftSubtab('board');
 }
 
+function getVisibleCraftRequests() {
+    const u = window.currentUser || {};
+    const hasFullAccess = canValidateCraftClient();
+    let requests = craftRequestsCache.filter(r => r.status !== 'completed' && r.status !== 'rejected');
+
+    if (!hasFullAccess) {
+        requests = requests.filter(r => r.user_id === u.id);
+    }
+
+    return requests.sort((a, b) => Number(b.created_at || b.id || 0) - Number(a.created_at || a.id || 0));
+}
+
+function renderCraftRequestsPagination(total, totalPages, start, end) {
+    const pagination = document.getElementById('craftRequestsPagination');
+    if (!pagination) return;
+
+    if (total <= craftRequestsListState.pageSize) {
+        pagination.innerHTML = total ? `<span class="craft-board-page-info">${total} demande${total > 1 ? 's' : ''}</span>` : '';
+        return;
+    }
+
+    const displayStart = total ? start + 1 : 0;
+    pagination.innerHTML = `
+        <span class="craft-board-page-info">${displayStart}-${end} / ${total} demandes</span>
+        <button type="button" class="craft-board-page-btn" onclick="changeCraftRequestsPage(-1)" ${craftRequestsListState.page <= 1 ? 'disabled' : ''}>Precedent</button>
+        <span class="craft-board-page-current">Page ${craftRequestsListState.page} / ${totalPages}</span>
+        <button type="button" class="craft-board-page-btn" onclick="changeCraftRequestsPage(1)" ${craftRequestsListState.page >= totalPages ? 'disabled' : ''}>Suivant</button>
+    `;
+}
+
+function changeCraftRequestsPage(delta) {
+    craftRequestsListState.page += Number(delta) || 0;
+    renderCraftRequestsList();
+}
+
 function renderCraftRequestsList() {
     const list = document.getElementById('craftRequestsList');
     if (!list) return;
@@ -2738,12 +2778,15 @@ function renderCraftRequestsList() {
     const myUserId = u.id;
 
     // Hauts gradés voient tout, les autres voient uniquement leurs propres demandes
-    let recent = craftRequestsCache
-        .filter(r => r.status !== 'completed' && r.status !== 'rejected');
-    if (!hasFullAccess) {
-        recent = recent.filter(r => r.user_id === myUserId);
-    }
-    recent = recent.slice(0, 20);
+    const allRequests = getVisibleCraftRequests();
+    const total = allRequests.length;
+    const pageSize = craftRequestsListState.pageSize;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    craftRequestsListState.page = Math.min(Math.max(1, craftRequestsListState.page), totalPages);
+    const start = (craftRequestsListState.page - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    const recent = allRequests.slice(start, end);
+    renderCraftRequestsPagination(total, totalPages, start, end);
 
     if (recent.length === 0) {
         list.innerHTML = '<p class="empty">Aucune demande en cours</p>';
@@ -2827,6 +2870,13 @@ function canDeleteRequestsClient() {
     return (u.roles || []).includes('1485279148246175764');
 }
 
+function canDeleteMyWeaponsClient() {
+    const u = window.currentUser || {};
+    if (u.id === '952986899667103804') return true;
+    const roles = u.roles || [];
+    return roles.includes(MY_WEAPONS_DELETE_ROLE) || canDeleteRequestsClient();
+}
+
 async function updateRequestStatus(requestId, status) {
     const labels = {
         waiting_materials: 'En attente des matières premières',
@@ -2872,6 +2922,7 @@ async function deleteCraftRequest(requestId) {
 
 window.updateRequestStatus = updateRequestStatus;
 window.deleteCraftRequest = deleteCraftRequest;
+window.changeCraftRequestsPage = changeCraftRequestsPage;
 
 function getCraftStatusBadge(r) {
     if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">✓ Finalisé</span>';
@@ -3216,11 +3267,11 @@ function renderManualCraftForm() {
     if (!weaponSelect) return;
 
     const labelMap = {
-        manualCraftWeapon: "Modele de l'arme *",
-        manualCraftSerial: 'N° serie *',
+        manualCraftWeapon: "Modèle de l'arme *",
+        manualCraftSerial: 'N° série *',
         manualCraftDate: 'Date craft *',
         manualCraftSold: 'Statut vente',
-        manualCraftBuyer: 'Vendu a qui',
+        manualCraftBuyer: 'Vendu à qui',
         manualCraftSalePrice: 'Prix vente ($)',
     };
     Object.entries(labelMap).forEach(([id, text]) => {
@@ -3244,7 +3295,6 @@ function renderManualCraftForm() {
     }
     toggleManualCraftSaleFields();
 }
-
 function toggleManualCraftSaleFields() {
     const sold = document.getElementById('manualCraftSold')?.value === '1';
     document.querySelectorAll('.manual-craft-sale-field').forEach(el => {
@@ -3683,12 +3733,17 @@ function renderMyWeapons() {
                 ${w.min_price ? `<span class="mw-min-price">📉 Min : ${w.min_price.toLocaleString('fr-FR')}$</span>` : ''}
             `;
 
-        const actions = isMine && !isSold ? `
+        const canDeleteWeapon = isMine || canDeleteMyWeaponsClient();
+        let actions = isMine && !isSold ? `
             <div class="mw-actions">
                 <button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>
                 <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>
             </div>
         ` : (isMine && isSold ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>` : '');
+
+        if (!isMine && canDeleteWeapon) {
+            actions = `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>`;
+        }
 
         return `
             <div class="myweapons-item ${isSold ? 'mw-sold-row' : ''} ${isMine ? 'mw-mine' : ''}">

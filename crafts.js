@@ -926,6 +926,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     const CRAFT_VALIDATION_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
     const SUPER_ADMIN_ROLE = '1485279148246175764';
     const SUPER_ADMIN_USER = '952986899667103804';
+    const MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
 
     function canValidateCraft(user) {
         if (!user) return false;
@@ -940,16 +941,56 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         return (user.roles || []).includes(SUPER_ADMIN_ROLE);
     }
 
+    function canDeleteMyWeapons(user) {
+        if (!user) return false;
+        if (user.id === SUPER_ADMIN_USER) return true;
+        const roles = user.roles || [];
+        return roles.includes(MY_WEAPONS_DELETE_ROLE) || canDeleteRequests(user);
+    }
+
+    async function postManualCraftSaleJustification(requestId, saleTimestamp) {
+        const updated = getRequest(requestId);
+        if (!updated || updated.posted_to_channel) return;
+
+        const state = botState();
+        const channelId = (state?.CONFIG?.CHANNELS?.WEAPONS_LOG) || '1497021044953845791';
+        const channel = botClient.channels.cache.get(channelId);
+        if (!channel) return;
+
+        const saleDate = saleTimestamp ? new Date(saleTimestamp * 1000).toLocaleDateString('fr-FR') : 'N/A';
+        const { EmbedBuilder } = require('discord.js');
+        const embed = new EmbedBuilder()
+            .setTitle(`Justification de vente • ${updated.weapon_name}`)
+            .setDescription('Craft manuel archivé comme vente finalisée.')
+            .setColor(0xffb84d)
+            .addFields(
+                { name: 'Vendeur', value: updated.completed_by_id ? `<@${updated.completed_by_id}>` : (updated.completed_by_name || 'N/A'), inline: true },
+                { name: 'Numéro de série', value: `\`${updated.serial_number || 'N/A'}\``, inline: true },
+                { name: 'Acheteur', value: updated.buyer_org || 'N/A', inline: true },
+                { name: 'Prix final', value: moneyLabel(updated.sale_price), inline: true },
+                { name: 'Date vente', value: saleDate, inline: true },
+            )
+            .setTimestamp()
+            .setFooter({ text: '21 Block Savage • Justification d’arme' });
+
+        await channel.send({
+            content: `✅ Vente archivée • **${updated.weapon_name}**`,
+            embeds: [embed],
+            allowedMentions: { parse: [] },
+        });
+        markRequestPosted(requestId);
+    }
+
     app.post('/api/crafts/requests/manual', requireAuth, async (req, res) => {
         try {
             if (!canValidateCraft(req.session.user)) {
-                return res.status(403).json({ error: 'Action rÃ©servÃ©e aux hauts gradÃ©s' });
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
 
             const { weapon_id, serial_number, craft_date, is_sold, buyer_org, sale_price } = req.body;
             const weapon = getWeapon(parseInt(weapon_id));
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
-            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'NÂ° de sÃ©rie obligatoire' });
+            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N° de série obligatoire' });
             if (!craft_date) return res.status(400).json({ error: 'Date craft obligatoire' });
             if (is_sold && !buyer_org) return res.status(400).json({ error: 'Organisation acheteuse obligatoire si vendu' });
 
@@ -1035,6 +1076,14 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     created_at: now,
                 });
                 saveJSON();
+            }
+
+            if (sold) {
+                try {
+                    await postManualCraftSaleJustification(requestId, now);
+                } catch (e) {
+                    console.error('Erreur justification craft manuel:', e.message);
+                }
             }
 
             res.json({ success: true, id: requestId, myWeaponId });
@@ -1674,8 +1723,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             if (!existing) return res.status(404).json({ error: 'Introuvable' });
             // Le vendeur peut supprimer sa propre annonce, OU super admin
-            if (existing.user_id !== userId && !canDeleteRequests(req.session.user)) {
-                return res.status(403).json({ error: 'Action non autorisÃ©e' });
+            if (existing.user_id !== userId && !canDeleteMyWeapons(req.session.user)) {
+                return res.status(403).json({ error: 'Action non autorisée' });
             }
             if (existing.discord_message_id) {
                 try {
