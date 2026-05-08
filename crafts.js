@@ -1191,6 +1191,21 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     // â”€â”€â”€ MY WEAPONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const MYWEAPONS_CHANNEL = '1497185767053594695';
+    const MYWEAPONS_AUTHORIZED_CRAFTERS = [
+        { id: 'otelow', name: 'Otelow' },
+        { id: 'ney', name: 'Ney' },
+        { id: 'le-h', name: 'Le H' },
+    ];
+
+    function resolveAuthorizedCrafter(craftedById, craftedByName) {
+        const rawId = String(craftedById || '').trim().toLowerCase();
+        const rawName = String(craftedByName || '').trim().toLowerCase();
+        return MYWEAPONS_AUTHORIZED_CRAFTERS.find(c =>
+            c.id.toLowerCase() === rawId ||
+            c.name.toLowerCase() === rawName ||
+            c.name.toLowerCase() === rawId
+        ) || null;
+    }
 
     function normalizeSerialList(input) {
         const raw = Array.isArray(input) ? input.join('\n') : String(input || '');
@@ -1341,22 +1356,26 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             const weaponName = matchedWeaponName ? matchedWeaponName.name : requestedWeaponName;
             if (typeof is_crafted === 'undefined') return res.status(400).json({ error: "Origine de l'arme obligatoire" });
-            if (is_crafted && !crafted_by_id) return res.status(400).json({ error: "Armurier obligatoire" });
+            const isCrafted21BS = is_crafted === true || is_crafted === 1 || is_crafted === '1' || is_crafted === 'true';
+            const authorizedCrafter = isCrafted21BS ? resolveAuthorizedCrafter(crafted_by_id, crafted_by_name) : null;
+            if (isCrafted21BS && !authorizedCrafter) {
+                return res.status(400).json({ error: "Armurier autorisé obligatoire : Otelow, Ney ou Le H" });
+            }
 
             const serials = normalizeSerialList(serial_numbers || serial_number);
             if (!serials.length) return res.status(400).json({ error: 'NÂ° de sÃ©rie obligatoire pour chaque arme' });
 
             const askingPrice = parseInt(asking_price) || null;
             const minPrice = parseInt(min_price) || null;
-            const craftedById = is_crafted ? String(crafted_by_id || '').trim() : null;
-            const craftedByName = is_crafted ? String(crafted_by_name || '').trim() : null;
+            const craftedById = isCrafted21BS ? authorizedCrafter.id : null;
+            const craftedByName = isCrafted21BS ? authorizedCrafter.name : null;
             const batchId = `mw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             let id;
 
             if (useSQLite) {
                 const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price, batch_id, crafted_by_id, crafted_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
                 for (const serial of serials) {
-                    const r = stmt.run(userId, userName, userAvatar, weaponName, is_crafted ? 1 : 0, serial, askingPrice, minPrice, batchId, craftedById, craftedByName);
+                    const r = stmt.run(userId, userName, userAvatar, weaponName, isCrafted21BS ? 1 : 0, serial, askingPrice, minPrice, batchId, craftedById, craftedByName);
                     if (!id) id = r.lastInsertRowid;
                 }
             } else {
@@ -1373,7 +1392,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         user_name: userName,
                         user_avatar: userAvatar,
                         weapon_name: weaponName,
-                        is_crafted: is_crafted ? 1 : 0,
+                        is_crafted: isCrafted21BS ? 1 : 0,
                         serial_number: serial,
                         asking_price: askingPrice,
                         min_price: minPrice,

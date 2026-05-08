@@ -3390,6 +3390,11 @@ function setupAdminSlide() {
 // ============================================================
 let myWeaponsCache = [];
 let myWeaponNamesCache = [];
+const myWeaponsAuthorizedCrafters = [
+    { id: 'otelow', name: 'Otelow' },
+    { id: 'ney', name: 'Ney' },
+    { id: 'le-h', name: 'Le H' },
+];
 
 async function initMyWeaponsTab() {
     if (!organizationsCache || organizationsCache.length === 0) {
@@ -3452,12 +3457,18 @@ function populateMyWeaponsMemberSelects() {
         `<option value="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`
     )).join('');
 
-    ['mwCraftedBy', 'markSoldBy'].forEach(id => {
-        const select = document.getElementById(id);
-        if (!select) return;
-        select.innerHTML = options;
-        if (currentId && members.some(m => m.id === currentId)) select.value = currentId;
-    });
+    const craftedBySelect = document.getElementById('mwCraftedBy');
+    if (craftedBySelect) {
+        craftedBySelect.innerHTML = '<option value="">— Choisir un armurier —</option>' + myWeaponsAuthorizedCrafters.map(c => (
+            `<option value="${escapeHtml(c.id)}" data-name="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`
+        )).join('');
+    }
+
+    const soldBySelect = document.getElementById('markSoldBy');
+    if (soldBySelect) {
+        soldBySelect.innerHTML = options;
+        if (currentId && members.some(m => m.id === currentId)) soldBySelect.value = currentId;
+    }
 }
 
 function getSelectedMember(selectId) {
