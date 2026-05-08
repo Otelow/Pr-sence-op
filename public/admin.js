@@ -2,6 +2,7 @@
 // ADMIN PANEL — JS
 // ============================================================
 let adminWeapons = [];
+let adminMyWeaponNames = [];
 let adminIngredients = [];
 let adminOrgs = [];
 let adminRoles = [];
@@ -24,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     loadAdminWeapons();
+    loadAdminMyWeaponNames();
     loadAdminIngredients();
     loadAdminOrgs();
     loadAdminRoles();
@@ -484,6 +486,73 @@ async function deleteWeapon(id) {
     }
 }
 window.deleteWeapon = deleteWeapon;
+
+// ─── ARMES A VENDRE (Vos Armes) ───────────────────────────
+async function loadAdminMyWeaponNames() {
+    try {
+        const r = await fetch('/api/crafts/myweapon-names');
+        const d = await r.json();
+        adminMyWeaponNames = d.names || [];
+        renderAdminMyWeaponNames();
+    } catch {
+        adminMyWeaponNames = [];
+        renderAdminMyWeaponNames();
+    }
+}
+
+function renderAdminMyWeaponNames() {
+    const list = document.getElementById('adminMyWeaponNamesList');
+    if (!list) return;
+    if (!adminMyWeaponNames.length) {
+        list.innerHTML = '<p class="empty">Aucun nom configuré. Ajoute les armes disponibles pour Vos Armes.</p>';
+        return;
+    }
+    list.innerHTML = adminMyWeaponNames.map(item => `
+        <div class="admin-myweapon-name-row">
+            <strong>${escapeHtml(item.name)}</strong>
+            <button class="btn-danger btn-small" onclick="deleteMyWeaponNameFromAdmin(${item.id})">Supprimer</button>
+        </div>
+    `).join('');
+}
+
+async function addMyWeaponNameFromAdmin() {
+    const input = document.getElementById('newMyWeaponName');
+    const name = input?.value?.trim();
+    if (!name) { toast('❌ Nom requis', 'error'); return; }
+    try {
+        const res = await fetch('/api/crafts/myweapon-names', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast('✅ Nom ajouté');
+            input.value = '';
+            await loadAdminMyWeaponNames();
+        } else {
+            toast(`❌ ${data.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+async function deleteMyWeaponNameFromAdmin(id) {
+    if (!await confirmAction({ title: 'Supprimer le nom', message: 'Retirer ce nom du menu Vos Armes ?', confirmText: 'Supprimer', danger: true })) return;
+    try {
+        const res = await fetch(`/api/crafts/myweapon-names/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            toast('🗑 Nom supprimé');
+            await loadAdminMyWeaponNames();
+        }
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+window.addMyWeaponNameFromAdmin = addMyWeaponNameFromAdmin;
+window.deleteMyWeaponNameFromAdmin = deleteMyWeaponNameFromAdmin;
 
 // ─── INGRÉDIENTS ─────────────────────
 async function loadAdminIngredients() {

@@ -24,6 +24,7 @@
     <!-- TABS ADMIN -->
     <nav class="admin-tabs">
         <button class="admin-tab active" data-admin-tab="weapons" onclick="switchAdminTab('weapons')">🔫 Armes</button>
+        <button class="admin-tab" data-admin-tab="saleNames" onclick="switchAdminTab('saleNames')">📋 Armes à vendre</button>
         <button class="admin-tab" data-admin-tab="ingredients" onclick="switchAdminTab('ingredients')">🧪 Ingrédients</button>
         <button class="admin-tab" data-admin-tab="orgs" onclick="switchAdminTab('orgs')">🏢 Organisations</button>
         <button class="admin-tab" data-admin-tab="impersonate" onclick="switchAdminTab('impersonate')">👁 Vue impersonate</button>
@@ -41,6 +42,23 @@
             </div>
 
             <div class="admin-weapons-list" id="adminWeaponsList">
+                <p class="empty">Chargement...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ARMES A VENDRE -->
+    <section class="admin-tab-content" id="adminTab-saleNames" style="display:none;">
+        <div class="admin-section">
+            <h2 class="section-title">📋 Noms des armes pour Vos Armes</h2>
+            <p class="admin-info">Ces noms apparaissent dans le menu déroulant "Nom de l'arme" quand un membre met une arme en vente.</p>
+
+            <div class="admin-org-form">
+                <input type="text" id="newMyWeaponName" class="comm-input" placeholder="Ex: Pistolet Cal.50">
+                <button class="btn-primary" onclick="addMyWeaponNameFromAdmin()">+ Ajouter</button>
+            </div>
+
+            <div class="admin-myweapon-names-list" id="adminMyWeaponNamesList">
                 <p class="empty">Chargement...</p>
             </div>
         </div>

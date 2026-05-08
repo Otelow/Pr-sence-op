@@ -4847,6 +4847,26 @@ select:focus {
     outline: none !important;
 }
 
+select,
+select.comm-input,
+select.comm-select,
+select.craft-filter-select,
+select.craft-org-select {
+    color: var(--text) !important;
+    background-color: rgba(0, 0, 0, 0.42) !important;
+}
+
+select option {
+    background: #111114 !important;
+    color: #f5f5f5 !important;
+}
+
+select option:checked,
+select option:hover {
+    background: #ff8c00 !important;
+    color: #08080a !important;
+}
+
 /* ─── BTN BACK CHANNELS ──────────────────────────────────── */
 .btn-back-channels {
     background: rgba(255, 255, 255, 0.04) !important;
@@ -5762,6 +5782,30 @@ body {
     border-radius: 8px;
 }
 
+.admin-myweapon-names-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+}
+
+.admin-myweapon-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: rgba(20, 20, 24, 0.55);
+    border: 0.5px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+.admin-myweapon-name-row strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ============================================================
    CRAFT D'ARMES — Section principale
    ============================================================ */
@@ -6241,6 +6285,12 @@ body {
     background: rgba(96, 165, 250, 0.15);
     color: var(--blue);
     border: 0.5px solid rgba(96, 165, 250, 0.3);
+}
+
+.craft-status-materials {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--accent);
+    border: 0.5px solid rgba(245, 158, 11, 0.35);
 }
 
 .craft-status-crafted {
@@ -6994,6 +7044,7 @@ body {
 }
 
 .btn-status-progress,
+.btn-status-materials,
 .btn-status-reject,
 .btn-status-pending,
 .btn-status-delete {
@@ -7014,6 +7065,13 @@ body {
     color: var(--blue);
 }
 .btn-status-progress:hover { background: rgba(96, 165, 250, 0.25); }
+
+.btn-status-materials {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.32);
+    color: var(--accent);
+}
+.btn-status-materials:hover { background: rgba(245, 158, 11, 0.24); }
 
 .btn-status-reject {
     background: rgba(239, 68, 68, 0.12);
