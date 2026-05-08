@@ -3408,23 +3408,26 @@ async function submitMyWeapon() {
     const weapon_name = document.getElementById('mwName').value.trim();
     const origin = document.querySelector('input[name="mwOrigin"]:checked')?.value;
     const is_crafted = origin === 'crafted';
-    const serial_number = document.getElementById('mwSerial').value.trim();
+    const serial_numbers = document.getElementById('mwSerial').value
+        .split(/[\n,;]+/)
+        .map(s => s.trim())
+        .filter(Boolean);
     const asking_price = document.getElementById('mwAskingPrice').value;
     const min_price = document.getElementById('mwMinPrice').value;
 
     if (!weapon_name) { toast('❌ Nom de l\'arme requis', 'error'); return; }
     if (!origin) { toast('❌ Origine de l\'arme requise', 'error'); return; }
-    if (!serial_number) { toast('❌ N° de série obligatoire', 'error'); return; }
+    if (!serial_numbers.length) { toast('❌ N° de série obligatoire pour chaque arme', 'error'); return; }
 
     try {
         const res = await fetch('/api/crafts/myweapons', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ weapon_name, is_crafted, serial_number, asking_price, min_price })
+            body: JSON.stringify({ weapon_name, is_crafted, serial_numbers, asking_price, min_price })
         });
         const data = await res.json();
         if (res.ok) {
-            toast('✅ Arme mise en vente — annonce postée sur Discord');
+            toast(`✅ ${data.quantity || serial_numbers.length} arme(s) mise(s) en vente — 1 annonce Discord`);
             document.getElementById('mwName').value = '';
             document.getElementById('mwSerial').value = '';
             document.getElementById('mwAskingPrice').value = '';
@@ -3452,7 +3455,14 @@ function renderMyWeapons() {
             : `<div class="mw-avatar mw-avatar-fallback">${(w.user_name || '?').substring(0, 1).toUpperCase()}</div>`;
 
         const isMine = w.is_mine;
-        const isSold = !!w.is_sold;
+        const totalQty = w.quantity_total || 1;
+        const availableQty = typeof w.quantity_available === 'number' ? w.quantity_available : (w.is_sold ? 0 : 1);
+        const serials = Array.isArray(w.serials) ? w.serials : [];
+        const isSold = availableQty <= 0;
+        const serialPreview = serials.length
+            ? serials.slice(0, 6).map(s => `${s.is_sold ? 'Vendu' : 'Dispo'}: ${escapeHtml(s.serial_number || '')}`).join(' • ')
+            : (w.serial_number ? escapeHtml(w.serial_number) : '');
+        const moreSerials = serials.length > 6 ? ` +${serials.length - 6}` : '';
 
         const priceBlock = isSold
             ? `<span class="mw-sold-price">✅ Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '→ ' + escapeHtml(w.sold_to) : ''}</span>`
@@ -3475,11 +3485,12 @@ function renderMyWeapons() {
                     <div class="myweapons-item-name">
                         ${escapeHtml(w.weapon_name)}
                         ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
+                        <span class="myweapons-tag-stock">${availableQty}/${totalQty}</span>
                         ${isSold ? '<span class="myweapons-tag-sold">VENDU</span>' : ''}
                     </div>
                     <div class="myweapons-item-meta">
                         <span class="mw-username">👤 ${escapeHtml(w.user_name)}</span>
-                        ${w.serial_number ? `<span>N°: ${escapeHtml(w.serial_number)}</span>` : ''}
+                        ${serialPreview ? `<span>N°: ${serialPreview}${moreSerials}</span>` : ''}
                         ${priceBlock}
                         <span>📅 ${date}</span>
                     </div>
@@ -3492,11 +3503,23 @@ function renderMyWeapons() {
 
 // ─── Modal "Marquer comme vendu" ───
 function openMarkSoldModal(id) {
-    document.getElementById('markSoldId').value = id;
+    const item = myWeaponsCache.find(w => Number(w.id) === Number(id));
+    const availableSerials = item && Array.isArray(item.serials)
+        ? item.serials.filter(s => !s.is_sold)
+        : [];
+    const soldIdInput = document.getElementById('markSoldId');
+    soldIdInput.value = availableSerials[0]?.id || id;
     document.getElementById('markSoldPrice').value = '';
     const label = document.getElementById('markSoldBuyerLabel');
     if (label) { label.classList.add('custom-dropdown-placeholder'); label.innerHTML = '— Choisir —'; }
     document.getElementById('markSoldBuyer').value = '';
+    const serialField = document.getElementById('markSoldSerialField');
+    const serialSelect = document.getElementById('markSoldSerial');
+    if (serialSelect && serialField) {
+        serialSelect.innerHTML = availableSerials.map(s => `<option value="${s.id}">${escapeHtml(s.serial_number || '')}</option>`).join('');
+        serialField.style.display = availableSerials.length > 1 ? 'block' : 'none';
+        serialSelect.onchange = () => { soldIdInput.value = serialSelect.value; };
+    }
     document.getElementById('markSoldModal').style.display = 'flex';
 }
 

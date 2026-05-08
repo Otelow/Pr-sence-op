@@ -153,6 +153,7 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_price INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_at INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN discord_message_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
 
             const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
@@ -1279,6 +1280,120 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     // ─── MY WEAPONS ─────────────────────
     const MYWEAPONS_CHANNEL = '1497185767053594695';
 
+    function normalizeSerialList(input) {
+        const raw = Array.isArray(input) ? input.join('\n') : String(input || '');
+        return [...new Set(raw.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean))];
+    }
+
+    function aggregateMyWeapons(list, userId) {
+        const grouped = new Map();
+        for (const item of list) {
+            const key = item.batch_id || `single-${item.id}`;
+            if (!grouped.has(key)) {
+                grouped.set(key, {
+                    ...item,
+                    group_id: key,
+                    serials: [],
+                    sold_serials: [],
+                    row_ids: [],
+                    available_row_ids: [],
+                    quantity_total: 0,
+                    quantity_available: 0,
+                    is_mine: item.user_id === userId,
+                });
+            }
+            const group = grouped.get(key);
+            group.quantity_total++;
+            group.row_ids.push(item.id);
+            const serialEntry = {
+                id: item.id,
+                serial_number: item.serial_number,
+                is_sold: !!item.is_sold,
+                sold_to: item.sold_to,
+                sold_price: item.sold_price,
+                sold_at: item.sold_at,
+            };
+            group.serials.push(serialEntry);
+            if (item.is_sold) group.sold_serials.push(serialEntry);
+            if (!item.is_sold) {
+                group.quantity_available++;
+                group.available_row_ids.push(item.id);
+                group.id = item.id;
+                group.is_sold = 0;
+                group.sold_to = null;
+                group.sold_price = null;
+                group.sold_at = null;
+            }
+        }
+        return [...grouped.values()].sort((a, b) => {
+            if ((a.quantity_available > 0) !== (b.quantity_available > 0)) return a.quantity_available > 0 ? -1 : 1;
+            return (b.created_at || 0) - (a.created_at || 0);
+        });
+    }
+
+    function buildMyWeaponsEmbed(weapon, rows) {
+        const { EmbedBuilder } = require('discord.js');
+        const total = rows.length;
+        const available = rows.filter(w => !w.is_sold).length;
+        const serials = rows
+            .map(w => `${w.is_sold ? 'VENDU' : 'DISPO'} - ${w.serial_number}${w.sold_to ? ` -> ${w.sold_to}` : ''}`)
+            .join('\n')
+            .slice(0, 1000) || 'N/A';
+
+        return new EmbedBuilder()
+            .setTitle(`Marché armurerie • ${weapon.weapon_name}`)
+            .setDescription(available > 0 ? `${available}/${total} arme(s) encore en vente.` : `Lot vendu entièrement.`)
+            .setColor(available > 0 ? 0xff8c00 : 0x4ade80)
+            .addFields(
+                { name: 'Vendeur', value: weapon.user_name || 'N/A', inline: true },
+                { name: 'Origine', value: weapon.is_crafted ? 'Craft 21BS validé' : 'Arme externe', inline: true },
+                { name: 'Stock', value: `${available}/${total} disponible(s)`, inline: true },
+                { name: 'Prix affiché', value: moneyLabel(weapon.asking_price), inline: true },
+                { name: 'Seuil minimum', value: moneyLabel(weapon.min_price), inline: true },
+                { name: 'N° série', value: serials, inline: false },
+            )
+            .setTimestamp()
+            .setFooter({ text: '21 Block Savage • Marché armurerie' });
+    }
+
+    async function updateMyWeaponsDiscordBatch(existing) {
+        let rows;
+        if (useSQLite) {
+            rows = existing.batch_id
+                ? db.prepare('SELECT * FROM my_weapons WHERE batch_id = ? ORDER BY id ASC').all(existing.batch_id)
+                : [db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(existing.id)];
+        } else {
+            rows = (jsonData.my_weapons || []).filter(w => existing.batch_id ? w.batch_id === existing.batch_id : w.id === existing.id);
+        }
+        rows = rows.filter(Boolean);
+        if (!rows.length) return;
+
+        const base = rows[0];
+        const available = rows.filter(w => !w.is_sold).length;
+        const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
+        if (!channel) return;
+        const embed = buildMyWeaponsEmbed(base, rows);
+        const content = available > 0
+            ? `Annonce armurerie : **${base.weapon_name}** • ${available}/${rows.length} disponible(s).`
+            : `Annonce clôturée • **${base.weapon_name}** • lot vendu.`;
+        const messageId = rows.find(w => w.discord_message_id)?.discord_message_id;
+        if (messageId) {
+            try {
+                const msg = await channel.messages.fetch(messageId);
+                await msg.edit({ content, embeds: [embed], allowedMentions: { parse: [] } });
+                return;
+            } catch {}
+        }
+        const msg = await channel.send({ content, embeds: [embed], allowedMentions: { parse: [] } });
+        if (useSQLite) {
+            if (base.batch_id) db.prepare('UPDATE my_weapons SET discord_message_id = ? WHERE batch_id = ?').run(msg.id, base.batch_id);
+            else db.prepare('UPDATE my_weapons SET discord_message_id = ? WHERE id = ?').run(msg.id, base.id);
+        } else {
+            for (const w of rows) w.discord_message_id = msg.id;
+            saveJSON();
+        }
+    }
+
     app.get('/api/crafts/myweapons', requireAuth, (req, res) => {
         try {
             const userId = req.session.user.id;
@@ -1293,13 +1408,71 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     return (b.created_at || 0) - (a.created_at || 0);
                 });
             }
-            // Marquer celles qui appartiennent au current user
-            list = list.map(w => ({ ...w, is_mine: w.user_id === userId }));
-            res.json({ myweapons: list });
+            res.json({ myweapons: aggregateMyWeapons(list, userId) });
         } catch (e) { res.json({ myweapons: [], error: e.message }); }
     });
 
-    app.post('/api/crafts/myweapons', requireAuth, async (req, res) => {
+    app.post('/api/crafts/myweapons', requireAuth, async (req, res, next) => {
+        try {
+            const { weapon_name, is_crafted, serial_number, serial_numbers, asking_price, min_price } = req.body;
+            const userId = req.session.user.id;
+            const userName = req.session.user.username;
+            const userAvatar = req.session.user.avatar || null;
+            if (!weapon_name) return res.status(400).json({ error: "Nom de l'arme requis" });
+            if (typeof is_crafted === 'undefined') return res.status(400).json({ error: "Origine de l'arme obligatoire" });
+
+            const serials = normalizeSerialList(serial_numbers || serial_number);
+            if (!serials.length) return res.status(400).json({ error: 'N° de série obligatoire pour chaque arme' });
+
+            const askingPrice = parseInt(asking_price) || null;
+            const minPrice = parseInt(min_price) || null;
+            const batchId = `mw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            let id;
+
+            if (useSQLite) {
+                const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price, batch_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+                for (const serial of serials) {
+                    const r = stmt.run(userId, userName, userAvatar, weapon_name, is_crafted ? 1 : 0, serial, askingPrice, minPrice, batchId);
+                    if (!id) id = r.lastInsertRowid;
+                }
+            } else {
+                if (!jsonData.my_weapons) jsonData.my_weapons = [];
+                if (!jsonData.counters.myweapons) jsonData.counters.myweapons = 0;
+                const createdAt = Math.floor(Date.now() / 1000);
+                for (const serial of serials) {
+                    jsonData.counters.myweapons++;
+                    const rowId = jsonData.counters.myweapons;
+                    if (!id) id = rowId;
+                    jsonData.my_weapons.push({
+                        id: rowId,
+                        user_id: userId,
+                        user_name: userName,
+                        user_avatar: userAvatar,
+                        weapon_name,
+                        is_crafted: is_crafted ? 1 : 0,
+                        serial_number: serial,
+                        asking_price: askingPrice,
+                        min_price: minPrice,
+                        is_sold: 0,
+                        batch_id: batchId,
+                        created_at: createdAt,
+                    });
+                }
+                saveJSON();
+            }
+
+            try {
+                const first = useSQLite ? db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id) : (jsonData.my_weapons || []).find(w => w.id === id);
+                if (first) await updateMyWeaponsDiscordBatch(first);
+            } catch (e) { console.error('Erreur post Discord myweapons:', e.message); }
+
+            return res.json({ success: true, id, quantity: serials.length });
+        } catch (e) {
+            return res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/crafts/myweapons-legacy', requireAuth, async (req, res) => {
         try {
             const { weapon_name, is_crafted, serial_number, asking_price, min_price } = req.body;
             const userId = req.session.user.id;
@@ -1451,6 +1624,10 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             } catch (e) { console.error('Erreur update Discord:', e.message); }
 
             // Auto-remplir Tableau de craft si l'arme est craftée 21BS et a un N°Série
+            try {
+                await updateMyWeaponsDiscordBatch(existing);
+            } catch (e) { console.error('Erreur update Discord lot myweapons:', e.message); }
+
             let autoFilledCraft = null;
             if (existing.is_crafted && existing.serial_number) {
                 try {
@@ -1534,7 +1711,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    app.delete('/api/crafts/myweapons/:id', requireAuth, (req, res) => {
+    app.delete('/api/crafts/myweapons/:id', requireAuth, async (req, res) => {
         try {
             const id = parseInt(req.params.id);
             const userId = req.session.user.id;
@@ -1549,10 +1726,18 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (existing.user_id !== userId && !canDeleteRequests(req.session.user)) {
                 return res.status(403).json({ error: 'Action non autorisée' });
             }
+            if (existing.discord_message_id) {
+                try {
+                    const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
+                    const msg = channel ? await channel.messages.fetch(existing.discord_message_id) : null;
+                    if (msg) await msg.delete();
+                } catch {}
+            }
             if (useSQLite) {
-                db.prepare('DELETE FROM my_weapons WHERE id = ?').run(id);
+                if (existing.batch_id) db.prepare('DELETE FROM my_weapons WHERE batch_id = ?').run(existing.batch_id);
+                else db.prepare('DELETE FROM my_weapons WHERE id = ?').run(id);
             } else {
-                jsonData.my_weapons = (jsonData.my_weapons || []).filter(w => w.id !== id);
+                jsonData.my_weapons = (jsonData.my_weapons || []).filter(w => existing.batch_id ? w.batch_id !== existing.batch_id : w.id !== id);
                 saveJSON();
             }
             res.json({ success: true });
