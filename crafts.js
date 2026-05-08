@@ -330,12 +330,12 @@ function getRequests(status) {
 
 function getRequest(id) {
     if (useSQLite) {
-        return db.prepare(`SELECT r.*, w.name as weapon_name FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id WHERE r.id = ?`).get(id);
+        return db.prepare(`SELECT r.*, w.name as weapon_name, w.image_path as weapon_image FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id WHERE r.id = ?`).get(id);
     }
     const r = jsonData.craft_requests.find(r => r.id === id);
     if (!r) return null;
     const w = jsonData.weapons.find(w => w.id === r.weapon_id);
-    return { ...r, weapon_name: w ? w.name : '?' };
+    return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null };
 }
 
 function insertRequest(user_id, user_name, weapon_id, has_plan, has_money) {
@@ -628,27 +628,65 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             .slice(0, 80) || 'certificat';
     }
 
+    function mimeFromImagePath(filePath) {
+        const ext = path.extname(filePath || '').toLowerCase();
+        if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+        if (ext === '.webp') return 'image/webp';
+        return 'image/png';
+    }
+
     async function generateCraftCertificateImage(request, serialNumber, craftedByName) {
         if (!process.env.OPENAI_API_KEY) return null;
 
         const craftDate = new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
         const prompt = [
-            'Créer une image PNG portrait de certificat d’arme, style affiche officielle 21 Block Savage.',
-            'Design proche d’un certificat militaire clandestin premium : fond noir texturé usé, bordures abîmées, typographie bloc massive, orange brûlé et blanc cassé, tampon APPROUVÉ, étoiles orange, effet papier ancien rayé.',
+            'Créer une image PNG portrait de certificat d’arme 21BS.',
+            'Reproduire le style de référence suivant : grand certificat vertical noir, texture papier ancien usé, coins abîmés, fissures blanches, typographie militaire massive, orange brûlé et blanc cassé, étoiles orange, lignes décoratives orange, lauriers sombres, tampon APPROUVÉ rond au centre bas, logo texte 21BS en bas.',
+            'Le résultat doit ressembler à une affiche officielle “CERTIFICAT D’ARME”, sombre, propre, premium, intimidante, exactement dans l’esprit 21 Block Savage.',
             'Composition obligatoire :',
-            'Très grand titre en haut : CERTIFICAT',
-            'Sous-titre orange : D’ARME',
+            'Très grand titre en haut : CERTIFICAT en blanc cassé, très usé.',
+            'Sous-titre juste dessous : D’ARME en orange.',
             'Phrase : CE DOCUMENT ATTESTE QUE L’ARME CI-DESSOUS A ÉTÉ CONTRÔLÉE, APPROUVÉE ET ENREGISTRÉE.',
             `Nom de l’arme au centre/bas dans un cadre orange : ${request.weapon_name}`,
             `Numéro de série dans un encadré : ${serialNumber || 'N/A'}`,
             `Date de construction dans un encadré : ${craftDate}`,
             'Logo texte en bas : 21BS puis 21 BLOCK SAVAGE',
-            'Ajouter une silhouette sombre d’arme au centre, non réaliste détaillée, sans marque réelle lisible.',
+            'Utiliser l’image d’arme fournie comme référence visuelle principale : placer cette arme au centre du certificat, en version sombre, intégrée au style, avec la même silhouette générale et les mêmes accents de couleur si visibles.',
             'Le texte doit être net, lisible, correctement orthographié en français, avec accents.',
             'Ne pas ajouter de personnes, de scène de violence, de sang, ni de marque réelle.',
         ].join('\n');
 
         try {
+            const weaponImagePath = request.weapon_image ? path.join(UPLOADS_DIR, request.weapon_image) : null;
+            if (weaponImagePath && fs.existsSync(weaponImagePath) && typeof FormData !== 'undefined' && typeof Blob !== 'undefined') {
+                try {
+                    const form = new FormData();
+                    form.append('model', OPENAI_IMAGE_MODEL);
+                    form.append('prompt', prompt);
+                    form.append('size', '1024x1536');
+                    form.append('quality', process.env.OPENAI_IMAGE_QUALITY || 'medium');
+                    form.append('n', '1');
+                    form.append('image', new Blob([fs.readFileSync(weaponImagePath)], { type: mimeFromImagePath(weaponImagePath) }), request.weapon_image);
+
+                    const editResponse = await fetch('https://api.openai.com/v1/images/edits', {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+                        body: form,
+                        signal: AbortSignal.timeout(120000),
+                    });
+
+                    const editData = await editResponse.json();
+                    if (!editResponse.ok) {
+                        console.error('Erreur édition image certificat OpenAI:', editData?.error?.message || `HTTP ${editResponse.status}`);
+                    } else {
+                        const editedBase64 = editData?.data?.[0]?.b64_json;
+                        if (editedBase64) return Buffer.from(editedBase64, 'base64');
+                    }
+                } catch (editError) {
+                    console.error('Erreur édition image certificat OpenAI:', editError.message);
+                }
+            }
+
             const response = await axios.post('https://api.openai.com/v1/images/generations', {
                 model: OPENAI_IMAGE_MODEL,
                 prompt,
