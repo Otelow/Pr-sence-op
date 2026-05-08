@@ -2002,6 +2002,80 @@ html, body {
     margin-top: 8px;
 }
 
+#pointModal .modal-content {
+    max-width: 620px !important;
+}
+
+#pointModal .roles-selector {
+    display: grid;
+    gap: 6px;
+    max-height: 240px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.48);
+    border: 1px solid rgba(255, 140, 0, 0.18);
+    border-radius: 10px;
+}
+
+#pointModal .role-checkbox {
+    display: grid;
+    grid-template-columns: 18px 10px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.025);
+}
+
+#pointModal .role-checkbox:hover {
+    background: rgba(255, 140, 0, 0.08);
+    border-color: rgba(255, 140, 0, 0.28);
+}
+
+#pointModal .role-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    justify-self: center;
+    accent-color: var(--accent);
+}
+
+#pointModal .role-color-dot {
+    width: 8px;
+    height: 8px;
+    justify-self: center;
+}
+
+#pointModal .role-checkbox-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+#pointModal .role-checkbox-count {
+    min-width: 28px;
+    text-align: right;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-family: var(--font-mono);
+}
+
+#pointModal .roles-quick-actions {
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+#pointModal .btn-quick {
+    min-height: 32px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
 .btn-quick {
     padding: 4px 10px;
     background: transparent;
