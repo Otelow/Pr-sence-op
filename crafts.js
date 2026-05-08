@@ -853,6 +853,35 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 'rejected': '⛔ Dossier refusé',
             };
             const statusLabel = statusEmoji[fullReq.status] || fullReq.status;
+            const updatedContentByStatus = {
+                pending:
+                    `🟧 **Nouvelle demande armurerie**\n` +
+                    `Demandeur : <@${fullReq.user_id}>\n` +
+                    `Arme demandée : **${fullReq.weapon_name}**\n` +
+                    `Statut : **Dossier en attente**\n\n` +
+                    `Merci de fournir rapidement le plan d'arme et les Corps le plus rapidement possible.\n` +
+                    `||<@&${CRAFT_PLAN_PROVIDER_ROLE}>||`,
+                in_progress:
+                    `🔧 **Production armurerie lancée**\n` +
+                    `Demandeur : <@${fullReq.user_id}>\n` +
+                    `Arme demandée : **${fullReq.weapon_name}**\n` +
+                    `Statut : **Production en cours**`,
+                crafted:
+                    `✅ **Arme craftée • ${fullReq.weapon_name}**\n` +
+                    `Demandeur : <@${fullReq.user_id}>\n` +
+                    `Statut : **Craft terminé**\n` +
+                    (fullReq.serial_number ? `N° : \`${fullReq.serial_number}\`` : ''),
+                completed:
+                    `✅ **Dossier armurerie clôturé**\n` +
+                    `Arme : **${fullReq.weapon_name}**\n` +
+                    `Statut : **Transaction terminée**`,
+                rejected:
+                    `⛔ **Dossier armurerie refusé**\n` +
+                    `Demandeur : <@${fullReq.user_id}>\n` +
+                    `Arme demandée : **${fullReq.weapon_name}**\n` +
+                    `Statut : **Refusé**`,
+            };
+            const updatedContent = updatedContentByStatus[fullReq.status] || updatedContentByStatus.pending;
 
             const { EmbedBuilder } = require('discord.js');
             const embed = new EmbedBuilder()
@@ -883,7 +912,11 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (fullReq.discord_message_id) {
                 try {
                     const msg = await channel.messages.fetch(fullReq.discord_message_id);
-                    await msg.edit({ embeds: [embed] });
+                    await msg.edit({
+                        content: updatedContent,
+                        embeds: [embed],
+                        allowedMentions: { users: [fullReq.user_id], roles: fullReq.status === 'pending' ? [CRAFT_PLAN_PROVIDER_ROLE] : [] },
+                    });
                     return;
                 } catch (e) {
                     console.error('Édition message craft échouée, création nouveau:', e.message);
@@ -891,9 +924,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
 
             const msg = await channel.send({
-                content,
+                content: content || updatedContent,
                 embeds: [embed],
-                allowedMentions: { users: [fullReq.user_id], roles: [CRAFT_PLAN_PROVIDER_ROLE] },
+                allowedMentions: { users: [fullReq.user_id], roles: fullReq.status === 'pending' ? [CRAFT_PLAN_PROVIDER_ROLE] : [] },
             });
 
             // Stocker l'ID
