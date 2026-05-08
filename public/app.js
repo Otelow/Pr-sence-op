@@ -3313,18 +3313,20 @@ async function loadMyWeapons() {
 }
 
 function toggleMwCrafted() {
-    const checked = document.getElementById('mwIsCrafted').checked;
-    document.getElementById('mwSerialField').style.display = checked ? 'block' : 'none';
+    // Conservé pour compatibilité avec les anciens handlers inline éventuels.
 }
 
 async function submitMyWeapon() {
     const weapon_name = document.getElementById('mwName').value.trim();
-    const is_crafted = document.getElementById('mwIsCrafted').checked;
+    const origin = document.querySelector('input[name="mwOrigin"]:checked')?.value;
+    const is_crafted = origin === 'crafted';
     const serial_number = document.getElementById('mwSerial').value.trim();
     const asking_price = document.getElementById('mwAskingPrice').value;
     const min_price = document.getElementById('mwMinPrice').value;
 
     if (!weapon_name) { toast('❌ Nom de l\'arme requis', 'error'); return; }
+    if (!origin) { toast('❌ Origine de l\'arme requise', 'error'); return; }
+    if (!serial_number) { toast('❌ N° de série obligatoire', 'error'); return; }
 
     try {
         const res = await fetch('/api/crafts/myweapons', {
@@ -3339,8 +3341,8 @@ async function submitMyWeapon() {
             document.getElementById('mwSerial').value = '';
             document.getElementById('mwAskingPrice').value = '';
             document.getElementById('mwMinPrice').value = '';
-            document.getElementById('mwIsCrafted').checked = false;
-            document.getElementById('mwSerialField').style.display = 'none';
+            const defaultOrigin = document.querySelector('input[name="mwOrigin"][value="crafted"]');
+            if (defaultOrigin) defaultOrigin.checked = true;
             await loadMyWeapons();
             renderMyWeapons();
         } else { toast(`❌ ${data.error}`, 'error'); }

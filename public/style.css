@@ -6970,6 +6970,41 @@ body {
     gap: 16px;
 }
 
+.myweapons-origin-choice {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.myweapons-origin-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px 14px;
+    border: 0.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.24);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.myweapons-origin-option:hover {
+    border-color: rgba(255, 140, 0, 0.28);
+    background: rgba(255, 140, 0, 0.06);
+}
+
+.myweapons-origin-option:has(input:checked) {
+    border-color: rgba(255, 140, 0, 0.65);
+    background: rgba(255, 140, 0, 0.12);
+    box-shadow: 0 0 0 1px rgba(255, 140, 0, 0.12);
+}
+
+.myweapons-origin-option input {
+    accent-color: var(--accent);
+}
+
 .myweapons-history {
     margin-top: 16px;
 }
@@ -7810,6 +7845,10 @@ body:has(#impersonateBanner[style*="flex"]) {
 
     .craft-board-table {
         min-width: 920px;
+    }
+
+    .myweapons-origin-choice {
+        grid-template-columns: 1fr;
     }
 
     .modal-content,

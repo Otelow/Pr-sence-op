@@ -713,15 +713,22 @@
                 </div>
 
                 <div class="comm-field">
-                    <label class="craft-checkbox-label">
-                        <input type="checkbox" id="mwIsCrafted" onchange="toggleMwCrafted()">
-                        <span>⚒ Cette arme a été <strong>craftée par les 21 Block Savage</strong></span>
-                    </label>
+                    <label class="comm-label">Origine de l'arme *</label>
+                    <div class="myweapons-origin-choice">
+                        <label class="myweapons-origin-option">
+                            <input type="radio" name="mwOrigin" value="crafted" checked>
+                            <span>⚒ Arme craftée par les <strong>21 Block Savage</strong></span>
+                        </label>
+                        <label class="myweapons-origin-option">
+                            <input type="radio" name="mwOrigin" value="external">
+                            <span>⛔ Arme non craftée par les <strong>21 Block Savage</strong></span>
+                        </label>
+                    </div>
                 </div>
 
-                <div class="comm-field" id="mwSerialField" style="display:none;">
-                    <label class="comm-label">N° de série</label>
-                    <input type="text" id="mwSerial" class="comm-input" placeholder="Ex: ABC123XYZ">
+                <div class="comm-field" id="mwSerialField">
+                    <label class="comm-label">N° de série *</label>
+                    <input type="text" id="mwSerial" class="comm-input" required placeholder="Ex: ABC123XYZ">
                 </div>
 
                 <div class="craft-field-row">

@@ -947,7 +947,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const userName = req.session.user.username;
             const userAvatar = req.session.user.avatar || null;
             if (!weapon_name) return res.status(400).json({ error: "Nom de l'arme requis" });
+            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N° de série obligatoire' });
 
+            const serial = String(serial_number).trim();
             const askingPrice = parseInt(asking_price) || null;
             const minPrice = parseInt(min_price) || null;
 
@@ -955,7 +957,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             let id;
             if (useSQLite) {
                 const r = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-                    .run(userId, userName, userAvatar, weapon_name, is_crafted ? 1 : 0, serial_number || null, askingPrice, minPrice);
+                    .run(userId, userName, userAvatar, weapon_name, is_crafted ? 1 : 0, serial, askingPrice, minPrice);
                 id = r.lastInsertRowid;
             } else {
                 if (!jsonData.my_weapons) jsonData.my_weapons = [];
@@ -965,7 +967,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 jsonData.my_weapons.push({
                     id, user_id: userId, user_name: userName, user_avatar: userAvatar,
                     weapon_name, is_crafted: is_crafted ? 1 : 0,
-                    serial_number: serial_number || null,
+                    serial_number: serial,
                     asking_price: askingPrice, min_price: minPrice,
                     is_sold: 0,
                     created_at: Math.floor(Date.now() / 1000),
@@ -985,7 +987,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         .addFields(
                             { name: 'Vendeur', value: `<@${userId}>`, inline: true },
                             { name: 'Origine', value: is_crafted ? 'Craft 21BS validé' : 'Arme externe', inline: true },
-                            ...(serial_number ? [{ name: 'Numéro de série', value: `\`${serial_number}\``, inline: true }] : []),
+                            { name: 'Numéro de série', value: `\`${serial}\``, inline: true },
                             { name: 'Prix affiché', value: moneyLabel(askingPrice), inline: true },
                             { name: 'Seuil minimum', value: moneyLabel(minPrice), inline: true },
                         )
