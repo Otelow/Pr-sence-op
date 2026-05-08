@@ -4,12 +4,14 @@
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const axios = require('axios');
 
 const isRailway = !!(process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_PROJECT_ID);
 const DATA_DIR = process.env.DATA_DIR || (isRailway ? '/data' : path.join(__dirname, 'data'));
 const DB_PATH = path.join(DATA_DIR, 'crafts.db');
 const UPLOADS_DIR = path.join(DATA_DIR, 'crafts');
 const FALLBACK_PATH = path.join(DATA_DIR, 'crafts.json');
+const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1';
 
 // Assurer l'existence des dossiers
 try {
@@ -618,6 +620,57 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     const CRAFT_PLAN_PROVIDER_ROLE = '1490361524408291459';
     const moneyLabel = (amount) => amount ? `${Number(amount).toLocaleString('fr-FR')}$` : 'N/A';
 
+    function safeCertificateFileName(value) {
+        return String(value || 'certificat')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9_-]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 80) || 'certificat';
+    }
+
+    async function generateCraftCertificateImage(request, serialNumber, craftedByName) {
+        if (!process.env.OPENAI_API_KEY) return null;
+
+        const craftDate = new Date().toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
+        const prompt = [
+            'Créer une image PNG portrait de certificat d’arme, style affiche officielle 21 Block Savage.',
+            'Design proche d’un certificat militaire clandestin premium : fond noir texturé usé, bordures abîmées, typographie bloc massive, orange brûlé et blanc cassé, tampon APPROUVÉ, étoiles orange, effet papier ancien rayé.',
+            'Composition obligatoire :',
+            'Très grand titre en haut : CERTIFICAT',
+            'Sous-titre orange : D’ARME',
+            'Phrase : CE DOCUMENT ATTESTE QUE L’ARME CI-DESSOUS A ÉTÉ CONTRÔLÉE, APPROUVÉE ET ENREGISTRÉE.',
+            `Nom de l’arme au centre/bas dans un cadre orange : ${request.weapon_name}`,
+            `Numéro de série dans un encadré : ${serialNumber || 'N/A'}`,
+            `Date de construction dans un encadré : ${craftDate}`,
+            'Logo texte en bas : 21BS puis 21 BLOCK SAVAGE',
+            'Ajouter une silhouette sombre d’arme au centre, non réaliste détaillée, sans marque réelle lisible.',
+            'Le texte doit être net, lisible, correctement orthographié en français, avec accents.',
+            'Ne pas ajouter de personnes, de scène de violence, de sang, ni de marque réelle.',
+        ].join('\n');
+
+        try {
+            const response = await axios.post('https://api.openai.com/v1/images/generations', {
+                model: OPENAI_IMAGE_MODEL,
+                prompt,
+                size: '1024x1536',
+                quality: process.env.OPENAI_IMAGE_QUALITY || 'medium',
+                n: 1,
+            }, {
+                headers: {
+                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                timeout: 120000,
+            });
+
+            const imageBase64 = response.data?.data?.[0]?.b64_json;
+            return imageBase64 ? Buffer.from(imageBase64, 'base64') : null;
+        } catch (e) {
+            console.error('Erreur génération image certificat OpenAI:', e.response?.data?.error?.message || e.message);
+            return null;
+        }
+    }
+
     // Helper : créer/éditer le message de demande de craft sur Discord
     async function postOrUpdateCraftRequestMessage(requestId) {
         try {
@@ -789,7 +842,12 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 // Ping dans le salon de statut
                 const channel = botClient.channels.cache.get(CRAFT_STATUS_CHANNEL);
                 if (channel) {
-                    const { EmbedBuilder } = require('discord.js');
+                    const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+                    const certificateImage = await generateCraftCertificateImage(existing, serial_number, userName);
+                    const certificateFileName = `certificat-${safeCertificateFileName(existing.weapon_name)}-${safeCertificateFileName(serial_number || id)}.png`;
+                    const files = certificateImage
+                        ? [new AttachmentBuilder(certificateImage, { name: certificateFileName })]
+                        : [];
                     const embed = new EmbedBuilder()
                         .setTitle(`Craft terminé • ${existing.weapon_name}`)
                         .setDescription('L\'arme est prête. Complète la vente dès que la transaction est faite.')
@@ -801,9 +859,11 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         )
                         .setTimestamp()
                         .setFooter({ text: '21 Block Savage • Atelier craft' });
+                    if (certificateImage) embed.setImage(`attachment://${certificateFileName}`);
                     await channel.send({
                         content: `<@${existing.user_id}>`,
                         embeds: [embed],
+                        files,
                         allowedMentions: { users: [existing.user_id] }
                     }).catch(e => console.error('Erreur ping craft:', e.message));
                 }
