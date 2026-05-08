@@ -1494,7 +1494,7 @@ async function loadRolesForModal() {
             <input type="checkbox" value="${r.id}" data-role-id="${r.id}">
             <span class="role-color-dot" style="background:${r.color || 'var(--text-muted)'};"></span>
             <span class="role-checkbox-name" style="color:${r.color || 'var(--text)'};">${escapeHtml(r.name)}</span>
-            <span style="font-size:10px;color:var(--text-muted);">${r.memberCount}</span>
+            <span class="role-checkbox-count">${r.memberCount || 0}</span>
         </label>
     `).join('');
 }
