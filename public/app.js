@@ -2736,6 +2736,7 @@ function renderCraftRequestsList() {
         if (canChangeStatus) {
             statusActions = `
                 <div class="craft-status-actions">
+                    ${r.status !== 'waiting_materials' && r.status !== 'crafted' ? `<button class="btn-status-materials" onclick="updateRequestStatus(${r.id}, 'waiting_materials')">📦 Matières</button>` : ''}
                     ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
                     ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
                     ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
@@ -2798,7 +2799,12 @@ function canDeleteRequestsClient() {
 }
 
 async function updateRequestStatus(requestId, status) {
-    const labels = { in_progress: 'En cours', rejected: 'Refusé', pending: 'En attente' };
+    const labels = {
+        waiting_materials: 'En attente des matières premières',
+        in_progress: 'En cours',
+        rejected: 'Refusé',
+        pending: 'En attente'
+    };
     if (!await confirmAction({ title: 'Changer le statut', message: `Passer cette demande en "${labels[status]}" ?`, confirmText: 'Changer le statut', danger: status === 'rejected' })) return;
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}/status`, {
@@ -2842,6 +2848,7 @@ function getCraftStatusBadge(r) {
     if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">✓ Finalisé</span>';
     if (r.status === 'rejected') return '<span class="craft-status-badge craft-status-rejected">✗ Refusé</span>';
     if (r.crafted) return '<span class="craft-status-badge craft-status-crafted">⚒ Crafté</span>';
+    if (r.status === 'waiting_materials') return '<span class="craft-status-badge craft-status-materials">📦 En attente des matières premières</span>';
     if (r.status === 'in_progress') return '<span class="craft-status-badge craft-status-progress">⏳ En cours</span>';
     return '<span class="craft-status-badge craft-status-pending">📋 En attente</span>';
 }
@@ -3382,12 +3389,15 @@ function setupAdminSlide() {
 // VOS ARMES (myweapons)
 // ============================================================
 let myWeaponsCache = [];
+let myWeaponNamesCache = [];
 
 async function initMyWeaponsTab() {
     if (!organizationsCache || organizationsCache.length === 0) {
         await loadOrganizations();
     }
+    await loadMyWeaponNames();
     await loadAllMembers();
+    populateMyWeaponNameSelect();
     populateMyWeaponsMemberSelects();
     toggleMwCrafted();
     renderMarkSoldBuyerDropdown();
@@ -3401,6 +3411,29 @@ async function loadMyWeapons() {
         const d = await r.json();
         myWeaponsCache = d.myweapons || [];
     } catch { myWeaponsCache = []; }
+}
+
+async function loadMyWeaponNames() {
+    try {
+        const r = await fetch('/api/crafts/myweapon-names');
+        const d = await r.json();
+        myWeaponNamesCache = d.names || [];
+    } catch {
+        myWeaponNamesCache = [];
+    }
+}
+
+function populateMyWeaponNameSelect() {
+    const select = document.getElementById('mwName');
+    if (!select) return;
+    if (!myWeaponNamesCache.length) {
+        select.innerHTML = '<option value="">Aucune arme configurée</option>';
+        return;
+    }
+    select.innerHTML = '<option value="">— Choisir une arme —</option>' +
+        myWeaponNamesCache
+            .map(w => `<option value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`)
+            .join('');
 }
 
 function toggleMwCrafted() {
