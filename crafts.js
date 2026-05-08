@@ -702,10 +702,10 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
       <feDisplacementMap in="SourceGraphic" scale="1.5"/>
     </filter>
     <style>
-      .title { font-family: Impact, Haettenschweiler, 'Arial Black', sans-serif; font-weight: 900; letter-spacing: 8px; }
-      .block { font-family: Impact, Haettenschweiler, 'Arial Black', sans-serif; font-weight: 900; letter-spacing: 3px; }
-      .mono { font-family: 'Arial Narrow', Arial, sans-serif; font-weight: 900; letter-spacing: 5px; }
-      .small { font-family: 'Arial Narrow', Arial, sans-serif; font-weight: 800; letter-spacing: 3px; }
+      .title { font-family: 'DejaVu Sans Condensed', 'DejaVu Sans', 'Liberation Sans', sans-serif; font-weight: 900; letter-spacing: 8px; }
+      .block { font-family: 'DejaVu Sans Condensed', 'DejaVu Sans', 'Liberation Sans', sans-serif; font-weight: 900; letter-spacing: 3px; }
+      .mono { font-family: 'DejaVu Sans Mono', 'Liberation Mono', monospace; font-weight: 900; letter-spacing: 3px; }
+      .small { font-family: 'DejaVu Sans Condensed', 'DejaVu Sans', 'Liberation Sans', sans-serif; font-weight: 800; letter-spacing: 3px; }
     </style>
   </defs>
   <rect width="1024" height="1536" fill="url(#paperGlow)"/>
@@ -715,34 +715,34 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
   <rect x="15" y="15" width="994" height="1506" rx="10" fill="none" stroke="#d8c7a6" stroke-width="6" opacity="0.55"/>
   <rect x="28" y="28" width="968" height="1480" rx="7" fill="none" stroke="#6e6049" stroke-width="2" opacity="0.55"/>
   <path d="M20 86 C76 20 128 18 191 22 M935 20 C985 32 1004 65 1007 123 M18 1426 C54 1498 121 1517 196 1514 M828 1512 C933 1504 996 1460 1005 1378" fill="none" stroke="#d8c7a6" stroke-width="3" opacity="0.45"/>
-  <text x="512" y="176" text-anchor="middle" class="title" font-size="118" fill="#d8cfba" filter="url(#textWear)">CERTIFICAT</text>
+  <text x="512" y="176" text-anchor="middle" class="title" font-size="110" fill="#d8cfba">CERTIFICAT</text>
   <line x1="130" y1="276" x2="300" y2="276" stroke="#c55b0a" stroke-width="5" opacity="0.82"/>
-  <text x="512" y="320" text-anchor="middle" class="title" font-size="96" fill="#bd570b" filter="url(#textWear)">D&#39;ARME</text>
+  <text x="512" y="320" text-anchor="middle" class="title" font-size="88" fill="#bd570b">D&#39;ARME</text>
   <line x1="724" y1="276" x2="894" y2="276" stroke="#c55b0a" stroke-width="5" opacity="0.82"/>
-  <text x="250" y="278" text-anchor="middle" class="block" font-size="48" fill="#bd570b">&#9733;</text>
-  <text x="774" y="278" text-anchor="middle" class="block" font-size="48" fill="#bd570b">&#9733;</text>
+  <circle cx="250" cy="270" r="18" fill="#bd570b" opacity="0.9"/>
+  <circle cx="774" cy="270" r="18" fill="#bd570b" opacity="0.9"/>
   <text x="512" y="407" text-anchor="middle" class="small" font-size="31" fill="#d8cfba">CE DOCUMENT ATTESTE QUE L&#39;ARME CI-DESSOUS</text>
   <text x="512" y="452" text-anchor="middle" class="small" font-size="31" fill="#d8cfba">A ETE CONTROLEE, APPROUVEE ET ENREGISTREE.</text>
   <path d="M246 930 C178 797 177 637 246 515 C305 626 304 809 246 930 Z" fill="none" stroke="#4a473d" stroke-width="15" opacity="0.23"/>
   <path d="M778 930 C846 797 847 637 778 515 C719 626 720 809 778 930 Z" fill="none" stroke="#4a473d" stroke-width="15" opacity="0.23"/>
-  ${weaponDataUri ? `<image href="${weaponDataUri}" x="150" y="510" width="724" height="385" preserveAspectRatio="xMidYMid meet" opacity="0.32" filter="url(#weaponShadow)"/>` : `<path d="M248 710 L776 618 L797 694 L280 812 Z" fill="#0a0a09" opacity="0.30"/>`}
+  ${weaponDataUri ? `<image href="${weaponDataUri}" x="125" y="495" width="774" height="420" preserveAspectRatio="xMidYMid meet" opacity="0.42" filter="url(#weaponShadow)"/>` : `<path d="M248 710 L776 618 L797 694 L280 812 Z" fill="#0a0a09" opacity="0.30"/>`}
   <path d="M116 942 L908 942 L930 964 L930 1037 L908 1059 L116 1059 L94 1037 L94 964 Z" fill="#080807" stroke="#bd570b" stroke-width="4"/>
   <path d="M131 957 L893 957 L913 977 L913 1024 L893 1044 L131 1044 L111 1024 L111 977 Z" fill="none" stroke="#bd570b" stroke-width="1.5" opacity="0.8"/>
-  <text x="512" y="1020" text-anchor="middle" class="block" font-size="${weaponName.size}" fill="#d8cfba" filter="url(#textWear)">${escapeXml(weaponName.text)}</text>
+  <text x="512" y="1020" text-anchor="middle" class="block" font-size="${weaponName.size}" fill="#d8cfba">${escapeXml(weaponName.text)}</text>
   <rect x="82" y="1130" width="386" height="126" fill="#080807" stroke="#bd570b" stroke-width="2.5"/>
   <rect x="556" y="1130" width="386" height="126" fill="#080807" stroke="#bd570b" stroke-width="2.5"/>
   <line x1="82" y1="1182" x2="468" y2="1182" stroke="#bd570b" stroke-width="2"/>
   <line x1="556" y1="1182" x2="942" y2="1182" stroke="#bd570b" stroke-width="2"/>
   <text x="116" y="1169" class="small" font-size="28" fill="#d8cfba">N&#176;</text>
   <text x="588" y="1169" class="small" font-size="28" fill="#d8cfba">DATE DE CONSTRUCTION</text>
-  <text x="116" y="1232" class="mono" font-size="34" fill="#bd570b">${escapeXml(serial)}</text>
+  <text x="116" y="1232" class="mono" font-size="30" fill="#bd570b">${escapeXml(serial)}</text>
   <text x="748" y="1232" text-anchor="middle" class="mono" font-size="38" fill="#bd570b">${escapeXml(craftDate)}</text>
   <g transform="translate(756 1208) rotate(-10)" opacity="0.72">
     <circle cx="95" cy="95" r="88" fill="none" stroke="#d8cfba" stroke-width="4"/>
     <circle cx="95" cy="95" r="67" fill="none" stroke="#d8cfba" stroke-width="2"/>
     <text x="95" y="108" text-anchor="middle" class="block" font-size="34" fill="#d8cfba">APPROUVE</text>
   </g>
-  <text x="512" y="1364" text-anchor="middle" class="title" font-size="112" fill="#d8cfba" filter="url(#textWear)">21BS</text>
+  <text x="512" y="1364" text-anchor="middle" class="title" font-size="108" fill="#d8cfba">21BS</text>
   <line x1="322" y1="1408" x2="405" y2="1408" stroke="#bd570b" stroke-width="4"/>
   <text x="512" y="1421" text-anchor="middle" class="small" font-size="34" fill="#d8cfba">21 BLOCK SAVAGE</text>
   <line x1="619" y1="1408" x2="702" y2="1408" stroke="#bd570b" stroke-width="4"/>
@@ -889,7 +889,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 .setDescription('Suivi officiel de la demande craft 21 Block Savage.')
                 .setColor(fullReq.status === 'rejected' ? 0xef4444 : (fullReq.status === 'in_progress' ? 0x60a5fa : (fullReq.status === 'crafted' || fullReq.status === 'completed' ? 0x4ade80 : 0xffb84d)))
                 .addFields(
-                    { name: 'Demandeur', value: `<@${fullReq.user_id}>`, inline: true },
+                    { name: 'Demandeur', value: fullReq.user_name || 'N/A', inline: true },
                     { name: 'Statut', value: statusLabel, inline: true },
                     { name: 'Pré-requis', value: `Plan : ${fullReq.has_plan ? 'validé' : 'manquant'}\nFonds : ${fullReq.has_money ? 'validés' : 'manquants'}`, inline: true },
                     ...(fullReq.serial_number ? [{ name: 'Numéro de série', value: `\`${fullReq.serial_number}\``, inline: true }] : []),
@@ -955,15 +955,15 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             let color = 0xffb84d;
             if (newStatus === 'in_progress') {
                 title = 'Production lancée';
-                description = `<@${fullReq.user_id}>, ton dossier **${fullReq.weapon_name}** passe en atelier.`;
+                description = `Le dossier **${fullReq.weapon_name}** passe en atelier.`;
                 color = 0x60a5fa;
             } else if (newStatus === 'rejected') {
                 title = 'Dossier refusé';
-                description = `<@${fullReq.user_id}>, ta demande **${fullReq.weapon_name}** a été refusée. Contacte un haut gradé si besoin.`;
+                description = `La demande **${fullReq.weapon_name}** a été refusée. Contacte un haut gradé si besoin.`;
                 color = 0xef4444;
             } else if (newStatus === 'pending') {
                 title = 'Retour en attente';
-                description = `<@${fullReq.user_id}>, ton dossier **${fullReq.weapon_name}** est remis en file d'attente.`;
+                description = `Le dossier **${fullReq.weapon_name}** est remis en file d'attente.`;
             } else {
                 return; // Pas de notif pour les autres statuts
             }
@@ -976,7 +976,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 .setFooter({ text: '21 Block Savage • Suivi craft' });
 
             await channel.send({
-                content: `<@${fullReq.user_id}>`,
+                content: `Production lancée pour <@${fullReq.user_id}> : **${fullReq.weapon_name}**.`,
                 embeds: [embed],
                 allowedMentions: { users: [fullReq.user_id] },
             });
@@ -1020,6 +1020,107 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         return (user.roles || []).includes(SUPER_ADMIN_ROLE);
     }
 
+    app.post('/api/crafts/requests/manual', requireAuth, async (req, res) => {
+        try {
+            if (!canValidateCraft(req.session.user)) {
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
+            }
+
+            const { weapon_id, serial_number, craft_date, is_sold, buyer_org, sale_price } = req.body;
+            const weapon = getWeapon(parseInt(weapon_id));
+            if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
+            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N° de série obligatoire' });
+            if (!craft_date) return res.status(400).json({ error: 'Date craft obligatoire' });
+            if (is_sold && !buyer_org) return res.status(400).json({ error: 'Organisation acheteuse obligatoire si vendu' });
+
+            const userId = req.session.user.id;
+            const userName = req.session.user.username;
+            const userAvatar = req.session.user.avatar || null;
+            const serial = String(serial_number).trim();
+            const craftTimestamp = Math.floor(new Date(`${craft_date}T12:00:00+01:00`).getTime() / 1000);
+            if (!Number.isFinite(craftTimestamp)) return res.status(400).json({ error: 'Date craft invalide' });
+            const sold = !!is_sold;
+            const now = Math.floor(Date.now() / 1000);
+            const soldPrice = parseInt(sale_price) || null;
+            const status = sold ? 'completed' : 'crafted';
+            let requestId;
+            let myWeaponId;
+
+            if (useSQLite) {
+                const r = db.prepare(`
+                    INSERT INTO craft_requests (
+                        user_id, user_name, weapon_id, has_plan, has_money, status, crafted,
+                        serial_number, craft_date, crafted_by_id, crafted_by_name,
+                        buyer_org, sale_price, sale_date, completed_by_id, completed_by_name
+                    ) VALUES (?, ?, ?, 1, 1, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `).run(
+                    userId, userName, weapon.id, status, serial, craftTimestamp,
+                    userId, userName, sold ? buyer_org : null, soldPrice,
+                    sold ? now : null, sold ? userId : null, sold ? userName : null
+                );
+                requestId = r.lastInsertRowid;
+
+                const mw = db.prepare(`
+                    INSERT INTO my_weapons (
+                        user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number,
+                        asking_price, min_price, is_sold, sold_to, sold_price, sold_at
+                    ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+                `).run(userId, userName, userAvatar, weapon.name, serial, soldPrice, null, sold ? 1 : 0, sold ? buyer_org : null, soldPrice, sold ? now : null);
+                myWeaponId = mw.lastInsertRowid;
+            } else {
+                if (!jsonData.craft_requests) jsonData.craft_requests = [];
+                if (!jsonData.counters.requests) jsonData.counters.requests = 0;
+                jsonData.counters.requests++;
+                requestId = jsonData.counters.requests;
+                jsonData.craft_requests.push({
+                    id: requestId,
+                    user_id: userId,
+                    user_name: userName,
+                    weapon_id: weapon.id,
+                    has_plan: 1,
+                    has_money: 1,
+                    status,
+                    crafted: 1,
+                    serial_number: serial,
+                    craft_date: craftTimestamp,
+                    crafted_by_id: userId,
+                    crafted_by_name: userName,
+                    buyer_org: sold ? buyer_org : null,
+                    sale_price: soldPrice,
+                    sale_date: sold ? now : null,
+                    completed_by_id: sold ? userId : null,
+                    completed_by_name: sold ? userName : null,
+                    posted_to_channel: 0,
+                    created_at: now,
+                });
+
+                if (!jsonData.my_weapons) jsonData.my_weapons = [];
+                if (!jsonData.counters.myweapons) jsonData.counters.myweapons = 0;
+                jsonData.counters.myweapons++;
+                myWeaponId = jsonData.counters.myweapons;
+                jsonData.my_weapons.push({
+                    id: myWeaponId,
+                    user_id: userId,
+                    user_name: userName,
+                    user_avatar: userAvatar,
+                    weapon_name: weapon.name,
+                    is_crafted: 1,
+                    serial_number: serial,
+                    asking_price: soldPrice,
+                    min_price: null,
+                    is_sold: sold ? 1 : 0,
+                    sold_to: sold ? buyer_org : null,
+                    sold_price: soldPrice,
+                    sold_at: sold ? now : null,
+                    created_at: now,
+                });
+                saveJSON();
+            }
+
+            res.json({ success: true, id: requestId, myWeaponId });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
     app.patch('/api/crafts/requests/:id/craft', requireAuth, async (req, res) => {
         try {
             if (!canValidateCraft(req.session.user)) {
@@ -1051,7 +1152,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         .setDescription('L\'arme est prête. Complète la vente dès que la transaction est faite.')
                         .setColor(0x4ade80)
                         .addFields(
-                            { name: 'Demandeur', value: `<@${existing.user_id}>`, inline: true },
+                            { name: 'Demandeur', value: existing.user_name || 'N/A', inline: true },
                             { name: 'Numéro de série', value: `\`${serial_number || 'N/A'}\``, inline: true },
                             { name: 'À compléter', value: 'Prix de vente, groupe acheteur et date de vente.', inline: false },
                         )
@@ -1059,7 +1160,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         .setFooter({ text: '21 Block Savage • Atelier craft' });
                     if (certificateImage) embed.setImage(`attachment://${certificateFileName}`);
                     await channel.send({
-                        content: `<@${existing.user_id}>`,
+                        content: `Craft terminé pour <@${existing.user_id}> : **${existing.weapon_name}**.`,
                         embeds: [embed],
                         files,
                         allowedMentions: { users: [existing.user_id] }

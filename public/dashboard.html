@@ -688,6 +688,47 @@
                 <h3 class="section-title">✓ Historique des crafts finalisés</h3>
                 <p class="crafts-section-info">Récap de toutes les demandes complétées (craftées + vendues).</p>
             </div>
+            <div class="manual-craft-card">
+                <div class="manual-craft-head">
+                    <div>
+                        <h4>Ajouter un craft manuel</h4>
+                        <p>Pour les armes craftÃ©es avant le dÃ©ploiement du suivi automatique.</p>
+                    </div>
+                    <span>Archivage 21BS</span>
+                </div>
+                <div class="manual-craft-grid">
+                    <div class="comm-field">
+                        <label class="comm-label">ModÃ¨le de l'arme *</label>
+                        <select id="manualCraftWeapon" class="comm-input"></select>
+                    </div>
+                    <div class="comm-field">
+                        <label class="comm-label">NÂ° sÃ©rie *</label>
+                        <input type="text" id="manualCraftSerial" class="comm-input" placeholder="Ex: ABC123XYZ">
+                    </div>
+                    <div class="comm-field">
+                        <label class="comm-label">Date craft *</label>
+                        <input type="date" id="manualCraftDate" class="comm-input">
+                    </div>
+                    <div class="comm-field">
+                        <label class="comm-label">Statut vente</label>
+                        <select id="manualCraftSold" class="comm-input" onchange="toggleManualCraftSaleFields()">
+                            <option value="0">Non vendu</option>
+                            <option value="1">DÃ©jÃ  vendu</option>
+                        </select>
+                    </div>
+                    <div class="comm-field manual-craft-sale-field" style="display:none;">
+                        <label class="comm-label">Vendu Ã  qui</label>
+                        <select id="manualCraftBuyer" class="comm-input"></select>
+                    </div>
+                    <div class="comm-field manual-craft-sale-field" style="display:none;">
+                        <label class="comm-label">Prix vente ($)</label>
+                        <input type="number" id="manualCraftSalePrice" class="comm-input" min="0" placeholder="Ex: 2000000">
+                    </div>
+                </div>
+                <div class="craft-actions">
+                    <button class="btn-primary" onclick="submitManualCraft()">+ Ajouter au suivi</button>
+                </div>
+            </div>
             <div class="craft-history-list" id="craftHistoryList">
                 <p class="empty">Chargement...</p>
             </div>

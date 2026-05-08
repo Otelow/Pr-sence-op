@@ -3066,6 +3066,7 @@ async function validateCraftSale(requestId) {
 function renderCraftHistory() {
     const list = document.getElementById('craftHistoryList');
     if (!list) return;
+    renderManualCraftForm();
 
     const completed = craftRequestsCache.filter(r => r.status === 'completed');
     const isSuperAdmin = canDeleteRequestsClient();
@@ -3102,6 +3103,91 @@ function renderCraftHistory() {
     }).join('');
 }
 
+function renderManualCraftForm() {
+    const weaponSelect = document.getElementById('manualCraftWeapon');
+    const buyerSelect = document.getElementById('manualCraftBuyer');
+    const craftDate = document.getElementById('manualCraftDate');
+    if (!weaponSelect) return;
+
+    const labelMap = {
+        manualCraftWeapon: "Modele de l'arme *",
+        manualCraftSerial: 'N° serie *',
+        manualCraftDate: 'Date craft *',
+        manualCraftSold: 'Statut vente',
+        manualCraftBuyer: 'Vendu a qui',
+        manualCraftSalePrice: 'Prix vente ($)',
+    };
+    Object.entries(labelMap).forEach(([id, text]) => {
+        const field = document.getElementById(id)?.closest('.comm-field');
+        const label = field?.querySelector('.comm-label');
+        if (label) label.textContent = text;
+    });
+
+    weaponSelect.innerHTML = '<option value="">-- Choisir une arme --</option>' +
+        [...weaponsCache].sort(compareWeaponsBySalePrice)
+            .map(w => `<option value="${w.id}">${escapeHtml(w.name)}</option>`)
+            .join('');
+
+    if (buyerSelect) {
+        buyerSelect.innerHTML = '<option value="">-- Choisir une organisation --</option>' +
+            organizationsCache.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('');
+    }
+
+    if (craftDate && !craftDate.value) {
+        craftDate.value = new Date().toISOString().slice(0, 10);
+    }
+    toggleManualCraftSaleFields();
+}
+
+function toggleManualCraftSaleFields() {
+    const sold = document.getElementById('manualCraftSold')?.value === '1';
+    document.querySelectorAll('.manual-craft-sale-field').forEach(el => {
+        el.style.display = sold ? 'block' : 'none';
+    });
+}
+
+async function submitManualCraft() {
+    const weapon_id = document.getElementById('manualCraftWeapon')?.value;
+    const serial_number = document.getElementById('manualCraftSerial')?.value.trim();
+    const craft_date = document.getElementById('manualCraftDate')?.value;
+    const is_sold = document.getElementById('manualCraftSold')?.value === '1';
+    const buyer_org = document.getElementById('manualCraftBuyer')?.value;
+    const sale_price = document.getElementById('manualCraftSalePrice')?.value;
+
+    if (!weapon_id) { toast('Choisis un modèle d’arme', 'error'); return; }
+    if (!serial_number) { toast('N° série obligatoire', 'error'); return; }
+    if (!craft_date) { toast('Date craft obligatoire', 'error'); return; }
+    if (is_sold && !buyer_org) { toast('Choisis l’organisation acheteuse', 'error'); return; }
+
+    const message = is_sold
+        ? 'Ajouter cette arme directement dans l’historique comme vendue ?'
+        : 'Ajouter cette arme au suivi et dans Vos Armes comme non vendue ?';
+    if (!await confirmAction({ title: 'Ajouter un craft manuel', message, confirmText: 'Ajouter' })) return;
+
+    try {
+        const res = await fetch('/api/crafts/requests/manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ weapon_id, serial_number, craft_date, is_sold, buyer_org, sale_price })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            toast(`❌ ${data.error || 'Erreur ajout manuel'}`, 'error');
+            return;
+        }
+
+        toast(is_sold ? '✅ Craft manuel ajouté à l’historique' : '✅ Craft manuel ajouté dans Vos Armes');
+        document.getElementById('manualCraftSerial').value = '';
+        document.getElementById('manualCraftSalePrice').value = '';
+        document.getElementById('manualCraftSold').value = '0';
+        await Promise.all([loadCraftRequests(), loadMyWeapons?.()]);
+        renderCraftHistory();
+        renderCraftBoard();
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
 async function deleteHistoryEntry(id) {
     if (!await confirmAction({ title: 'Supprimer l’historique', message: 'Supprimer définitivement cette entrée de l’historique ? Le craft restera tracé dans Discord mais sera retiré du dashboard.', confirmText: 'Supprimer', danger: true })) return;
     try {
@@ -3133,6 +3219,8 @@ window.updateCraftSerial = updateCraftSerial;
 window.handleOrgChange = handleOrgChange;
 window.updateCraftSalePrice = updateCraftSalePrice;
 window.validateCraftSale = validateCraftSale;
+window.toggleManualCraftSaleFields = toggleManualCraftSaleFields;
+window.submitManualCraft = submitManualCraft;
 
 // ============================================================
 // EMBED MODE TOGGLE (annonce/rappel)
