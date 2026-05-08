@@ -769,7 +769,7 @@
 
                 <div class="comm-field" id="mwSerialField">
                     <label class="comm-label">N° de série *</label>
-                    <input type="text" id="mwSerial" class="comm-input" required placeholder="Ex: ABC123XYZ">
+                    <textarea id="mwSerial" class="comm-input mw-serial-textarea" required rows="4" placeholder="Ex: ABC123XYZ&#10;DEF456UVW&#10;GHI789RST"></textarea>
                 </div>
 
                 <div class="craft-field-row">
@@ -803,6 +803,11 @@
             <h3 class="modal-title" id="markSoldTitle">Marquer comme vendu</h3>
             <form id="markSoldForm" onsubmit="confirmMarkSold(event)">
                 <input type="hidden" id="markSoldId">
+
+                <div class="comm-field" id="markSoldSerialField" style="display:none;">
+                    <label class="comm-label">N° de série vendue</label>
+                    <select id="markSoldSerial" class="comm-input"></select>
+                </div>
 
                 <div class="comm-field">
                     <label class="comm-label">Groupe acheteur</label>
