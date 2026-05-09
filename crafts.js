@@ -72,12 +72,12 @@ function nextId(type) {
 }
 
 const STOCK_MATERIAL_NAMES = [
-    'Titane',
-    'Tungstène',
-    'Chrome',
+    'Bloc de chrome',
     'Bloc de titane',
     'Bloc de tungstène',
-    'Bloc de chrome',
+    'Chrome',
+    'Titane',
+    'Tungstène',
 ];
 
 function normalizeStockName(value) {
@@ -90,14 +90,19 @@ function normalizeStockName(value) {
         .replace(/Ã¢/g, 'a')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
+        .replace(/^stock\s+/i, '')
         .replace(/\s+/g, ' ')
         .trim()
         .toLowerCase();
 }
 
-function isStockMaterialName(name) {
+function getCanonicalStockMaterialName(name) {
     const normalized = normalizeStockName(name);
-    return STOCK_MATERIAL_NAMES.some(material => normalizeStockName(material) === normalized);
+    return STOCK_MATERIAL_NAMES.find(material => normalizeStockName(material) === normalized) || null;
+}
+
+function isStockMaterialName(name) {
+    return Boolean(getCanonicalStockMaterialName(name));
 }
 
 function parseWeaponIngredients(value) {
@@ -266,19 +271,42 @@ function seedDefaultIngredientsJSON() {
 function seedStockMaterials() {
     if (useSQLite) {
         const insertIngredient = db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)');
-        const insertStock = db.prepare('INSERT OR IGNORE INTO stock_materials (ingredient_id, quantity) VALUES (?, 0)');
+        const upsertStock = db.prepare(`
+            INSERT INTO stock_materials (ingredient_id, quantity, updated_at)
+            VALUES (?, ?, strftime('%s','now'))
+            ON CONFLICT(ingredient_id) DO UPDATE SET
+                quantity = excluded.quantity,
+                updated_at = excluded.updated_at
+        `);
+        const stockByIngredient = db.prepare('SELECT * FROM stock_materials WHERE ingredient_id = ?');
+        const deleteDuplicateStock = db.prepare('DELETE FROM stock_materials WHERE ingredient_id = ?');
+        const updateIngredientName = db.prepare('UPDATE ingredients SET name = ? WHERE id = ?');
 
         for (const name of STOCK_MATERIAL_NAMES) {
-            const existing = db.prepare('SELECT * FROM ingredients').all()
-                .find(item => normalizeStockName(item.name) === normalizeStockName(name));
-            if (existing && existing.name !== name) {
-                try { db.prepare('UPDATE ingredients SET name = ? WHERE id = ?').run(name, existing.id); } catch {}
-            } else if (!existing) {
+            let allIngredients = db.prepare('SELECT * FROM ingredients').all();
+            let matches = allIngredients.filter(item => normalizeStockName(item.name) === normalizeStockName(name));
+            if (!matches.length) {
                 insertIngredient.run(name);
+                allIngredients = db.prepare('SELECT * FROM ingredients').all();
+                matches = allIngredients.filter(item => normalizeStockName(item.name) === normalizeStockName(name));
             }
-        }
-        for (const ingredient of db.prepare('SELECT * FROM ingredients').all()) {
-            if (isStockMaterialName(ingredient.name)) insertStock.run(ingredient.id);
+            const preferred = matches.find(item => item.name === name)
+                || matches.find(item => item.image_path)
+                || matches[0];
+            if (!preferred) continue;
+            if (preferred.name !== name) {
+                try { updateIngredientName.run(name, preferred.id); } catch {}
+            }
+
+            let quantity = 0;
+            for (const ingredient of matches) {
+                const stock = stockByIngredient.get(ingredient.id);
+                if (stock) quantity = Math.max(quantity, Number(stock.quantity) || 0);
+            }
+            upsertStock.run(preferred.id, quantity);
+            for (const ingredient of matches) {
+                if (Number(ingredient.id) !== Number(preferred.id)) deleteDuplicateStock.run(ingredient.id);
+            }
         }
         return;
     }
@@ -288,7 +316,10 @@ function seedStockMaterials() {
     if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
 
     for (const name of STOCK_MATERIAL_NAMES) {
-        let ingredient = jsonData.ingredients.find(item => normalizeStockName(item.name) === normalizeStockName(name));
+        const matches = jsonData.ingredients.filter(item => normalizeStockName(item.name) === normalizeStockName(name));
+        let ingredient = matches.find(item => item.name === name)
+            || matches.find(item => item.image_path)
+            || matches[0];
         if (!ingredient) {
             jsonData.counters.ingredients++;
             ingredient = {
@@ -301,14 +332,27 @@ function seedStockMaterials() {
         } else if (ingredient.name !== name) {
             ingredient.name = name;
         }
-        if (!jsonData.stock_materials.some(row => Number(row.ingredient_id) === Number(ingredient.id))) {
+
+        const duplicateIds = new Set(matches.map(item => Number(item.id)).filter(id => id !== Number(ingredient.id)));
+        const duplicateRows = jsonData.stock_materials.filter(row => duplicateIds.has(Number(row.ingredient_id)));
+        const existing = jsonData.stock_materials.find(row => Number(row.ingredient_id) === Number(ingredient.id));
+        const quantity = Math.max(
+            Number(existing?.quantity) || 0,
+            ...duplicateRows.map(row => Number(row.quantity) || 0)
+        );
+
+        if (existing) {
+            existing.quantity = quantity;
+            existing.updated_at = Math.floor(Date.now() / 1000);
+        } else {
             jsonData.stock_materials.push({
                 id: jsonData.stock_materials.length + 1,
                 ingredient_id: ingredient.id,
-                quantity: 0,
+                quantity,
                 updated_at: Math.floor(Date.now() / 1000),
             });
         }
+        jsonData.stock_materials = jsonData.stock_materials.filter(row => !duplicateIds.has(Number(row.ingredient_id)));
     }
     saveJSON();
 }
@@ -439,7 +483,40 @@ function deleteIngredient(id) {
 }
 
 function toCraftImageUrl(imagePath) {
-    return imagePath ? `/crafts/images/${imagePath}` : null;
+    const value = String(imagePath || '').trim();
+    if (!value) return null;
+    if (value.startsWith('/') || /^https?:\/\//i.test(value)) return value;
+    return `/crafts/images/${value}`;
+}
+
+function dedupeStockRows(rows) {
+    const byName = new Map();
+    for (const row of rows) {
+        const canonicalName = getCanonicalStockMaterialName(row.name);
+        if (!canonicalName) continue;
+        const existing = byName.get(canonicalName);
+        const cleanRow = {
+            ...row,
+            name: canonicalName,
+            quantity: Number(row.quantity) || 0,
+            image_url: toCraftImageUrl(row.image_path),
+        };
+        if (!existing) {
+            byName.set(canonicalName, cleanRow);
+            continue;
+        }
+        byName.set(canonicalName, {
+            ...existing,
+            ingredient_id: existing.image_path ? existing.ingredient_id : cleanRow.ingredient_id,
+            image_path: existing.image_path || cleanRow.image_path,
+            image_url: existing.image_url || cleanRow.image_url,
+            quantity: Math.max(Number(existing.quantity) || 0, cleanRow.quantity),
+            updated_at: Math.max(Number(existing.updated_at) || 0, Number(cleanRow.updated_at) || 0),
+        });
+    }
+    return STOCK_MATERIAL_NAMES
+        .map(name => byName.get(name))
+        .filter(Boolean);
 }
 
 function getStockMaterials() {
@@ -452,17 +529,11 @@ function getStockMaterials() {
             JOIN ingredients i ON i.id = sm.ingredient_id
             ORDER BY i.name ASC
         `).all();
-        return rows
-            .filter(row => isStockMaterialName(row.name))
-            .map(row => ({
-                ...row,
-                quantity: Number(row.quantity) || 0,
-                image_url: toCraftImageUrl(row.image_path),
-            }));
+        return dedupeStockRows(rows);
     }
 
     const ingredients = jsonData.ingredients || [];
-    return (jsonData.stock_materials || [])
+    const rows = (jsonData.stock_materials || [])
         .map(row => {
             const ingredient = ingredients.find(item => Number(item.id) === Number(row.ingredient_id));
             if (!ingredient || !isStockMaterialName(ingredient.name)) return null;
@@ -474,8 +545,8 @@ function getStockMaterials() {
                 image_url: toCraftImageUrl(ingredient.image_path),
             };
         })
-        .filter(Boolean)
-        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'fr'));
+        .filter(Boolean);
+    return dedupeStockRows(rows);
 }
 
 function updateStockMaterial(ingredientId, quantity) {
@@ -519,7 +590,9 @@ function getCraftableWeapons() {
     const ingredients = getAllIngredients();
     const ingredientById = new Map(ingredients.map(item => [Number(item.id), item]));
     const ingredientByName = new Map(ingredients.map(item => [normalizeStockName(item.name), item]));
-    const stockByIngredientId = new Map(getStockMaterials().map(item => [Number(item.ingredient_id), item]));
+    const stockMaterials = getStockMaterials();
+    const stockByIngredientId = new Map(stockMaterials.map(item => [Number(item.ingredient_id), item]));
+    const stockByName = new Map(stockMaterials.map(item => [normalizeStockName(item.name), item]));
 
     const decoratedWeapons = weapons.map(weapon => {
         const requiredMaterials = parseWeaponIngredients(weapon.ingredients).map(recipe => {
@@ -529,7 +602,9 @@ function getCraftableWeapons() {
                 || null;
             const name = ingredient?.name || recipe.name || 'Ingredient';
             const required = Math.max(0, parseInt(recipe.quantity || recipe.qty || recipe.amount, 10) || 0);
-            const stock = ingredient ? stockByIngredientId.get(Number(ingredient.id)) : null;
+            const stock = (ingredient ? stockByIngredientId.get(Number(ingredient.id)) : null)
+                || stockByName.get(normalizeStockName(name))
+                || null;
             const tracked = Boolean(stock || isStockMaterialName(name));
             const available = stock ? Number(stock.quantity) || 0 : 0;
 
@@ -565,7 +640,7 @@ function getCraftableWeapons() {
     });
 
     return {
-        stocks: getStockMaterials(),
+        stocks: stockMaterials,
         weapons: decoratedWeapons,
     };
 }

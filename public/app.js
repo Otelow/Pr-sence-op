@@ -2527,10 +2527,42 @@ function getStockLevelClass(quantity) {
     return 'ok';
 }
 
+function cleanStockName(name) {
+    return String(name || '')
+        .replace(/^stock\s+/i, '')
+        .replace(/Ã¨/g, 'è')
+        .replace(/Ã©/g, 'é')
+        .replace(/Ãª/g, 'ê')
+        .replace(/Ã«/g, 'ë')
+        .replace(/Ã /g, 'à')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getVisibleStockMaterials() {
+    const byName = new Map();
+    for (const stock of stockMaterialsCache || []) {
+        const name = cleanStockName(stock.name);
+        if (!name) continue;
+        const key = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        const existing = byName.get(key);
+        const cleanStock = { ...stock, name };
+        if (!existing || (!existing.image_url && cleanStock.image_url)) {
+            byName.set(key, cleanStock);
+        }
+    }
+    const order = ['Bloc de chrome', 'Bloc de titane', 'Bloc de tungstène', 'Chrome', 'Titane', 'Tungstène'];
+    return order.map(name => {
+        const key = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        return byName.get(key);
+    }).filter(Boolean);
+}
+
 function renderCraftStockState() {
     const panels = [document.getElementById('craftStockPanel'), document.getElementById('craftBoardStockPanel')].filter(Boolean);
     if (!panels.length) return;
-    if (!stockMaterialsCache.length) {
+    const visibleStocks = getVisibleStockMaterials();
+    if (!visibleStocks.length) {
         panels.forEach(panel => { panel.innerHTML = ''; });
         return;
     }
@@ -2543,12 +2575,12 @@ function renderCraftStockState() {
             </div>
         </div>
         <div class="craft-stock-grid">
-            ${stockMaterialsCache.map(stock => {
+            ${visibleStocks.map(stock => {
                 const level = getStockLevelClass(stock.quantity);
                 const imageUrl = safeImageUrl(stock.image_url);
                 return `
                     <div class="craft-stock-card stock-${level}">
-                        ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}">` : '<span class="craft-stock-placeholder">Stock</span>'}
+                        ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}">` : '<span class="craft-stock-placeholder" aria-hidden="true"></span>'}
                         <div>
                             <strong>${escapeHtml(stock.name)}</strong>
                             <span>${Number(stock.quantity) || 0}</span>
