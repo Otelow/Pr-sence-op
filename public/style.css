@@ -6575,6 +6575,24 @@ body {
     gap: 14px;
 }
 
+.manual-craft-free-option {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 140, 0, 0.18);
+    border-radius: 8px;
+    background: rgba(255, 140, 0, 0.06);
+    color: var(--text);
+    font-family: var(--font-mono);
+    cursor: pointer;
+}
+
+.manual-craft-free-option input {
+    accent-color: var(--accent);
+}
+
 .craft-history-item {
     display: flex;
     align-items: center;

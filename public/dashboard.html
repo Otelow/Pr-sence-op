@@ -741,9 +741,17 @@
                         <select id="manualCraftBuyer" class="comm-input"></select>
                     </div>
                     <div class="comm-field manual-craft-sale-field" style="display:none;">
+                        <label class="comm-label">Date de vente *</label>
+                        <input type="date" id="manualCraftSaleDate" class="comm-input">
+                    </div>
+                    <div class="comm-field manual-craft-sale-field" style="display:none;">
                         <label class="comm-label">Prix vente ($)</label>
                         <input type="number" id="manualCraftSalePrice" class="comm-input" min="0" placeholder="Ex: 2000000">
                     </div>
+                    <label class="manual-craft-free-option manual-craft-sale-field" style="display:none;">
+                        <input type="checkbox" id="manualCraftFreeSale" onchange="toggleManualCraftFreeSale()">
+                        <span>Vente gratuite</span>
+                    </label>
                 </div>
                 <div class="craft-actions">
                     <button class="btn-primary" onclick="submitManualCraft()">+ Ajouter au suivi</button>

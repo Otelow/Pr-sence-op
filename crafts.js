@@ -712,7 +712,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     const CRAFT_REQUEST_CHANNEL = '1501593802014720061';
     const CRAFT_STATUS_CHANNEL = '1496977220097282290';
     const CRAFT_PLAN_PROVIDER_ROLE = '1490361524408291459';
-    const moneyLabel = (amount) => amount ? `${Number(amount).toLocaleString('fr-FR')}$` : 'N/A';
+    const moneyLabel = (amount) => Number(amount) === 0 ? 'Gratuit' : (amount ? `${Number(amount).toLocaleString('fr-FR')}$` : 'N/A');
 
     // Helper : crÃ©er/Ã©diter le message de demande de craft sur Discord
     async function postOrUpdateCraftRequestMessage(requestId) {
@@ -987,12 +987,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
 
-            const { weapon_id, serial_number, craft_date, is_sold, buyer_org, sale_price } = req.body;
+            const { weapon_id, serial_number, craft_date, is_sold, buyer_org, sale_price, sale_date, free_sale } = req.body;
             const weapon = getWeapon(parseInt(weapon_id));
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
             if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N° de série obligatoire' });
             if (!craft_date) return res.status(400).json({ error: 'Date craft obligatoire' });
             if (is_sold && !buyer_org) return res.status(400).json({ error: 'Organisation acheteuse obligatoire si vendu' });
+            if (is_sold && !sale_date) return res.status(400).json({ error: 'Date de vente obligatoire si vendu' });
 
             const userId = req.session.user.id;
             const userName = req.session.user.username;
@@ -1002,7 +1003,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (!Number.isFinite(craftTimestamp)) return res.status(400).json({ error: 'Date craft invalide' });
             const sold = !!is_sold;
             const now = Math.floor(Date.now() / 1000);
-            const soldPrice = parseInt(sale_price) || null;
+            const saleTimestamp = sold ? Math.floor(new Date(`${sale_date}T12:00:00+01:00`).getTime() / 1000) : null;
+            if (sold && !Number.isFinite(saleTimestamp)) return res.status(400).json({ error: 'Date de vente invalide' });
+            const soldPrice = free_sale ? 0 : (parseInt(sale_price) || null);
             const status = sold ? 'completed' : 'crafted';
             let requestId;
             let myWeaponId;
@@ -1017,7 +1020,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 `).run(
                     userId, userName, weapon.id, status, serial, craftTimestamp,
                     userId, userName, sold ? buyer_org : null, soldPrice,
-                    sold ? now : null, sold ? userId : null, sold ? userName : null
+                    sold ? saleTimestamp : null, sold ? userId : null, sold ? userName : null
                 );
                 requestId = r.lastInsertRowid;
 
@@ -1026,7 +1029,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number,
                         asking_price, min_price, is_sold, sold_to, sold_price, sold_at
                     ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
-                `).run(userId, userName, userAvatar, weapon.name, serial, soldPrice, null, sold ? 1 : 0, sold ? buyer_org : null, soldPrice, sold ? now : null);
+                `).run(userId, userName, userAvatar, weapon.name, serial, soldPrice, null, sold ? 1 : 0, sold ? buyer_org : null, soldPrice, sold ? saleTimestamp : null);
                 myWeaponId = mw.lastInsertRowid;
             } else {
                 if (!jsonData.craft_requests) jsonData.craft_requests = [];
@@ -1048,7 +1051,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     crafted_by_name: userName,
                     buyer_org: sold ? buyer_org : null,
                     sale_price: soldPrice,
-                    sale_date: sold ? now : null,
+                    sale_date: sold ? saleTimestamp : null,
                     completed_by_id: sold ? userId : null,
                     completed_by_name: sold ? userName : null,
                     posted_to_channel: 0,
@@ -1072,7 +1075,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     is_sold: sold ? 1 : 0,
                     sold_to: sold ? buyer_org : null,
                     sold_price: soldPrice,
-                    sold_at: sold ? now : null,
+                    sold_at: sold ? saleTimestamp : null,
                     created_at: now,
                 });
                 saveJSON();
@@ -1080,7 +1083,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             if (sold) {
                 try {
-                    await postManualCraftSaleJustification(requestId, now);
+                    await postManualCraftSaleJustification(requestId, saleTimestamp);
                 } catch (e) {
                     console.error('Erreur justification craft manuel:', e.message);
                 }
