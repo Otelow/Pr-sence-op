@@ -2416,8 +2416,10 @@ let craftBoardState = {
 let craftRequestsListState = {
     page: 1,
     pageSize: 10,
+    sortBy: 'date',
+    sortDir: 'desc',
 };
-const CRAFT_BOARD_ACTIVE_STATUSES = ['waiting_materials', 'in_progress', 'crafted'];
+const CRAFT_BOARD_ACTIVE_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
 const MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
 
 function compareWeaponsBySalePrice(a, b) {
@@ -2603,14 +2605,19 @@ function renderCraftStockState() {
         </div>
         <div class="craft-stock-grid">
             ${visibleStocks.map(stock => {
-                const level = getStockLevelClass(stock.quantity);
+                const total = Number(stock.quantity_total ?? stock.quantity) || 0;
+                const reserved = Number(stock.quantity_reserved) || 0;
+                const available = Number(stock.quantity_available ?? stock.quantity) || 0;
+                const level = getStockLevelClass(available);
                 const imageUrl = getStockImageUrl(stock);
                 return `
                     <div class="craft-stock-card stock-${level}">
                         ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}" onerror="this.outerHTML='<span class=&quot;craft-stock-placeholder&quot; aria-hidden=&quot;true&quot;>◆</span>'">` : '<span class="craft-stock-placeholder" aria-hidden="true">◆</span>'}
                         <div>
                             <strong>${escapeHtml(stock.name)}</strong>
-                            <span>${Number(stock.quantity) || 0}</span>
+                            <span>${available}</span>
+                            ${reserved > 0 ? `<small>Réservé : ${reserved}</small>` : ''}
+                            ${reserved > 0 ? `<small>Total : ${total}</small>` : ''}
                         </div>
                     </div>
                 `;
@@ -2870,6 +2877,40 @@ function goToCraftBoard() {
     switchCraftSubtab('board');
 }
 
+function getCraftRequestSortValue(request, sortBy) {
+    if (sortBy === 'user') return String(request.user_name || '').toLocaleLowerCase('fr-FR');
+    if (sortBy === 'weapon') return String(request.weapon_name || '').toLocaleLowerCase('fr-FR');
+    if (sortBy === 'price') return Number(request.weapon_craft_price ?? request.craft_price ?? 0) || 0;
+    return Number(request.created_at || request.id || 0) || 0;
+}
+
+function compareCraftRequests(a, b) {
+    const sortBy = craftRequestsListState.sortBy || 'date';
+    const sortDir = craftRequestsListState.sortDir === 'asc' ? 1 : -1;
+    const av = getCraftRequestSortValue(a, sortBy);
+    const bv = getCraftRequestSortValue(b, sortBy);
+    let result = 0;
+
+    if (typeof av === 'string' || typeof bv === 'string') {
+        result = String(av).localeCompare(String(bv), 'fr');
+    } else {
+        result = Number(av) - Number(bv);
+    }
+
+    const sortedResult = result * sortDir;
+    if (sortedResult !== 0) return sortedResult;
+    return (Number(b.created_at || b.id || 0) || 0) - (Number(a.created_at || a.id || 0) || 0);
+}
+
+function updateCraftRequestsSort() {
+    const sortBy = document.getElementById('craftRequestsSortBy');
+    const sortDir = document.getElementById('craftRequestsSortDir');
+    craftRequestsListState.sortBy = sortBy?.value || 'date';
+    craftRequestsListState.sortDir = sortDir?.value || 'desc';
+    craftRequestsListState.page = 1;
+    renderCraftRequestsList();
+}
+
 function getVisibleCraftRequests() {
     const u = window.currentUser || {};
     const hasFullAccess = canValidateCraftClient();
@@ -2879,7 +2920,7 @@ function getVisibleCraftRequests() {
         requests = requests.filter(r => r.user_id === u.id);
     }
 
-    return requests.sort((a, b) => Number(b.created_at || b.id || 0) - Number(a.created_at || a.id || 0));
+    return [...requests].sort(compareCraftRequests);
 }
 
 function renderCraftRequestsPagination(total, totalPages, start, end) {
@@ -2908,6 +2949,10 @@ function changeCraftRequestsPage(delta) {
 function renderCraftRequestsList() {
     const list = document.getElementById('craftRequestsList');
     if (!list) return;
+    const sortBySelect = document.getElementById('craftRequestsSortBy');
+    const sortDirSelect = document.getElementById('craftRequestsSortDir');
+    if (sortBySelect) sortBySelect.value = craftRequestsListState.sortBy;
+    if (sortDirSelect) sortDirSelect.value = craftRequestsListState.sortDir;
 
     const u = window.currentUser || {};
     const hasFullAccess = canValidateCraftClient();
@@ -2985,13 +3030,14 @@ async function cancelMyCraftRequest(id) {
         const data = await res.json();
         if (res.ok) {
             toast('🗑 Demande annulée');
-            await loadCraftRequests();
+            await Promise.all([loadCraftRequests(), loadWeaponsCatalog()]);
             renderCraftRequestsList();
             renderCraftBoard();
         } else { toast(`❌ ${data.error}`, 'error'); }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 window.cancelMyCraftRequest = cancelMyCraftRequest;
+window.updateCraftRequestsSort = updateCraftRequestsSort;
 
 function canValidateCraftClient() {
     const u = window.currentUser || {};
@@ -3015,6 +3061,7 @@ function canDeleteMyWeaponsClient() {
 
 async function updateRequestStatus(requestId, status) {
     const labels = {
+        materials: 'En attente des matières premières',
         waiting_materials: 'En attente des matières premières',
         in_progress: 'En cours',
         rejected: 'Refusé',
@@ -3030,7 +3077,7 @@ async function updateRequestStatus(requestId, status) {
         const data = await res.json();
         if (res.ok) {
             toast(`✅ Statut → ${labels[status]}`);
-            await loadCraftRequests();
+            await Promise.all([loadCraftRequests(), loadWeaponsCatalog()]);
             renderCraftRequestsList();
             renderCraftBoard();
         } else {
@@ -3046,7 +3093,7 @@ async function deleteCraftRequest(requestId) {
         const data = await res.json();
         if (res.ok) {
             toast('🗑 Supprimée');
-            await loadCraftRequests();
+            await Promise.all([loadCraftRequests(), loadWeaponsCatalog()]);
             renderCraftRequestsList();
             renderCraftBoard();
             renderCraftHistory();
@@ -3064,7 +3111,7 @@ function getCraftStatusBadge(r) {
     if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">✓ Finalisé</span>';
     if (r.status === 'rejected') return '<span class="craft-status-badge craft-status-rejected">✗ Refusé</span>';
     if (r.crafted) return '<span class="craft-status-badge craft-status-crafted">⚒ Crafté</span>';
-    if (r.status === 'waiting_materials') return '<span class="craft-status-badge craft-status-materials">📦 En attente des matières premières</span>';
+    if (r.status === 'materials' || r.status === 'waiting_materials') return '<span class="craft-status-badge craft-status-materials">📦 En attente des matières premières</span>';
     if (r.status === 'in_progress') return '<span class="craft-status-badge craft-status-progress">⏳ En cours</span>';
     return '<span class="craft-status-badge craft-status-pending">📋 En attente</span>';
 }
@@ -3346,7 +3393,7 @@ async function validateCraftSale(requestId) {
         const data = await res.json();
         if (res.ok) {
             toast('✅ Vente validée, récap posté');
-            await loadCraftRequests();
+            await Promise.all([loadCraftRequests(), loadWeaponsCatalog()]);
             renderCraftBoard();
             renderCraftHistory();
         } else {

@@ -86,7 +86,7 @@ const STOCK_MATERIAL_NAMES = [
     'Tungstène',
 ];
 
-const CRAFT_PRODUCTION_STATUSES = ['waiting_materials', 'in_progress', 'crafted'];
+const CRAFT_PRODUCTION_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
 
 function normalizeStockName(value) {
     return String(value || '')
@@ -569,6 +569,64 @@ function getStockMaterials() {
     return dedupeStockRows(rows, ingredients);
 }
 
+function getReservedStockByActiveRequests() {
+    const reservedByIngredientId = new Map();
+    const reservedByName = new Map();
+    const weapons = getAllWeapons();
+    const weaponsById = new Map(weapons.map(weapon => [Number(weapon.id), weapon]));
+    const ingredients = getAllIngredients();
+    const ingredientById = new Map(ingredients.map(item => [Number(item.id), item]));
+    const ingredientByName = new Map(ingredients.map(item => [normalizeStockName(item.name), item]));
+    const activeRequests = getRequests('all', { productionOnly: true });
+
+    for (const request of activeRequests) {
+        if (!CRAFT_PRODUCTION_STATUSES.includes(request.status)) continue;
+        const weapon = weaponsById.get(Number(request.weapon_id));
+        if (!weapon) continue;
+
+        for (const recipe of parseWeaponIngredients(weapon.ingredients)) {
+            const ingredientId = Number(recipe.ingredient_id || recipe.id || 0);
+            const ingredient = ingredientById.get(ingredientId)
+                || ingredientByName.get(normalizeStockName(recipe.name))
+                || null;
+            const name = ingredient?.name || recipe.name || '';
+            if (!isStockMaterialName(name)) continue;
+
+            const required = Math.max(0, parseInt(recipe.quantity || recipe.qty || recipe.amount, 10) || 0);
+            if (!required) continue;
+
+            if (ingredient) {
+                const id = Number(ingredient.id);
+                reservedByIngredientId.set(id, (reservedByIngredientId.get(id) || 0) + required);
+            }
+            const normalizedName = normalizeStockName(name);
+            reservedByName.set(normalizedName, (reservedByName.get(normalizedName) || 0) + required);
+        }
+    }
+
+    return { byIngredientId: reservedByIngredientId, byName: reservedByName };
+}
+
+function getAvailableStock() {
+    const stockMaterials = getStockMaterials();
+    const reserved = getReservedStockByActiveRequests();
+
+    return stockMaterials.map(material => {
+        const total = Number(material.quantity) || 0;
+        const reservedById = reserved.byIngredientId.get(Number(material.ingredient_id));
+        const reservedByName = reserved.byName.get(normalizeStockName(material.name));
+        const quantityReserved = Math.max(0, Number(reservedById ?? reservedByName) || 0);
+        const quantityAvailable = Math.max(0, total - quantityReserved);
+
+        return {
+            ...material,
+            quantity_total: total,
+            quantity_reserved: quantityReserved,
+            quantity_available: quantityAvailable,
+        };
+    });
+}
+
 function updateStockMaterial(ingredientId, quantity) {
     const cleanIngredientId = Number(ingredientId);
     const cleanQuantity = Math.max(0, parseInt(quantity, 10) || 0);
@@ -610,7 +668,7 @@ function getCraftableWeapons() {
     const ingredients = getAllIngredients();
     const ingredientById = new Map(ingredients.map(item => [Number(item.id), item]));
     const ingredientByName = new Map(ingredients.map(item => [normalizeStockName(item.name), item]));
-    const stockMaterials = getStockMaterials();
+    const stockMaterials = getAvailableStock();
     const stockByIngredientId = new Map(stockMaterials.map(item => [Number(item.ingredient_id), item]));
     const stockByName = new Map(stockMaterials.map(item => [normalizeStockName(item.name), item]));
 
@@ -626,13 +684,15 @@ function getCraftableWeapons() {
                 || stockByName.get(normalizeStockName(name))
                 || null;
             const tracked = Boolean(stock || isStockMaterialName(name));
-            const available = stock ? Number(stock.quantity) || 0 : 0;
+            const available = stock ? Number(stock.quantity_available ?? stock.quantity) || 0 : 0;
 
             return {
                 ingredient_id: ingredient ? ingredient.id : ingredientId || null,
                 name,
                 required,
                 available: tracked ? available : null,
+                available_total: tracked && stock ? Number(stock.quantity_total ?? stock.quantity) || 0 : null,
+                reserved: tracked && stock ? Number(stock.quantity_reserved) || 0 : 0,
                 tracked,
                 sufficient: !tracked || available >= required,
                 image_url: toCraftImageUrl(ingredient?.image_path),
@@ -722,7 +782,7 @@ function deleteOrg(id) {
 
 function getRequests(status, options = {}) {
     if (useSQLite) {
-        let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
+        let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image, w.craft_price as weapon_craft_price FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
         const params = [];
         if (options.productionOnly) {
             query += ` WHERE r.status IN (${CRAFT_PRODUCTION_STATUSES.map(() => '?').join(',')})`;
@@ -739,7 +799,7 @@ function getRequests(status, options = {}) {
     else if (status && status !== 'all') arr = arr.filter(r => r.status === status);
     return [...arr].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => {
         const w = jsonData.weapons.find(w => w.id === r.weapon_id);
-        return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null };
+        return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null, weapon_craft_price: w ? w.craft_price : 0 };
     });
 }
 

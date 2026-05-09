@@ -5955,6 +5955,13 @@ body {
     font: 800 18px/1.1 var(--font-mono);
 }
 
+.craft-stock-card small {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-muted);
+    font: 600 10px/1.2 var(--font-mono);
+}
+
 .craft-stock-card.stock-ok { border-color: rgba(74,222,128,.35); }
 .craft-stock-card.stock-ok span { color: #4ade80; }
 .craft-stock-card.stock-warning { border-color: rgba(251,191,36,.42); }
@@ -6490,6 +6497,21 @@ body {
     font-size: 12px;
 }
 
+.craft-requests-toolbar {
+    display: flex;
+    align-items: end;
+    gap: 12px;
+    margin: 8px 0 12px;
+    padding: 12px;
+    border: 0.5px solid rgba(255, 140, 0, 0.14);
+    border-radius: 12px;
+    background: rgba(12, 12, 14, 0.58);
+}
+
+.craft-requests-toolbar .craft-requests-pagination {
+    margin: 0 0 0 auto;
+}
+
 .craft-board-page-info,
 .craft-board-page-current {
     white-space: nowrap;
@@ -6513,6 +6535,11 @@ body {
 
 @media (max-width: 900px) {
     .craft-board-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .craft-requests-toolbar {
         align-items: stretch;
         flex-direction: column;
     }

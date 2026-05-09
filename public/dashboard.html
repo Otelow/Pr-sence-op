@@ -655,7 +655,25 @@
 
             <div class="craft-recent-requests">
                 <h4>📜 Demandes récentes</h4>
-                <div class="craft-requests-pagination" id="craftRequestsPagination"></div>
+                <div class="craft-requests-toolbar">
+                    <div class="craft-board-sort">
+                        <label class="comm-label" for="craftRequestsSortBy">Trier par</label>
+                        <select id="craftRequestsSortBy" class="comm-input craft-board-select" onchange="updateCraftRequestsSort()">
+                            <option value="date">Date</option>
+                            <option value="user">Utilisateur</option>
+                            <option value="weapon">Arme</option>
+                            <option value="price">Prix craft</option>
+                        </select>
+                    </div>
+                    <div class="craft-board-sort">
+                        <label class="comm-label" for="craftRequestsSortDir">Ordre</label>
+                        <select id="craftRequestsSortDir" class="comm-input craft-board-select" onchange="updateCraftRequestsSort()">
+                            <option value="desc">Décroissant</option>
+                            <option value="asc">Croissant</option>
+                        </select>
+                    </div>
+                    <div class="craft-requests-pagination" id="craftRequestsPagination"></div>
+                </div>
                 <div class="craft-requests-list" id="craftRequestsList">
                     <p class="empty">Aucune demande</p>
                 </div>
