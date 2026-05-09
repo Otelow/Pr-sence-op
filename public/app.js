@@ -2580,7 +2580,7 @@ function renderCraftStockState() {
                 const imageUrl = safeImageUrl(stock.image_url);
                 return `
                     <div class="craft-stock-card stock-${level}">
-                        ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}">` : '<span class="craft-stock-placeholder" aria-hidden="true"></span>'}
+                        ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}" onerror="this.outerHTML='<span class=&quot;craft-stock-placeholder&quot; aria-hidden=&quot;true&quot;>◆</span>'">` : '<span class="craft-stock-placeholder" aria-hidden="true">◆</span>'}
                         <div>
                             <strong>${escapeHtml(stock.name)}</strong>
                             <span>${Number(stock.quantity) || 0}</span>

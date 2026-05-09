@@ -290,8 +290,8 @@ function seedStockMaterials() {
                 allIngredients = db.prepare('SELECT * FROM ingredients').all();
                 matches = allIngredients.filter(item => normalizeStockName(item.name) === normalizeStockName(name));
             }
-            const preferred = matches.find(item => item.name === name)
-                || matches.find(item => item.image_path)
+            const preferred = matches.find(item => item.image_path)
+                || matches.find(item => item.name === name)
                 || matches[0];
             if (!preferred) continue;
             if (preferred.name !== name) {
@@ -317,8 +317,8 @@ function seedStockMaterials() {
 
     for (const name of STOCK_MATERIAL_NAMES) {
         const matches = jsonData.ingredients.filter(item => normalizeStockName(item.name) === normalizeStockName(name));
-        let ingredient = matches.find(item => item.name === name)
-            || matches.find(item => item.image_path)
+        let ingredient = matches.find(item => item.image_path)
+            || matches.find(item => item.name === name)
             || matches[0];
         if (!ingredient) {
             jsonData.counters.ingredients++;
@@ -489,17 +489,26 @@ function toCraftImageUrl(imagePath) {
     return `/crafts/images/${value}`;
 }
 
-function dedupeStockRows(rows) {
+function dedupeStockRows(rows, ingredients = []) {
+    const imageByName = new Map();
+    for (const ingredient of ingredients) {
+        const canonicalName = getCanonicalStockMaterialName(ingredient.name);
+        if (!canonicalName || !ingredient.image_path) continue;
+        if (!imageByName.has(canonicalName)) imageByName.set(canonicalName, ingredient.image_path);
+    }
+
     const byName = new Map();
     for (const row of rows) {
         const canonicalName = getCanonicalStockMaterialName(row.name);
         if (!canonicalName) continue;
+        const imagePath = row.image_path || imageByName.get(canonicalName) || null;
         const existing = byName.get(canonicalName);
         const cleanRow = {
             ...row,
             name: canonicalName,
             quantity: Number(row.quantity) || 0,
-            image_url: toCraftImageUrl(row.image_path),
+            image_path: imagePath,
+            image_url: toCraftImageUrl(imagePath),
         };
         if (!existing) {
             byName.set(canonicalName, cleanRow);
@@ -523,13 +532,14 @@ function getStockMaterials() {
     seedStockMaterials();
 
     if (useSQLite) {
+        const ingredients = db.prepare('SELECT * FROM ingredients').all();
         const rows = db.prepare(`
             SELECT sm.id, sm.ingredient_id, sm.quantity, sm.updated_at, i.name, i.image_path
             FROM stock_materials sm
             JOIN ingredients i ON i.id = sm.ingredient_id
             ORDER BY i.name ASC
         `).all();
-        return dedupeStockRows(rows);
+        return dedupeStockRows(rows, ingredients);
     }
 
     const ingredients = jsonData.ingredients || [];
@@ -546,7 +556,7 @@ function getStockMaterials() {
             };
         })
         .filter(Boolean);
-    return dedupeStockRows(rows);
+    return dedupeStockRows(rows, ingredients);
 }
 
 function updateStockMaterial(ingredientId, quantity) {
