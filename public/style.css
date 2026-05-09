@@ -7566,6 +7566,38 @@ body {
     gap: 12px;
 }
 
+.myweapons-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.myweapons-summary-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.myweapons-summary-pill.available {
+    color: var(--green);
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid rgba(0, 255, 136, 0.32);
+}
+
+.myweapons-summary-pill.sold {
+    color: #ff8585;
+    background: rgba(255, 51, 51, 0.09);
+    border: 1px solid rgba(255, 51, 51, 0.28);
+}
+
 .myweapons-item {
     display: flex;
     align-items: center;
@@ -7781,9 +7813,32 @@ body:has(#impersonateBanner[style*="flex"]) {
     background: rgba(255, 140, 0, 0.04);
 }
 
+.myweapons-item.mw-available-row {
+    border-color: rgba(0, 255, 136, 0.22);
+    border-left: 3px solid var(--green);
+    background:
+        linear-gradient(90deg, rgba(0, 255, 136, 0.08), transparent 44%),
+        rgba(20, 20, 24, 0.68);
+    box-shadow: 0 0 18px rgba(0, 255, 136, 0.04);
+}
+
+.myweapons-item.mw-available-row:hover {
+    border-color: rgba(0, 255, 136, 0.42);
+    box-shadow: 0 0 24px rgba(0, 255, 136, 0.08);
+}
+
 .myweapons-item.mw-sold-row {
-    opacity: 0.65;
-    border-color: rgba(74, 222, 128, 0.25);
+    opacity: 0.72;
+    filter: saturate(0.72);
+    border-color: rgba(255, 51, 51, 0.22);
+    border-left: 3px solid var(--accent);
+    background:
+        linear-gradient(90deg, rgba(255, 51, 51, 0.08), transparent 42%),
+        rgba(18, 18, 22, 0.52);
+}
+
+.myweapons-item.mw-sold-row .mw-avatar {
+    filter: grayscale(0.55) blur(0.35px);
 }
 
 .mw-avatar {
@@ -7846,7 +7901,7 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 .mw-sold-price {
-    color: var(--green);
+    color: #ff8585;
     font-weight: 700;
 }
 
@@ -7869,15 +7924,36 @@ body:has(#impersonateBanner[style*="flex"]) {
     border: 0.5px solid rgba(74, 222, 128, 0.35);
 }
 
-.myweapons-tag-sold {
-    background: rgba(74, 222, 128, 0.15);
+.myweapons-tag-status {
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.myweapons-tag-status.available {
     color: var(--green);
+    background: rgba(0, 255, 136, 0.13);
+    border: 0.5px solid rgba(0, 255, 136, 0.4);
+}
+
+.myweapons-tag-status.sold {
+    color: #ff8585;
+    background: rgba(255, 51, 51, 0.14);
+    border: 0.5px solid rgba(255, 51, 51, 0.36);
+}
+
+.myweapons-tag-sold {
+    background: rgba(255, 51, 51, 0.14);
+    color: #ff8585;
     padding: 2px 10px;
     border-radius: 4px;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
-    border: 0.5px solid rgba(74, 222, 128, 0.3);
+    border: 0.5px solid rgba(255, 51, 51, 0.36);
 }
 
 .mw-actions {

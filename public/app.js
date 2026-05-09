@@ -3945,7 +3945,30 @@ function renderMyWeapons() {
         list.innerHTML = '<p class="empty">Aucune arme en vente</p>';
         return;
     }
-    list.innerHTML = myWeaponsCache.map(w => {
+
+    const getAvailableQty = (weapon) => (
+        typeof weapon.quantity_available === 'number'
+            ? weapon.quantity_available
+            : (weapon.is_sold ? 0 : 1)
+    );
+    const getTotalQty = (weapon) => weapon.quantity_total || 1;
+    const sortedWeapons = [...myWeaponsCache].sort((a, b) => {
+        const aSold = getAvailableQty(a) <= 0;
+        const bSold = getAvailableQty(b) <= 0;
+        if (aSold !== bSold) return aSold ? 1 : -1;
+        return (Number(b.created_at) || 0) - (Number(a.created_at) || 0);
+    });
+    const availableUnits = sortedWeapons.reduce((sum, w) => sum + Math.max(0, getAvailableQty(w)), 0);
+    const soldUnits = sortedWeapons.reduce((sum, w) => sum + Math.max(0, getTotalQty(w) - getAvailableQty(w)), 0);
+
+    const summary = `
+        <div class="myweapons-summary">
+            <span class="myweapons-summary-pill available">${availableUnits} arme${availableUnits > 1 ? 's' : ''} en vente</span>
+            <span class="myweapons-summary-pill sold">${soldUnits} vendue${soldUnits > 1 ? 's' : ''}</span>
+        </div>
+    `;
+
+    const rows = sortedWeapons.map(w => {
         const date = new Date(w.created_at * 1000).toLocaleDateString('fr-FR');
         const avatarUrl = safeImageUrl(w.user_avatar);
         const avatar = avatarUrl
@@ -3966,7 +3989,7 @@ function renderMyWeapons() {
             : '';
 
         const priceBlock = isSold
-            ? `<span class="mw-sold-price">✅ Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '→ ' + escapeHtml(w.sold_to) : ''}</span>`
+            ? `<span class="mw-sold-price">Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '→ ' + escapeHtml(w.sold_to) : ''}</span>`
             : `
                 <span class="mw-asking-price">💰 Souhaité : ${(w.asking_price || 0).toLocaleString('fr-FR')}$</span>
                 ${w.min_price ? `<span class="mw-min-price">📉 Min : ${w.min_price.toLocaleString('fr-FR')}$</span>` : ''}
@@ -3985,14 +4008,14 @@ function renderMyWeapons() {
         }
 
         return `
-            <div class="myweapons-item ${isSold ? 'mw-sold-row' : ''} ${isMine ? 'mw-mine' : ''}">
+            <div class="myweapons-item ${isSold ? 'mw-sold-row' : 'mw-available-row'} ${isMine ? 'mw-mine' : ''}">
                 ${avatar}
                 <div class="myweapons-item-body">
                     <div class="myweapons-item-name">
                         ${escapeHtml(w.weapon_name)}
+                        <span class="myweapons-tag-status ${isSold ? 'sold' : 'available'}">${isSold ? 'VENDUE' : 'EN VENTE'}</span>
                         ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
                         <span class="myweapons-tag-stock">${availableQty}/${totalQty}</span>
-                        ${isSold ? '<span class="myweapons-tag-sold">VENDU</span>' : ''}
                     </div>
                     <div class="myweapons-item-meta">
                         <span class="mw-username">👤 ${escapeHtml(w.user_name)}</span>
@@ -4006,6 +4029,8 @@ function renderMyWeapons() {
             </div>
         `;
     }).join('');
+
+    list.innerHTML = summary + rows;
 }
 
 // ─── Modal "Marquer comme vendu" ───

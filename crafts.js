@@ -203,6 +203,7 @@ function initDB() {
                     sold_by_id TEXT,
                     sold_by_name TEXT,
                     discord_message_id TEXT,
+                    weapons_log_message_id TEXT,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
                 CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
@@ -227,6 +228,7 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_by_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_by_name TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN discord_message_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN weapons_log_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
 
@@ -1758,6 +1760,111 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         }
     }
 
+    async function fetchDiscordChannel(channelId, label) {
+        if (!botClient) {
+            console.error(`[discord] ${label}: botClient indisponible`);
+            return null;
+        }
+        const cached = botClient.channels.cache.get(channelId);
+        if (cached) return cached;
+        try {
+            return await botClient.channels.fetch(channelId);
+        } catch (e) {
+            console.error(`[discord] ${label}: salon ${channelId} introuvable ou inaccessible: ${e.message}`);
+            return null;
+        }
+    }
+
+    function getWeaponsLogChannelId() {
+        const state = botState();
+        return (state?.CONFIG?.CHANNELS?.WEAPONS_LOG) || '1497021044953845791';
+    }
+
+    function buildMyWeaponsCraftLogEmbed(base, rows) {
+        const { EmbedBuilder } = require('discord.js');
+        const serials = rows
+            .map(w => `\`${w.serial_number}\``)
+            .join('\n')
+            .slice(0, 1000);
+        const date = new Date().toLocaleDateString('fr-FR');
+
+        return new EmbedBuilder()
+            .setTitle(`Log arme 21BS • ${base.weapon_name}`)
+            .setDescription('Arme craftée par les 21 Block Savage déclarée dans Vos Armes.')
+            .setColor(0xffb84d)
+            .addFields(
+                { name: 'Arme', value: base.weapon_name || 'N/A', inline: true },
+                { name: 'Quantité', value: String(rows.length), inline: true },
+                { name: 'Membre', value: base.user_id ? `<@${base.user_id}>` : (base.user_name || 'N/A'), inline: true },
+                { name: 'Craftée par', value: base.crafted_by_name || 'Non renseigné', inline: true },
+                { name: 'Prix souhaité', value: moneyLabel(base.asking_price), inline: true },
+                { name: 'Prix minimum', value: moneyLabel(base.min_price), inline: true },
+                { name: 'Numéro de série', value: serials || 'N/A', inline: false },
+                { name: 'Date', value: date, inline: true },
+            )
+            .setTimestamp()
+            .setFooter({ text: '21 Block Savage • Logs armes' });
+    }
+
+    async function postMyWeaponsCraftLog(existing) {
+        let rows;
+        if (useSQLite) {
+            rows = existing.batch_id
+                ? db.prepare('SELECT * FROM my_weapons WHERE batch_id = ? ORDER BY id ASC').all(existing.batch_id)
+                : [db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(existing.id)];
+        } else {
+            rows = (jsonData.my_weapons || []).filter(w => existing.batch_id ? w.batch_id === existing.batch_id : w.id === existing.id);
+        }
+
+        rows = rows
+            .filter(Boolean)
+            .filter(w => {
+                const crafted = w.is_crafted === true || w.is_crafted === 1 || w.is_crafted === '1';
+                return crafted && String(w.serial_number || '').trim();
+            });
+
+        if (!rows.length) return;
+        if (rows.every(w => w.weapons_log_message_id)) return;
+
+        const existingLogId = rows.find(w => w.weapons_log_message_id)?.weapons_log_message_id;
+        if (existingLogId) {
+            if (useSQLite) {
+                const ids = rows.filter(w => !w.weapons_log_message_id).map(w => w.id);
+                const stmt = db.prepare('UPDATE my_weapons SET weapons_log_message_id = ? WHERE id = ?');
+                for (const rowId of ids) stmt.run(existingLogId, rowId);
+            } else {
+                for (const w of rows) {
+                    if (!w.weapons_log_message_id) w.weapons_log_message_id = existingLogId;
+                }
+                saveJSON();
+            }
+            return;
+        }
+
+        const channelId = getWeaponsLogChannelId();
+        const channel = await fetchDiscordChannel(channelId, 'WEAPONS_LOG');
+        if (!channel) return;
+
+        const base = rows[0];
+        const embed = buildMyWeaponsCraftLogEmbed(base, rows);
+        try {
+            const msg = await channel.send({
+                content: `📋 Log arme 21BS • **${base.weapon_name}** • ${rows.length} série(s) enregistrée(s).`,
+                embeds: [embed],
+                allowedMentions: { parse: [] },
+            });
+            if (useSQLite) {
+                const stmt = db.prepare('UPDATE my_weapons SET weapons_log_message_id = ? WHERE id = ?');
+                for (const row of rows) stmt.run(msg.id, row.id);
+            } else {
+                for (const w of rows) w.weapons_log_message_id = msg.id;
+                saveJSON();
+            }
+        } catch (e) {
+            console.error(`[discord] WEAPONS_LOG: envoi impossible pour ${base.weapon_name}: ${e.message}`);
+        }
+    }
+
     app.get('/api/crafts/myweapons', requireAuth, (req, res) => {
         try {
             const userId = req.session.user.id;
@@ -1844,7 +1951,10 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             try {
                 const first = useSQLite ? db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id) : (jsonData.my_weapons || []).find(w => w.id === id);
-                if (first) await updateMyWeaponsDiscordBatch(first);
+                if (first) {
+                    await postMyWeaponsCraftLog(first);
+                    await updateMyWeaponsDiscordBatch(first);
+                }
             } catch (e) { console.error('Erreur post Discord myweapons:', e.message); }
 
             return res.json({ success: true, id, quantity: serials.length });
