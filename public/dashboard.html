@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard ? 21 Block Savage</title>
+<title>Dashboard — 21 Block Savage</title>
 <link rel="stylesheet" href="/style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,36 +16,36 @@
 <aside class="sidebar">
     <div class="sidebar-header">
         <div class="badge-mini">21BS</div>
-        <span class="sidebar-title">Centre Contr?le</span>
+        <span class="sidebar-title">Centre Contrôle</span>
     </div>
 
     <nav class="nav">
         <a href="#" class="nav-item active" data-tab="presence">
-            <span class="nav-icon">?</span>
-            <span>Pr?sence</span>
+            <span class="nav-icon">▣</span>
+            <span>Présence</span>
         </a>
         <a href="#" class="nav-item" data-tab="commands">
-            <span class="nav-icon">?</span>
+            <span class="nav-icon">⚡</span>
             <span>Commandes</span>
         </a>
         <a href="#" class="nav-item" data-tab="map">
-            <span class="nav-icon">?</span>
+            <span class="nav-icon">⌖</span>
             <span>Carte</span>
         </a>
         <a href="#" class="nav-item" data-tab="crafts">
-            <span class="nav-icon">?</span>
+            <span class="nav-icon">⚒</span>
             <span>Craft d'armes</span>
         </a>
         <a href="#" class="nav-item" data-tab="myweapons">
-            <span class="nav-icon">??</span>
+            <span class="nav-icon">🔫</span>
             <span>Vos Armes</span>
         </a>
         <a href="#" class="nav-item" data-tab="stats">
-            <span class="nav-icon">?</span>
+            <span class="nav-icon">▤</span>
             <span>Statistiques</span>
         </a>
         <a href="#" class="nav-item" data-tab="sanctions">
-            <span class="nav-icon">?</span>
+            <span class="nav-icon">⚠</span>
             <span>Sanctions</span>
         </a>
         <a href="#" class="nav-item" data-tab="channels">
@@ -57,15 +57,15 @@
     <div class="sidebar-footer">
         <div class="admin-slide-wrapper" id="adminSlideWrapper" style="display:none;">
             <div class="admin-slide-track" id="adminSlideTrack">
-                <div class="admin-slide-handle" id="adminSlideHandle">??</div>
-                <span class="admin-slide-label">Glisse ? Panneau Admin</span>
+                <div class="admin-slide-handle" id="adminSlideHandle">🛠</div>
+                <span class="admin-slide-label">Glisse → Panneau Admin</span>
             </div>
         </div>
         <div class="user-card">
             <img id="userAvatar" src="" alt="" class="user-avatar">
             <div class="user-info">
-                <div id="userName" class="user-name">?</div>
-                <a href="/auth/logout" class="logout-link">D?connexion ?</a>
+                <div id="userName" class="user-name">—</div>
+                <a href="/auth/logout" class="logout-link">Déconnexion ↗</a>
             </div>
         </div>
     </div>
@@ -75,54 +75,54 @@
 
     <header class="topbar">
         <div class="topbar-left">
-            <h1 class="page-title" id="pageTitle">Pr?sence OP</h1>
-            <span class="page-sub" id="pageSub">Suivi temps r?el</span>
+            <h1 class="page-title" id="pageTitle">Présence OP</h1>
+            <span class="page-sub" id="pageSub">Suivi temps réel</span>
         </div>
         <div class="topbar-right">
             <div class="live-indicator">
                 <span class="live-dot"></span>
                 <span class="live-text">LIVE</span>
             </div>
-            <button class="btn-refresh" onclick="refreshAll()" title="Rafra?chir">?</button>
+            <button class="btn-refresh" onclick="refreshAll()" title="Rafraîchir">↻</button>
         </div>
     </header>
 
-    <!-- TAB: PR?SENCE -->
+    <!-- TAB: PRÉSENCE -->
     <section class="tab-content active" id="tab-presence">
 
         <div class="stats-grid">
             <button type="button" class="stat-card stat-card-action" onclick="openPresenceStatDetails('members')">
                 <div class="stat-label">Membres total</div>
-                <div class="stat-value" id="statTotal">?</div>
+                <div class="stat-value" id="statTotal">—</div>
             </button>
             <button type="button" class="stat-card stat-card-action stat-info" onclick="openPresenceStatDetails('op')">
                 <div class="stat-label">Inscrits OP</div>
-                <div class="stat-value" id="statInscrits">?</div>
-                <div class="stat-sub">R?le 21BS</div>
+                <div class="stat-value" id="statInscrits">—</div>
+                <div class="stat-sub">Rôle 21BS</div>
             </button>
             <button type="button" class="stat-card stat-card-action" onclick="openPresenceStatDetails('absences')">
                 <div class="stat-label">Absences semaine</div>
-                <div class="stat-value" id="statAbsences">?</div>
+                <div class="stat-value" id="statAbsences">—</div>
             </button>
             <button type="button" class="stat-card stat-card-action stat-warning" id="statConsecutiveCard" onclick="openPresenceStatDetails('kp')">
                 <div class="stat-label">Alertes KP</div>
-                <div class="stat-value" id="statConsecutive">?</div>
+                <div class="stat-value" id="statConsecutive">—</div>
             </button>
         </div>
 
         <div class="op-grid">
             <div class="op-panel" id="op1Panel">
                 <div class="op-header">
-                    <h2>1?re Pr?sence OP</h2>
-                    <span class="op-status" id="op1Status">?</span>
+                    <h2>1ère Présence OP</h2>
+                    <span class="op-status" id="op1Status">—</span>
                 </div>
                 <div class="op-categories" id="op1Categories"></div>
             </div>
 
             <div class="op-panel" id="op2Panel">
                 <div class="op-header">
-                    <h2>2?me Pr?sence OP</h2>
-                    <span class="op-status" id="op2Status">?</span>
+                    <h2>2ème Présence OP</h2>
+                    <span class="op-status" id="op2Status">—</span>
                 </div>
                 <div class="op-categories" id="op2Categories"></div>
             </div>
@@ -130,20 +130,20 @@
 
         <div class="absences-panel">
             <div class="absences-panel-header">
-                <h2 class="section-title" style="margin:0;">?? Absences pos?es dans le salon</h2>
-                <p class="absences-panel-sub">R?cap des absences d?clar?es par les membres dans le salon d?di?</p>
+                <h2 class="section-title" style="margin:0;">📅 Absences posées dans le salon</h2>
+                <p class="absences-panel-sub">Récap des absences déclarées par les membres dans le salon dédié</p>
             </div>
             <div class="absences-grid">
                 <div class="absences-block">
                     <div class="absences-header valid">
-                        <span><span class="absences-icon">?</span> Conformes</span>
+                        <span><span class="absences-icon">✅</span> Conformes</span>
                         <span class="count" id="validCount">0</span>
                     </div>
                     <div class="absences-list" id="validList"></div>
                 </div>
                 <div class="absences-block">
                     <div class="absences-header invalid">
-                        <span><span class="absences-icon">?</span> Non conformes</span>
+                        <span><span class="absences-icon">❌</span> Non conformes</span>
                         <span class="count" id="invalidCount">0</span>
                     </div>
                     <div class="absences-list" id="invalidList"></div>
@@ -157,50 +157,50 @@
     <section class="tab-content" id="tab-commands">
 
         <div class="cmd-section">
-            <h2 class="section-title">?? Alertes terrain</h2>
+            <h2 class="section-title">🚨 Alertes terrain</h2>
             <div class="cmd-grid">
                 <button class="cmd-btn cmd-danger" onclick="runCmd('qg')">
-                    <span class="cmd-icon">??</span>
+                    <span class="cmd-icon">📍</span>
                     <span class="cmd-name">QG</span>
                     <span class="cmd-desc">Rendez-vous au Hood (5 min)</span>
                 </button>
                 <button class="cmd-btn cmd-danger" onclick="runCmd('defense')">
-                    <span class="cmd-icon">??</span>
-                    <span class="cmd-name">D?fense Labo</span>
-                    <span class="cmd-desc">Laboratoire attaqu?</span>
+                    <span class="cmd-icon">🔥</span>
+                    <span class="cmd-name">Défense Labo</span>
+                    <span class="cmd-desc">Laboratoire attaqué</span>
                 </button>
                 <button class="cmd-btn" onclick="runCmd('garage')">
-                    <span class="cmd-icon">??</span>
+                    <span class="cmd-icon">🏗</span>
                     <span class="cmd-name">Garage</span>
                     <span class="cmd-desc">Rendez-vous au Garage Hood</span>
                 </button>
                 <button class="cmd-btn" onclick="runCmd('alignement')">
-                    <span class="cmd-icon">??</span>
+                    <span class="cmd-icon">📐</span>
                     <span class="cmd-name">Alignement</span>
                     <span class="cmd-desc">3 minutes pour s'aligner</span>
                 </button>
                 <button class="cmd-btn" onclick="runCmd('position')">
-                    <span class="cmd-icon">??</span>
+                    <span class="cmd-icon">🎯</span>
                     <span class="cmd-name">Positions</span>
                     <span class="cmd-desc">Prendre des positions</span>
                 </button>
                 <button class="cmd-btn" onclick="runCmd('tir')">
-                    <span class="cmd-icon">?</span>
+                    <span class="cmd-icon">✋</span>
                     <span class="cmd-name">Stop Tir</span>
-                    <span class="cmd-desc">Arr?ter de tirer</span>
+                    <span class="cmd-desc">Arrêter de tirer</span>
                 </button>
                 <button class="cmd-btn" onclick="runCmd('weed')">
-                    <span class="cmd-icon">??</span>
+                    <span class="cmd-icon">🌿</span>
                     <span class="cmd-name">Weed</span>
                     <span class="cmd-desc">Aller sur la weed</span>
                 </button>
                 <button class="cmd-btn" onclick="runCmd('traitement-weed')">
-                    <span class="cmd-icon">?</span>
+                    <span class="cmd-icon">⚗</span>
                     <span class="cmd-name">Traitement</span>
                     <span class="cmd-desc">Traitement de la weed</span>
                 </button>
                 <button class="cmd-btn" onclick="runCmd('trash')">
-                    <span class="cmd-icon">??</span>
+                    <span class="cmd-icon">🚫</span>
                     <span class="cmd-name">Anti-Trash</span>
                     <span class="cmd-desc">Avertissement trash</span>
                 </button>
@@ -208,21 +208,21 @@
         </div>
 
         <div class="cmd-section">
-            <h2 class="section-title">?? Communications</h2>
+            <h2 class="section-title">📡 Communications</h2>
             <div class="cmd-grid">
                 <button class="cmd-btn cmd-info" onclick="runCmd('radio')">
-                    <span class="cmd-icon">??</span>
+                    <span class="cmd-icon">📻</span>
                     <span class="cmd-name">Nouvelle Radio</span>
-                    <span class="cmd-desc">Fr?quence al?atoire</span>
+                    <span class="cmd-desc">Fréquence aléatoire</span>
                 </button>
                 <button class="cmd-btn cmd-info" onclick="runCmd('presence')">
-                    <span class="cmd-icon">??</span>
-                    <span class="cmd-name">1?re Pr?sence OP</span>
-                    <span class="cmd-desc">Lancer la pr?sence</span>
+                    <span class="cmd-icon">📋</span>
+                    <span class="cmd-name">1ère Présence OP</span>
+                    <span class="cmd-desc">Lancer la présence</span>
                 </button>
                 <button class="cmd-btn cmd-info" onclick="runCmd('presence2')">
-                    <span class="cmd-icon">??</span>
-                    <span class="cmd-name">2?me Pr?sence OP</span>
+                    <span class="cmd-icon">📋</span>
+                    <span class="cmd-name">2ème Présence OP</span>
                     <span class="cmd-desc">Sans relances</span>
                 </button>
             </div>
@@ -230,22 +230,22 @@
 
         <div class="cmd-section">
             <div class="comm-header">
-                <h2 class="comm-title">?? Communications</h2>
+                <h2 class="comm-title">📨 Communications</h2>
                 <p class="comm-subtitle">Envoie des annonces, rappels ou avertissements directement sur Discord</p>
             </div>
 
             <div class="comm-tabs-wrapper">
                 <div class="comm-tabs">
                     <button type="button" class="comm-tab active" data-comm="annonce" onclick="switchCommTab('annonce')">
-                        <span class="comm-tab-icon">??</span>
+                        <span class="comm-tab-icon">📢</span>
                         <span class="comm-tab-label">Annonce</span>
                     </button>
                     <button type="button" class="comm-tab" data-comm="rappel" onclick="switchCommTab('rappel')">
-                        <span class="comm-tab-icon">??</span>
+                        <span class="comm-tab-icon">📌</span>
                         <span class="comm-tab-label">Rappel</span>
                     </button>
                     <button type="button" class="comm-tab" data-comm="sanction" onclick="switchCommTab('sanction')">
-                        <span class="comm-tab-icon">??</span>
+                        <span class="comm-tab-icon">⚠️</span>
                         <span class="comm-tab-label">Sanction</span>
                     </button>
                 </div>
@@ -255,14 +255,14 @@
             <div class="comm-panel active" id="commPanel-annonce">
                 <div class="comm-card">
                     <div class="comm-field">
-                        <label class="comm-label">R?le ? mentionner</label>
+                        <label class="comm-label">Rôle à mentionner</label>
                         <div class="custom-dropdown" id="annonceRoleDropdownWrapper">
                             <button type="button" class="custom-dropdown-trigger" onclick="toggleRoleDropdown('annonce', event)">
-                                <span class="custom-dropdown-placeholder" id="annonceRoleLabel">? Choisir un r?le ?</span>
-                                <span class="custom-dropdown-arrow">?</span>
+                                <span class="custom-dropdown-placeholder" id="annonceRoleLabel">— Choisir un rôle —</span>
+                                <span class="custom-dropdown-arrow">▾</span>
                             </button>
                             <div class="custom-dropdown-menu" id="annonceRoleMenu" style="display:none;">
-                                <input type="text" class="custom-dropdown-search" id="annonceRoleSearch" placeholder="?? Filtrer..." onclick="event.stopPropagation()">
+                                <input type="text" class="custom-dropdown-search" id="annonceRoleSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
                                 <div class="custom-dropdown-list" id="annonceRoleList"></div>
                             </div>
                             <input type="hidden" id="annonceRole">
@@ -273,10 +273,10 @@
                             <label class="comm-label">Message</label>
                             <span class="comm-charcount" id="annonceCharCount">0 / 2000</span>
                         </div>
-                        <textarea id="annonceMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton annonce ici...&#10;&#10;Tu peux faire des retours ? la ligne et ins?rer des :emojis: du serveur."></textarea>
+                        <textarea id="annonceMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton annonce ici...&#10;&#10;Tu peux faire des retours à la ligne et insérer des :emojis: du serveur."></textarea>
                         <div class="comm-toolbar">
                             <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('annonceMessage')">
-                                <span>??</span> Emojis
+                                <span>😀</span> Emojis
                             </button>
                             <label class="comm-embed-toggle">
                                 <input type="checkbox" id="annonceUseEmbed" onchange="toggleEmbedMode('annonce')">
@@ -286,7 +286,7 @@
                     </div>
                     <div class="comm-actions">
                         <button class="comm-send-btn comm-send-annonce" onclick="sendAnnonce()">
-                            ?? Envoyer l'annonce
+                            📤 Envoyer l'annonce
                         </button>
                     </div>
                 </div>
@@ -296,14 +296,14 @@
             <div class="comm-panel" id="commPanel-rappel">
                 <div class="comm-card">
                     <div class="comm-field">
-                        <label class="comm-label">R?le ? mentionner</label>
+                        <label class="comm-label">Rôle à mentionner</label>
                         <div class="custom-dropdown" id="rappelRoleDropdownWrapper">
                             <button type="button" class="custom-dropdown-trigger" onclick="toggleRoleDropdown('rappel', event)">
-                                <span class="custom-dropdown-placeholder" id="rappelRoleLabel">? Choisir un r?le ?</span>
-                                <span class="custom-dropdown-arrow">?</span>
+                                <span class="custom-dropdown-placeholder" id="rappelRoleLabel">— Choisir un rôle —</span>
+                                <span class="custom-dropdown-arrow">▾</span>
                             </button>
                             <div class="custom-dropdown-menu" id="rappelRoleMenu" style="display:none;">
-                                <input type="text" class="custom-dropdown-search" id="rappelRoleSearch" placeholder="?? Filtrer..." onclick="event.stopPropagation()">
+                                <input type="text" class="custom-dropdown-search" id="rappelRoleSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
                                 <div class="custom-dropdown-list" id="rappelRoleList"></div>
                             </div>
                             <input type="hidden" id="rappelRole">
@@ -317,7 +317,7 @@
                         <textarea id="rappelMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton rappel ici..."></textarea>
                         <div class="comm-toolbar">
                             <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('rappelMessage')">
-                                <span>??</span> Emojis
+                                <span>😀</span> Emojis
                             </button>
                             <label class="comm-embed-toggle">
                                 <input type="checkbox" id="rappelUseEmbed" onchange="toggleEmbedMode('rappel')">
@@ -327,7 +327,7 @@
                     </div>
                     <div class="comm-actions">
                         <button class="comm-send-btn comm-send-rappel" onclick="sendRappel()">
-                            ?? Envoyer le rappel
+                            📌 Envoyer le rappel
                         </button>
                     </div>
                 </div>
@@ -337,14 +337,14 @@
             <div class="comm-panel" id="commPanel-sanction">
                 <div class="comm-card">
                     <div class="comm-field">
-                        <label class="comm-label">Utilisateur ? sanctionner</label>
+                        <label class="comm-label">Utilisateur à sanctionner</label>
                         <div class="custom-dropdown" id="sanctionUserDropdownWrapper">
                             <button type="button" class="custom-dropdown-trigger" id="sanctionDropdownTrigger" onclick="toggleSanctionDropdown(event)">
-                                <span class="custom-dropdown-placeholder" id="sanctionDropdownLabel">? S?lectionne un membre ?</span>
-                                <span class="custom-dropdown-arrow">?</span>
+                                <span class="custom-dropdown-placeholder" id="sanctionDropdownLabel">— Sélectionne un membre —</span>
+                                <span class="custom-dropdown-arrow">▾</span>
                             </button>
                             <div class="custom-dropdown-menu" id="sanctionDropdownMenu" style="display:none;">
-                                <input type="text" class="custom-dropdown-search" id="sanctionDropdownSearch" placeholder="?? Filtrer..." onclick="event.stopPropagation()">
+                                <input type="text" class="custom-dropdown-search" id="sanctionDropdownSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
                                 <div class="custom-dropdown-list" id="sanctionDropdownList"></div>
                             </div>
                             <input type="hidden" id="sanctionUser">
@@ -365,19 +365,19 @@
                         <textarea id="sanctionRaison" class="comm-textarea" rows="6" maxlength="2000" placeholder="Explique la raison de l'avertissement..."></textarea>
                         <div class="comm-toolbar">
                             <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('sanctionRaison')">
-                                <span>??</span> Emojis
+                                <span>😀</span> Emojis
                             </button>
                         </div>
                     </div>
                     <div class="comm-actions">
                         <button class="comm-send-btn comm-send-sanction" onclick="sendSanction()">
-                            ?? Envoyer l'avertissement
+                            ⚠️ Envoyer l'avertissement
                         </button>
                     </div>
                 </div>
             </div>
 
-            <!-- Picker emojis partag? -->
+            <!-- Picker emojis partagé -->
             <div class="comm-emoji-picker" id="emojiPicker" style="display:none;">
                 <p class="empty" style="padding:12px;grid-column:1/-1;">Chargement des emojis...</p>
             </div>
@@ -392,26 +392,26 @@
 
         <div class="stats-tables">
             <div class="stats-block">
-                <h3 class="stats-block-title alert">?? Alertes KP ? Absences cons?cutives</h3>
+                <h3 class="stats-block-title alert">🚨 Alertes KP — Absences consécutives</h3>
                 <div class="stats-list" id="consecutiveList">
                     <p class="empty">Chargement...</p>
                 </div>
             </div>
 
             <div class="stats-block">
-                <h3 class="stats-block-title">?? Calendrier de pr?sence ? Cette semaine</h3>
+                <h3 class="stats-block-title">📅 Calendrier de présence — Cette semaine</h3>
                 <div class="stats-calendar" id="statsCalendar">
                     <p class="empty">Chargement...</p>
                 </div>
             </div>
         </div>
 
-        <p class="stats-note">Reset automatique chaque dimanche ? 22h00</p>
+        <p class="stats-note">Reset automatique chaque dimanche à 22h00</p>
     </section>
 
     <!-- TAB: SANCTIONS -->
     <section class="tab-content" id="tab-sanctions">
-        <h2 class="section-title">? Historique des sanctions / avertissements</h2>
+        <h2 class="section-title">⚠ Historique des sanctions / avertissements</h2>
         <div class="sanctions-list" id="sanctionsList">
             <p class="empty">Chargement...</p>
         </div>
@@ -421,7 +421,7 @@
     <section class="tab-content" id="tab-channels">
         <div class="channels-toolbar">
             <input type="text" id="channelSearch" placeholder="Rechercher un salon..." class="channel-search">
-            <button class="btn-back-channels" id="backToChannelsBtn" style="display:none;" onclick="backToChannels()">? Retour aux salons</button>
+            <button class="btn-back-channels" id="backToChannelsBtn" style="display:none;" onclick="backToChannels()">← Retour aux salons</button>
         </div>
 
         <!-- Vue grille des salons -->
@@ -433,25 +433,25 @@
         <div class="channel-messages-view" id="channelMessagesView" style="display:none;">
             <div class="channel-viewer-header">
                 <div>
-                    <h2 id="viewerName">?</h2>
+                    <h2 id="viewerName">—</h2>
                     <p id="viewerTopic" class="viewer-topic"></p>
                 </div>
                 <div class="viewer-actions">
-                    <a id="viewerOpenDiscord" href="#" target="_blank" class="btn-discord-mini">Ouvrir dans Discord ?</a>
+                    <a id="viewerOpenDiscord" href="#" target="_blank" class="btn-discord-mini">Ouvrir dans Discord ↗</a>
                 </div>
             </div>
             <div class="channel-timeline" id="channelTimeline"></div>
             <div class="channels-load-more">
-                <button id="loadMoreBtn" class="btn-load-more" style="display:none;">? Charger plus de messages</button>
+                <button id="loadMoreBtn" class="btn-load-more" style="display:none;">↑ Charger plus de messages</button>
             </div>
             <!-- Zone d'envoi de message -->
             <div class="message-input-area" id="messageInputArea" style="display:none;">
                 <div class="message-input-wrapper">
-                    <textarea id="messageInput" placeholder="?cris un message..." rows="1" maxlength="2000"></textarea>
+                    <textarea id="messageInput" placeholder="Écris un message..." rows="1" maxlength="2000"></textarea>
                     <div class="message-input-actions">
-                        <button class="msg-action-btn" title="Emojis" onclick="toggleMessageEmojiPicker()">??</button>
+                        <button class="msg-action-btn" title="Emojis" onclick="toggleMessageEmojiPicker()">😀</button>
                         <button class="msg-action-btn" title="Mentionner" onclick="insertMention()">@</button>
-                        <button class="msg-send-btn" id="sendMessageBtn" onclick="sendChannelMessage()">Envoyer ?</button>
+                        <button class="msg-send-btn" id="sendMessageBtn" onclick="sendChannelMessage()">Envoyer ↗</button>
                     </div>
                 </div>
                 <!-- Picker emojis pour message -->
@@ -459,7 +459,7 @@
                 <!-- Suggestion mentions -->
                 <div class="msg-mention-suggest" id="msgMentionSuggest" style="display:none;"></div>
                 <div class="message-input-hint">
-                    <span><kbd>Entr?e</kbd> pour envoyer ? <kbd>Maj+Entr?e</kbd> pour nouvelle ligne ? <kbd>@</kbd> pour mentionner</span>
+                    <span><kbd>Entrée</kbd> pour envoyer · <kbd>Maj+Entrée</kbd> pour nouvelle ligne · <kbd>@</kbd> pour mentionner</span>
                     <span class="char-count" id="charCount">0/2000</span>
                 </div>
             </div>
@@ -469,38 +469,38 @@
     <!-- TAB: MAP -->
     <section class="tab-content" id="tab-map">
         <div class="map-toolbar">
-            <h2 class="section-title" style="margin:0;">?? Carte Los Santos / 21BS Confidential</h2>
+            <h2 class="section-title" style="margin:0;">🗺 Carte Los Santos / 21BS Confidential</h2>
             <div class="map-controls">
                 <div class="map-mode" id="mapMode">
-                    <button class="map-mode-btn active" data-mode="view">?? Voir</button>
-                    <button class="map-mode-btn" data-mode="add" id="mapAddBtn" style="display:none;">? Ajouter</button>
-                    <button class="map-mode-btn" data-mode="delete" id="mapDeleteBtn" style="display:none;">?? Supprimer</button>
+                    <button class="map-mode-btn active" data-mode="view">👁 Voir</button>
+                    <button class="map-mode-btn" data-mode="add" id="mapAddBtn" style="display:none;">＋ Ajouter</button>
+                    <button class="map-mode-btn" data-mode="delete" id="mapDeleteBtn" style="display:none;">🗑 Supprimer</button>
                 </div>
                 <div class="map-zoom-controls">
-                    <button class="map-zoom-btn" onclick="mapZoom(-1)" title="D?zoomer">?</button>
+                    <button class="map-zoom-btn" onclick="mapZoom(-1)" title="Dézoomer">−</button>
                     <span class="map-zoom-label" id="mapZoomLabel">100%</span>
                     <button class="map-zoom-btn" onclick="mapZoom(1)" title="Zoomer">+</button>
-                    <button class="map-zoom-btn" onclick="mapZoomReset()" title="Reset">?</button>
+                    <button class="map-zoom-btn" onclick="mapZoomReset()" title="Reset">⟲</button>
                 </div>
             </div>
         </div>
 
         <div class="map-info" id="mapInfo">
-            <span class="info-text">Mode <strong>Voir</strong> ? Clique sur un point pour voir les d?tails ? Molette pour zoomer ? Drag pour d?placer</span>
+            <span class="info-text">Mode <strong>Voir</strong> — Clique sur un point pour voir les détails • Molette pour zoomer • Drag pour déplacer</span>
         </div>
 
         <div class="map-container" id="mapContainer">
             <div class="map-canvas" id="mapCanvas">
                 <img src="/map-optimized.jpg" alt="Carte" class="map-image" id="mapImage" onerror="this.onerror=null;this.src='/map.png';">
                 <div class="map-placeholder" id="mapPlaceholder" style="display:none;">
-                    <p>?? Upload <code>public/map.png</code> sur GitHub pour voir ta carte</p>
+                    <p>📍 Upload <code>public/map.png</code> sur GitHub pour voir ta carte</p>
                 </div>
                 <div class="map-points-layer" id="mapPointsLayer"></div>
             </div>
         </div>
 
         <div class="map-legend">
-            <span class="map-stat">?? <span id="mapPointCount">0</span> points sur la carte</span>
+            <span class="map-stat">📍 <span id="mapPointCount">0</span> points sur la carte</span>
         </div>
     </section>
 
@@ -508,7 +508,7 @@
     <div class="modal" id="pointModal" style="display:none;">
         <div class="modal-backdrop" onclick="closePointModal()"></div>
         <div class="modal-content">
-            <h3 class="modal-title">?? Ajouter un point</h3>
+            <h3 class="modal-title">📍 Ajouter un point</h3>
             <div class="modal-field">
                 <label>Nom du point</label>
                 <input type="text" id="pointLabel" placeholder="Ex: Cache Sud, Champ Nord...">
@@ -516,28 +516,28 @@
             <div class="modal-field">
                 <label>Type</label>
                 <select id="pointType" onchange="onPointTypeChange()">
-                    <option value="weed">?? Champ de Weed</option>
-                    <option value="weed-treatment">? Traitement Weed</option>
-                    <option value="opium">?? Champ Opium</option>
-                    <option value="coke">? Champ Coke</option>
-                    <option value="lab">?? Laboratoire</option>
-                    <option value="weapon-lab">?? Laboratoire d'armes</option>
-                    <option value="hood">?? Hood</option>
-                    <option value="danger">? Danger</option>
+                    <option value="weed">🌿 Champ de Weed</option>
+                    <option value="weed-treatment">⚗ Traitement Weed</option>
+                    <option value="opium">🌺 Champ Opium</option>
+                    <option value="coke">❄ Champ Coke</option>
+                    <option value="lab">🧪 Laboratoire</option>
+                    <option value="weapon-lab">🔫 Laboratoire d'armes</option>
+                    <option value="hood">🏘 Hood</option>
+                    <option value="danger">⚠ Danger</option>
                 </select>
             </div>
             <div class="modal-field" id="pointCodeField" style="display:none;">
-                <label>?? Code d'acc?s <span class="field-hint">(visible uniquement par les r?les autoris?s)</span></label>
+                <label>🔐 Code d'accès <span class="field-hint">(visible uniquement par les rôles autorisés)</span></label>
                 <input type="text" id="pointCode" placeholder="Ex: 4829, ALPHA-7, etc." maxlength="50">
             </div>
             <div class="modal-field">
-                <label>Visible par <span class="field-hint">(r?les autoris?s ? voir ce point)</span></label>
+                <label>Visible par <span class="field-hint">(rôles autorisés à voir ce point)</span></label>
                 <div class="roles-selector" id="pointRolesSelector">
                     <p class="empty" style="padding:12px;">Chargement...</p>
                 </div>
                 <div class="roles-quick-actions">
                     <button type="button" class="btn-quick" onclick="selectAllRoles()">Tout cocher</button>
-                    <button type="button" class="btn-quick" onclick="selectNoRoles()">Tout d?cocher</button>
+                    <button type="button" class="btn-quick" onclick="selectNoRoles()">Tout décocher</button>
                 </div>
             </div>
             <div class="modal-actions">
@@ -547,11 +547,11 @@
         </div>
     </div>
 
-    <!-- Modal d?tails d'un point -->
+    <!-- Modal détails d'un point -->
     <div class="modal" id="pointDetailsModal" style="display:none;">
         <div class="modal-backdrop" onclick="closeDetailsModal()"></div>
         <div class="modal-content">
-            <h3 class="modal-title" id="detailsTitle">?? Point</h3>
+            <h3 class="modal-title" id="detailsTitle">📍 Point</h3>
             <div class="point-details" id="detailsContent"></div>
             <div class="modal-actions">
                 <button onclick="closeDetailsModal()" class="btn-secondary">Fermer</button>
@@ -559,7 +559,7 @@
         </div>
     </div>
 
-    <!-- Modal d?tails d'une arme -->
+    <!-- Modal détails d'une arme -->
     <div class="modal" id="craftWeaponDetailsModal" style="display:none;">
         <div class="modal-backdrop" onclick="closeCraftWeaponDetails()"></div>
         <div class="modal-content craft-detail-modal">
@@ -571,11 +571,11 @@
         </div>
     </div>
 
-    <!-- Modal d?tails stats pr?sence -->
+    <!-- Modal détails stats présence -->
     <div class="modal" id="presenceStatDetailsModal" style="display:none;">
         <div class="modal-backdrop" onclick="closePresenceStatDetails()"></div>
         <div class="modal-content presence-stat-modal">
-            <h3 class="modal-title" id="presenceStatDetailsTitle">D?tails</h3>
+            <h3 class="modal-title" id="presenceStatDetailsTitle">Détails</h3>
             <div id="presenceStatDetailsContent"></div>
             <div class="modal-actions">
                 <button onclick="closePresenceStatDetails()" class="btn-secondary">Fermer</button>
@@ -586,20 +586,20 @@
     <!-- TAB: CRAFTS D'ARMES -->
     <section class="tab-content" id="tab-crafts">
         <div class="crafts-subtabs">
-            <button class="crafts-subtab active" data-subtab="catalog" onclick="switchCraftSubtab('catalog')">?? Catalogue</button>
-            <button class="crafts-subtab" data-subtab="request" onclick="switchCraftSubtab('request')">?? Faire une demande</button>
-            <button class="crafts-subtab" data-subtab="board" onclick="switchCraftSubtab('board')">? Tableau de craft</button>
-            <button class="crafts-subtab" data-subtab="history" onclick="switchCraftSubtab('history')">? Historique</button>
+            <button class="crafts-subtab active" data-subtab="catalog" onclick="switchCraftSubtab('catalog')">📦 Catalogue</button>
+            <button class="crafts-subtab" data-subtab="request" onclick="switchCraftSubtab('request')">📝 Faire une demande</button>
+            <button class="crafts-subtab" data-subtab="board" onclick="switchCraftSubtab('board')">⚒ Tableau de craft</button>
+            <button class="crafts-subtab" data-subtab="history" onclick="switchCraftSubtab('history')">✓ Historique</button>
         </div>
 
         <!-- Sous-section : Catalogue -->
         <div class="crafts-section" id="craftSection-catalog">
             <div class="crafts-section-header">
-                <h3 class="section-title">?? Catalogue des armes craftables</h3>
-                <p class="crafts-section-info">Visualise toutes les armes que tu peux faire crafter, avec leurs ingr?dients et prix.</p>
+                <h3 class="section-title">📦 Catalogue des armes craftables</h3>
+                <p class="crafts-section-info">Visualise toutes les armes que tu peux faire crafter, avec leurs ingrédients et prix.</p>
             </div>
             <div class="craft-catalog-toolbar">
-                <input type="search" id="craftCatalogSearch" class="craft-filter-input" placeholder="Rechercher une arme ou un ingr?dient...">
+                <input type="search" id="craftCatalogSearch" class="craft-filter-input" placeholder="Rechercher une arme ou un ingrédient...">
                 <span class="craft-filter-count" id="craftCatalogCount"></span>
             </div>
             <div class="crafts-catalog-grid" id="craftsCatalogGrid">
@@ -610,20 +610,20 @@
         <!-- Sous-section : Demande de craft -->
         <div class="crafts-section" id="craftSection-request" style="display:none;">
             <div class="crafts-section-header">
-                <h3 class="section-title">?? Faire une demande de craft</h3>
-                <p class="crafts-section-info">S?lectionne l'arme que tu souhaites, indique si tu as le plan et l'argent.</p>
+                <h3 class="section-title">📝 Faire une demande de craft</h3>
+                <p class="crafts-section-info">Sélectionne l'arme que tu souhaites, indique si tu as le plan et l'argent.</p>
             </div>
 
             <div class="craft-request-form">
                 <div class="craft-field">
-                    <label>Arme souhait?e</label>
+                    <label>Arme souhaitée</label>
                     <div class="custom-dropdown" id="craftWeaponDropdownWrapper">
                         <button type="button" class="custom-dropdown-trigger" onclick="toggleCraftWeaponDropdown(event)">
-                            <span class="custom-dropdown-placeholder" id="craftWeaponLabel">? Choisir une arme ?</span>
-                            <span class="custom-dropdown-arrow">?</span>
+                            <span class="custom-dropdown-placeholder" id="craftWeaponLabel">— Choisir une arme —</span>
+                            <span class="custom-dropdown-arrow">▾</span>
                         </button>
                         <div class="custom-dropdown-menu" id="craftWeaponMenu" style="display:none;">
-                            <input type="text" class="custom-dropdown-search" id="craftWeaponSearch" placeholder="?? Filtrer..." onclick="event.stopPropagation()">
+                            <input type="text" class="custom-dropdown-search" id="craftWeaponSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
                             <div class="custom-dropdown-list" id="craftWeaponList"></div>
                         </div>
                         <input type="hidden" id="craftWeaponId">
@@ -633,22 +633,22 @@
                 <div class="craft-field-row">
                     <label class="craft-checkbox-label">
                         <input type="checkbox" id="craftHasPlan">
-                        <span>?? J'ai le <strong>plan</strong></span>
+                        <span>📋 J'ai le <strong>plan</strong></span>
                     </label>
                     <label class="craft-checkbox-label">
                         <input type="checkbox" id="craftHasMoney">
-                        <span>?? J'ai l'<strong>argent</strong></span>
+                        <span>💰 J'ai l'<strong>argent</strong></span>
                     </label>
                 </div>
 
                 <div class="craft-actions">
-                    <button class="btn-primary" onclick="submitCraftRequest()">? Soumettre la demande</button>
-                    <button class="btn-secondary" onclick="goToCraftBoard()">? Aller au tableau</button>
+                    <button class="btn-primary" onclick="submitCraftRequest()">✅ Soumettre la demande</button>
+                    <button class="btn-secondary" onclick="goToCraftBoard()">→ Aller au tableau</button>
                 </div>
             </div>
 
             <div class="craft-recent-requests">
-                <h4>?? Demandes r?centes</h4>
+                <h4>📜 Demandes récentes</h4>
                 <div class="craft-requests-pagination" id="craftRequestsPagination"></div>
                 <div class="craft-requests-list" id="craftRequestsList">
                     <p class="empty">Aucune demande</p>
@@ -659,8 +659,8 @@
         <!-- Sous-section : Tableau de craft (28 lignes) -->
         <div class="crafts-section" id="craftSection-board" style="display:none;">
             <div class="crafts-section-header">
-                <h3 class="section-title">? Tableau de craft</h3>
-                <p class="crafts-section-info">Tableau pour les <strong>hauts grad?s</strong> : remplir <strong>Armes craft? / N?S?rie</strong> ping automatiquement le demandeur. La <strong>vente</strong> est compl?t?e par le demandeur.</p>
+                <h3 class="section-title">⚒ Tableau de craft</h3>
+                <p class="crafts-section-info">Tableau pour les <strong>hauts gradés</strong> : remplir <strong>Armes crafté / N°Série</strong> ping automatiquement le demandeur. La <strong>vente</strong> est complétée par le demandeur.</p>
             </div>
 
             <div class="craft-board-toolbar">
@@ -688,9 +688,9 @@
                         <tr>
                             <th>#</th>
                             <th>Demande</th>
-                            <th>Craft? ?</th>
-                            <th>N?S?rie</th>
-                            <th>Vendu ?</th>
+                            <th>Crafté ?</th>
+                            <th>N°Série</th>
+                            <th>Vendu à</th>
                             <th>Prix</th>
                             <th>Date craft</th>
                             <th>Date vente</th>
@@ -705,24 +705,24 @@
         <!-- Sous-section : Historique -->
         <div class="crafts-section" id="craftSection-history" style="display:none;">
             <div class="crafts-section-header">
-                <h3 class="section-title">? Historique des crafts finalis?s</h3>
-                <p class="crafts-section-info">R?cap de toutes les demandes compl?t?es (craft?es + vendues).</p>
+                <h3 class="section-title">✓ Historique des crafts finalisés</h3>
+                <p class="crafts-section-info">Récap de toutes les demandes complétées (craftées + vendues).</p>
             </div>
             <div class="manual-craft-card">
                 <div class="manual-craft-head">
                     <div>
                         <h4>Ajouter un craft manuel</h4>
-                        <p>Pour les armes craft?es avant le d?ploiement du suivi automatique.</p>
+                        <p>Pour les armes craftées avant le déploiement du suivi automatique.</p>
                     </div>
                     <span>Archivage 21BS</span>
                 </div>
                 <div class="manual-craft-grid">
                     <div class="comm-field">
-                        <label class="comm-label">Mod?le de l'arme *</label>
+                        <label class="comm-label">Modèle de l'arme *</label>
                         <select id="manualCraftWeapon" class="comm-input"></select>
                     </div>
                     <div class="comm-field">
-                        <label class="comm-label">N? s?rie *</label>
+                        <label class="comm-label">N° série *</label>
                         <input type="text" id="manualCraftSerial" class="comm-input" placeholder="Ex: ABC123XYZ">
                     </div>
                     <div class="comm-field">
@@ -737,11 +737,11 @@
                         <label class="comm-label">Statut vente</label>
                         <select id="manualCraftSold" class="comm-input" onchange="toggleManualCraftSaleFields()">
                             <option value="0">Non vendu</option>
-                            <option value="1">D?j? vendu</option>
+                            <option value="1">Déjà vendu</option>
                         </select>
                     </div>
                     <div class="comm-field manual-craft-sale-field" style="display:none;">
-                        <label class="comm-label">Vendu ? qui</label>
+                        <label class="comm-label">Vendu à qui</label>
                         <select id="manualCraftBuyer" class="comm-input"></select>
                     </div>
                     <div class="comm-field manual-craft-sale-field" style="display:none;">
@@ -774,14 +774,14 @@
     <!-- TAB: VOS ARMES -->
     <section class="tab-content" id="tab-myweapons">
         <div class="myweapons-banner-shimmer">
-            <span class="banner-icon">??</span>
+            <span class="banner-icon">⚠️</span>
             <div>
-                <strong>Important :</strong> Si l'arme a ?t? craft?e par les <strong>21 Block Savage</strong>, pense ? remplir aussi la demande dans la cat?gorie <strong>Craft d'armes</strong>.
+                <strong>Important :</strong> Si l'arme a été craftée par les <strong>21 Block Savage</strong>, pense à remplir aussi la demande dans la catégorie <strong>Craft d'armes</strong>.
             </div>
         </div>
 
         <div class="myweapons-form-card">
-            <h3 class="section-title">?? Mettre une arme en vente</h3>
+            <h3 class="section-title">🔫 Mettre une arme en vente</h3>
 
             <div class="myweapons-form">
                 <div class="comm-field">
@@ -796,46 +796,46 @@
                     <div class="myweapons-origin-choice">
                         <label class="myweapons-origin-option">
                             <input type="radio" name="mwOrigin" value="crafted" checked onchange="toggleMwCrafted()">
-                            <span>? Arme craft?e par les <strong>21 Block Savage</strong></span>
+                            <span>⚒ Arme craftée par les <strong>21 Block Savage</strong></span>
                         </label>
                         <label class="myweapons-origin-option">
                             <input type="radio" name="mwOrigin" value="external" onchange="toggleMwCrafted()">
-                            <span>? Arme non craft?e par les <strong>21 Block Savage</strong></span>
+                            <span>⛔ Arme non craftée par les <strong>21 Block Savage</strong></span>
                         </label>
                     </div>
                 </div>
 
                 <div class="comm-field" id="mwCraftedByField">
-                    <label class="comm-label">Craft?e par *</label>
+                    <label class="comm-label">Craftée par *</label>
                     <select id="mwCraftedBy" class="comm-input">
                         <option value="">Chargement des membres...</option>
                     </select>
                 </div>
 
                 <div class="comm-field" id="mwSerialField">
-                    <label class="comm-label">N? de s?rie *</label>
+                    <label class="comm-label">N° de série *</label>
                     <textarea id="mwSerial" class="comm-input mw-serial-textarea" required rows="4" placeholder="Ex: ABC123XYZ&#10;DEF456UVW&#10;GHI789RST"></textarea>
                 </div>
 
                 <div class="craft-field-row">
                     <div class="comm-field" style="flex:1;">
-                        <label class="comm-label">Prix souhait? ($)</label>
+                        <label class="comm-label">Prix souhaité ($)</label>
                         <input type="number" id="mwAskingPrice" class="comm-input" min="0" placeholder="Ex: 1000000">
                     </div>
                     <div class="comm-field" style="flex:1;">
-                        <label class="comm-label">Prix minimum accept? ($)</label>
+                        <label class="comm-label">Prix minimum accepté ($)</label>
                         <input type="number" id="mwMinPrice" class="comm-input" min="0" placeholder="Ex: 800000">
                     </div>
                 </div>
 
                 <div class="craft-actions">
-                    <button class="btn-primary" onclick="submitMyWeapon()">?? Mettre en vente</button>
+                    <button class="btn-primary" onclick="submitMyWeapon()">📤 Mettre en vente</button>
                 </div>
             </div>
         </div>
 
         <div class="myweapons-history">
-            <h4 class="section-title" style="font-size:18px;margin-top:32px;">?? Armes en vente / Vendues</h4>
+            <h4 class="section-title" style="font-size:18px;margin-top:32px;">📜 Armes en vente / Vendues</h4>
             <div id="myWeaponsList">
                 <p class="empty">Chargement...</p>
             </div>
@@ -850,7 +850,7 @@
                 <input type="hidden" id="markSoldId">
 
                 <div class="comm-field" id="markSoldSerialField" style="display:none;">
-                    <label class="comm-label">N? de s?rie vendue</label>
+                    <label class="comm-label">N° de série vendue</label>
                     <select id="markSoldSerial" class="comm-input"></select>
                 </div>
 
@@ -865,11 +865,11 @@
                     <label class="comm-label">Groupe acheteur</label>
                     <div class="custom-dropdown" id="markSoldBuyerWrapper">
                         <button type="button" class="custom-dropdown-trigger" onclick="toggleMarkSoldBuyerDropdown(event)">
-                            <span class="custom-dropdown-placeholder" id="markSoldBuyerLabel">? Choisir ?</span>
-                            <span class="custom-dropdown-arrow">?</span>
+                            <span class="custom-dropdown-placeholder" id="markSoldBuyerLabel">— Choisir —</span>
+                            <span class="custom-dropdown-arrow">▾</span>
                         </button>
                         <div class="custom-dropdown-menu" id="markSoldBuyerMenu" style="display:none;">
-                            <input type="text" class="custom-dropdown-search" id="markSoldBuyerSearch" placeholder="?? Filtrer..." onclick="event.stopPropagation()">
+                            <input type="text" class="custom-dropdown-search" id="markSoldBuyerSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
                             <div class="custom-dropdown-list" id="markSoldBuyerList"></div>
                         </div>
                         <input type="hidden" id="markSoldBuyer">
@@ -883,7 +883,7 @@
 
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="closeMarkSoldModal()">Annuler</button>
-                    <button type="submit" class="btn-primary">? Confirmer la vente</button>
+                    <button type="submit" class="btn-primary">✅ Confirmer la vente</button>
                 </div>
             </form>
         </div>

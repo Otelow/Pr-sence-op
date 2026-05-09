@@ -1,5 +1,5 @@
 // ==========================================
-// MODULE CRAFTS ? DB SQLite avec fallback JSON
+// MODULE CRAFTS — DB SQLite avec fallback JSON
 // ==========================================
 const path = require('path');
 const fs = require('fs');
@@ -16,7 +16,7 @@ try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 } catch (e) {
-    console.error('? Erreur cr?ation dossiers data:', e.message);
+    console.error('❌ Erreur création dossiers data:', e.message);
 }
 
 // Tenter de charger better-sqlite3, sinon fallback JSON
@@ -27,9 +27,9 @@ let Database = null;
 try {
     Database = require('better-sqlite3');
     useSQLite = true;
-    console.log('? better-sqlite3 charg?');
+    console.log('✅ better-sqlite3 chargé');
 } catch (e) {
-    console.warn('?? better-sqlite3 indisponible, fallback JSON activ?');
+    console.warn('⚠️ better-sqlite3 indisponible, fallback JSON activé');
     useSQLite = false;
 }
 
@@ -169,31 +169,31 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
 
-            const defaultIngredients = ['Tungst?ne', 'Bloc de tungst?ne', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil ? pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
+            const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
                 try { db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)').run(ing); } catch {}
             }
             seedMyWeaponNamesFromWeapons();
 
-            console.log('?? DB Crafts initialis?e (SQLite)');
+            console.log('💾 DB Crafts initialisée (SQLite)');
         } catch (e) {
-            console.error('? SQLite init error, fallback JSON:', e.message);
+            console.error('❌ SQLite init error, fallback JSON:', e.message);
             useSQLite = false;
             loadJSON();
             seedDefaultIngredientsJSON();
             seedMyWeaponNamesFromWeapons();
-            console.log('?? DB Crafts initialis?e (JSON fallback)');
+            console.log('💾 DB Crafts initialisée (JSON fallback)');
         }
     } else {
         loadJSON();
         seedDefaultIngredientsJSON();
         seedMyWeaponNamesFromWeapons();
-        console.log('?? DB Crafts initialis?e (JSON)');
+        console.log('💾 DB Crafts initialisée (JSON)');
     }
 }
 
 function seedDefaultIngredientsJSON() {
-    const defaults = ['Tungst?ne', 'Bloc de tungst?ne', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil ? pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
+    const defaults = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
     if (!jsonData.ingredients) jsonData.ingredients = [];
     if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
     for (const name of defaults) {
@@ -287,7 +287,7 @@ function deleteWeapon(id) {
     saveJSON();
 }
 
-// ??? INGREDIENTS ???????????????
+// ─── INGREDIENTS ───────────────
 function getAllIngredients() {
     if (useSQLite) return db.prepare('SELECT * FROM ingredients ORDER BY name ASC').all();
     return [...(jsonData.ingredients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -492,7 +492,7 @@ const upload = multer({
         const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowed.includes(ext)) cb(null, true);
-        else cb(new Error('Format non support?'));
+        else cb(new Error('Format non supporté'));
     }
 });
 
@@ -525,7 +525,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 };
             });
 
-            // Trier par prix de vente d?croissant, puis prix craft.
+            // Trier par prix de vente décroissant, puis prix craft.
             list.sort((a, b) => {
                 const saleDiff = (Number(b.sale_price) || 0) - (Number(a.sale_price) || 0);
                 if (saleDiff !== 0) return saleDiff;
@@ -607,7 +607,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // ??? INGREDIENTS ?????????????
+    // ─── INGREDIENTS ─────────────
     app.get('/api/crafts/ingredients', requireAuth, (req, res) => {
         try {
             const list = getAllIngredients().map(i => ({
@@ -633,7 +633,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const id = parseInt(req.params.id);
             const { name } = req.body;
             const existing = getIngredient(id);
-            if (!existing) return res.status(404).json({ error: 'Ingr?dient introuvable' });
+            if (!existing) return res.status(404).json({ error: 'Ingrédient introuvable' });
             if (req.file && existing.image_path) {
                 const p = path.join(UPLOADS_DIR, existing.image_path);
                 if (fs.existsSync(p)) fs.unlinkSync(p);
@@ -714,7 +714,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     const CRAFT_PLAN_PROVIDER_ROLE = '1490361524408291459';
     const moneyLabel = (amount) => Number(amount) === 0 ? 'Gratuit' : (amount ? `${Number(amount).toLocaleString('fr-FR')}$` : 'N/A');
 
-    // Helper : cr?er/?diter le message de demande de craft sur Discord
+    // Helper : créer/éditer le message de demande de craft sur Discord
     async function postOrUpdateCraftRequestMessage(requestId) {
         try {
             const fullReq = getRequest(requestId);
@@ -725,79 +725,79 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             const statusMeta = {
                 pending: {
-                    icon: '??',
+                    icon: '🟧',
                     label: 'Demande en attente',
                     color: 0xff8c00,
-                    description: 'Demande enregistr?e. Les pr?-requis sont en cours de v?rification.',
+                    description: 'Demande enregistrée. Les pré-requis sont en cours de vérification.',
                 },
                 waiting_materials: {
-                    icon: '??',
-                    label: 'En attente des mati?res premi?res',
+                    icon: '📦',
+                    label: 'En attente des matières premières',
                     color: 0xf59e0b,
-                    description: 'Commande mise en attente : les mati?res premi?res doivent ?tre fournies avant la construction.',
+                    description: 'Commande mise en attente : les matières premières doivent être fournies avant la construction.',
                 },
                 in_progress: {
-                    icon: '??',
+                    icon: '🔨',
                     label: 'Ton arme est en cours de construction',
                     color: 0xfb923c,
-                    description: 'La construction est lanc?e. Ton arme est en cours de construction.',
+                    description: 'La construction est lancée. Ton arme est en cours de construction.',
                 },
                 crafted: {
-                    icon: '?',
-                    label: 'Craft termin?',
+                    icon: '✅',
+                    label: 'Craft terminé',
                     color: 0x22c55e,
-                    description: 'L?arme est pr?te. La vente peut maintenant ?tre renseign?e.',
+                    description: 'L’arme est prête. La vente peut maintenant être renseignée.',
                 },
                 completed: {
-                    icon: '?',
-                    label: 'Transaction cl?tur?e',
+                    icon: '✅',
+                    label: 'Transaction clôturée',
                     color: 0x22c55e,
-                    description: 'Le craft et la vente sont termin?s. Le dossier est cl?tur?.',
+                    description: 'Le craft et la vente sont terminés. Le dossier est clôturé.',
                 },
                 rejected: {
-                    icon: '?',
-                    label: 'Demande refus?e',
+                    icon: '⛔',
+                    label: 'Demande refusée',
                     color: 0xef4444,
-                    description: 'La demande a ?t? refus?e. Contacte un haut grad? si une pr?cision est n?cessaire.',
+                    description: 'La demande a été refusée. Contacte un haut gradé si une précision est nécessaire.',
                 },
             };
             const meta = statusMeta[fullReq.status] || statusMeta.pending;
-            const prereqText = `Plan : ${fullReq.has_plan ? 'valid?' : 'manquant'}\nFonds : ${fullReq.has_money ? 'valid?s' : 'manquants'}`;
-            const serialLine = fullReq.serial_number ? `\nN? s?rie : \`${fullReq.serial_number}\`` : '';
+            const prereqText = `Plan : ${fullReq.has_plan ? 'validé' : 'manquant'}\nFonds : ${fullReq.has_money ? 'validés' : 'manquants'}`;
+            const serialLine = fullReq.serial_number ? `\nN° série : \`${fullReq.serial_number}\`` : '';
             const planProviderLine = fullReq.status === 'pending' ? `\n||<@&${CRAFT_PLAN_PROVIDER_ROLE}>||` : '';
 
             const contentByStatus = {
                 pending:
                     `${meta.icon} **Nouvelle demande de Craft**\n` +
                     `Demandeur : <@${fullReq.user_id}>\n` +
-                    `Arme demand?e : **${fullReq.weapon_name}**\n` +
+                    `Arme demandée : **${fullReq.weapon_name}**\n` +
                     `Statut : **${meta.label}**\n\n` +
                     `Merci de fournir rapidement le plan d'arme et les Corps le plus rapidement possible.` +
                     planProviderLine,
                 waiting_materials:
-                    `${meta.icon} **Mati?res premi?res attendues**\n` +
+                    `${meta.icon} **Matières premières attendues**\n` +
                     `Demandeur : <@${fullReq.user_id}>\n` +
-                    `Arme demand?e : **${fullReq.weapon_name}**\n` +
+                    `Arme demandée : **${fullReq.weapon_name}**\n` +
                     `Statut : **${meta.label}**\n\n` +
-                    `Les hauts grad?s attendent les mati?res premi?res avant de lancer la construction.`,
+                    `Les hauts gradés attendent les matières premières avant de lancer la construction.`,
                 in_progress:
-                    `${meta.icon} **Construction lanc?e**\n` +
+                    `${meta.icon} **Construction lancée**\n` +
                     `Demandeur : <@${fullReq.user_id}>\n` +
-                    `Arme demand?e : **${fullReq.weapon_name}**\n` +
+                    `Arme demandée : **${fullReq.weapon_name}**\n` +
                     `Statut : **${meta.label}**`,
                 crafted:
-                    `${meta.icon} **Arme craft?e ? ${fullReq.weapon_name}**\n` +
+                    `${meta.icon} **Arme craftée • ${fullReq.weapon_name}**\n` +
                     `Demandeur : <@${fullReq.user_id}>\n` +
                     `Statut : **${meta.label}**` +
                     serialLine,
                 completed:
-                    `${meta.icon} **Transaction cl?tur?e ? ${fullReq.weapon_name}**\n` +
+                    `${meta.icon} **Transaction clôturée • ${fullReq.weapon_name}**\n` +
                     `Demandeur : <@${fullReq.user_id}>\n` +
                     `Statut : **${meta.label}**`,
                 rejected:
-                    `${meta.icon} **Demande de craft refus?e**\n` +
+                    `${meta.icon} **Demande de craft refusée**\n` +
                     `Demandeur : <@${fullReq.user_id}>\n` +
-                    `Arme demand?e : **${fullReq.weapon_name}**\n` +
+                    `Arme demandée : **${fullReq.weapon_name}**\n` +
                     `Statut : **${meta.label}**`,
             };
             const content = contentByStatus[fullReq.status] || contentByStatus.pending;
@@ -806,19 +806,19 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const embedFields = [
                 { name: 'Demandeur', value: fullReq.user_name || 'N/A', inline: true },
                 { name: 'Statut', value: meta.label, inline: true },
-                { name: 'Pr?-requis', value: prereqText, inline: true },
+                { name: 'Pré-requis', value: prereqText, inline: true },
             ];
             if (fullReq.serial_number) {
-                embedFields.push({ name: 'Num?ro de s?rie', value: `\`${fullReq.serial_number}\``, inline: true });
+                embedFields.push({ name: 'Numéro de série', value: `\`${fullReq.serial_number}\``, inline: true });
             }
 
             const embed = new EmbedBuilder()
-                .setTitle(`Demande de Craft ? ${fullReq.weapon_name}`)
+                .setTitle(`Demande de Craft • ${fullReq.weapon_name}`)
                 .setDescription(meta.description)
                 .setColor(meta.color)
                 .addFields(...embedFields)
                 .setTimestamp()
-                .setFooter({ text: '21 Block Savage ? Suivi craft' });
+                .setFooter({ text: '21 Block Savage • Suivi craft' });
 
             const allowedMentions = {
                 users: [fullReq.user_id],
@@ -831,7 +831,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     await msg.edit({ content, embeds: [embed], allowedMentions });
                     return;
                 } catch (e) {
-                    console.error('?dition message craft ?chou?e, cr?ation nouveau:', e.message);
+                    console.error('Édition message craft échouée, création nouveau:', e.message);
                 }
             }
 
@@ -857,27 +857,27 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             const statusMeta = {
                 pending: {
-                    content: `?? <@${fullReq.user_id}> ta demande de craft est remise en attente.`,
+                    content: `🟧 <@${fullReq.user_id}> ta demande de craft est remise en attente.`,
                     title: 'Demande en attente',
-                    description: `La demande **${fullReq.weapon_name}** est ? nouveau en attente de validation.`,
+                    description: `La demande **${fullReq.weapon_name}** est à nouveau en attente de validation.`,
                     color: 0xff8c00,
                 },
                 waiting_materials: {
-                    content: `?? <@${fullReq.user_id}> ta commande attend les mati?res premi?res.`,
-                    title: 'Mati?res premi?res attendues',
-                    description: `La construction de **${fullReq.weapon_name}** commencera d?s que les mati?res premi?res seront fournies.`,
+                    content: `📦 <@${fullReq.user_id}> ta commande attend les matières premières.`,
+                    title: 'Matières premières attendues',
+                    description: `La construction de **${fullReq.weapon_name}** commencera dès que les matières premières seront fournies.`,
                     color: 0xf59e0b,
                 },
                 in_progress: {
-                    content: `?? <@${fullReq.user_id}> ton arme est en cours de construction.`,
-                    title: 'Construction lanc?e',
+                    content: `🔨 <@${fullReq.user_id}> ton arme est en cours de construction.`,
+                    title: 'Construction lancée',
                     description: `Ton arme **${fullReq.weapon_name}** est en cours de construction.`,
                     color: 0xfb923c,
                 },
                 rejected: {
-                    content: `? <@${fullReq.user_id}> ta demande de craft a ?t? refus?e.`,
-                    title: 'Demande refus?e',
-                    description: `La demande **${fullReq.weapon_name}** a ?t? refus?e. Contacte un haut grad? si besoin.`,
+                    content: `⛔ <@${fullReq.user_id}> ta demande de craft a été refusée.`,
+                    title: 'Demande refusée',
+                    description: `La demande **${fullReq.weapon_name}** a été refusée. Contacte un haut gradé si besoin.`,
                     color: 0xef4444,
                 },
             };
@@ -886,7 +886,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             const { EmbedBuilder } = require('discord.js');
             const embed = new EmbedBuilder()
-                .setTitle(`Craft d?armes ? ${meta.title}`)
+                .setTitle(`Craft d’armes • ${meta.title}`)
                 .setDescription(meta.description)
                 .setColor(meta.color)
                 .addFields(
@@ -894,7 +894,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     { name: 'Demandeur', value: fullReq.user_name || 'N/A', inline: true },
                 )
                 .setTimestamp()
-                .setFooter({ text: '21 Block Savage ? Suivi craft' });
+                .setFooter({ text: '21 Block Savage • Suivi craft' });
 
             await channel.send({
                 content: meta.content,
@@ -922,7 +922,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // CRAFT_VALIDATION_ROLES : seuls ces r?les peuvent valider/cocher craft?
+    // CRAFT_VALIDATION_ROLES : seuls ces rôles peuvent valider/cocher crafté
     const CRAFT_VALIDATION_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
     const SUPER_ADMIN_ROLE = '1485279148246175764';
     const SUPER_ADMIN_USER = '952986899667103804';
@@ -963,21 +963,21 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             : (updated.completed_by_name || 'N/A');
         const { EmbedBuilder } = require('discord.js');
         const embed = new EmbedBuilder()
-            .setTitle(`Justification de vente ? ${updated.weapon_name}`)
-            .setDescription('Craft manuel archiv? comme vente finalis?e.')
+            .setTitle(`Justification de vente • ${updated.weapon_name}`)
+            .setDescription('Craft manuel archivé comme vente finalisée.')
             .setColor(0xffb84d)
             .addFields(
                 { name: 'Vendeur', value: sellerLabel, inline: true },
-                { name: 'Num?ro de s?rie', value: `\`${updated.serial_number || 'N/A'}\``, inline: true },
+                { name: 'Numéro de série', value: `\`${updated.serial_number || 'N/A'}\``, inline: true },
                 { name: 'Acheteur', value: updated.buyer_org || 'N/A', inline: true },
                 { name: 'Prix final', value: moneyLabel(updated.sale_price), inline: true },
                 { name: 'Date vente', value: saleDate, inline: true },
             )
             .setTimestamp()
-            .setFooter({ text: '21 Block Savage ? Justification d?arme' });
+            .setFooter({ text: '21 Block Savage • Justification d’arme' });
 
         await channel.send({
-            content: `? Vente archiv?e ? **${updated.weapon_name}**`,
+            content: `✅ Vente archivée • **${updated.weapon_name}**`,
             embeds: [embed],
             allowedMentions: { parse: [] },
         });
@@ -987,7 +987,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.post('/api/crafts/requests/manual', requireAuth, async (req, res) => {
         try {
             if (!canValidateCraft(req.session.user)) {
-                return res.status(403).json({ error: 'Action r?serv?e aux hauts grad?s' });
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
 
             const {
@@ -1006,7 +1006,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             } = req.body;
             const weapon = getWeapon(parseInt(weapon_id));
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
-            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N? de s?rie obligatoire' });
+            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N° de série obligatoire' });
             if (!craft_date) return res.status(400).json({ error: 'Date craft obligatoire' });
             if (is_sold && !buyer_org) return res.status(400).json({ error: 'Organisation acheteuse obligatoire si vendu' });
             if (is_sold && !sale_date) return res.status(400).json({ error: 'Date de vente obligatoire si vendu' });
@@ -1126,7 +1126,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.patch('/api/crafts/requests/:id/craft', requireAuth, async (req, res) => {
         try {
             if (!canValidateCraft(req.session.user)) {
-                return res.status(403).json({ error: 'Action r?serv?e aux hauts grad?s' });
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
             const id = parseInt(req.params.id);
             const { crafted, serial_number } = req.body;
@@ -1136,7 +1136,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
             updateRequestCraft(id, crafted, serial_number, userId, userName);
 
-            // Mettre ? jour le message Discord original
+            // Mettre à jour le message Discord original
             await postOrUpdateCraftRequestMessage(id);
 
             if (crafted) {
@@ -1144,33 +1144,33 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 if (channel) {
                     const { EmbedBuilder } = require('discord.js');
                     const embed = new EmbedBuilder()
-                        .setTitle(`Arme pr?te ? ${existing.weapon_name}`)
-                        .setDescription('La construction est termin?e. Renseigne la vente quand la transaction est effectu?e.')
+                        .setTitle(`Arme prête • ${existing.weapon_name}`)
+                        .setDescription('La construction est terminée. Renseigne la vente quand la transaction est effectuée.')
                         .setColor(0x22c55e)
                         .addFields(
                             { name: 'Demandeur', value: existing.user_name || 'N/A', inline: true },
-                            { name: 'Num?ro de s?rie', value: `\`${serial_number || 'N/A'}\``, inline: true },
-                            { name: 'Prochaine ?tape', value: 'Compl?ter le prix de vente, le groupe acheteur et la date de vente.', inline: false },
+                            { name: 'Numéro de série', value: `\`${serial_number || 'N/A'}\``, inline: true },
+                            { name: 'Prochaine étape', value: 'Compléter le prix de vente, le groupe acheteur et la date de vente.', inline: false },
                         )
                         .setTimestamp()
-                        .setFooter({ text: '21 Block Savage ? Atelier craft' });
+                        .setFooter({ text: '21 Block Savage • Atelier craft' });
 
                     await channel.send({
-                        content: `? <@${existing.user_id}> ton arme est pr?te : **${existing.weapon_name}**.`,
+                        content: `✅ <@${existing.user_id}> ton arme est prête : **${existing.weapon_name}**.`,
                         embeds: [embed],
                         allowedMentions: { users: [existing.user_id] },
-                    }).catch(e => console.error('Erreur notification craft termin?:', e.message));
+                    }).catch(e => console.error('Erreur notification craft terminé:', e.message));
                 }
             }
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // Changement de statut (En attente / Mati?res / En cours / Refus?)
+    // Changement de statut (En attente / Matières / En cours / Refusé)
     app.patch('/api/crafts/requests/:id/status', requireAuth, async (req, res) => {
         try {
             if (!canValidateCraft(req.session.user)) {
-                return res.status(403).json({ error: 'Action r?serv?e aux hauts grad?s' });
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
             const id = parseInt(req.params.id);
             const { status } = req.body;
@@ -1184,7 +1184,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 if (r) { r.status = status; saveJSON(); }
             }
 
-            // Mettre ? jour le message Discord original (?dition embed)
+            // Mettre à jour le message Discord original (édition embed)
             await postOrUpdateCraftRequestMessage(id);
 
             // Notification dans le salon de statut
@@ -1203,7 +1203,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
             const isAdmin = req.session.user.isAdmin;
-            if (existing.user_id !== userId && !isAdmin) return res.status(403).json({ error: 'Action non autoris?e' });
+            if (existing.user_id !== userId && !isAdmin) return res.status(403).json({ error: 'Action non autorisée' });
             const saleTimestamp = sale_date ? Math.floor(new Date(sale_date).getTime() / 1000) : Math.floor(Date.now() / 1000);
             updateRequestSale(id, buyer_org, parseInt(sale_price) || null, saleTimestamp, userId, userName);
             const updated = getRequest(id);
@@ -1214,22 +1214,22 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     const saleDate = updated.sale_date ? new Date(updated.sale_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
                     const { EmbedBuilder } = require('discord.js');
                     const embed = new EmbedBuilder()
-                        .setTitle(`Justification de vente ? ${updated.weapon_name}`)
+                        .setTitle(`Justification de vente • ${updated.weapon_name}`)
                         .setColor(0xffb84d)
                         .addFields(
                             { name: 'Gestionnaire', value: `<@${updated.completed_by_id}>`, inline: true },
-                            { name: 'Num?ro de s?rie', value: `\`${updated.serial_number || 'N/A'}\``, inline: true },
+                            { name: 'Numéro de série', value: `\`${updated.serial_number || 'N/A'}\``, inline: true },
                             { name: 'Acheteur', value: updated.buyer_org || 'N/A', inline: true },
                             { name: 'Prix final', value: moneyLabel(updated.sale_price), inline: true },
                             { name: 'Date vente', value: saleDate, inline: true },
                         )
                         .setTimestamp()
-                        .setFooter({ text: '21 Block Savage ? Vente craft cl?tur?e' });
+                        .setFooter({ text: '21 Block Savage • Vente craft clôturée' });
                     await channel.send({
-                        content: `? Vente craft cl?tur?e ? **${updated.weapon_name}**`,
+                        content: `✅ Vente craft clôturée • **${updated.weapon_name}**`,
                         embeds: [embed],
                         allowedMentions: { parse: [] }
-                    }).catch(e => console.error('Erreur r?cap:', e.message));
+                    }).catch(e => console.error('Erreur récap:', e.message));
                     markRequestPosted(id);
                 }
             }
@@ -1245,7 +1245,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
 
-            // Le demandeur peut annuler tant que c'est pas craft?/finalis?
+            // Le demandeur peut annuler tant que c'est pas crafté/finalisé
             const isOwner = existing.user_id === userId;
             const isSuperAdmin = canDeleteRequests(req.session.user);
 
@@ -1253,7 +1253,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 return res.status(403).json({ error: 'Tu peux annuler uniquement tes propres demandes' });
             }
             if (isOwner && !isSuperAdmin && (existing.status === 'crafted' || existing.status === 'completed')) {
-                return res.status(403).json({ error: 'Demande d?j? craft?e, contacte un admin' });
+                return res.status(403).json({ error: 'Demande déjà craftée, contacte un admin' });
             }
 
             deleteRequest(id);
@@ -1264,14 +1264,14 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.delete('/api/crafts/requests/:id', requireAuth, (req, res) => {
         try {
             if (!canDeleteRequests(req.session.user)) {
-                return res.status(403).json({ error: 'Action r?serv?e ? Otelow / Super Admin' });
+                return res.status(403).json({ error: 'Action réservée à Otelow / Super Admin' });
             }
             deleteRequest(parseInt(req.params.id));
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // ??? MY WEAPONS ?????????????????????
+    // ─── MY WEAPONS ─────────────────────
     const MYWEAPONS_CHANNEL = '1497185767053594695';
     const MYWEAPONS_AUTHORIZED_CRAFTERS = [
         { id: 'otelow', name: 'Otelow' },
@@ -1347,25 +1347,25 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         const total = rows.length;
         const available = rows.filter(w => !w.is_sold).length;
         const serials = rows
-            .map(w => `${w.is_sold ? 'Vendu' : 'Disponible'} ? ${w.serial_number || 'N? non renseigne'}${w.sold_to ? ` ? ${w.sold_to}` : ''}${w.sold_by_name ? ` ? vendu par ${w.sold_by_name}` : ''}`)
+            .map(w => `${w.is_sold ? 'Vendu' : 'Disponible'} • ${w.serial_number || 'N° non renseigne'}${w.sold_to ? ` → ${w.sold_to}` : ''}${w.sold_by_name ? ` • vendu par ${w.sold_by_name}` : ''}`)
             .join('\n')
             .slice(0, 1000) || 'N/A';
 
         return new EmbedBuilder()
-            .setTitle(`March? armurerie ? ${weapon.weapon_name}`)
-            .setDescription(available > 0 ? `Stock disponible : ${available}/${total} arme(s).` : 'Lot vendu enti?rement.')
+            .setTitle(`Marché armurerie • ${weapon.weapon_name}`)
+            .setDescription(available > 0 ? `Stock disponible : ${available}/${total} arme(s).` : 'Lot vendu entièrement.')
             .setColor(available > 0 ? 0xff8c00 : 0x22c55e)
             .addFields(
                 { name: 'Vendeur', value: weapon.user_name || 'N/A', inline: true },
-                { name: 'Origine', value: weapon.is_crafted ? 'Craft 21BS valid?' : 'Arme externe', inline: true },
-                { name: 'Craft?e par', value: weapon.is_crafted ? (weapon.crafted_by_name || 'Non renseign?') : 'Arme externe', inline: true },
+                { name: 'Origine', value: weapon.is_crafted ? 'Craft 21BS validé' : 'Arme externe', inline: true },
+                { name: 'Craftée par', value: weapon.is_crafted ? (weapon.crafted_by_name || 'Non renseigné') : 'Arme externe', inline: true },
                 { name: 'Stock', value: `${available}/${total} disponible(s)`, inline: true },
-                { name: 'Prix affich?', value: moneyLabel(weapon.asking_price), inline: true },
+                { name: 'Prix affiché', value: moneyLabel(weapon.asking_price), inline: true },
                 { name: 'Seuil minimum', value: moneyLabel(weapon.min_price), inline: true },
-                { name: 'N? s?rie', value: serials, inline: false },
+                { name: 'N° série', value: serials, inline: false },
             )
             .setTimestamp()
-            .setFooter({ text: '21 Block Savage ? March? armurerie' });
+            .setFooter({ text: '21 Block Savage • Marché armurerie' });
     }
     async function updateMyWeaponsDiscordBatch(existing) {
         let rows;
@@ -1385,8 +1385,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         if (!channel) return;
         const embed = buildMyWeaponsEmbed(base, rows);
         const content = available > 0
-            ? `?? Vente armurerie ? **${base.weapon_name}** ? ${available}/${rows.length} disponible(s).`
-            : `? Vente armurerie cl?tur?e ? **${base.weapon_name}** ? lot vendu.`;
+            ? `📦 Vente armurerie • **${base.weapon_name}** • ${available}/${rows.length} disponible(s).`
+            : `✅ Vente armurerie clôturée • **${base.weapon_name}** • lot vendu.`;
         const messageId = rows.find(w => w.discord_message_id)?.discord_message_id;
         if (messageId) {
             try {
@@ -1434,18 +1434,18 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const allowedWeaponNames = getAllMyWeaponNames();
             const matchedWeaponName = allowedWeaponNames.find(w => String(w.name || '').toLowerCase() === requestedWeaponName.toLowerCase());
             if (allowedWeaponNames.length && !matchedWeaponName) {
-                return res.status(400).json({ error: "Choisis une arme dans la liste autoris?e" });
+                return res.status(400).json({ error: "Choisis une arme dans la liste autorisée" });
             }
             const weaponName = matchedWeaponName ? matchedWeaponName.name : requestedWeaponName;
             if (typeof is_crafted === 'undefined') return res.status(400).json({ error: "Origine de l'arme obligatoire" });
             const isCrafted21BS = is_crafted === true || is_crafted === 1 || is_crafted === '1' || is_crafted === 'true';
             const authorizedCrafter = isCrafted21BS ? resolveAuthorizedCrafter(crafted_by_id, crafted_by_name) : null;
             if (isCrafted21BS && !authorizedCrafter) {
-                return res.status(400).json({ error: "Armurier autoris? obligatoire : Otelow, Ney ou Le H" });
+                return res.status(400).json({ error: "Armurier autorisé obligatoire : Otelow, Ney ou Le H" });
             }
 
             let serials = normalizeSerialList(serial_numbers || serial_number);
-            if (isCrafted21BS && !serials.length) return res.status(400).json({ error: 'N? de s?rie obligatoire pour une arme 21BS' });
+            if (isCrafted21BS && !serials.length) return res.status(400).json({ error: 'N° de série obligatoire pour une arme 21BS' });
             if (!isCrafted21BS && !serials.length) serials = [null];
 
             const askingPrice = parseInt(asking_price) || null;
@@ -1507,13 +1507,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const userName = req.session.user.username;
             const userAvatar = req.session.user.avatar || null;
             if (!weapon_name) return res.status(400).json({ error: "Nom de l'arme requis" });
-            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N? de s?rie obligatoire' });
+            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N° de série obligatoire' });
 
             const serial = String(serial_number).trim();
             const askingPrice = parseInt(asking_price) || null;
             const minPrice = parseInt(min_price) || null;
 
-            // Ins?rer dans la DB
+            // Insérer dans la DB
             let id;
             if (useSQLite) {
                 const r = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -1535,32 +1535,32 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 saveJSON();
             }
 
-            // Envoyer le r?sum? sur Discord avec ping
+            // Envoyer le résumé sur Discord avec ping
             try {
                 const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
                 if (channel) {
                     const { EmbedBuilder } = require('discord.js');
                     const embed = new EmbedBuilder()
-                        .setTitle(`March? armurerie ? ${weapon_name}`)
-                        .setDescription('Nouvelle annonce enregistr?e dans le circuit 21BS.')
+                        .setTitle(`Marché armurerie • ${weapon_name}`)
+                        .setDescription('Nouvelle annonce enregistrée dans le circuit 21BS.')
                         .setColor(0xff8c00)
                         .addFields(
                             { name: 'Vendeur', value: `<@${userId}>`, inline: true },
-                            { name: 'Origine', value: is_crafted ? 'Craft 21BS valid?' : 'Arme externe', inline: true },
-                            { name: 'Num?ro de s?rie', value: `\`${serial}\``, inline: true },
-                            { name: 'Prix affich?', value: moneyLabel(askingPrice), inline: true },
+                            { name: 'Origine', value: is_crafted ? 'Craft 21BS validé' : 'Arme externe', inline: true },
+                            { name: 'Numéro de série', value: `\`${serial}\``, inline: true },
+                            { name: 'Prix affiché', value: moneyLabel(askingPrice), inline: true },
                             { name: 'Seuil minimum', value: moneyLabel(minPrice), inline: true },
                         )
                         .setTimestamp()
-                        .setFooter({ text: '21 Block Savage ? March? armurerie' });
+                        .setFooter({ text: '21 Block Savage • Marché armurerie' });
 
                     const msg = await channel.send({
-                        content: `?? Nouvelle annonce armurerie d?pos?e par <@${userId}>.`,
+                        content: `📦 Nouvelle annonce armurerie déposée par <@${userId}>.`,
                         embeds: [embed],
                         allowedMentions: { users: [userId] }
                     });
 
-                    // Stocker l'ID du message pour pouvoir le mettre ? jour si vendue
+                    // Stocker l'ID du message pour pouvoir le mettre à jour si vendue
                     if (useSQLite) {
                         db.prepare('UPDATE my_weapons SET discord_message_id = ? WHERE id = ?').run(msg.id, id);
                     } else {
@@ -1581,7 +1581,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const { sold_to, sold_price, sold_by_id, sold_by_name } = req.body;
             const userId = req.session.user.id;
 
-            // R?cup?rer
+            // Récupérer
             let existing;
             if (useSQLite) {
                 existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
@@ -1590,7 +1590,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             if (!existing) return res.status(404).json({ error: 'Introuvable' });
             if (existing.user_id !== userId && !canDeleteRequests(req.session.user)) {
-                return res.status(403).json({ error: 'Action non autoris?e ? seul le vendeur peut marquer comme vendu' });
+                return res.status(403).json({ error: 'Action non autorisée — seul le vendeur peut marquer comme vendu' });
             }
 
             const now = Math.floor(Date.now() / 1000);
@@ -1615,14 +1615,14 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 }
             }
 
-            // Mettre ? jour le message Discord (?dit ou nouveau message)
+            // Mettre à jour le message Discord (édit ou nouveau message)
             try {
                 const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
                 if (channel) {
                     const { EmbedBuilder } = require('discord.js');
                     const embed = new EmbedBuilder()
-                        .setTitle(`Vente finalis?e ? ${existing.weapon_name}`)
-                        .setDescription('Transaction confirm?e. L?annonce est verrouill?e.')
+                        .setTitle(`Vente finalisée • ${existing.weapon_name}`)
+                        .setDescription('Transaction confirmée. L’annonce est verrouillée.')
                         .setColor(0x4ade80)
                         .addFields(
                             { name: 'Vendeur', value: `<@${existing.user_id}>`, inline: true },
@@ -1630,25 +1630,25 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                             { name: 'Prix final', value: moneyLabel(soldPrice), inline: true },
                         )
                         .setTimestamp()
-                        .setFooter({ text: '21 Block Savage ? Vente termin?e' });
+                        .setFooter({ text: '21 Block Savage • Vente terminée' });
 
                     if (existing.discord_message_id) {
                         try {
                             const msg = await channel.messages.fetch(existing.discord_message_id);
                             await msg.edit({
-                                content: `? Annonce cl?tur?e ? **VENDU**`,
+                                content: `✅ Annonce clôturée • **VENDU**`,
                                 embeds: [embed]
                             });
                         } catch {
                             await channel.send({
-                                content: `? Vente finalis?e ? **${existing.weapon_name}**`,
+                                content: `✅ Vente finalisée • **${existing.weapon_name}**`,
                                 embeds: [embed],
                                 allowedMentions: { parse: [] }
                             });
                         }
                     } else {
                         await channel.send({
-                            content: `? Vente finalis?e ? **${existing.weapon_name}**`,
+                            content: `✅ Vente finalisée • **${existing.weapon_name}**`,
                             embeds: [embed],
                             allowedMentions: { parse: [] }
                         });
@@ -1656,7 +1656,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 }
             } catch (e) { console.error('Erreur update Discord:', e.message); }
 
-            // Auto-remplir Tableau de craft si l'arme est craft?e 21BS et a un N?S?rie
+            // Auto-remplir Tableau de craft si l'arme est craftée 21BS et a un N°Série
             try {
                 await updateMyWeaponsDiscordBatch(existing);
             } catch (e) { console.error('Erreur update Discord lot myweapons:', e.message); }
@@ -1666,7 +1666,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 try {
                     let matchedRequest;
                     if (useSQLite) {
-                        // Chercher demande par : user_id + N?S?rie + status (crafted/in_progress/pending)
+                        // Chercher demande par : user_id + N°Série + status (crafted/in_progress/pending)
                         matchedRequest = db.prepare(`
                             SELECT r.*, w.name as weapon_name FROM craft_requests r
                             JOIN weapons w ON r.weapon_id = w.id
@@ -1686,7 +1686,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     }
 
                     if (matchedRequest) {
-                        // Compl?ter la demande craft avec les infos de vente
+                        // Compléter la demande craft avec les infos de vente
                         if (useSQLite) {
                             db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
                                 .run(sold_to || null, soldPrice, now, userId, existing.user_name, matchedRequest.id);
@@ -1704,7 +1704,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         }
                         autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
 
-                        // Post? le r?cap dans le salon WEAPONS_LOG
+                        // Posté le récap dans le salon WEAPONS_LOG
                         try {
                             const stateData = botState();
                             const recapChannel = botClient.channels.cache.get((stateData?.CONFIG?.CHANNELS?.WEAPONS_LOG) || '1497021044953845791');
@@ -1712,19 +1712,19 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                                 const saleDate = new Date(now * 1000).toLocaleDateString('fr-FR');
                                 const { EmbedBuilder } = require('discord.js');
                                 const recapEmbed = new EmbedBuilder()
-                                    .setTitle(`Justification automatique ? ${matchedRequest.weapon_name}`)
+                                    .setTitle(`Justification automatique • ${matchedRequest.weapon_name}`)
                                     .setColor(0xffb84d)
                                     .addFields(
                                         { name: 'Vendeur', value: `<@${existing.user_id}>`, inline: true },
-                                        { name: 'Num?ro de s?rie', value: `\`${existing.serial_number || 'N/A'}\``, inline: true },
+                                        { name: 'Numéro de série', value: `\`${existing.serial_number || 'N/A'}\``, inline: true },
                                         { name: 'Acheteur', value: sold_to || 'N/A', inline: true },
                                         { name: 'Prix final', value: moneyLabel(soldPrice), inline: true },
                                         { name: 'Date vente', value: saleDate, inline: true },
                                     )
                                     .setTimestamp()
-                                    .setFooter({ text: '21 Block Savage ? R?cap craft automatique' });
+                                    .setFooter({ text: '21 Block Savage • Récap craft automatique' });
                                 await recapChannel.send({
-                                    content: `? Dossier craft synchronis? ? **${matchedRequest.weapon_name}**`,
+                                    content: `✅ Dossier craft synchronisé • **${matchedRequest.weapon_name}**`,
                                     embeds: [recapEmbed],
                                     allowedMentions: { parse: [] }
                                 });
@@ -1735,7 +1735,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                                     if (r) { r.posted_to_channel = 1; saveJSON(); }
                                 }
                             }
-                        } catch (e) { console.error('Erreur r?cap auto:', e.message); }
+                        } catch (e) { console.error('Erreur récap auto:', e.message); }
                     }
                 } catch (e) { console.error('Erreur auto-fill craft:', e.message); }
             }
@@ -1757,7 +1757,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (!existing) return res.status(404).json({ error: 'Introuvable' });
             // Le vendeur peut supprimer sa propre annonce, OU super admin
             if (existing.user_id !== userId && !canDeleteMyWeapons(req.session.user)) {
-                return res.status(403).json({ error: 'Action non autoris?e' });
+                return res.status(403).json({ error: 'Action non autorisée' });
             }
             if (existing.discord_message_id) {
                 try {
