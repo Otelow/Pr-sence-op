@@ -718,16 +718,24 @@ function deleteOrg(id) {
     saveJSON();
 }
 
-function getRequests(status) {
+function getRequests(status, options = {}) {
+    const productionStatuses = ['in_progress', 'crafted'];
     if (useSQLite) {
         let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
         const params = [];
-        if (status && status !== 'all') { query += ' WHERE r.status = ?'; params.push(status); }
+        if (options.productionOnly) {
+            query += ` WHERE r.status IN (${productionStatuses.map(() => '?').join(',')})`;
+            params.push(...productionStatuses);
+        } else if (status && status !== 'all') {
+            query += ' WHERE r.status = ?';
+            params.push(status);
+        }
         query += ' ORDER BY r.created_at DESC';
         return db.prepare(query).all(...params);
     }
     let arr = jsonData.craft_requests;
-    if (status && status !== 'all') arr = arr.filter(r => r.status === status);
+    if (options.productionOnly) arr = arr.filter(r => productionStatuses.includes(r.status));
+    else if (status && status !== 'all') arr = arr.filter(r => r.status === status);
     return [...arr].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => {
         const w = jsonData.weapons.find(w => w.id === r.weapon_id);
         return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null };
@@ -1053,7 +1061,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.get('/api/crafts/requests', requireAuth, (req, res) => {
         try {
-            const requests = getRequests(req.query.status);
+            const requests = getRequests(req.query.status, {
+                productionOnly: req.query.view === 'board',
+            });
             const list = requests.map(r => ({
                 ...r,
                 weapon_image_url: r.weapon_image ? `/crafts/images/${r.weapon_image}` : null,

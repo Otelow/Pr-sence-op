@@ -3071,7 +3071,7 @@ function getCraftStatusBadge(r) {
 function getCraftBoardActiveRequests() {
     const u = window.currentUser || {};
     const hasFullAccess = canValidateCraftClient();
-    let active = craftRequestsCache.filter(r => r.status !== 'completed' && r.status !== 'rejected');
+    let active = craftRequestsCache.filter(r => ['in_progress', 'crafted'].includes(r.status));
     if (!hasFullAccess) active = active.filter(r => r.user_id === u.id);
     return active;
 }
@@ -3144,7 +3144,7 @@ function renderCraftBoard() {
     const end = Math.min(start + pageSize, total);
     const pageItems = active.slice(start, end);
 
-    // Filtrer : exclure rejected et completed
+    // Vue production : uniquement les demandes acceptées/en cours ou déjà craftées.
 
     // Hauts gradés voient toutes les demandes, les autres seulement les leurs
 
