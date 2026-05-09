@@ -1,5 +1,5 @@
 // ==========================================
-// MODULE CRAFTS ??? DB SQLite avec fallback JSON
+// MODULE CRAFTS ? DB SQLite avec fallback JSON
 // ==========================================
 const path = require('path');
 const fs = require('fs');
@@ -16,7 +16,7 @@ try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 } catch (e) {
-    console.error('??? Erreur cr??ation dossiers data:', e.message);
+    console.error('? Erreur cr?ation dossiers data:', e.message);
 }
 
 // Tenter de charger better-sqlite3, sinon fallback JSON
@@ -27,9 +27,9 @@ let Database = null;
 try {
     Database = require('better-sqlite3');
     useSQLite = true;
-    console.log('??? better-sqlite3 charg??');
+    console.log('? better-sqlite3 charg?');
 } catch (e) {
-    console.warn('?????? better-sqlite3 indisponible, fallback JSON activ??');
+    console.warn('?? better-sqlite3 indisponible, fallback JSON activ?');
     useSQLite = false;
 }
 
@@ -169,31 +169,31 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
 
-            const defaultIngredients = ['Tungst??ne', 'Bloc de tungst??ne', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil ?? pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
+            const defaultIngredients = ['Tungst?ne', 'Bloc de tungst?ne', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil ? pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
                 try { db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)').run(ing); } catch {}
             }
             seedMyWeaponNamesFromWeapons();
 
-            console.log('???? DB Crafts initialis??e (SQLite)');
+            console.log('?? DB Crafts initialis?e (SQLite)');
         } catch (e) {
-            console.error('??? SQLite init error, fallback JSON:', e.message);
+            console.error('? SQLite init error, fallback JSON:', e.message);
             useSQLite = false;
             loadJSON();
             seedDefaultIngredientsJSON();
             seedMyWeaponNamesFromWeapons();
-            console.log('???? DB Crafts initialis??e (JSON fallback)');
+            console.log('?? DB Crafts initialis?e (JSON fallback)');
         }
     } else {
         loadJSON();
         seedDefaultIngredientsJSON();
         seedMyWeaponNamesFromWeapons();
-        console.log('???? DB Crafts initialis??e (JSON)');
+        console.log('?? DB Crafts initialis?e (JSON)');
     }
 }
 
 function seedDefaultIngredientsJSON() {
-    const defaults = ['Tungst??ne', 'Bloc de tungst??ne', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil ?? pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
+    const defaults = ['Tungst?ne', 'Bloc de tungst?ne', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil ? pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
     if (!jsonData.ingredients) jsonData.ingredients = [];
     if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
     for (const name of defaults) {
@@ -287,7 +287,7 @@ function deleteWeapon(id) {
     saveJSON();
 }
 
-// ????????? INGREDIENTS ?????????????????????????????????????????????
+// ??? INGREDIENTS ???????????????
 function getAllIngredients() {
     if (useSQLite) return db.prepare('SELECT * FROM ingredients ORDER BY name ASC').all();
     return [...(jsonData.ingredients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -492,7 +492,7 @@ const upload = multer({
         const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowed.includes(ext)) cb(null, true);
-        else cb(new Error('Format non support??'));
+        else cb(new Error('Format non support?'));
     }
 });
 
@@ -525,7 +525,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 };
             });
 
-            // Trier par prix de vente d??croissant, puis prix craft.
+            // Trier par prix de vente d?croissant, puis prix craft.
             list.sort((a, b) => {
                 const saleDiff = (Number(b.sale_price) || 0) - (Number(a.sale_price) || 0);
                 if (saleDiff !== 0) return saleDiff;
@@ -607,7 +607,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // ????????? INGREDIENTS ???????????????????????????????????????
+    // ??? INGREDIENTS ?????????????
     app.get('/api/crafts/ingredients', requireAuth, (req, res) => {
         try {
             const list = getAllIngredients().map(i => ({
@@ -633,7 +633,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const id = parseInt(req.params.id);
             const { name } = req.body;
             const existing = getIngredient(id);
-            if (!existing) return res.status(404).json({ error: 'Ingr??dient introuvable' });
+            if (!existing) return res.status(404).json({ error: 'Ingr?dient introuvable' });
             if (req.file && existing.image_path) {
                 const p = path.join(UPLOADS_DIR, existing.image_path);
                 if (fs.existsSync(p)) fs.unlinkSync(p);
@@ -714,7 +714,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     const CRAFT_PLAN_PROVIDER_ROLE = '1490361524408291459';
     const moneyLabel = (amount) => Number(amount) === 0 ? 'Gratuit' : (amount ? `${Number(amount).toLocaleString('fr-FR')}$` : 'N/A');
 
-    // Helper : cr??er/??diter le message de demande de craft sur Discord
+    // Helper : cr?er/?diter le message de demande de craft sur Discord
     async function postOrUpdateCraftRequestMessage(requestId) {
         try {
             const fullReq = getRequest(requestId);
@@ -922,7 +922,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // CRAFT_VALIDATION_ROLES : seuls ces r??les peuvent valider/cocher craft??
+    // CRAFT_VALIDATION_ROLES : seuls ces r?les peuvent valider/cocher craft?
     const CRAFT_VALIDATION_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
     const SUPER_ADMIN_ROLE = '1485279148246175764';
     const SUPER_ADMIN_USER = '952986899667103804';
@@ -1126,7 +1126,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.patch('/api/crafts/requests/:id/craft', requireAuth, async (req, res) => {
         try {
             if (!canValidateCraft(req.session.user)) {
-                return res.status(403).json({ error: 'Action r??serv??e aux hauts grad??s' });
+                return res.status(403).json({ error: 'Action r?serv?e aux hauts grad?s' });
             }
             const id = parseInt(req.params.id);
             const { crafted, serial_number } = req.body;
@@ -1136,7 +1136,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
             updateRequestCraft(id, crafted, serial_number, userId, userName);
 
-            // Mettre ?? jour le message Discord original
+            // Mettre ? jour le message Discord original
             await postOrUpdateCraftRequestMessage(id);
 
             if (crafted) {
@@ -1166,11 +1166,11 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // Changement de statut (En attente / Mati??res / En cours / Refus??)
+    // Changement de statut (En attente / Mati?res / En cours / Refus?)
     app.patch('/api/crafts/requests/:id/status', requireAuth, async (req, res) => {
         try {
             if (!canValidateCraft(req.session.user)) {
-                return res.status(403).json({ error: 'Action r??serv??e aux hauts grad??s' });
+                return res.status(403).json({ error: 'Action r?serv?e aux hauts grad?s' });
             }
             const id = parseInt(req.params.id);
             const { status } = req.body;
@@ -1184,7 +1184,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 if (r) { r.status = status; saveJSON(); }
             }
 
-            // Mettre ?? jour le message Discord original (??dition embed)
+            // Mettre ? jour le message Discord original (?dition embed)
             await postOrUpdateCraftRequestMessage(id);
 
             // Notification dans le salon de statut
@@ -1203,7 +1203,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
             const isAdmin = req.session.user.isAdmin;
-            if (existing.user_id !== userId && !isAdmin) return res.status(403).json({ error: 'Action non autoris??e' });
+            if (existing.user_id !== userId && !isAdmin) return res.status(403).json({ error: 'Action non autoris?e' });
             const saleTimestamp = sale_date ? Math.floor(new Date(sale_date).getTime() / 1000) : Math.floor(Date.now() / 1000);
             updateRequestSale(id, buyer_org, parseInt(sale_price) || null, saleTimestamp, userId, userName);
             const updated = getRequest(id);
@@ -1229,7 +1229,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         content: `? Vente craft cl?tur?e ? **${updated.weapon_name}**`,
                         embeds: [embed],
                         allowedMentions: { parse: [] }
-                    }).catch(e => console.error('Erreur r??cap:', e.message));
+                    }).catch(e => console.error('Erreur r?cap:', e.message));
                     markRequestPosted(id);
                 }
             }
@@ -1245,7 +1245,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
 
-            // Le demandeur peut annuler tant que c'est pas craft??/finalis??
+            // Le demandeur peut annuler tant que c'est pas craft?/finalis?
             const isOwner = existing.user_id === userId;
             const isSuperAdmin = canDeleteRequests(req.session.user);
 
@@ -1253,7 +1253,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 return res.status(403).json({ error: 'Tu peux annuler uniquement tes propres demandes' });
             }
             if (isOwner && !isSuperAdmin && (existing.status === 'crafted' || existing.status === 'completed')) {
-                return res.status(403).json({ error: 'Demande d??j?? craft??e, contacte un admin' });
+                return res.status(403).json({ error: 'Demande d?j? craft?e, contacte un admin' });
             }
 
             deleteRequest(id);
@@ -1264,14 +1264,14 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.delete('/api/crafts/requests/:id', requireAuth, (req, res) => {
         try {
             if (!canDeleteRequests(req.session.user)) {
-                return res.status(403).json({ error: 'Action r??serv??e ?? Otelow / Super Admin' });
+                return res.status(403).json({ error: 'Action r?serv?e ? Otelow / Super Admin' });
             }
             deleteRequest(parseInt(req.params.id));
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // ????????? MY WEAPONS ???????????????????????????????????????????????????????????????
+    // ??? MY WEAPONS ?????????????????????
     const MYWEAPONS_CHANNEL = '1497185767053594695';
     const MYWEAPONS_AUTHORIZED_CRAFTERS = [
         { id: 'otelow', name: 'Otelow' },
@@ -1434,7 +1434,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const allowedWeaponNames = getAllMyWeaponNames();
             const matchedWeaponName = allowedWeaponNames.find(w => String(w.name || '').toLowerCase() === requestedWeaponName.toLowerCase());
             if (allowedWeaponNames.length && !matchedWeaponName) {
-                return res.status(400).json({ error: "Choisis une arme dans la liste autoris??e" });
+                return res.status(400).json({ error: "Choisis une arme dans la liste autoris?e" });
             }
             const weaponName = matchedWeaponName ? matchedWeaponName.name : requestedWeaponName;
             if (typeof is_crafted === 'undefined') return res.status(400).json({ error: "Origine de l'arme obligatoire" });
@@ -1507,13 +1507,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const userName = req.session.user.username;
             const userAvatar = req.session.user.avatar || null;
             if (!weapon_name) return res.status(400).json({ error: "Nom de l'arme requis" });
-            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N?? de s??rie obligatoire' });
+            if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N? de s?rie obligatoire' });
 
             const serial = String(serial_number).trim();
             const askingPrice = parseInt(asking_price) || null;
             const minPrice = parseInt(min_price) || null;
 
-            // Ins??rer dans la DB
+            // Ins?rer dans la DB
             let id;
             if (useSQLite) {
                 const r = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -1535,7 +1535,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 saveJSON();
             }
 
-            // Envoyer le r??sum?? sur Discord avec ping
+            // Envoyer le r?sum? sur Discord avec ping
             try {
                 const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
                 if (channel) {
@@ -1560,7 +1560,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         allowedMentions: { users: [userId] }
                     });
 
-                    // Stocker l'ID du message pour pouvoir le mettre ?? jour si vendue
+                    // Stocker l'ID du message pour pouvoir le mettre ? jour si vendue
                     if (useSQLite) {
                         db.prepare('UPDATE my_weapons SET discord_message_id = ? WHERE id = ?').run(msg.id, id);
                     } else {
@@ -1581,7 +1581,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const { sold_to, sold_price, sold_by_id, sold_by_name } = req.body;
             const userId = req.session.user.id;
 
-            // R??cup??rer
+            // R?cup?rer
             let existing;
             if (useSQLite) {
                 existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
@@ -1590,7 +1590,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             if (!existing) return res.status(404).json({ error: 'Introuvable' });
             if (existing.user_id !== userId && !canDeleteRequests(req.session.user)) {
-                return res.status(403).json({ error: 'Action non autoris??e ??? seul le vendeur peut marquer comme vendu' });
+                return res.status(403).json({ error: 'Action non autoris?e ? seul le vendeur peut marquer comme vendu' });
             }
 
             const now = Math.floor(Date.now() / 1000);
@@ -1615,7 +1615,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 }
             }
 
-            // Mettre ?? jour le message Discord (??dit ou nouveau message)
+            // Mettre ? jour le message Discord (?dit ou nouveau message)
             try {
                 const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
                 if (channel) {
@@ -1656,7 +1656,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 }
             } catch (e) { console.error('Erreur update Discord:', e.message); }
 
-            // Auto-remplir Tableau de craft si l'arme est craft??e 21BS et a un N??S??rie
+            // Auto-remplir Tableau de craft si l'arme est craft?e 21BS et a un N?S?rie
             try {
                 await updateMyWeaponsDiscordBatch(existing);
             } catch (e) { console.error('Erreur update Discord lot myweapons:', e.message); }
@@ -1666,7 +1666,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 try {
                     let matchedRequest;
                     if (useSQLite) {
-                        // Chercher demande par : user_id + N??S??rie + status (crafted/in_progress/pending)
+                        // Chercher demande par : user_id + N?S?rie + status (crafted/in_progress/pending)
                         matchedRequest = db.prepare(`
                             SELECT r.*, w.name as weapon_name FROM craft_requests r
                             JOIN weapons w ON r.weapon_id = w.id
@@ -1686,7 +1686,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     }
 
                     if (matchedRequest) {
-                        // Compl??ter la demande craft avec les infos de vente
+                        // Compl?ter la demande craft avec les infos de vente
                         if (useSQLite) {
                             db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
                                 .run(sold_to || null, soldPrice, now, userId, existing.user_name, matchedRequest.id);
@@ -1704,7 +1704,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         }
                         autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
 
-                        // Post?? le r??cap dans le salon WEAPONS_LOG
+                        // Post? le r?cap dans le salon WEAPONS_LOG
                         try {
                             const stateData = botState();
                             const recapChannel = botClient.channels.cache.get((stateData?.CONFIG?.CHANNELS?.WEAPONS_LOG) || '1497021044953845791');
@@ -1735,7 +1735,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                                     if (r) { r.posted_to_channel = 1; saveJSON(); }
                                 }
                             }
-                        } catch (e) { console.error('Erreur r??cap auto:', e.message); }
+                        } catch (e) { console.error('Erreur r?cap auto:', e.message); }
                     }
                 } catch (e) { console.error('Erreur auto-fill craft:', e.message); }
             }
