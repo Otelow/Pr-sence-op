@@ -1,5 +1,5 @@
 /* ==========================================
-   21 BLOCK SAVAGE — Dashboard
+   21 BLOCK SAVAGE ? Dashboard
    Design : Urban / Brutalist / Dark
    ========================================== */
 
@@ -970,7 +970,7 @@ html, body {
 ::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
 
 /* ============================================
-   PAGE D'ERREUR (login refusé)
+   PAGE D'ERREUR (login refus?)
    ============================================ */
 .error-card {
     text-align: center;
@@ -1790,10 +1790,10 @@ html, body {
 }
 
 /* ============================================
-   AMÉLIORATIONS V2
+   AM?LIORATIONS V2
    ============================================ */
 
-/* Stat info supplémentaire */
+/* Stat info suppl?mentaire */
 .stat-card.stat-info::before { background: var(--blue); }
 .stat-sub {
     font-size: 10px;
@@ -1803,7 +1803,7 @@ html, body {
     margin-top: 4px;
 }
 
-/* Liste membres présence — meilleur affichage */
+/* Liste membres pr?sence ? meilleur affichage */
 .op-cat-list .member {
     display: flex;
     align-items: center;
@@ -2092,7 +2092,7 @@ html, body {
 }
 
 /* ============================================
-   CARTE — ZOOM CONTROLS
+   CARTE ? ZOOM CONTROLS
    ============================================ */
 .map-zoom-controls {
     display: flex;
@@ -2128,7 +2128,7 @@ html, body {
     padding: 0 8px;
 }
 
-/* Carte recadrée correctement */
+/* Carte recadr?e correctement */
 .map-container {
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -2173,7 +2173,7 @@ html, body {
 }
 
 /* ============================================
-   STATS — CALENDRIER
+   STATS ? CALENDRIER
    ============================================ */
 .stats-overview {
     display: grid;
@@ -2290,7 +2290,7 @@ html, body {
     gap: 6px;
 }
 
-/* Stats list — avec avatars */
+/* Stats list ? avec avatars */
 .stats-list .member-row {
     display: flex;
     align-items: center;
@@ -2316,7 +2316,7 @@ html, body {
 }
 
 /* ============================================
-   SANCTIONS — meilleur visuel
+   SANCTIONS ? meilleur visuel
    ============================================ */
 .sanctions-list .sanction {
     background: var(--bg-card);
@@ -2354,7 +2354,7 @@ html, body {
 }
 
 /* ============================================
-   SALONS — VUE CARTES
+   SALONS ? VUE CARTES
    ============================================ */
 .channels-toolbar {
     display: flex;
@@ -2496,7 +2496,7 @@ html, body {
     font-style: italic;
 }
 
-/* Vue messages — timeline */
+/* Vue messages ? timeline */
 .channel-messages-view {
     display: flex;
     flex-direction: column;
@@ -2532,10 +2532,10 @@ html, body {
 
 
 /* ============================================
-   AMÉLIORATIONS V3 — Polish & lisibilité
+   AM?LIORATIONS V3 ? Polish & lisibilit?
    ============================================ */
 
-/* Mentions stylées (sanctions + messages) */
+/* Mentions styl?es (sanctions + messages) */
 .mention {
     display: inline-block;
     padding: 1px 6px;
@@ -2570,7 +2570,7 @@ html, body {
 }
 
 /* ============================================
-   ABSENCES POSÉES — Refait
+   ABSENCES POS?ES ? Refait
    ============================================ */
 .absences-panel-header {
     margin-bottom: 16px;
@@ -2647,7 +2647,7 @@ html, body {
 }
 
 /* ============================================
-   SALONS — VUE LISTE
+   SALONS ? VUE LISTE
    ============================================ */
 .channels-grid-view {
     display: block;
@@ -2758,7 +2758,7 @@ html, body {
 }
 
 /* ============================================
-   FORUMS — Threads
+   FORUMS ? Threads
    ============================================ */
 .forum-thread {
     background: var(--bg-card);
@@ -2867,7 +2867,7 @@ html, body {
 }
 
 /* ============================================
-   MESSAGES — Vidéo
+   MESSAGES ? Vid?o
    ============================================ */
 .message-attachment-video {
     max-width: 480px;
@@ -2883,7 +2883,7 @@ html, body {
 }
 
 /* ============================================
-   SANCTIONS — Avec avatar
+   SANCTIONS ? Avec avatar
    ============================================ */
 .sanctions-list .sanction {
     background: var(--bg-card);
@@ -2928,7 +2928,7 @@ html, body {
 }
 
 /* ============================================
-   STATS — Lisibilité
+   STATS ? Lisibilit?
    ============================================ */
 .stat-label {
     font-weight: 600;
@@ -2952,7 +2952,7 @@ html, body {
     color: #ff8585;
 }
 
-/* Liste membres présence — meilleure lisibilité */
+/* Liste membres pr?sence ? meilleure lisibilit? */
 .op-cat-list .member {
     color: var(--text);
     font-weight: 500;
@@ -2977,7 +2977,7 @@ html, body {
     padding: 18px 16px;
 }
 
-/* Page sub - lisibilité */
+/* Page sub - lisibilit? */
 .page-sub {
     color: #b8b8b8;
     font-weight: 500;
@@ -3172,7 +3172,7 @@ html, body {
 }
 
 /* ============================================
-   CARTE — Code d'accès
+   CARTE ? Code d'acc?s
    ============================================ */
 .point-code-box {
     background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.05));
@@ -3230,7 +3230,7 @@ html, body {
 /* Indicateur visuel pour les pins lab/weapon-lab avec code */
 .map-point[data-type="lab"]::after,
 .map-point[data-type="weapon-lab"]::after {
-    content: '🔐';
+    content: '??';
     position: absolute;
     top: -8px;
     right: -8px;
@@ -3247,14 +3247,14 @@ html, body {
 }
 
 /* ============================================
-   CARTE V5 — Reset et refonte complète
+   CARTE V5 ? Reset et refonte compl?te
    ============================================ */
 
-/* Override toutes les règles précédentes */
+/* Override toutes les r?gles pr?c?dentes */
 .map-container {
     background: var(--bg-deep) !important;
     border: 1px solid var(--border) !important;
-    overflow: hidden !important; /* Pas de scroll natif, on gère avec transform */
+    overflow: hidden !important; /* Pas de scroll natif, on g?re avec transform */
     height: calc(100vh - 280px) !important;
     position: relative !important;
     cursor: grab !important;
@@ -3302,7 +3302,7 @@ html, body {
     pointer-events: none !important;
 }
 
-/* Points : taille FIXE peu importe le zoom (on inverse l'échelle) */
+/* Points : taille FIXE peu importe le zoom (on inverse l'?chelle) */
 .map-point {
     position: absolute;
     width: 36px;
@@ -3363,7 +3363,7 @@ html, body {
 /* Indicateur code pour Lab/Lab armes */
 .map-point[data-type="lab"]::after,
 .map-point[data-type="weapon-lab"]::after {
-    content: '🔐';
+    content: '??';
     position: absolute;
     top: -4px;
     right: -8px;
@@ -3391,7 +3391,7 @@ html, body {
 
 
 /* ============================================
-   FORUM — Vignettes vidéo / lien
+   FORUM ? Vignettes vid?o / lien
    ============================================ */
 .thread-thumbnail.thread-video-icon,
 .thread-thumbnail.thread-link-icon {
@@ -3429,7 +3429,7 @@ html, body {
 
 
 /* ============================================
-   COMMUNICATIONS — Onglets et zone élargie
+   COMMUNICATIONS ? Onglets et zone ?largie
    ============================================ */
 .cmd-section .annonce-form {
     max-width: 100%;
@@ -3542,7 +3542,7 @@ html, body {
 
 
 /* ============================================
-   COMMUNICATIONS V2 — Design moderne
+   COMMUNICATIONS V2 ? Design moderne
    ============================================ */
 
 .cmd-section .comm-header {
@@ -3563,7 +3563,7 @@ html, body {
     margin: 0;
 }
 
-/* ─── Onglets ─── */
+/* ??? Onglets ??? */
 .comm-tabs-wrapper {
     margin-bottom: -1px;
     position: relative;
@@ -3629,7 +3629,7 @@ html, body {
 .comm-tab[data-comm="rappel"].active { box-shadow: inset 0 3px 0 var(--blue); }
 .comm-tab[data-comm="sanction"].active { box-shadow: inset 0 3px 0 var(--orange); }
 
-/* ─── Panels ─── */
+/* ??? Panels ??? */
 .comm-panel {
     display: none;
     animation: fadeInPanel 0.2s ease-out;
@@ -3651,7 +3651,7 @@ html, body {
     padding: 28px;
 }
 
-/* ─── Champs ─── */
+/* ??? Champs ??? */
 .comm-field {
     margin-bottom: 22px;
 }
@@ -3693,7 +3693,7 @@ html, body {
     font-weight: 700;
 }
 
-/* ─── Inputs / textareas ─── */
+/* ??? Inputs / textareas ??? */
 .comm-select,
 .comm-input,
 .comm-textarea {
@@ -3735,7 +3735,7 @@ html, body {
     padding-right: 40px;
 }
 
-/* ─── Toolbar (emojis serveur) ─── */
+/* ??? Toolbar (emojis serveur) ??? */
 .comm-toolbar {
     display: flex;
     align-items: center;
@@ -3767,7 +3767,7 @@ html, body {
     color: var(--text-muted);
 }
 
-/* ─── Bouton d'envoi ─── */
+/* ??? Bouton d'envoi ??? */
 .comm-actions {
     display: flex;
     justify-content: flex-end;
@@ -3817,7 +3817,7 @@ html, body {
     box-shadow: 0 6px 18px rgba(255, 149, 0, 0.4);
 }
 
-/* ─── Picker emojis ─── */
+/* ??? Picker emojis ??? */
 .comm-emoji-picker {
     margin-top: 16px;
     background: var(--bg-card);
@@ -3970,7 +3970,7 @@ html, body {
     margin-top: 2px;
 }
 
-/* Affichage de l'utilisateur sélectionné */
+/* Affichage de l'utilisateur s?lectionn? */
 .user-picker-selected {
     display: flex;
     align-items: center;
@@ -4011,11 +4011,11 @@ html, body {
 
 
 /* ============================================================
-   THÈME LIQUID GLASS V1 — NOIR / ORANGE
-   Override final : prend le dessus sur toutes les règles ci-dessus
+   TH?ME LIQUID GLASS V1 ? NOIR / ORANGE
+   Override final : prend le dessus sur toutes les r?gles ci-dessus
    ============================================================ */
 
-/* ─── PALETTE ─────────────────────────────────────────────── */
+/* ??? PALETTE ??????????????????????????????????????????????? */
 :root {
     /* Backgrounds noirs profonds */
     --bg-deep: #050505;
@@ -4047,7 +4047,7 @@ html, body {
     --discord: #5865f2;
 }
 
-/* ─── BACKDROP : fond animé subtil ───────────────────────── */
+/* ??? BACKDROP : fond anim? subtil ????????????????????????? */
 body {
     background:
         radial-gradient(ellipse at top left, rgba(255, 140, 0, 0.08), transparent 50%),
@@ -4068,7 +4068,7 @@ body::before {
     z-index: 0;
 }
 
-/* ─── SIDEBAR ─────────────────────────────────────────────── */
+/* ??? SIDEBAR ??????????????????????????????????????????????? */
 .sidebar {
     background: rgba(8, 8, 10, 0.75) !important;
     backdrop-filter: blur(14px) saturate(140%) !important;
@@ -4124,7 +4124,7 @@ body::before {
     border-radius: 12px;
 }
 
-/* ─── HEADER (top bar) ─────────────────────────────────────── */
+/* ??? HEADER (top bar) ??????????????????????????????????????? */
 .topbar,
 .header,
 .page-header {
@@ -4163,7 +4163,7 @@ body::before {
     color: var(--accent) !important;
 }
 
-/* ─── CARTES STATS / BLOCS ────────────────────────────────── */
+/* ??? CARTES STATS / BLOCS ?????????????????????????????????? */
 .stat-card,
 .op-block,
 .absences-block,
@@ -4222,7 +4222,7 @@ body::before {
     letter-spacing: 0.08em;
 }
 
-/* ─── PRÉSENCE OP ─────────────────────────────────────────── */
+/* ??? PR?SENCE OP ??????????????????????????????????????????? */
 .op-status.active {
     background: rgba(74, 222, 128, 0.15) !important;
     color: var(--green) !important;
@@ -4248,7 +4248,7 @@ body::before {
     border-color: var(--border-hover) !important;
 }
 
-/* ─── ABSENCES PANEL ─────────────────────────────────────── */
+/* ??? ABSENCES PANEL ??????????????????????????????????????? */
 .absences-header.valid {
     background: rgba(74, 222, 128, 0.08) !important;
     color: var(--green) !important;
@@ -4275,7 +4275,7 @@ body::before {
     backdrop-filter: blur(4px);
 }
 
-/* ─── COMMUNICATIONS — onglets et panels ───────────────── */
+/* ??? COMMUNICATIONS ? onglets et panels ????????????????? */
 .comm-title {
     color: var(--text) !important;
     background: linear-gradient(135deg, var(--text) 60%, var(--accent) 100%);
@@ -4397,7 +4397,7 @@ body::before {
     box-shadow: 0 8px 28px rgba(239, 68, 68, 0.5) !important;
 }
 
-/* ─── USER DROPDOWN (Sanction) ───────────────────────────── */
+/* ??? USER DROPDOWN (Sanction) ????????????????????????????? */
 .user-dropdown-wrapper {
     position: relative;
 }
@@ -4447,7 +4447,7 @@ body::before {
     font-family: var(--font-mono);
 }
 
-/* ─── SALONS ─────────────────────────────────────────────── */
+/* ??? SALONS ??????????????????????????????????????????????? */
 .channel-row {
     border-radius: 10px !important;
     margin-bottom: 6px !important;
@@ -4570,7 +4570,7 @@ body::before {
     box-shadow: 0 4px 20px rgba(255, 140, 0, 0.5);
 }
 
-/* ─── CARTE ──────────────────────────────────────────────── */
+/* ??? CARTE ???????????????????????????????????????????????? */
 .map-toolbar h2 {
     color: var(--text) !important;
 }
@@ -4630,7 +4630,7 @@ body::before {
     border-radius: 12px !important;
 }
 
-/* ─── STATS ──────────────────────────────────────────────── */
+/* ??? STATS ???????????????????????????????????????????????? */
 .calendar-table {
     background: transparent !important;
 }
@@ -4658,7 +4658,7 @@ body::before {
     color: #fca5a5 !important;
 }
 
-/* ─── SANCTIONS LISTE ─────────────────────────────────────── */
+/* ??? SANCTIONS LISTE ??????????????????????????????????????? */
 .sanctions-list .sanction {
     border-left: 3px solid var(--accent) !important;
     padding-left: 18px !important;
@@ -4669,7 +4669,7 @@ body::before {
     background: rgba(255, 140, 0, 0.03) !important;
 }
 
-/* ─── BOUTONS GÉNÉRAUX ───────────────────────────────────── */
+/* ??? BOUTONS G?N?RAUX ????????????????????????????????????? */
 .btn-primary {
     background: linear-gradient(135deg, var(--accent), #ff7700) !important;
     color: #0a0a0a !important;
@@ -4728,7 +4728,7 @@ body::before {
     box-shadow: 0 8px 24px rgba(96, 165, 250, 0.2);
 }
 
-/* ─── SECTION TITLES ─────────────────────────────────────── */
+/* ??? SECTION TITLES ??????????????????????????????????????? */
 .section-title,
 h2,
 h3 {
@@ -4743,7 +4743,7 @@ h3 {
     display: inline-block;
 }
 
-/* ─── MODALES ────────────────────────────────────────────── */
+/* ??? MODALES ?????????????????????????????????????????????? */
 .modal-content {
     background: rgba(15, 15, 18, 0.85) !important;
     backdrop-filter: blur(20px) saturate(140%) !important;
@@ -4771,7 +4771,7 @@ h3 {
     color: var(--text) !important;
 }
 
-/* ─── TOAST ──────────────────────────────────────────────── */
+/* ??? TOAST ???????????????????????????????????????????????? */
 .toast {
     background: rgba(15, 15, 18, 0.9) !important;
     backdrop-filter: blur(16px) saturate(140%) !important;
@@ -4786,7 +4786,7 @@ h3 {
     border-left-color: var(--red) !important;
 }
 
-/* ─── SCROLLBARS ─────────────────────────────────────────── */
+/* ??? SCROLLBARS ??????????????????????????????????????????? */
 ::-webkit-scrollbar {
     width: 8px !important;
     height: 8px !important;
@@ -4806,7 +4806,7 @@ h3 {
     background: rgba(255, 140, 0, 0.4) !important;
 }
 
-/* ─── MENTIONS dans les messages ──────────────────────────── */
+/* ??? MENTIONS dans les messages ???????????????????????????? */
 .mention-user {
     background: rgba(96, 165, 250, 0.15) !important;
     color: #93c5fd !important;
@@ -4822,25 +4822,25 @@ h3 {
     color: #93c5fd !important;
 }
 
-/* ─── LIVE INDICATOR animation ───────────────────────────── */
+/* ??? LIVE INDICATOR animation ????????????????????????????? */
 .live-dot {
     background: var(--green) !important;
     box-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
 }
 
-/* ─── EMPTY STATES ───────────────────────────────────────── */
+/* ??? EMPTY STATES ????????????????????????????????????????? */
 .empty,
 .empty-cat,
 .empty-list {
     color: var(--text-muted) !important;
 }
 
-/* ─── MESSAGES — scroll fluide ──────────────────────────── */
+/* ??? MESSAGES ? scroll fluide ???????????????????????????? */
 .channel-timeline {
     scroll-behavior: smooth;
 }
 
-/* ─── INPUT FOCUS GLOW global ───────────────────────────── */
+/* ??? INPUT FOCUS GLOW global ????????????????????????????? */
 input:focus,
 textarea:focus,
 select:focus {
@@ -4873,7 +4873,7 @@ select option:hover {
     color: #08080a !important;
 }
 
-/* ─── BTN BACK CHANNELS ──────────────────────────────────── */
+/* ??? BTN BACK CHANNELS ???????????????????????????????????? */
 .btn-back-channels {
     background: rgba(255, 255, 255, 0.04) !important;
     backdrop-filter: blur(8px);
@@ -4887,7 +4887,7 @@ select option:hover {
     color: var(--accent) !important;
 }
 
-/* ─── LOAD MORE ──────────────────────────────────────────── */
+/* ??? LOAD MORE ???????????????????????????????????????????? */
 .btn-load-more {
     background: rgba(255, 140, 0, 0.05) !important;
     backdrop-filter: blur(8px);
@@ -4901,7 +4901,7 @@ select option:hover {
     border-color: var(--accent) !important;
 }
 
-/* ─── FORUMS ─────────────────────────────────────────────── */
+/* ??? FORUMS ??????????????????????????????????????????????? */
 .forum-thread:hover {
     border-color: var(--border-hover) !important;
     background: rgba(255, 140, 0, 0.02) !important;
@@ -4924,7 +4924,7 @@ select option:hover {
     color: var(--green) !important;
 }
 
-/* ─── ROUGE rare → ORANGE partout ───────────────────────── */
+/* ??? ROUGE rare ? ORANGE partout ????????????????????????? */
 .accent-color,
 [style*="--accent: #ff3333"] {
     --accent: #ff8c00 !important;
@@ -4961,7 +4961,7 @@ select option:hover {
 
 
 /* ============================================
-   FIX FLÈCHE SELECT (override)
+   FIX FL?CHE SELECT (override)
    ============================================ */
 .comm-select {
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ff8c00' d='M6 8L0 0h12z'/%3E%3C/svg%3E") !important;
@@ -4972,7 +4972,7 @@ select option:hover {
 }
 
 /* ============================================
-   CUSTOM DROPDOWN (Sanction users + rôles)
+   CUSTOM DROPDOWN (Sanction users + r?les)
    ============================================ */
 .custom-dropdown {
     position: relative;
@@ -5151,7 +5151,7 @@ select option:hover {
     margin-top: 1px;
 }
 
-/* Scrollbar du dropdown — bien visible */
+/* Scrollbar du dropdown ? bien visible */
 .custom-dropdown-list::-webkit-scrollbar {
     width: 10px;
     background: rgba(0, 0, 0, 0.3);
@@ -5201,7 +5201,7 @@ h2.section-title {
     color: rgba(255, 184, 77, 0.7) !important;
 }
 
-/* Les titres "21BS / Centre Contrôle" et autres petits */
+/* Les titres "21BS / Centre Contr?le" et autres petits */
 .sidebar-title,
 .sidebar-header h1 {
     background: linear-gradient(90deg, #ffb84d 0%, #ff8c00 100%) !important;
@@ -5346,10 +5346,10 @@ h2.section-title {
 }
 
 /* ============================================================
-   LIQUID GLASS APPLE STYLE — Renforcement final
+   LIQUID GLASS APPLE STYLE ? Renforcement final
    ============================================================ */
 
-/* Background avec gradient mesh animé */
+/* Background avec gradient mesh anim? */
 body {
     background:
         radial-gradient(ellipse 80% 50% at 20% 0%, rgba(255, 140, 0, 0.15), transparent 50%),
@@ -5363,7 +5363,7 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glass effect renforcé sur les blocs principaux */
+/* Glass effect renforc? sur les blocs principaux */
 .sidebar {
     background: rgba(10, 10, 12, 0.6) !important;
     backdrop-filter: blur(40px) saturate(180%) !important;
@@ -5382,7 +5382,7 @@ body {
     box-shadow: 0 1px 0 rgba(255, 140, 0, 0.04) !important;
 }
 
-/* Cartes : effet liquid glass plus marqué */
+/* Cartes : effet liquid glass plus marqu? */
 .stat-card,
 .op-block,
 .absences-block,
@@ -5813,7 +5813,7 @@ body {
 }
 
 /* ============================================================
-   CRAFT D'ARMES — Section principale
+   CRAFT D'ARMES ? Section principale
    ============================================================ */
 .crafts-subtabs {
     display: flex;
@@ -6576,16 +6576,19 @@ body {
 }
 
 .manual-craft-free-option {
-    min-height: 48px;
+    min-height: 36px;
+    width: fit-content;
+    justify-self: start;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    border: 1px solid rgba(255, 140, 0, 0.18);
+    gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: 8px;
-    background: rgba(255, 140, 0, 0.06);
+    background: rgba(255, 255, 255, 0.035);
     color: var(--text);
     font-family: var(--font-mono);
+    font-size: 12px;
     cursor: pointer;
 }
 
@@ -6666,7 +6669,7 @@ body {
    FIXES VISUELS V3
    ============================================================ */
 
-/* Empêcher les blocs absences de déborder */
+/* Emp?cher les blocs absences de d?border */
 .absences-block {
     overflow: hidden !important;
 }
@@ -6681,7 +6684,7 @@ body {
     padding: 16px 20px !important;
 }
 
-/* Les chips ne doivent pas déborder du parent */
+/* Les chips ne doivent pas d?border du parent */
 .chip-valid,
 .chip-invalid {
     margin: 4px !important;
@@ -6697,7 +6700,7 @@ body {
     overflow: hidden;
 }
 
-/* Stats : badges nombres ne doivent pas déborder */
+/* Stats : badges nombres ne doivent pas d?border */
 .calendar-cell,
 .calendar-table td {
     overflow: hidden;
@@ -6725,9 +6728,9 @@ body {
     color: var(--text-dim);
 }
 
-/* Lien admin TRÈS visible */
+/* Lien admin TR?S visible */
 .admin-link {
-    display: none; /* Caché par défaut, JS le montre */
+    display: none; /* Cach? par d?faut, JS le montre */
     align-items: center !important;
     justify-content: center;
     gap: 8px;
@@ -6750,7 +6753,7 @@ body {
 }
 
 /* ============================================================
-   ADMIN PAGE V2 — Tabs + ingrédients + impersonate dropdown
+   ADMIN PAGE V2 ? Tabs + ingr?dients + impersonate dropdown
    ============================================================ */
 
 .admin-tabs {
@@ -6790,7 +6793,7 @@ body {
     animation: fadeIn 0.2s ease-out;
 }
 
-/* Style fix : select de l'impersonate (utilise custom-dropdown) — déjà OK */
+/* Style fix : select de l'impersonate (utilise custom-dropdown) ? d?j? OK */
 .impersonate-panel-admin {
     max-width: 600px;
 }
@@ -6909,7 +6912,7 @@ body {
 }
 
 /* ============================================================
-   FIXES BATCH 3 — Login particles + Slide admin + craft fixes
+   FIXES BATCH 3 ? Login particles + Slide admin + craft fixes
    ============================================================ */
 
 /* === LOGIN PAGE PARTICLES === */
@@ -7083,7 +7086,7 @@ body {
     font-weight: 600;
 }
 
-/* === IMAGES INGRÉDIENTS === */
+/* === IMAGES INGR?DIENTS === */
 .craft-ingredient {
     display: flex;
     flex-direction: column;
@@ -7203,7 +7206,7 @@ body {
     border-color: var(--red);
 }
 
-/* Statut refusé */
+/* Statut refus? */
 .craft-request-rejected {
     opacity: 0.5;
     text-decoration: line-through;
@@ -7418,7 +7421,7 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 /* ============================================================
-   MYWEAPONS V2 — Bandeau shimmer + UI mises en vente
+   MYWEAPONS V2 ? Bandeau shimmer + UI mises en vente
    ============================================================ */
 
 /* Bandeau d'avertissement vibrant avec shimmer */
@@ -7643,10 +7646,10 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 /* ============================================================
-   FIX MODALS — supprimé, redéfini ci-dessous
+   FIX MODALS ? supprim?, red?fini ci-dessous
    ============================================================ */
 
-/* Admin saleprice field — plus visible */
+/* Admin saleprice field ? plus visible */
 .admin-saleprice-field {
     background: rgba(74, 222, 128, 0.04);
     border-left: 3px solid var(--green);
@@ -7715,10 +7718,10 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 /* ============================================================
-   FIX MODAL FINAL — propre et safe
+   FIX MODAL FINAL ? propre et safe
    ============================================================ */
 
-/* Cibler uniquement les modal-backdrop avec un ID (modals racine, pas les sous-éléments) */
+/* Cibler uniquement les modal-backdrop avec un ID (modals racine, pas les sous-?l?ments) */
 .modal-backdrop[id] {
     display: none;
     position: fixed !important;
@@ -7765,7 +7768,7 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 /* ============================================================
-   OVERLAY CONFIDENTIEL (présence/commandes verrouillées)
+   OVERLAY CONFIDENTIEL (pr?sence/commandes verrouill?es)
    ============================================================ */
 .tab-content.access-locked {
     position: relative;

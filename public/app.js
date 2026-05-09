@@ -1,16 +1,16 @@
 // ==========================================
-// 21 BLOCK SAVAGE — Dashboard JS
+// 21 BLOCK SAVAGE ? Dashboard JS
 // ==========================================
 
 const PAGE_TITLES = {
-    presence: { title: 'Présence', sub: 'Suivi Présence/Absence' },
-    commands: { title: 'Commandes', sub: 'Centre de contrôle' },
+    presence: { title: 'Pr?sence', sub: 'Suivi Pr?sence/Absence' },
+    commands: { title: 'Commandes', sub: 'Centre de contr?le' },
     channels: { title: 'Salons Discord', sub: 'Historique et navigation' },
     map: { title: 'Carte du Laboratoire', sub: 'Marquage de zones' },
     stats: { title: 'Statistiques', sub: 'Suivi hebdomadaire' },
     sanctions: { title: 'Sanctions', sub: 'Historique des avertissements' },
     crafts: { title: "Craft d'armes", sub: 'Gestion des demandes & production' },
-    myweapons: { title: 'Vos Armes', sub: 'Tes armes à vendre' },
+    myweapons: { title: 'Vos Armes', sub: 'Tes armes ? vendre' },
 };
 
 let currentTab = 'presence';
@@ -22,7 +22,7 @@ let presenceStatsCache = null;
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
-    // Déplacer uniquement les modals racine (avec ID) au body
+    // D?placer uniquement les modals racine (avec ID) au body
     document.querySelectorAll('.modal-backdrop[id]').forEach(modal => {
         if (modal.parentNode !== document.body) {
             document.body.appendChild(modal);
@@ -85,7 +85,7 @@ function restoreLastTab() {
         }
         const last = localStorage.getItem('lastTab');
         if (last && document.getElementById(`tab-${last}`) && PAGE_TITLES[last]) {
-            // Rôle non autorisé sur tab verrouillé → reste sur presence (qui sera flouté)
+            // R?le non autoris? sur tab verrouill? ? reste sur presence (qui sera flout?)
             switchTab(last);
             return;
         }
@@ -132,7 +132,7 @@ function applyPermissionsUI() {
                 <div class="danger-lock-panel">
                     <span class="danger-lock-kicker">CONNEXION INTERROMPUE</span>
                     <span class="confidential-text">CONFIDENCIAL</span>
-                    <span class="danger-lock-sub">ZONE CHIFFRÉE 21BS • ACCÈS NON AUTORISÉ</span>
+                    <span class="danger-lock-sub">ZONE CHIFFR?E 21BS ? ACC?S NON AUTORIS?</span>
                 </div>
             `;
             sec.appendChild(overlay);
@@ -216,7 +216,7 @@ function renderPresenceMemberList(items, emptyText, showAbsences = false) {
         const avatar = safeImageUrl(m.avatar) || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='44' height='44'><rect width='44' height='44' fill='%23262626'/></svg>`;
         const color = safeColor(m.color);
         const detail = showAbsences
-            ? `<span>${m.count || 0} absence(s)${m.consecutiveDays >= 2 ? ` • ${m.consecutiveDays}j consécutifs` : ''}</span>`
+            ? `<span>${m.count || 0} absence(s)${m.consecutiveDays >= 2 ? ` ? ${m.consecutiveDays}j cons?cutifs` : ''}</span>`
             : `<span>ID ${escapeHtml(m.id || '')}</span>`;
         const dates = showAbsences && m.dates?.length
             ? `<div class="presence-detail-dates">${m.dates.map(d => `<code>${escapeHtml(d)}</code>`).join('')}</div>`
@@ -244,16 +244,16 @@ async function openPresenceStatDetails(type) {
     const s = presenceStatsCache || {};
     if (type === 'members') {
         title.textContent = 'Membres 21BS';
-        content.innerHTML = renderPresenceMemberList(s.totalMembersList, 'Aucun membre trouvé');
+        content.innerHTML = renderPresenceMemberList(s.totalMembersList, 'Aucun membre trouv?');
     } else if (type === 'op') {
         title.textContent = 'Inscrits OP';
-        content.innerHTML = renderPresenceMemberList(s.inscritsList, 'Aucun inscrit OP trouvé');
+        content.innerHTML = renderPresenceMemberList(s.inscritsList, 'Aucun inscrit OP trouv?');
     } else if (type === 'absences') {
         title.textContent = 'Absences semaine';
         content.innerHTML = renderPresenceMemberList(s.absenceMembers, 'Aucune absence cette semaine', true);
     } else {
         title.textContent = 'Alertes KP';
-        content.innerHTML = renderPresenceMemberList(s.kpMembers, 'Aucun membre à KP', true);
+        content.innerHTML = renderPresenceMemberList(s.kpMembers, 'Aucun membre ? KP', true);
     }
     modal.style.display = 'flex';
 }
@@ -263,7 +263,7 @@ function closePresenceStatDetails() {
     if (modal) modal.style.display = 'none';
 }
 
-// ===== PRÉSENCE =====
+// ===== PR?SENCE =====
 async function loadPresence() {
     try {
         const res = await fetch('/api/presence');
@@ -284,7 +284,7 @@ function renderOP(prefix, op) {
     if (!op.active) {
         status.textContent = 'INACTIVE';
         status.className = 'op-status inactive';
-        cats.innerHTML = '<p class="empty-cat">⚠ Pas de présence active</p>';
+        cats.innerHTML = '<p class="empty-cat">? Pas de pr?sence active</p>';
         return;
     }
 
@@ -294,11 +294,11 @@ function renderOP(prefix, op) {
     const total = op.present.length + op.late.length + op.absentReact.length + op.absentValid.length + op.noReaction.length;
 
     const categories = [
-        { icon: '✅', label: 'Présents', list: op.present },
-        { icon: '⏰', label: 'Retards', list: op.late },
-        { icon: '❌', label: 'Absents non justifiés', list: op.absentReact },
-        { icon: '📋', label: 'Absents justifiés', list: op.absentValid },
-        { icon: '⚠️', label: 'Pas de réaction', list: op.noReaction },
+        { icon: '?', label: 'Pr?sents', list: op.present },
+        { icon: '?', label: 'Retards', list: op.late },
+        { icon: '?', label: 'Absents non justifi?s', list: op.absentReact },
+        { icon: '??', label: 'Absents justifi?s', list: op.absentValid },
+        { icon: '??', label: 'Pas de r?action', list: op.noReaction },
     ];
 
     const renderMember = (m) => {
@@ -308,7 +308,7 @@ function renderOP(prefix, op) {
 
     cats.innerHTML = `
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">
-            👥 <strong style="color:var(--text);">${total}</strong> membres
+            ?? <strong style="color:var(--text);">${total}</strong> membres
         </div>
     ` + categories.map(c => `
         <div class="op-category" onclick="this.classList.toggle('open')">
@@ -334,13 +334,13 @@ function renderAbsencesSalon(data) {
 
     const renderChip = (name, isValid) => `
         <div class="absence-chip ${isValid ? 'chip-valid' : 'chip-invalid'}">
-            <span class="chip-icon">${isValid ? '✓' : '✗'}</span>
+            <span class="chip-icon">${isValid ? '?' : '?'}</span>
             <span class="chip-name">${escapeHtml(name)}</span>
         </div>
     `;
 
     validList.innerHTML = data.valid.length === 0
-        ? '<p class="empty-list">Aucune absence conforme posée</p>'
+        ? '<p class="empty-list">Aucune absence conforme pos?e</p>'
         : `<div class="chips-grid">${data.valid.map(n => renderChip(n, true)).join('')}</div>`;
 
     invalidList.innerHTML = data.invalid.length === 0
@@ -359,9 +359,9 @@ async function loadWeekly() {
         const consecutiveList = document.getElementById('consecutiveList');
         const calendar = document.getElementById('statsCalendar');
 
-        // Section consécutifs
+        // Section cons?cutifs
         consecutiveList.innerHTML = consecutive.length === 0
-            ? '<p class="empty">Aucune absence consécutive ✨</p>'
+            ? '<p class="empty">Aucune absence cons?cutive ?</p>'
             : consecutive.map(m => renderStatsMemberRow(m, true)).join('');
 
         // Calendrier visuel
@@ -375,7 +375,7 @@ function renderStatsMemberRow(m, isAlert) {
     const avatar = m.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'><rect width='48' height='48' fill='%23262626'/></svg>`;
     const detailsHtml = m.details && m.details.length > 0
         ? `<div class="member-details-list">
-            ${m.details.map(d => `<div class="detail">${d.justified ? '✅' : '❌'} ${d.date} • ${d.op}</div>`).join('')}
+            ${m.details.map(d => `<div class="detail">${d.justified ? '?' : '?'} ${d.date} ? ${d.op}</div>`).join('')}
           </div>`
         : '';
 
@@ -385,7 +385,7 @@ function renderStatsMemberRow(m, isAlert) {
             <div class="member-row-info">
                 <div class="member-row-name">${escapeHtml(m.username)}</div>
                 <div class="member-row-details">
-                    ${isAlert ? `<span class="member-row-badge">${m.consecutiveDays} JOURS CONSÉCUTIFS</span> ` : ''}
+                    ${isAlert ? `<span class="member-row-badge">${m.consecutiveDays} JOURS CONS?CUTIFS</span> ` : ''}
                     ${m.count} absence(s) cette semaine
                 </div>
                 ${detailsHtml}
@@ -398,7 +398,7 @@ function renderStatsMemberRow(m, isAlert) {
 function renderCalendar(tracking) {
     if (tracking.length === 0) return '<p class="empty">Aucune absence cette semaine</p>';
 
-    // Récupérer les 7 derniers jours (du lundi au dimanche)
+    // R?cup?rer les 7 derniers jours (du lundi au dimanche)
     const today = new Date();
     const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1; // Lundi = 0
     const monday = new Date(today);
@@ -429,7 +429,7 @@ function renderCalendar(tracking) {
             <img class="calendar-member-avatar" src="${avatar}" alt="">
             <div class="calendar-member-info">
                 <div class="calendar-member-name">${escapeHtml(m.username)}</div>
-                <div class="calendar-member-stats">${m.count} absence(s) ${m.consecutiveDays >= 2 ? `• ${m.consecutiveDays}j consécutifs` : ''}</div>
+                <div class="calendar-member-stats">${m.count} absence(s) ${m.consecutiveDays >= 2 ? `? ${m.consecutiveDays}j cons?cutifs` : ''}</div>
             </div>
         </td>`;
 
@@ -437,13 +437,13 @@ function renderCalendar(tracking) {
             const dayDetails = (m.details || []).filter(det => det.date === d.dateStr);
             let cell = '';
             if (dayDetails.length === 0) {
-                // Pas d'info pour ce jour → considéré présent (ou pas d'OP)
-                cell = '<span class="calendar-cell empty">—</span>';
+                // Pas d'info pour ce jour ? consid?r? pr?sent (ou pas d'OP)
+                cell = '<span class="calendar-cell empty">?</span>';
             } else {
                 const hasJustified = dayDetails.some(det => det.justified);
                 const hasUnjustified = dayDetails.some(det => !det.justified);
-                if (hasJustified && !hasUnjustified) cell = '<span class="calendar-cell justified" title="Absence justifiée">📋✓</span>';
-                else if (hasUnjustified) cell = '<span class="calendar-cell absent" title="Absence non justifiée">❌</span>';
+                if (hasJustified && !hasUnjustified) cell = '<span class="calendar-cell justified" title="Absence justifi?e">???</span>';
+                else if (hasUnjustified) cell = '<span class="calendar-cell absent" title="Absence non justifi?e">?</span>';
             }
             html += `<td>${cell}</td>`;
         }
@@ -454,12 +454,12 @@ function renderCalendar(tracking) {
 
     html += '</tbody></table>';
 
-    // Légende
+    // L?gende
     html += `
         <div class="calendar-legend">
-            <div class="calendar-legend-item">📋✓ <span>Absence justifiée</span></div>
-            <div class="calendar-legend-item">❌ <span>Absence non justifiée</span></div>
-            <div class="calendar-legend-item">— <span>Pas d'OP / présent</span></div>
+            <div class="calendar-legend-item">??? <span>Absence justifi?e</span></div>
+            <div class="calendar-legend-item">? <span>Absence non justifi?e</span></div>
+            <div class="calendar-legend-item">? <span>Pas d'OP / pr?sent</span></div>
         </div>
     `;
 
@@ -474,7 +474,7 @@ async function loadSanctions() {
         const list = document.getElementById('sanctionsList');
 
         if (!data.sanctions || data.sanctions.length === 0) {
-            list.innerHTML = '<p class="empty">Aucune sanction récente</p>';
+            list.innerHTML = '<p class="empty">Aucune sanction r?cente</p>';
             return;
         }
 
@@ -509,7 +509,7 @@ async function loadSanctions() {
                 <div class="sanction">
                     <img class="sanction-avatar" src="${avatar}" alt="">
                     <div class="sanction-body">
-                        <span class="sanction-time">📅 ${dateStr}</span>
+                        <span class="sanction-time">?? ${dateStr}</span>
                         <div class="sanction-content">${content}</div>
                     </div>
                 </div>
@@ -538,13 +538,13 @@ async function runCmd(command) {
 
         if (res.ok) {
             toast(data.frequency
-                ? `📻 Radio envoyée : ${data.frequency}`
-                : `✅ Commande "${command}" lancée`);
+                ? `?? Radio envoy?e : ${data.frequency}`
+                : `? Commande "${command}" lanc?e`);
         } else {
-            toast(`❌ ${data.error || 'Erreur'}`, 'error');
+            toast(`? ${data.error || 'Erreur'}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
@@ -661,7 +661,7 @@ function renderChannelsTree(filter = '') {
         const matches = !f || ch.name.toLowerCase().includes(f);
         if (!matches) return null;
 
-        const icons = { 0: '#', 2: '🔊', 5: '📢', 13: '🎙', 15: '💬' };
+        const icons = { 0: '#', 2: '??', 5: '??', 13: '??', 15: '??' };
         const types = { 0: 'Texte', 2: 'Vocal', 5: 'Annonces', 13: 'Stage', 15: 'Forum' };
         const icon = icons[ch.type] || '#';
         const typeLabel = types[ch.type] || 'Salon';
@@ -677,7 +677,7 @@ function renderChannelsTree(filter = '') {
                 ${ch.topic ? `<div class="channel-row-topic">${escapeHtml(ch.topic)}</div>` : ''}
             </div>
             <span class="channel-row-type">${typeLabel}</span>
-            ${isClickable ? '<span class="channel-row-arrow">→</span>' : ''}
+            ${isClickable ? '<span class="channel-row-arrow">?</span>' : ''}
         `;
         if (isClickable) row.onclick = () => selectChannel(ch);
         else row.classList.add('channel-row-disabled');
@@ -689,7 +689,7 @@ function renderChannelsTree(filter = '') {
         if (matchingOrphans.length > 0) {
             const section = document.createElement('div');
             section.className = 'channel-category-section';
-            section.innerHTML = `<div class="channel-category-title">▸ Sans catégorie</div>`;
+            section.innerHTML = `<div class="channel-category-title">? Sans cat?gorie</div>`;
             const list = document.createElement('div');
             list.className = 'channel-rows-list';
             matchingOrphans.forEach(c => list.appendChild(c));
@@ -704,7 +704,7 @@ function renderChannelsTree(filter = '') {
 
         const section = document.createElement('div');
         section.className = 'channel-category-section';
-        section.innerHTML = `<div class="channel-category-title">▸ ${escapeHtml(cat.name)}</div>`;
+        section.innerHTML = `<div class="channel-category-title">? ${escapeHtml(cat.name)}</div>`;
         const list = document.createElement('div');
         list.className = 'channel-rows-list';
         matchingChannels.forEach(c => list.appendChild(c));
@@ -713,7 +713,7 @@ function renderChannelsTree(filter = '') {
     }
 
     if (tree.innerHTML === '') {
-        tree.innerHTML = '<p class="empty">Aucun salon trouvé</p>';
+        tree.innerHTML = '<p class="empty">Aucun salon trouv?</p>';
     }
 }
 
@@ -760,7 +760,7 @@ async function selectChannel(ch) {
             const input = document.getElementById('messageInput');
             if (input) {
                 input.value = '';
-                input.placeholder = `Écris un message dans #${ch.name}...`;
+                input.placeholder = `?cris un message dans #${ch.name}...`;
                 input.style.height = 'auto';
             }
             document.getElementById('charCount').textContent = '0/2000';
@@ -771,7 +771,7 @@ async function selectChannel(ch) {
 
     await loadMessages(ch.id);
 
-    // Démarrer le polling si c'est un salon texte
+    // D?marrer le polling si c'est un salon texte
     if (ch.type === 0 || ch.type === 5 || [10, 11, 12].includes(ch.type)) {
         startChannelPolling();
     }
@@ -785,7 +785,7 @@ async function loadMessages(channelId, before = null) {
 
         const container = document.getElementById('channelTimeline');
         if (data.error) {
-            container.innerHTML = `<p class="empty">❌ ${data.error}</p>`;
+            container.innerHTML = `<p class="empty">? ${data.error}</p>`;
             return;
         }
 
@@ -808,9 +808,9 @@ async function loadMessages(channelId, before = null) {
         container.style.flexDirection = 'column-reverse';
         if (!before) {
             container.innerHTML = '';
-            // Reset newest pour la première charge
+            // Reset newest pour la premi?re charge
             if (data.messages.length > 0) {
-                newestMessageId = data.messages[0].id; // [0] = plus récent (Discord renvoie en ordre desc)
+                newestMessageId = data.messages[0].id; // [0] = plus r?cent (Discord renvoie en ordre desc)
             }
         }
 
@@ -823,7 +823,7 @@ async function loadMessages(channelId, before = null) {
         if (data.hasMore) {
             loadBtn.style.display = 'inline-block';
             loadBtn.disabled = false;
-            loadBtn.textContent = '↑ Charger plus de messages';
+            loadBtn.textContent = '? Charger plus de messages';
         } else {
             loadBtn.style.display = 'none';
         }
@@ -841,7 +841,7 @@ function startChannelPolling() {
         if (!currentChannelId) return;
         // Skip si l'onglet n'est pas Salons
         if (currentTab !== 'channels') return;
-        // Skip si la vue messages n'est pas affichée
+        // Skip si la vue messages n'est pas affich?e
         const view = document.getElementById('channelMessagesView');
         if (!view || view.style.display === 'none') return;
 
@@ -850,16 +850,16 @@ function startChannelPolling() {
             const data = await res.json();
             if (data.error || !data.messages || data.messages.length === 0) return;
 
-            // Vérifier si on doit auto-scroll (l'utilisateur est en bas)
+            // V?rifier si on doit auto-scroll (l'utilisateur est en bas)
             const container = document.getElementById('channelTimeline');
             // Avec column-reverse, scrollTop = 0 signifie qu'on est en bas
             const wasAtBottom = Math.abs(container.scrollTop) < 100;
 
-            // Ajouter les nouveaux messages au début (column-reverse)
-            // Discord renvoie [récent, ..., ancien], on les ajoute du plus ancien au plus récent
+            // Ajouter les nouveaux messages au d?but (column-reverse)
+            // Discord renvoie [r?cent, ..., ancien], on les ajoute du plus ancien au plus r?cent
             const sorted = [...data.messages].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
             for (const m of sorted) {
-                // Vérifier qu'il n'existe pas déjà
+                // V?rifier qu'il n'existe pas d?j?
                 if (container.querySelector(`[data-msg-id="${m.id}"]`)) continue;
                 const el = renderMessage(m);
                 container.insertBefore(el, container.firstChild);
@@ -872,7 +872,7 @@ function startChannelPolling() {
                 container.scrollTop = 0;
             }
         } catch (e) {
-            // Silencieux : on est en polling, pas grave si une requête échoue
+            // Silencieux : on est en polling, pas grave si une requ?te ?choue
         }
     }, 5000);
 }
@@ -894,7 +894,7 @@ function renderThread(t, parentId) {
         const fm = t.firstMessage;
         const avatar = fm.authorAvatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><rect width='24' height='24' fill='%23262626'/></svg>`;
 
-        // Détecter le type de média (image, vidéo, lien externe)
+        // D?tecter le type de m?dia (image, vid?o, lien externe)
         let mediaPreview = '';
         if (fm.attachments && fm.attachments.length > 0) {
             const firstImg = fm.attachments.find(a => a.isImage);
@@ -902,7 +902,7 @@ function renderThread(t, parentId) {
             if (firstImg) {
                 mediaPreview = `<img class="thread-thumbnail" src="${firstImg.url}" alt="">`;
             } else if (firstVid) {
-                mediaPreview = `<div class="thread-thumbnail thread-video-icon">🎥<br><small>VIDÉO</small></div>`;
+                mediaPreview = `<div class="thread-thumbnail thread-video-icon">??<br><small>VID?O</small></div>`;
             }
         }
 
@@ -912,22 +912,22 @@ function renderThread(t, parentId) {
             if (embedImg) {
                 mediaPreview = `<img class="thread-thumbnail" src="${embedImg.thumbnail || embedImg.image}" alt="">`;
             } else {
-                mediaPreview = `<div class="thread-thumbnail thread-link-icon">🔗<br><small>LIEN</small></div>`;
+                mediaPreview = `<div class="thread-thumbnail thread-link-icon">??<br><small>LIEN</small></div>`;
             }
         }
 
-        // Détecter les liens vidéo dans le contenu
+        // D?tecter les liens vid?o dans le contenu
         if (!mediaPreview && fm.content) {
             const videoMatch = fm.content.match(/https?:\/\/[^\s]+\.(mp4|mov|avi|webm|mkv)|https?:\/\/(www\.)?(youtube\.com|youtu\.be|twitch\.tv|clips\.twitch\.tv|streamable\.com|medal\.tv|tiktok\.com|x\.com|twitter\.com)/i);
             if (videoMatch) {
-                mediaPreview = `<div class="thread-thumbnail thread-link-icon">🎥<br><small>CLIP</small></div>`;
+                mediaPreview = `<div class="thread-thumbnail thread-link-icon">??<br><small>CLIP</small></div>`;
             }
         }
 
         // Contenu texte (avec liens cliquables)
         let textContent = '';
         if (fm.content) {
-            const truncated = fm.content.length > 200 ? fm.content.substring(0, 200) + '…' : fm.content;
+            const truncated = fm.content.length > 200 ? fm.content.substring(0, 200) + '?' : fm.content;
             textContent = escapeHtml(truncated).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" onclick="event.stopPropagation()">$1</a>');
         }
 
@@ -949,21 +949,21 @@ function renderThread(t, parentId) {
         <div class="forum-thread-header">
             <h4 class="forum-thread-name">${escapeHtml(t.name)}</h4>
             <div class="forum-thread-meta">
-                ${t.archived ? '<span class="thread-tag">📦 Archivé</span>' : '<span class="thread-tag thread-active">● Actif</span>'}
-                <span>💬 ${t.messageCount} messages</span>
-                <span>👥 ${t.memberCount} membres</span>
-                <span>🕐 ${date}</span>
+                ${t.archived ? '<span class="thread-tag">?? Archiv?</span>' : '<span class="thread-tag thread-active">? Actif</span>'}
+                <span>?? ${t.messageCount} messages</span>
+                <span>?? ${t.memberCount} membres</span>
+                <span>?? ${date}</span>
             </div>
         </div>
         ${preview}
-        <button class="btn-thread-open" onclick="openThread('${t.id}', '${escapeHtml(t.name).replace(/'/g, "\\'")}')">Voir le fil →</button>
+        <button class="btn-thread-open" onclick="openThread('${t.id}', '${escapeHtml(t.name).replace(/'/g, "\\'")}')">Voir le fil ?</button>
     `;
     return div;
 }
 
 async function openThread(threadId, threadName) {
     currentChannelId = threadId;
-    document.getElementById('viewerName').textContent = '🧵 ' + threadName;
+    document.getElementById('viewerName').textContent = '?? ' + threadName;
     document.getElementById('channelTimeline').innerHTML = '<p class="empty">Chargement...</p>';
     oldestMessageId = null;
 
@@ -974,7 +974,7 @@ async function openThread(threadId, threadName) {
         const input = document.getElementById('messageInput');
         if (input) {
             input.value = '';
-            input.placeholder = `Écris dans le fil "${threadName}"...`;
+            input.placeholder = `?cris dans le fil "${threadName}"...`;
             input.style.height = 'auto';
         }
         document.getElementById('charCount').textContent = '0/2000';
@@ -1003,10 +1003,10 @@ function renderMessage(m) {
             const r = m.mentions.roles.find(r => r.id === id);
             const color = r?.color ? `#${r.color.toString(16).padStart(6, '0')}` : null;
             const style = color ? `style="color:${color};background:${color}22;"` : '';
-            return `<span class="mention mention-role" ${style}>@${escapeHtml(r?.name || 'rôle')}</span>`;
+            return `<span class="mention mention-role" ${style}>@${escapeHtml(r?.name || 'r?le')}</span>`;
         })
         .replace(/<#(\d+)>/g, '<span class="mention mention-channel">#salon</span>')
-        // Emojis customs → vraie image
+        // Emojis customs ? vraie image
         .replace(/&lt;(a?):(\w+):(\d+)&gt;/g, (_, animated, name, id) => {
             const ext = animated === 'a' ? 'gif' : 'png';
             return `<img class="inline-emoji" src="https://cdn.discordapp.com/emojis/${id}.${ext}" alt=":${name}:" title=":${name}:">`;
@@ -1023,7 +1023,7 @@ function renderMessage(m) {
         } else if (a.isVideo) {
             attachmentsHtml += `<video class="message-attachment-video" src="${a.url}" controls></video>`;
         } else {
-            attachmentsHtml += `<a href="${a.url}" target="_blank" class="message-attachment-file">📎 ${escapeHtml(a.name)}</a>`;
+            attachmentsHtml += `<a href="${a.url}" target="_blank" class="message-attachment-file">?? ${escapeHtml(a.name)}</a>`;
         }
     }
 
@@ -1050,7 +1050,7 @@ function renderMessage(m) {
             <div class="message-header">
                 <span class="message-author ${m.authorBot ? 'bot' : ''}" ${m.authorColor ? `style="color:${m.authorColor};"` : ''}>${escapeHtml(m.authorName)}</span>
                 ${m.authorBot ? '<span class="message-bot-tag">BOT</span>' : ''}
-                ${m.pinned ? '<span class="message-pinned-tag">📌 ÉPINGLÉ</span>' : ''}
+                ${m.pinned ? '<span class="message-pinned-tag">?? ?PINGL?</span>' : ''}
                 <span class="message-time">${dateStr}</span>
             </div>
             ${content ? `<div class="message-content">${content}</div>` : ''}
@@ -1101,7 +1101,7 @@ document.addEventListener('click', async (e) => {
 });
 
 // ==========================================
-// CARTE INTERACTIVE — V2 avec zoom & rôles
+// CARTE INTERACTIVE ? V2 avec zoom & r?les
 // ==========================================
 let mapPoints = [];
 let mapMode = 'view';
@@ -1112,21 +1112,21 @@ let mapTranslateY = 0;
 let mapDragMoved = false;
 let isDragging = false;
 let dragStart = { x: 0, y: 0, tx: 0, ty: 0 };
-let allRoles = []; // Cache des rôles pour la modal
+let allRoles = []; // Cache des r?les pour la modal
 
 const POINT_TYPES = {
-    weed: { icon: '🌿', label: 'Champ Weed', color: '#7CFC00' },
-    'weed-treatment': { icon: '⚗', label: 'Traitement Weed', color: '#9ACD32' },
-    opium: { icon: '🌺', label: 'Champ Opium', color: '#DA70D6' },
-    coke: { icon: '❄', label: 'Champ Coke', color: '#87CEEB' },
-    lab: { icon: '🧪', label: 'Laboratoire', color: '#00CED1' },
-    'weapon-lab': { icon: '🔫', label: 'Laboratoire d\'armes', color: '#FFD700' },
-    hood: { icon: '🏘', label: 'Hood', color: '#FFA500' },
-    danger: { icon: '⚠', label: 'Danger', color: '#FF0000' },
+    weed: { icon: '??', label: 'Champ Weed', color: '#7CFC00' },
+    'weed-treatment': { icon: '?', label: 'Traitement Weed', color: '#9ACD32' },
+    opium: { icon: '??', label: 'Champ Opium', color: '#DA70D6' },
+    coke: { icon: '?', label: 'Champ Coke', color: '#87CEEB' },
+    lab: { icon: '??', label: 'Laboratoire', color: '#00CED1' },
+    'weapon-lab': { icon: '??', label: 'Laboratoire d\'armes', color: '#FFD700' },
+    hood: { icon: '??', label: 'Hood', color: '#FFA500' },
+    danger: { icon: '?', label: 'Danger', color: '#FF0000' },
 };
 
 function getPointTypeIcon(type) {
-    return POINT_TYPES[type]?.icon || '📍';
+    return POINT_TYPES[type]?.icon || '??';
 }
 
 function getPointTypeColor(type) {
@@ -1142,7 +1142,7 @@ function setupMap() {
         btn.addEventListener('click', () => {
             const mode = btn.dataset.mode;
             if ((mode === 'add' || mode === 'delete') && !userPermissions.canEditMap) {
-                toast('❌ Tu n\'as pas les permissions pour modifier la carte', 'error');
+                toast('? Tu n\'as pas les permissions pour modifier la carte', 'error');
                 return;
             }
             setMapMode(mode);
@@ -1153,7 +1153,7 @@ function setupMap() {
     const canvas = document.getElementById('mapCanvas');
     if (!container || !canvas) return;
 
-    // Click sur la carte (mode add) — détection click vs drag
+    // Click sur la carte (mode add) ? d?tection click vs drag
     canvas.addEventListener('click', async (e) => {
         if (mapMode !== 'add') return;
         if (e.target.closest('.map-point')) return;
@@ -1179,9 +1179,9 @@ function setupMap() {
 
     // ====== ZOOM/PAN LOGIC avec transform ======
     // mapTranslateX/Y = position du canvas (en px)
-    // mapZoomLevel = échelle
+    // mapZoomLevel = ?chelle
 
-    // Zoom à la molette — centré sur le curseur
+    // Zoom ? la molette ? centr? sur le curseur
     container.addEventListener('wheel', (e) => {
         e.preventDefault();
 
@@ -1206,7 +1206,7 @@ function setupMap() {
         applyMapTransform();
     }, { passive: false });
 
-    // Drag pour déplacer
+    // Drag pour d?placer
     let isMouseDown = false;
     let dragStartX, dragStartY, startTranslateX, startTranslateY;
 
@@ -1297,7 +1297,7 @@ function applyMapTransform() {
     if (!canvas) return;
     canvas.style.transform = `translate(${mapTranslateX}px, ${mapTranslateY}px) scale(${mapZoomLevel})`;
 
-    // Inverser l'échelle des points pour qu'ils gardent leur taille visible
+    // Inverser l'?chelle des points pour qu'ils gardent leur taille visible
     const layer = document.getElementById('mapPointsLayer');
     if (layer) {
         const points = layer.querySelectorAll('.map-point');
@@ -1350,16 +1350,16 @@ function setMapMode(mode) {
 
     const info = document.getElementById('mapInfo');
     const messages = {
-        view: 'Mode <strong>Voir</strong> — Clique sur un point pour voir les détails • Molette pour zoomer • Drag pour déplacer',
-        add: 'Mode <strong>Ajouter</strong> — Clique sur la carte pour placer un nouveau point',
-        delete: 'Mode <strong>Supprimer</strong> — Clique sur un point pour le supprimer',
+        view: 'Mode <strong>Voir</strong> ? Clique sur un point pour voir les d?tails ? Molette pour zoomer ? Drag pour d?placer',
+        add: 'Mode <strong>Ajouter</strong> ? Clique sur la carte pour placer un nouveau point',
+        delete: 'Mode <strong>Supprimer</strong> ? Clique sur un point pour le supprimer',
     };
     info.innerHTML = `<span class="info-text">${messages[mode]}</span>`;
 }
 
 async function loadMapPoints() {
     try {
-        // Si en mode impersonate (admin), passer le rôle
+        // Si en mode impersonate (admin), passer le r?le
         const impersonateRole = localStorage.getItem('impersonate_role');
         const url = impersonateRole ? `/api/map/points?impersonate=${impersonateRole}` : '/api/map/points';
         const res = await fetch(url);
@@ -1392,8 +1392,8 @@ function updateImpersonateBanner() {
             document.body.prepend(banner);
         }
         banner.innerHTML = `
-            <span>👁 Vous êtes en mode <strong>impersonate</strong> du rôle ${role}</span>
-            <button onclick="exitImpersonate()" class="btn-impersonate-exit">✗ Quitter</button>
+            <span>?? Vous ?tes en mode <strong>impersonate</strong> du r?le ${role}</span>
+            <button onclick="exitImpersonate()" class="btn-impersonate-exit">? Quitter</button>
         `;
         banner.style.display = 'flex';
     } else if (banner) {
@@ -1440,7 +1440,7 @@ function autoFitMap() {
     setTimeout(() => { if (canvas) canvas.classList.remove('smooth-zoom'); }, 200);
 }
 
-// Re-fitter la carte automatiquement quand la fenêtre est redimensionnée
+// Re-fitter la carte automatiquement quand la fen?tre est redimensionn?e
 let mapResizeTimer = null;
 window.addEventListener('resize', () => {
     if (currentTab !== 'map') return;
@@ -1448,7 +1448,7 @@ window.addEventListener('resize', () => {
     mapResizeTimer = setTimeout(() => autoFitMap(), 150);
 });
 
-// Aussi quand on entre/sort du plein écran
+// Aussi quand on entre/sort du plein ?cran
 document.addEventListener('fullscreenchange', () => {
     if (currentTab !== 'map') return;
     setTimeout(() => autoFitMap(), 200);
@@ -1467,10 +1467,10 @@ function renderMapPoints() {
         const pin = document.createElement('div');
         pin.className = 'map-point';
         pin.dataset.type = p.type;
-        // Position en % de l'image (recalculée au render)
+        // Position en % de l'image (recalcul?e au render)
         pin.style.left = p.x + '%';
         pin.style.top = p.y + '%';
-        // Scale inverse pour rester de taille fixe à l'écran
+        // Scale inverse pour rester de taille fixe ? l'?cran
         pin.style.transform = `scale(${1 / mapZoomLevel})`;
 
         pin.innerHTML = `
@@ -1478,7 +1478,7 @@ function renderMapPoints() {
                 <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z"/>
                 <text x="12" y="17" text-anchor="middle" font-size="13" fill="#fff" stroke="none" style="font-family: Arial, sans-serif;">${icon}</text>
             </svg>
-            <div class="map-point-label">${escapeHtml(p.label)} • ${label}</div>
+            <div class="map-point-label">${escapeHtml(p.label)} ? ${label}</div>
         `;
         pin.onclick = (e) => {
             e.stopPropagation();
@@ -1508,7 +1508,7 @@ async function loadRolesForModal() {
     if (!container) return;
 
     if (allRoles.length === 0) {
-        container.innerHTML = '<p class="empty" style="padding:12px;">Aucun rôle disponible</p>';
+        container.innerHTML = '<p class="empty" style="padding:12px;">Aucun r?le disponible</p>';
         return;
     }
 
@@ -1557,13 +1557,13 @@ async function confirmAddPoint() {
             const data = await res.json();
             mapPoints.push(data.point);
             renderMapPoints();
-            toast('📍 Point ajouté');
+            toast('?? Point ajout?');
         } else {
             const err = await res.json();
-            toast(`❌ ${err.error}`, 'error');
+            toast(`? ${err.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 
     closePointModal();
@@ -1586,13 +1586,13 @@ async function deletePoint(id) {
         if (res.ok) {
             mapPoints = mapPoints.filter(p => p.id !== id);
             renderMapPoints();
-            toast('🗑 Point supprimé');
+            toast('?? Point supprim?');
         } else {
             const err = await res.json();
-            toast(`❌ ${err.error}`, 'error');
+            toast(`? ${err.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
@@ -1603,7 +1603,7 @@ function showPointDetails(p) {
     if (p.code && (p.type === 'lab' || p.type === 'weapon-lab')) {
         codeHtml = `
             <div class="point-code-box">
-                <div class="point-code-label">🔐 CODE D'ACCÈS</div>
+                <div class="point-code-label">?? CODE D'ACC?S</div>
                 <div class="point-code-value" onclick="copyCodeToClipboard('${escapeHtml(p.code).replace(/'/g, "\\'")}')">${escapeHtml(p.code)}</div>
                 <div class="point-code-hint">Clique pour copier</div>
             </div>
@@ -1614,18 +1614,18 @@ function showPointDetails(p) {
     document.getElementById('detailsContent').innerHTML = `
         ${codeHtml}
         <div class="detail-row"><span>Type</span><span>${getPointTypeLabel(p.type)}</span></div>
-        <div class="detail-row"><span>Placé par</span><span>${escapeHtml(displayName(p.createdBy))}</span></div>
+        <div class="detail-row"><span>Plac? par</span><span>${escapeHtml(displayName(p.createdBy))}</span></div>
         <div class="detail-row"><span>Date</span><span>${date}</span></div>
-        ${userPermissions.canEditMap ? `<button class="btn-delete-point" onclick="deletePoint('${p.id}'); closeDetailsModal();">🗑 Supprimer ce point</button>` : ''}
+        ${userPermissions.canEditMap ? `<button class="btn-delete-point" onclick="deletePoint('${p.id}'); closeDetailsModal();">?? Supprimer ce point</button>` : ''}
     `;
     document.getElementById('pointDetailsModal').style.display = 'flex';
 }
 
 function copyCodeToClipboard(code) {
     navigator.clipboard.writeText(code).then(() => {
-        toast('📋 Code copié dans le presse-papier');
+        toast('?? Code copi? dans le presse-papier');
     }).catch(() => {
-        toast('❌ Impossible de copier', 'error');
+        toast('? Impossible de copier', 'error');
     });
 }
 
@@ -1633,7 +1633,7 @@ function closeDetailsModal() {
     document.getElementById('pointDetailsModal').style.display = 'none';
 }
 
-// Touche Échap pour fermer les modales
+// Touche ?chap pour fermer les modales
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
         closePointModal();
@@ -1683,7 +1683,7 @@ let serverEmojis = [];
 let allRolesCache = [];
 
 async function loadAnnonceData() {
-    // Charger rôles
+    // Charger r?les
     try {
         const r = await fetch('/api/roles');
         const data = await r.json();
@@ -1701,7 +1701,7 @@ async function loadAnnonceData() {
         serverEmojis = data.emojis || [];
     } catch {}
 
-    // Initialiser les compteurs de caractères
+    // Initialiser les compteurs de caract?res
     setupCharCounters();
 
     // Setup search dans les dropdowns
@@ -1770,8 +1770,8 @@ function closeAllDropdowns() {
 }
 
 // Helper : toggle un dropdown intelligemment
-// Si le menu était ouvert → ferme tout (y compris lui)
-// Sinon → ferme tout puis ouvre celui-là
+// Si le menu ?tait ouvert ? ferme tout (y compris lui)
+// Sinon ? ferme tout puis ouvre celui-l?
 function smartToggleDropdown(menuId, beforeOpen) {
     const menu = document.getElementById(menuId);
     if (!menu) return false;
@@ -1786,7 +1786,7 @@ function smartToggleDropdown(menuId, beforeOpen) {
 }
 window.smartToggleDropdown = smartToggleDropdown;
 
-// Click extérieur ferme tous les dropdowns
+// Click ext?rieur ferme tous les dropdowns
 document.addEventListener('click', (e) => {
     if (!e.target.closest('.custom-dropdown')) {
         closeAllDropdowns();
@@ -1842,11 +1842,11 @@ window.switchCommTab = switchCommTab;
 let emojiPickerCategory = 'server'; // 'server' ou 'discord'
 
 const DISCORD_EMOJIS = {
-    'Visages': ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '😕', '😟', '🙁', '☹️', '😮', '😯', '😲', '😳', '🥺', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖'],
-    'Gestes': ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🦷', '🦴', '👀', '👁️', '👅', '👄', '💋'],
-    'Cœurs & Symboles': ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴', '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', '🉐', '㊙️', '㊗️'],
-    'Objets': ['💎', '💍', '🔫', '🔪', '⚔️', '🛡️', '🚬', '⚰️', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🦠', '🧫', '🧪', '🌡️', '🧹', '🪒', '🧽', '🧴', '🛎️', '🔑', '🗝️', '🚪', '🪑', '🛋️', '🛏️', '🛌', '🧸', '🖼️', '🛍️', '🛒', '🎁', '🎈', '🎏', '🎀', '🎊', '🎉', '🎎', '🏮', '🎐', '✉️', '📩', '📨', '📧', '💌', '📥', '📤', '📦', '🏷️', '📪', '📫', '📬', '📭', '📮', '📯', '📜', '📃', '📄', '📑', '🧾', '📊', '📈', '📉', '🗒️', '🗓️', '📆', '📅', '🗑️', '📇', '🗃️', '🗳️', '🗄️', '📋', '📁', '📂', '🗂️', '🗞️', '📰', '📓', '📔', '📒', '📕', '📗', '📘', '📙', '📚', '📖', '🔖', '🧷', '🔗', '📎', '🖇️', '📐', '📏', '🧮', '📌', '📍', '✂️', '🖊️', '🖋️', '✒️', '🖌️', '🖍️', '📝', '✏️', '🔍', '🔎', '🔏', '🔐', '🔒', '🔓'],
-    'Drapeaux & Statut': ['🚩', '🏁', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '✅', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗', '❓', '❕', '❔', '‼️', '⁉️', '🔅', '🔆', '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✳️', '❇️', '🔵', '🟣', '🟢', '🟡', '🟠', '🔴', '⚫', '⚪', '🟤'],
+    'Visages': ['??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??'],
+    'Gestes': ['??', '??', '???', '?', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '?', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '???', '??', '??', '??'],
+    'C?urs & Symboles': ['??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '???', '??', '??', '??', '??', '??', '??', '??', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '?', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '???', '??', '??', '??', '??', '??', '??'],
+    'Objets': ['??', '??', '??', '??', '??', '???', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '???', '??', '??', '??', '??', '??', '??', '??', '??', '??', '???', '??', '??', '??', '??', '???', '??', '???', '??', '??', '???', '???', '??', '??', '???', '???', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '???', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '???', '???', '??', '??', '???', '??', '???', '???', '???', '??', '??', '??', '???', '???', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '???', '??', '??', '??', '??', '??', '??', '???', '???', '??', '???', '???', '??', '??', '??', '??', '??', '??', '??', '??'],
+    'Drapeaux & Statut': ['??', '??', '??', '???', '??????', '??????', '?????', '?', '?', '?', '??', '?', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '?', '?', '?', '?', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '??', '?', '?', '??'],
 };
 
 function toggleEmojiPicker(targetId) {
@@ -1872,8 +1872,8 @@ function renderEmojiPicker() {
 
     const tabsHTML = `
         <div class="emoji-picker-tabs">
-            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'server' ? 'active' : ''}" onclick="switchEmojiCategory('server')">🎨 Serveur</button>
-            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'discord' ? 'active' : ''}" onclick="switchEmojiCategory('discord')">😀 Discord</button>
+            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'server' ? 'active' : ''}" onclick="switchEmojiCategory('server')">?? Serveur</button>
+            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'discord' ? 'active' : ''}" onclick="switchEmojiCategory('discord')">?? Discord</button>
         </div>
     `;
 
@@ -1890,7 +1890,7 @@ function renderEmojiPicker() {
             `).join('') + `</div>`;
         }
     } else {
-        // Emojis Discord par catégorie
+        // Emojis Discord par cat?gorie
         contentHTML = '<div class="emoji-picker-content">';
         for (const [catName, emojis] of Object.entries(DISCORD_EMOJIS)) {
             contentHTML += `<div class="emoji-category-title">${catName}</div>`;
@@ -1917,7 +1917,7 @@ function insertEmoji(code) {
     textarea.value = value.substring(0, start) + code + value.substring(end);
     textarea.focus();
     textarea.setSelectionRange(start + code.length, start + code.length);
-    // Trigger input event pour mettre à jour le compteur
+    // Trigger input event pour mettre ? jour le compteur
     textarea.dispatchEvent(new Event('input'));
 }
 
@@ -1925,9 +1925,9 @@ async function sendAnnonce() {
     const roleId = document.getElementById('annonceRole').value;
     const message = document.getElementById('annonceMessage').value;
 
-    if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
-    if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
-    if (!await confirmAction({ title: 'Envoyer l’annonce', message: 'Envoyer cette annonce sur Discord ?', confirmText: 'Envoyer' })) return;
+    if (!roleId) { toast('? Choisis un r?le', 'error'); return; }
+    if (!message.trim()) { toast('? Tape un message', 'error'); return; }
+    if (!await confirmAction({ title: 'Envoyer l?annonce', message: 'Envoyer cette annonce sur Discord ?', confirmText: 'Envoyer' })) return;
 
     try {
         const res = await fetch('/api/command', {
@@ -1937,18 +1937,18 @@ async function sendAnnonce() {
         });
         const data = await res.json();
         if (res.ok) {
-            toast('📤 Annonce envoyée');
+            toast('?? Annonce envoy?e');
             const ta = document.getElementById('annonceMessage');
             ta.value = '';
             ta.dispatchEvent(new Event('input'));
             document.getElementById('annonceRole').value = '';
             const label = document.getElementById('annonceRoleLabel');
-            if (label) { label.innerHTML = '— Choisir un rôle —'; label.style.color = ''; }
+            if (label) { label.innerHTML = '? Choisir un r?le ?'; label.style.color = ''; }
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
@@ -1956,8 +1956,8 @@ async function sendRappel() {
     const roleId = document.getElementById('rappelRole').value;
     const message = document.getElementById('rappelMessage').value;
 
-    if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
-    if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
+    if (!roleId) { toast('? Choisis un r?le', 'error'); return; }
+    if (!message.trim()) { toast('? Tape un message', 'error'); return; }
     if (!await confirmAction({ title: 'Envoyer le rappel', message: 'Envoyer ce rappel sur Discord ?', confirmText: 'Envoyer' })) return;
 
     try {
@@ -1968,18 +1968,18 @@ async function sendRappel() {
         });
         const data = await res.json();
         if (res.ok) {
-            toast('📌 Rappel envoyé');
+            toast('?? Rappel envoy?');
             const ta = document.getElementById('rappelMessage');
             ta.value = '';
             ta.dispatchEvent(new Event('input'));
             document.getElementById('rappelRole').value = '';
             const label = document.getElementById('rappelRoleLabel');
-            if (label) { label.innerHTML = '— Choisir un rôle —'; label.style.color = ''; }
+            if (label) { label.innerHTML = '? Choisir un r?le ?'; label.style.color = ''; }
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
@@ -1987,9 +1987,9 @@ async function sendSanction() {
     const userId = document.getElementById('sanctionUser').value.trim();
     const raison = document.getElementById('sanctionRaison').value;
 
-    if (!userId) { toast('❌ Sélectionne un utilisateur', 'error'); return; }
-    if (!raison.trim()) { toast('❌ Indique une raison', 'error'); return; }
-    if (!await confirmAction({ title: 'Envoyer l’avertissement', message: 'Envoyer cet avertissement sur Discord ?', confirmText: 'Envoyer', danger: true })) return;
+    if (!userId) { toast('? S?lectionne un utilisateur', 'error'); return; }
+    if (!raison.trim()) { toast('? Indique une raison', 'error'); return; }
+    if (!await confirmAction({ title: 'Envoyer l?avertissement', message: 'Envoyer cet avertissement sur Discord ?', confirmText: 'Envoyer', danger: true })) return;
 
     try {
         const res = await fetch('/api/command', {
@@ -1999,23 +1999,23 @@ async function sendSanction() {
         });
         const data = await res.json();
         if (res.ok) {
-            toast('⚠️ Sanction envoyée');
+            toast('?? Sanction envoy?e');
             // Reset dropdown custom
             document.getElementById('sanctionUser').value = '';
             document.getElementById('sanctionUserPreview').style.display = 'none';
             const label = document.getElementById('sanctionDropdownLabel');
             if (label) {
                 label.classList.add('custom-dropdown-placeholder');
-                label.innerHTML = '— Sélectionne un membre —';
+                label.innerHTML = '? S?lectionne un membre ?';
             }
             const ta = document.getElementById('sanctionRaison');
             ta.value = '';
             ta.dispatchEvent(new Event('input'));
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
@@ -2045,11 +2045,11 @@ function setupMessageInput() {
         input.style.height = Math.min(input.scrollHeight, 150) + 'px';
         document.getElementById('charCount').textContent = `${input.value.length}/2000`;
 
-        // Détecter si on est en train de taper une mention
+        // D?tecter si on est en train de taper une mention
         handleMentionInput();
     });
 
-    // Envoi avec Entrée (sans Maj)
+    // Envoi avec Entr?e (sans Maj)
     input.addEventListener('keydown', (e) => {
         // Si dropdown mention ouverte
         if (mentionDropdownActive) {
@@ -2102,14 +2102,14 @@ async function handleMentionInput() {
         return;
     }
 
-    // Vérifier qu'il n'y a pas d'espace entre @ et le curseur
+    // V?rifier qu'il n'y a pas d'espace entre @ et le curseur
     const afterAt = beforeCursor.substring(lastAtIndex + 1);
     if (afterAt.includes(' ') || afterAt.includes('\n')) {
         closeMentionDropdown();
         return;
     }
 
-    // Vérifier qu'il y a un espace ou début de ligne avant @
+    // V?rifier qu'il y a un espace ou d?but de ligne avant @
     if (lastAtIndex > 0) {
         const charBefore = beforeCursor[lastAtIndex - 1];
         if (charBefore !== ' ' && charBefore !== '\n') {
@@ -2165,7 +2165,7 @@ function selectMention(member) {
     const before = value.substring(0, mentionStartIndex);
     const after = value.substring(input.selectionStart);
 
-    // Insérer la mention au format Discord <@id>
+    // Ins?rer la mention au format Discord <@id>
     input.value = before + `<@${member.id}> ` + after;
     input.focus();
     const newCursorPos = before.length + `<@${member.id}> `.length;
@@ -2259,20 +2259,20 @@ async function sendChannelMessage() {
             input.value = '';
             input.style.height = 'auto';
             document.getElementById('charCount').textContent = '0/2000';
-            // Rafraîchir les messages
+            // Rafra?chir les messages
             setTimeout(() => loadMessages(currentChannelId), 500);
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Envoyer ↗';
+        btn.textContent = 'Envoyer ?';
     }
 }
 
-// Charger les emojis serveur au boot pour le picker (réutilise serverEmojis)
+// Charger les emojis serveur au boot pour le picker (r?utilise serverEmojis)
 async function ensureServerEmojisLoaded() {
     if (serverEmojis.length === 0) {
         try {
@@ -2421,18 +2421,19 @@ let craftCatalogFiltersReady = false;
 
 async function initCraftsTab() {
     setupCraftCatalogFilters();
-    // Afficher tout de suite un état d'attente cohérent
+    // Afficher tout de suite un ?tat d'attente coh?rent
     renderCraftCatalog();
     renderCraftRequestsList();
     renderCraftBoard();
     renderCraftHistory();
 
-    // Charger les données en arrière-plan
+    // Charger les donn?es en arri?re-plan
     try {
         await Promise.all([
             loadWeaponsCatalog(),
             loadOrganizations(),
             loadCraftRequests(),
+            loadAllMembers(),
         ]);
     } catch (e) {
         console.error('Init crafts:', e);
@@ -2440,7 +2441,7 @@ async function initCraftsTab() {
 
     craftsLoaded = true;
 
-    // Re-render avec les vraies données
+    // Re-render avec les vraies donn?es
     renderCraftCatalog();
     renderCraftRequestsList();
     renderCraftBoard();
@@ -2629,7 +2630,7 @@ function openCraftWeaponDetails(id) {
                         <span>${escapeHtml(ing.name || '?')}</span>
                     </div>
                 `;
-            }).join('') : '<p class="empty">Aucun composant renseigné</p>'}
+            }).join('') : '<p class="empty">Aucun composant renseign?</p>'}
         </div>
     `;
     modal.style.display = 'flex';
@@ -2699,7 +2700,7 @@ async function submitCraftRequest() {
     const hasPlan = document.getElementById('craftHasPlan').checked;
     const hasMoney = document.getElementById('craftHasMoney').checked;
 
-    if (!weaponId) { toast('❌ Choisis une arme', 'error'); return; }
+    if (!weaponId) { toast('? Choisis une arme', 'error'); return; }
 
     try {
         const res = await fetch('/api/crafts/requests', {
@@ -2709,7 +2710,7 @@ async function submitCraftRequest() {
         });
         const data = await res.json();
         if (res.ok) {
-            toast('✅ Demande soumise');
+            toast('? Demande soumise');
             // Reset form
             document.getElementById('craftWeaponId').value = '';
             document.getElementById('craftHasPlan').checked = false;
@@ -2717,16 +2718,16 @@ async function submitCraftRequest() {
             const label = document.getElementById('craftWeaponLabel');
             if (label) {
                 label.classList.add('custom-dropdown-placeholder');
-                label.innerHTML = '— Choisir une arme —';
+                label.innerHTML = '? Choisir une arme ?';
             }
             await loadCraftRequests();
             renderCraftRequestsList();
             renderCraftBoard();
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
@@ -2777,7 +2778,7 @@ function renderCraftRequestsList() {
     const hasFullAccess = canValidateCraftClient();
     const myUserId = u.id;
 
-    // Hauts gradés voient tout, les autres voient uniquement leurs propres demandes
+    // Hauts grad?s voient tout, les autres voient uniquement leurs propres demandes
     const allRequests = getVisibleCraftRequests();
     const total = allRequests.length;
     const pageSize = craftRequestsListState.pageSize;
@@ -2802,37 +2803,37 @@ function renderCraftRequestsList() {
         const rejectedClass = r.status === 'rejected' ? ' craft-request-rejected' : '';
         const weaponImageUrl = safeImageUrl(r.weapon_image_url);
 
-        // Hauts gradés : peuvent changer statut + supprimer
-        // User normal : peut juste annuler/supprimer SA demande tant que pas craftée
+        // Hauts grad?s : peuvent changer statut + supprimer
+        // User normal : peut juste annuler/supprimer SA demande tant que pas craft?e
         let statusActions = '';
         if (canChangeStatus) {
             statusActions = `
                 <div class="craft-status-actions">
-                    ${r.status !== 'waiting_materials' && r.status !== 'crafted' ? `<button class="btn-status-materials" onclick="updateRequestStatus(${r.id}, 'waiting_materials')">📦 Matières</button>` : ''}
-                    ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
-                    ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
-                    ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
-                    ${isSuperAdmin ? `<button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">🗑</button>` : ''}
+                    ${r.status !== 'waiting_materials' && r.status !== 'crafted' ? `<button class="btn-status-materials" onclick="updateRequestStatus(${r.id}, 'waiting_materials')">?? Mati?res</button>` : ''}
+                    ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">? En cours</button>` : ''}
+                    ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">? Refuser</button>` : ''}
+                    ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">? En attente</button>` : ''}
+                    ${isSuperAdmin ? `<button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">??</button>` : ''}
                 </div>
             `;
         } else if (isMine && r.status !== 'crafted' && r.status !== 'completed') {
             statusActions = `
                 <div class="craft-status-actions">
-                    <button class="btn-status-delete" onclick="cancelMyCraftRequest(${r.id})">🗑 Annuler ma demande</button>
+                    <button class="btn-status-delete" onclick="cancelMyCraftRequest(${r.id})">?? Annuler ma demande</button>
                 </div>
             `;
         }
 
         return `
             <div class="craft-request-item${rejectedClass}">
-                ${weaponImageUrl ? `<img class="craft-request-image" src="${weaponImageUrl}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+                ${weaponImageUrl ? `<img class="craft-request-image" src="${weaponImageUrl}" alt="">` : '<span class="craft-weapon-placeholder">??</span>'}
                 <div class="craft-request-body">
                     <div class="craft-request-name">${escapeHtml(r.weapon_name)}</div>
                     <div class="craft-request-meta">
-                        <span>👤 ${escapeHtml(r.user_name)}</span>
-                        <span>📅 ${date}</span>
-                        ${r.has_plan ? '<span class="craft-tag">📋 Plan</span>' : ''}
-                        ${r.has_money ? '<span class="craft-tag">💰 Argent</span>' : ''}
+                        <span>?? ${escapeHtml(r.user_name)}</span>
+                        <span>?? ${date}</span>
+                        ${r.has_plan ? '<span class="craft-tag">?? Plan</span>' : ''}
+                        ${r.has_money ? '<span class="craft-tag">?? Argent</span>' : ''}
                     </div>
                     ${statusActions}
                 </div>
@@ -2848,12 +2849,12 @@ async function cancelMyCraftRequest(id) {
         const res = await fetch(`/api/crafts/requests/${id}/cancel`, { method: 'DELETE' });
         const data = await res.json();
         if (res.ok) {
-            toast('🗑 Demande annulée');
+            toast('?? Demande annul?e');
             await loadCraftRequests();
             renderCraftRequestsList();
             renderCraftBoard();
-        } else { toast(`❌ ${data.error}`, 'error'); }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+        } else { toast(`? ${data.error}`, 'error'); }
+    } catch (e) { toast(`? ${e.message}`, 'error'); }
 }
 window.cancelMyCraftRequest = cancelMyCraftRequest;
 
@@ -2879,9 +2880,9 @@ function canDeleteMyWeaponsClient() {
 
 async function updateRequestStatus(requestId, status) {
     const labels = {
-        waiting_materials: 'En attente des matières premières',
+        waiting_materials: 'En attente des mati?res premi?res',
         in_progress: 'En cours',
-        rejected: 'Refusé',
+        rejected: 'Refus?',
         pending: 'En attente'
     };
     if (!await confirmAction({ title: 'Changer le statut', message: `Passer cette demande en "${labels[status]}" ?`, confirmText: 'Changer le statut', danger: status === 'rejected' })) return;
@@ -2893,31 +2894,31 @@ async function updateRequestStatus(requestId, status) {
         });
         const data = await res.json();
         if (res.ok) {
-            toast(`✅ Statut → ${labels[status]}`);
+            toast(`? Statut ? ${labels[status]}`);
             await loadCraftRequests();
             renderCraftRequestsList();
             renderCraftBoard();
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    } catch (e) { toast(`? ${e.message}`, 'error'); }
 }
 
 async function deleteCraftRequest(requestId) {
-    if (!await confirmAction({ title: 'Supprimer la demande', message: 'Supprimer définitivement cette demande ?', confirmText: 'Supprimer', danger: true })) return;
+    if (!await confirmAction({ title: 'Supprimer la demande', message: 'Supprimer d?finitivement cette demande ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}`, { method: 'DELETE' });
         const data = await res.json();
         if (res.ok) {
-            toast('🗑 Supprimée');
+            toast('?? Supprim?e');
             await loadCraftRequests();
             renderCraftRequestsList();
             renderCraftBoard();
             renderCraftHistory();
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    } catch (e) { toast(`? ${e.message}`, 'error'); }
 }
 
 window.updateRequestStatus = updateRequestStatus;
@@ -2925,12 +2926,12 @@ window.deleteCraftRequest = deleteCraftRequest;
 window.changeCraftRequestsPage = changeCraftRequestsPage;
 
 function getCraftStatusBadge(r) {
-    if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">✓ Finalisé</span>';
-    if (r.status === 'rejected') return '<span class="craft-status-badge craft-status-rejected">✗ Refusé</span>';
-    if (r.crafted) return '<span class="craft-status-badge craft-status-crafted">⚒ Crafté</span>';
-    if (r.status === 'waiting_materials') return '<span class="craft-status-badge craft-status-materials">📦 En attente des matières premières</span>';
-    if (r.status === 'in_progress') return '<span class="craft-status-badge craft-status-progress">⏳ En cours</span>';
-    return '<span class="craft-status-badge craft-status-pending">📋 En attente</span>';
+    if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">? Finalis?</span>';
+    if (r.status === 'rejected') return '<span class="craft-status-badge craft-status-rejected">? Refus?</span>';
+    if (r.crafted) return '<span class="craft-status-badge craft-status-crafted">? Craft?</span>';
+    if (r.status === 'waiting_materials') return '<span class="craft-status-badge craft-status-materials">?? En attente des mati?res premi?res</span>';
+    if (r.status === 'in_progress') return '<span class="craft-status-badge craft-status-progress">? En cours</span>';
+    return '<span class="craft-status-badge craft-status-pending">?? En attente</span>';
 }
 
 function getCraftBoardActiveRequests() {
@@ -3010,7 +3011,7 @@ function renderCraftBoard() {
 
     // Filtrer : exclure rejected et completed
 
-    // Hauts gradés voient toutes les demandes, les autres seulement les leurs
+    // Hauts grad?s voient toutes les demandes, les autres seulement les leurs
 
     // Compter les "En cours" pour le bandeau de notification
     const inProgressCount = active.filter(r => r.status === 'in_progress').length;
@@ -3024,7 +3025,7 @@ function renderCraftBoard() {
             wrapper.parentNode.insertBefore(banner, wrapper);
         }
         if (banner) {
-            banner.innerHTML = `⏳ <strong>${inProgressCount}</strong> demande${inProgressCount > 1 ? 's' : ''} actuellement <strong>en cours de craft</strong>`;
+            banner.innerHTML = `? <strong>${inProgressCount}</strong> demande${inProgressCount > 1 ? 's' : ''} actuellement <strong>en cours de craft</strong>`;
             banner.style.display = 'flex';
         }
     } else if (banner) {
@@ -3043,7 +3044,7 @@ function renderCraftBoard() {
         if (r) {
             lines.push(renderCraftBoardLine(start + i + 1, r));
         } else {
-            lines.push(`<tr class="craft-board-empty"><td>${i + 1}</td><td colspan="8"><em>— Emplacement libre —</em></td></tr>`);
+            lines.push(`<tr class="craft-board-empty"><td>${i + 1}</td><td colspan="8"><em>? Emplacement libre ?</em></td></tr>`);
         }
     }
 
@@ -3052,7 +3053,7 @@ function renderCraftBoard() {
     // Charger les organisations dans les selects
     document.querySelectorAll('.craft-org-select').forEach(select => {
         const currentValue = select.dataset.currentValue || select.value || '';
-        select.innerHTML = '<option value="">— Choisir —</option>' +
+        select.innerHTML = '<option value="">? Choisir ?</option>' +
             organizationsCache.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('') +
             '<option value="__add__">+ Ajouter une organisation</option>';
         select.value = currentValue;
@@ -3060,10 +3061,10 @@ function renderCraftBoard() {
 }
 
 function renderCraftBoardLine(num, r) {
-    const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : '—';
-    const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : '—';
+    const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : '?';
+    const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : '?';
     const isMine = r.user_id === window.currentUserId;
-    const canEditCraft = isAdminUser; // Hauts gradés peuvent cocher crafté + remplir N°série
+    const canEditCraft = isAdminUser; // Hauts grad?s peuvent cocher craft? + remplir N?s?rie
     const canEditSale = isMine || isAdminUser;
     const completed = r.status === 'completed';
 
@@ -3072,7 +3073,7 @@ function renderCraftBoardLine(num, r) {
             <td>${num}</td>
             <td>
                 <div class="craft-board-request">
-                    ${safeImageUrl(r.weapon_image_url) ? `<img class="craft-board-img" src="${safeImageUrl(r.weapon_image_url)}" alt="">` : '🔫'}
+                    ${safeImageUrl(r.weapon_image_url) ? `<img class="craft-board-img" src="${safeImageUrl(r.weapon_image_url)}" alt="">` : '??'}
                     <div>
                         <strong>${escapeHtml(r.weapon_name)}</strong>
                         <small>par ${escapeHtml(r.user_name)}</small>
@@ -3083,11 +3084,11 @@ function renderCraftBoardLine(num, r) {
                 <input type="checkbox" class="craft-checkbox-crafted" ${r.crafted ? 'checked' : ''} ${canEditCraft ? '' : 'disabled'} onchange="toggleCraftCrafted(${r.id}, this.checked)">
             </td>
             <td>
-                <input type="text" class="craft-input-serial" placeholder="N°Série" value="${r.serial_number || ''}" ${canEditCraft ? '' : 'disabled'} onblur="updateCraftSerial(${r.id}, this.value)">
+                <input type="text" class="craft-input-serial" placeholder="N?S?rie" value="${r.serial_number || ''}" ${canEditCraft ? '' : 'disabled'} onblur="updateCraftSerial(${r.id}, this.value)">
             </td>
             <td>
                 <select class="craft-org-select" data-current-value="${escapeHtml(r.buyer_org || '')}" ${canEditSale && r.crafted ? '' : 'disabled'} onchange="handleOrgChange(${r.id}, this)">
-                    <option value="${escapeHtml(r.buyer_org || '')}">${escapeHtml(r.buyer_org || '— Choisir —')}</option>
+                    <option value="${escapeHtml(r.buyer_org || '')}">${escapeHtml(r.buyer_org || '? Choisir ?')}</option>
                 </select>
             </td>
             <td>
@@ -3096,7 +3097,7 @@ function renderCraftBoardLine(num, r) {
             <td>${craftDate}</td>
             <td>${saleDate}</td>
             <td>
-                ${canEditSale && r.crafted && !completed ? `<button class="btn-craft-validate" onclick="validateCraftSale(${r.id})">✓ Valider</button>` : ''}
+                ${canEditSale && r.crafted && !completed ? `<button class="btn-craft-validate" onclick="validateCraftSale(${r.id})">? Valider</button>` : ''}
             </td>
         </tr>
     `;
@@ -3104,9 +3105,9 @@ function renderCraftBoardLine(num, r) {
 
 async function toggleCraftCrafted(requestId, crafted) {
     if (crafted) {
-        const serial = prompt('N° de série de l\'arme craftée :');
+        const serial = prompt('N? de s?rie de l\'arme craft?e :');
         if (!serial) {
-            // Annule si pas de N°série
+            // Annule si pas de N?s?rie
             const checkbox = document.querySelector(`tr[data-request-id="${requestId}"] .craft-checkbox-crafted`);
             if (checkbox) checkbox.checked = false;
             return;
@@ -3131,14 +3132,14 @@ async function updateCraftRequestCraft(requestId, crafted, serial) {
         });
         const data = await res.json();
         if (res.ok) {
-            toast(crafted ? '⚒ Craft validé, demandeur ping' : '↩ Annulé');
+            toast(crafted ? '? Craft valid?, demandeur ping' : '? Annul?');
             await loadCraftRequests();
             renderCraftBoard();
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
@@ -3155,7 +3156,7 @@ function handleOrgChange(requestId, select) {
         }
         return;
     }
-    // Stocker temporairement, sera envoyé à la validation
+    // Stocker temporairement, sera envoy? ? la validation
     select.dataset.value = value;
 }
 
@@ -3168,15 +3169,15 @@ async function addOrganization(name) {
         });
         if (res.ok) {
             await loadOrganizations();
-            toast('✅ Organisation ajoutée');
+            toast('? Organisation ajout?e');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
 function updateCraftSalePrice(requestId, value) {
-    // Stocké en local, sera envoyé à la validation finale
+    // Stock? en local, sera envoy? ? la validation finale
     const tr = document.querySelector(`tr[data-request-id="${requestId}"]`);
     if (tr) tr.dataset.salePrice = value;
 }
@@ -3191,10 +3192,10 @@ async function validateCraftSale(requestId) {
     const buyerOrg = select.value;
     const salePrice = priceInput.value;
 
-    if (!buyerOrg || buyerOrg === '__add__') { toast('❌ Choisis une organisation', 'error'); return; }
-    if (!salePrice) { toast('❌ Entre un prix de vente', 'error'); return; }
+    if (!buyerOrg || buyerOrg === '__add__') { toast('? Choisis une organisation', 'error'); return; }
+    if (!salePrice) { toast('? Entre un prix de vente', 'error'); return; }
 
-    if (!await confirmAction({ title: 'Valider la vente', message: 'Valider cette vente ? Un récap sera posté dans le salon.', confirmText: 'Valider la vente' })) return;
+    if (!await confirmAction({ title: 'Valider la vente', message: 'Valider cette vente ? Un r?cap sera post? dans le salon.', confirmText: 'Valider la vente' })) return;
 
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}/sale`, {
@@ -3208,15 +3209,15 @@ async function validateCraftSale(requestId) {
         });
         const data = await res.json();
         if (res.ok) {
-            toast('✅ Vente validée, récap posté');
+            toast('? Vente valid?e, r?cap post?');
             await loadCraftRequests();
             renderCraftBoard();
             renderCraftHistory();
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 
@@ -3229,7 +3230,7 @@ function renderCraftHistory() {
     const isSuperAdmin = canDeleteRequestsClient();
 
     if (completed.length === 0) {
-        list.innerHTML = '<p class="empty">Aucun craft finalisé</p>';
+        list.innerHTML = '<p class="empty">Aucun craft finalis?</p>';
         return;
     }
 
@@ -3237,21 +3238,21 @@ function renderCraftHistory() {
         const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
         const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
         const deleteBtn = isSuperAdmin
-            ? `<button class="btn-history-delete" onclick="deleteHistoryEntry(${r.id})" title="Supprimer">🗑</button>`
+            ? `<button class="btn-history-delete" onclick="deleteHistoryEntry(${r.id})" title="Supprimer">??</button>`
             : '';
         return `
             <div class="craft-history-item">
-                ${safeImageUrl(r.weapon_image_url) ? `<img class="craft-history-image" src="${safeImageUrl(r.weapon_image_url)}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
+                ${safeImageUrl(r.weapon_image_url) ? `<img class="craft-history-image" src="${safeImageUrl(r.weapon_image_url)}" alt="">` : '<span class="craft-weapon-placeholder">??</span>'}
                 <div class="craft-history-body">
                     <div class="craft-history-name">${escapeHtml(r.weapon_name)} <span class="craft-history-serial">[${r.serial_number || 'N/A'}]</span></div>
                     <div class="craft-history-meta">
-                        <span>👤 ${escapeHtml(r.user_name)}</span>
-                        <span>🏢 ${escapeHtml(r.buyer_org || 'N/A')}</span>
-                        <span>💰 ${(r.sale_price || 0).toLocaleString('fr-FR')}$</span>
+                        <span>?? ${escapeHtml(r.user_name)}</span>
+                        <span>?? ${escapeHtml(r.buyer_org || 'N/A')}</span>
+                        <span>?? ${(r.sale_price || 0).toLocaleString('fr-FR')}$</span>
                     </div>
                     <div class="craft-history-dates">
-                        <span>⚒ Craft : ${craftDate}</span>
-                        <span>📅 Vente : ${saleDate}</span>
+                        <span>? Craft : ${craftDate}</span>
+                        <span>?? Vente : ${saleDate}</span>
                     </div>
                 </div>
                 ${deleteBtn}
@@ -3263,21 +3264,30 @@ function renderCraftHistory() {
 function renderManualCraftForm() {
     const weaponSelect = document.getElementById('manualCraftWeapon');
     const buyerSelect = document.getElementById('manualCraftBuyer');
+    const craftedBySelect = document.getElementById('manualCraftCraftedBy');
+    const soldBySelect = document.getElementById('manualCraftSoldBy');
     const craftDate = document.getElementById('manualCraftDate');
     const saleDate = document.getElementById('manualCraftSaleDate');
     if (!weaponSelect) return;
 
     const previousWeapon = weaponSelect.value;
     const previousBuyer = buyerSelect?.value || '';
+    const previousCraftedBy = craftedBySelect?.value || '';
+    const previousSoldBy = soldBySelect?.value || '';
 
     const labelMap = {
-        manualCraftWeapon: "Modèle de l'arme *",
-        manualCraftSerial: 'N° série *',
+        manualCraftWeapon: "Mod?le de l'arme *",
+        manualCraftSerial: 'N? s?rie *',
         manualCraftDate: 'Date craft *',
         manualCraftSold: 'Statut vente',
-        manualCraftBuyer: 'Vendu à qui',
+        manualCraftBuyer: 'Vendu ? qui',
         manualCraftSaleDate: 'Date de vente *',
         manualCraftSalePrice: 'Prix vente ($)',
+        manualCraftWeapon: "Mod?le de l'arme *",
+        manualCraftSerial: 'N? s?rie *',
+        manualCraftCraftedBy: 'Qui a craft *',
+        manualCraftBuyer: 'Vendu ? qui',
+        manualCraftSoldBy: 'Qui a vendu *',
     };
     Object.entries(labelMap).forEach(([id, text]) => {
         const field = document.getElementById(id)?.closest('.comm-field');
@@ -3297,6 +3307,20 @@ function renderManualCraftForm() {
         weaponSelect.value = previousWeapon;
     }
 
+    if (craftedBySelect) {
+        const crafterOptions = '<option value="">-- Choisir --</option>' +
+            myWeaponsAuthorizedCrafters.map(c => (
+                `<option value="${escapeHtml(c.id)}" data-name="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`
+            )).join('');
+        if (craftedBySelect.dataset.optionsHtml !== crafterOptions) {
+            craftedBySelect.innerHTML = crafterOptions;
+            craftedBySelect.dataset.optionsHtml = crafterOptions;
+        }
+        if (previousCraftedBy && [...craftedBySelect.options].some(o => o.value === previousCraftedBy)) {
+            craftedBySelect.value = previousCraftedBy;
+        }
+    }
+
     if (buyerSelect) {
         const buyerOptions = '<option value="">-- Choisir une organisation --</option>' +
             organizationsCache.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('');
@@ -3306,6 +3330,21 @@ function renderManualCraftForm() {
         }
         if (previousBuyer && [...buyerSelect.options].some(o => o.value === previousBuyer)) {
             buyerSelect.value = previousBuyer;
+        }
+    }
+
+    if (soldBySelect) {
+        const memberOptions = '<option value="">-- Choisir un vendeur --</option>' +
+            (allMembersCache || []).map(m => (
+                `<option value="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`
+            )).join('') +
+            '<option value="former-21bs" data-name="Membre ne fait plus partie des 21BS">Membre ne fait plus partie des 21BS</option>';
+        if (soldBySelect.dataset.optionsHtml !== memberOptions) {
+            soldBySelect.innerHTML = memberOptions;
+            soldBySelect.dataset.optionsHtml = memberOptions;
+        }
+        if (previousSoldBy && [...soldBySelect.options].some(o => o.value === previousSoldBy)) {
+            soldBySelect.value = previousSoldBy;
         }
     }
 
@@ -3347,15 +3386,23 @@ async function submitManualCraft() {
     const sale_date = document.getElementById('manualCraftSaleDate')?.value;
     const free_sale = document.getElementById('manualCraftFreeSale')?.checked || false;
     const sale_price = free_sale ? '0' : document.getElementById('manualCraftSalePrice')?.value;
+    const craftedBySelect = document.getElementById('manualCraftCraftedBy');
+    const soldBySelect = document.getElementById('manualCraftSoldBy');
+    const crafted_by_id = craftedBySelect?.value || '';
+    const crafted_by_name = craftedBySelect?.options?.[craftedBySelect.selectedIndex]?.dataset?.name || '';
+    const sold_by_id = soldBySelect?.value || '';
+    const sold_by_name = soldBySelect?.options?.[soldBySelect.selectedIndex]?.dataset?.name || '';
 
-    if (!weapon_id) { toast('Choisis un modèle d’arme', 'error'); return; }
-    if (!serial_number) { toast('N° série obligatoire', 'error'); return; }
+    if (!weapon_id) { toast('Choisis un mod?le d?arme', 'error'); return; }
+    if (!serial_number) { toast('N? s?rie obligatoire', 'error'); return; }
     if (!craft_date) { toast('Date craft obligatoire', 'error'); return; }
-    if (is_sold && !buyer_org) { toast('Choisis l’organisation acheteuse', 'error'); return; }
+    if (!crafted_by_id) { toast('Choisis qui a craft? l?arme', 'error'); return; }
+    if (is_sold && !buyer_org) { toast('Choisis l?organisation acheteuse', 'error'); return; }
     if (is_sold && !sale_date) { toast('Date de vente obligatoire', 'error'); return; }
+    if (is_sold && !sold_by_id) { toast('Choisis qui a vendu l?arme', 'error'); return; }
 
     const message = is_sold
-        ? 'Ajouter cette arme directement dans l’historique comme vendue ?'
+        ? 'Ajouter cette arme directement dans l?historique comme vendue ?'
         : 'Ajouter cette arme au suivi et dans Vos Armes comme non vendue ?';
     if (!await confirmAction({ title: 'Ajouter un craft manuel', message, confirmText: 'Ajouter' })) return;
 
@@ -3363,42 +3410,57 @@ async function submitManualCraft() {
         const res = await fetch('/api/crafts/requests/manual', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ weapon_id, serial_number, craft_date, is_sold, buyer_org, sale_date, sale_price, free_sale })
+            body: JSON.stringify({
+                weapon_id,
+                serial_number,
+                craft_date,
+                crafted_by_id,
+                crafted_by_name,
+                is_sold,
+                buyer_org,
+                sale_date,
+                sold_by_id,
+                sold_by_name,
+                sale_price,
+                free_sale,
+            })
         });
         const data = await res.json();
         if (!res.ok) {
-            toast(`❌ ${data.error || 'Erreur ajout manuel'}`, 'error');
+            toast(`? ${data.error || 'Erreur ajout manuel'}`, 'error');
             return;
         }
 
-        toast(is_sold ? '✅ Craft manuel ajouté à l’historique' : '✅ Craft manuel ajouté dans Vos Armes');
+        toast(is_sold ? '? Craft manuel ajout? ? l?historique' : '? Craft manuel ajout? dans Vos Armes');
         document.getElementById('manualCraftSerial').value = '';
         document.getElementById('manualCraftSalePrice').value = '';
         document.getElementById('manualCraftSaleDate').value = '';
         document.getElementById('manualCraftFreeSale').checked = false;
         document.getElementById('manualCraftSold').value = '0';
+        const manualSoldBy = document.getElementById('manualCraftSoldBy');
+        if (manualSoldBy) manualSoldBy.value = '';
         toggleManualCraftSaleFields();
         await Promise.all([loadCraftRequests(), loadMyWeapons?.()]);
         renderCraftHistory();
         renderCraftBoard();
     } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
+        toast(`? ${e.message}`, 'error');
     }
 }
 async function deleteHistoryEntry(id) {
-    if (!await confirmAction({ title: 'Supprimer l’historique', message: 'Supprimer définitivement cette entrée de l’historique ? Le craft restera tracé dans Discord mais sera retiré du dashboard.', confirmText: 'Supprimer', danger: true })) return;
+    if (!await confirmAction({ title: 'Supprimer l?historique', message: 'Supprimer d?finitivement cette entr?e de l?historique ? Le craft restera trac? dans Discord mais sera retir? du dashboard.', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/requests/${id}`, { method: 'DELETE' });
         const data = await res.json();
         if (res.ok) {
-            toast('🗑 Entrée supprimée');
+            toast('?? Entr?e supprim?e');
             await loadCraftRequests();
             renderCraftHistory();
             renderCraftBoard();
         } else {
-            toast(`❌ ${data.error}`, 'error');
+            toast(`? ${data.error}`, 'error');
         }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    } catch (e) { toast(`? ${e.message}`, 'error'); }
 }
 window.deleteHistoryEntry = deleteHistoryEntry;
 
@@ -3447,9 +3509,9 @@ window.toggleEmbedMode = toggleEmbedMode;
             const useEmbed = document.getElementById('annonceUseEmbed')?.checked;
             const roleId = document.getElementById('annonceRole').value;
             const message = document.getElementById('annonceMessage').value;
-            if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
-            if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
-            if (!await confirmAction({ title: 'Envoyer l’annonce', message: 'Envoyer cette annonce sur Discord ?', confirmText: 'Envoyer' })) return;
+            if (!roleId) { toast('? Choisis un r?le', 'error'); return; }
+            if (!message.trim()) { toast('? Tape un message', 'error'); return; }
+            if (!await confirmAction({ title: 'Envoyer l?annonce', message: 'Envoyer cette annonce sur Discord ?', confirmText: 'Envoyer' })) return;
 
             try {
                 const res = await fetch('/api/command', {
@@ -3459,17 +3521,17 @@ window.toggleEmbedMode = toggleEmbedMode;
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    toast('📤 Annonce envoyée');
+                    toast('?? Annonce envoy?e');
                     const ta = document.getElementById('annonceMessage');
                     ta.value = '';
                     ta.dispatchEvent(new Event('input'));
                     document.getElementById('annonceRole').value = '';
                     const label = document.getElementById('annonceRoleLabel');
-                    if (label) { label.innerHTML = '— Choisir un rôle —'; label.style.color = ''; }
+                    if (label) { label.innerHTML = '? Choisir un r?le ?'; label.style.color = ''; }
                 } else {
-                    toast(`❌ ${data.error}`, 'error');
+                    toast(`? ${data.error}`, 'error');
                 }
-            } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+            } catch (e) { toast(`? ${e.message}`, 'error'); }
         };
     }
 })();
@@ -3480,8 +3542,8 @@ window.toggleEmbedMode = toggleEmbedMode;
             const useEmbed = document.getElementById('rappelUseEmbed')?.checked;
             const roleId = document.getElementById('rappelRole').value;
             const message = document.getElementById('rappelMessage').value;
-            if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
-            if (!message.trim()) { toast('❌ Tape un message', 'error'); return; }
+            if (!roleId) { toast('? Choisis un r?le', 'error'); return; }
+            if (!message.trim()) { toast('? Tape un message', 'error'); return; }
             if (!await confirmAction({ title: 'Envoyer le rappel', message: 'Envoyer ce rappel sur Discord ?', confirmText: 'Envoyer' })) return;
             try {
                 const res = await fetch('/api/command', {
@@ -3491,15 +3553,15 @@ window.toggleEmbedMode = toggleEmbedMode;
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    toast('📌 Rappel envoyé');
+                    toast('?? Rappel envoy?');
                     const ta = document.getElementById('rappelMessage');
                     ta.value = '';
                     ta.dispatchEvent(new Event('input'));
                     document.getElementById('rappelRole').value = '';
                     const label = document.getElementById('rappelRoleLabel');
-                    if (label) { label.innerHTML = '— Choisir un rôle —'; label.style.color = ''; }
-                } else { toast(`❌ ${data.error}`, 'error'); }
-            } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+                    if (label) { label.innerHTML = '? Choisir un r?le ?'; label.style.color = ''; }
+                } else { toast(`? ${data.error}`, 'error'); }
+            } catch (e) { toast(`? ${e.message}`, 'error'); }
         };
     }
 })();
@@ -3554,7 +3616,7 @@ function setupAdminSlide() {
         handle.style.left = currentX + 'px';
         if (currentX >= trackWidth * 0.85) {
             isDragging = false;
-            handle.innerHTML = '✓';
+            handle.innerHTML = '?';
             handle.style.background = 'linear-gradient(135deg, #4ade80, #16a34a)';
             setTimeout(() => { window.location.href = '/admin'; }, 300);
         }
@@ -3635,10 +3697,10 @@ function populateMyWeaponNameSelect() {
     if (!select) return;
     const previousValue = select.value;
     if (!myWeaponNamesCache.length) {
-        select.innerHTML = '<option value="">Aucune arme configurée</option>';
+        select.innerHTML = '<option value="">Aucune arme configur?e</option>';
         return;
     }
-    select.innerHTML = '<option value="">— Choisir une arme —</option>' +
+    select.innerHTML = '<option value="">? Choisir une arme ?</option>' +
         myWeaponNamesCache
             .map(w => `<option value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`)
             .join('');
@@ -3663,19 +3725,19 @@ function toggleMwCrafted() {
         serial.required = crafted;
         serial.placeholder = crafted ? 'Ex: ABC123XYZ\nDEF456UVW\nGHI789RST' : 'Optionnel pour une arme externe';
     }
-    if (serialLabel) serialLabel.textContent = crafted ? 'N° de série *' : 'N° de série (optionnel)';
+    if (serialLabel) serialLabel.textContent = crafted ? 'N? de s?rie *' : 'N? de s?rie (optionnel)';
 }
 
 function populateMyWeaponsMemberSelects() {
     const members = allMembersCache || [];
     const currentId = window.currentUser?.id || window.currentUserId || '';
-    const options = '<option value="">— Choisir un membre —</option>' + members.map(m => (
+    const options = '<option value="">? Choisir un membre ?</option>' + members.map(m => (
         `<option value="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`
     )).join('');
 
     const craftedBySelect = document.getElementById('mwCraftedBy');
     if (craftedBySelect) {
-        craftedBySelect.innerHTML = '<option value="">— Choisir un armurier —</option>' + myWeaponsAuthorizedCrafters.map(c => (
+        craftedBySelect.innerHTML = '<option value="">? Choisir un armurier ?</option>' + myWeaponsAuthorizedCrafters.map(c => (
             `<option value="${escapeHtml(c.id)}" data-name="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`
         )).join('');
     }
@@ -3706,10 +3768,10 @@ async function submitMyWeapon() {
     const min_price = document.getElementById('mwMinPrice').value;
     const craftedBy = getSelectedMember('mwCraftedBy');
 
-    if (!weapon_name) { toast('❌ Nom de l\'arme requis', 'error'); return; }
-    if (!origin) { toast('❌ Origine de l\'arme requise', 'error'); return; }
-    if (is_crafted && !craftedBy.id) { toast('❌ Choisis qui a crafté l\'arme', 'error'); return; }
-    if (is_crafted && !serial_numbers.length) { toast('❌ N° de série obligatoire pour une arme 21BS', 'error'); return; }
+    if (!weapon_name) { toast('? Nom de l\'arme requis', 'error'); return; }
+    if (!origin) { toast('? Origine de l\'arme requise', 'error'); return; }
+    if (is_crafted && !craftedBy.id) { toast('? Choisis qui a craft? l\'arme', 'error'); return; }
+    if (is_crafted && !serial_numbers.length) { toast('? N? de s?rie obligatoire pour une arme 21BS', 'error'); return; }
 
     try {
         const res = await fetch('/api/crafts/myweapons', {
@@ -3727,7 +3789,7 @@ async function submitMyWeapon() {
         });
         const data = await res.json();
         if (res.ok) {
-            toast(`✅ ${data.quantity || serial_numbers.length || 1} arme(s) mise(s) en vente — 1 annonce Discord`);
+            toast(`? ${data.quantity || serial_numbers.length || 1} arme(s) mise(s) en vente ? 1 annonce Discord`);
             document.getElementById('mwName').value = '';
             document.getElementById('mwSerial').value = '';
             document.getElementById('mwAskingPrice').value = '';
@@ -3737,8 +3799,8 @@ async function submitMyWeapon() {
             toggleMwCrafted();
             await loadMyWeapons();
             renderMyWeapons();
-        } else { toast(`❌ ${data.error}`, 'error'); }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+        } else { toast(`? ${data.error}`, 'error'); }
+    } catch (e) { toast(`? ${e.message}`, 'error'); }
 }
 
 function renderMyWeapons() {
@@ -3761,30 +3823,30 @@ function renderMyWeapons() {
         const serials = Array.isArray(w.serials) ? w.serials : [];
         const isSold = availableQty <= 0;
         const serialPreview = serials.length
-            ? serials.slice(0, 6).map(s => `${s.is_sold ? 'Vendu' : 'Dispo'}: ${escapeHtml(s.serial_number || 'Non renseigne')}${s.sold_by_name ? ` par ${escapeHtml(s.sold_by_name)}` : ''}`).join(' • ')
+            ? serials.slice(0, 6).map(s => `${s.is_sold ? 'Vendu' : 'Dispo'}: ${escapeHtml(s.serial_number || 'Non renseigne')}${s.sold_by_name ? ` par ${escapeHtml(s.sold_by_name)}` : ''}`).join(' ? ')
             : (w.serial_number ? escapeHtml(w.serial_number) : '');
         const moreSerials = serials.length > 6 ? ` +${serials.length - 6}` : '';
         const craftedByLine = w.is_crafted && w.crafted_by_name
-            ? `<span>⚒ ${escapeHtml(w.crafted_by_name)}</span>`
+            ? `<span>? ${escapeHtml(w.crafted_by_name)}</span>`
             : '';
 
         const priceBlock = isSold
-            ? `<span class="mw-sold-price">✅ Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '→ ' + escapeHtml(w.sold_to) : ''}</span>`
+            ? `<span class="mw-sold-price">? Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '? ' + escapeHtml(w.sold_to) : ''}</span>`
             : `
-                <span class="mw-asking-price">💰 Souhaité : ${(w.asking_price || 0).toLocaleString('fr-FR')}$</span>
-                ${w.min_price ? `<span class="mw-min-price">📉 Min : ${w.min_price.toLocaleString('fr-FR')}$</span>` : ''}
+                <span class="mw-asking-price">?? Souhait? : ${(w.asking_price || 0).toLocaleString('fr-FR')}$</span>
+                ${w.min_price ? `<span class="mw-min-price">?? Min : ${w.min_price.toLocaleString('fr-FR')}$</span>` : ''}
             `;
 
         const canDeleteWeapon = isMine || canDeleteMyWeaponsClient();
         let actions = isMine && !isSold ? `
             <div class="mw-actions">
-                <button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>
-                <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>
+                <button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">? Marquer vendu</button>
+                <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">??</button>
             </div>
-        ` : (isMine && isSold ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>` : '');
+        ` : (isMine && isSold ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">??</button>` : '');
 
         if (!isMine && canDeleteWeapon) {
-            actions = `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>`;
+            actions = `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">??</button>`;
         }
 
         return `
@@ -3793,16 +3855,16 @@ function renderMyWeapons() {
                 <div class="myweapons-item-body">
                     <div class="myweapons-item-name">
                         ${escapeHtml(w.weapon_name)}
-                        ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
+                        ${w.is_crafted ? '<span class="myweapons-tag-crafted">? Craft 21BS</span>' : ''}
                         <span class="myweapons-tag-stock">${availableQty}/${totalQty}</span>
                         ${isSold ? '<span class="myweapons-tag-sold">VENDU</span>' : ''}
                     </div>
                     <div class="myweapons-item-meta">
-                        <span class="mw-username">👤 ${escapeHtml(w.user_name)}</span>
+                        <span class="mw-username">?? ${escapeHtml(w.user_name)}</span>
                         ${craftedByLine}
-                        ${serialPreview ? `<span>N°: ${serialPreview}${moreSerials}</span>` : ''}
+                        ${serialPreview ? `<span>N?: ${serialPreview}${moreSerials}</span>` : ''}
                         ${priceBlock}
-                        <span>📅 ${date}</span>
+                        <span>?? ${date}</span>
                     </div>
                 </div>
                 ${actions}
@@ -3811,7 +3873,7 @@ function renderMyWeapons() {
     }).join('');
 }
 
-// ─── Modal "Marquer comme vendu" ───
+// ??? Modal "Marquer comme vendu" ???
 function openMarkSoldModal(id) {
     const item = myWeaponsCache.find(w => Number(w.id) === Number(id));
     const availableSerials = item && Array.isArray(item.serials)
@@ -3821,12 +3883,12 @@ function openMarkSoldModal(id) {
     soldIdInput.value = availableSerials[0]?.id || id;
     document.getElementById('markSoldPrice').value = '';
     const label = document.getElementById('markSoldBuyerLabel');
-    if (label) { label.classList.add('custom-dropdown-placeholder'); label.innerHTML = '— Choisir —'; }
+    if (label) { label.classList.add('custom-dropdown-placeholder'); label.innerHTML = '? Choisir ?'; }
     document.getElementById('markSoldBuyer').value = '';
     const serialField = document.getElementById('markSoldSerialField');
     const serialSelect = document.getElementById('markSoldSerial');
     if (serialSelect && serialField) {
-        serialSelect.innerHTML = availableSerials.map(s => `<option value="${s.id}">${escapeHtml(s.serial_number || 'Arme sans N° série')}</option>`).join('');
+        serialSelect.innerHTML = availableSerials.map(s => `<option value="${s.id}">${escapeHtml(s.serial_number || 'Arme sans N? s?rie')}</option>`).join('');
         serialField.style.display = availableSerials.length > 1 ? 'block' : 'none';
         serialSelect.onchange = () => { soldIdInput.value = serialSelect.value; };
     }
@@ -3847,7 +3909,7 @@ function renderMarkSoldBuyerDropdown() {
     if (!list) return;
     list.innerHTML = (organizationsCache || []).map(o => `
         <div class="custom-dropdown-item" data-name="${escapeHtml(o.name).toLowerCase()}" onclick="selectMarkSoldBuyer('${escapeJsArg(o.name)}')">
-            <span class="custom-dropdown-item-label">🏢 ${escapeHtml(o.name)}</span>
+            <span class="custom-dropdown-item-label">?? ${escapeHtml(o.name)}</span>
         </div>
     `).join('');
     const search = document.getElementById('markSoldBuyerSearch');
@@ -3878,7 +3940,7 @@ function selectMarkSoldBuyer(name) {
     const label = document.getElementById('markSoldBuyerLabel');
     if (label) {
         label.classList.remove('custom-dropdown-placeholder');
-        label.innerHTML = `🏢 ${escapeHtml(name)}`;
+        label.innerHTML = `?? ${escapeHtml(name)}`;
     }
     document.getElementById('markSoldBuyerMenu').style.display = 'none';
 }
@@ -3889,8 +3951,8 @@ async function confirmMarkSold(e) {
     const sold_to = document.getElementById('markSoldBuyer').value;
     const sold_price = document.getElementById('markSoldPrice').value;
     const soldBy = getSelectedMember('markSoldBy');
-    if (!sold_price) { toast('❌ Prix de vente requis', 'error'); return; }
-    if (!soldBy.id) { toast('❌ Choisis qui a vendu l\'arme', 'error'); return; }
+    if (!sold_price) { toast('? Prix de vente requis', 'error'); return; }
+    if (!soldBy.id) { toast('? Choisis qui a vendu l\'arme', 'error'); return; }
 
     try {
         const res = await fetch(`/api/crafts/myweapons/${id}/sold`, {
@@ -3901,31 +3963,31 @@ async function confirmMarkSold(e) {
         const data = await res.json();
         if (res.ok) {
             if (data.auto_completed_craft) {
-                toast('✅ Vente confirmée — Tableau de craft auto-rempli !');
+                toast('? Vente confirm?e ? Tableau de craft auto-rempli !');
             } else {
-                toast('✅ Vente confirmée');
+                toast('? Vente confirm?e');
             }
             closeMarkSoldModal();
             await loadMyWeapons();
             renderMyWeapons();
-            // Recharger aussi les crafts en cache pour cohérence
+            // Recharger aussi les crafts en cache pour coh?rence
             if (typeof loadCraftRequests === 'function') {
                 await loadCraftRequests();
             }
-        } else { toast(`❌ ${data.error}`, 'error'); }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+        } else { toast(`? ${data.error}`, 'error'); }
+    } catch (e) { toast(`? ${e.message}`, 'error'); }
 }
 
 async function deleteMyWeapon(id) {
-    if (!await confirmAction({ title: 'Supprimer l’annonce', message: 'Supprimer cette annonce de vente ?', confirmText: 'Supprimer', danger: true })) return;
+    if (!await confirmAction({ title: 'Supprimer l?annonce', message: 'Supprimer cette annonce de vente ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/myweapons/${id}`, { method: 'DELETE' });
         if (res.ok) {
-            toast('🗑 Supprimée');
+            toast('?? Supprim?e');
             await loadMyWeapons();
             renderMyWeapons();
         }
-    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    } catch (e) { toast(`? ${e.message}`, 'error'); }
 }
 
 window.toggleMwCrafted = toggleMwCrafted;
