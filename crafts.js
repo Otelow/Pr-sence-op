@@ -86,6 +86,8 @@ const STOCK_MATERIAL_NAMES = [
     'Tungstène',
 ];
 
+const CRAFT_PRODUCTION_STATUSES = ['waiting_materials', 'in_progress', 'crafted'];
+
 function normalizeStockName(value) {
     return String(value || '')
         .replace(/Ã¨/g, 'e')
@@ -719,13 +721,12 @@ function deleteOrg(id) {
 }
 
 function getRequests(status, options = {}) {
-    const productionStatuses = ['in_progress', 'crafted'];
     if (useSQLite) {
         let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
         const params = [];
         if (options.productionOnly) {
-            query += ` WHERE r.status IN (${productionStatuses.map(() => '?').join(',')})`;
-            params.push(...productionStatuses);
+            query += ` WHERE r.status IN (${CRAFT_PRODUCTION_STATUSES.map(() => '?').join(',')})`;
+            params.push(...CRAFT_PRODUCTION_STATUSES);
         } else if (status && status !== 'all') {
             query += ' WHERE r.status = ?';
             params.push(status);
@@ -734,7 +735,7 @@ function getRequests(status, options = {}) {
         return db.prepare(query).all(...params);
     }
     let arr = jsonData.craft_requests;
-    if (options.productionOnly) arr = arr.filter(r => productionStatuses.includes(r.status));
+    if (options.productionOnly) arr = arr.filter(r => CRAFT_PRODUCTION_STATUSES.includes(r.status));
     else if (status && status !== 'all') arr = arr.filter(r => r.status === status);
     return [...arr].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => {
         const w = jsonData.weapons.find(w => w.id === r.weapon_id);

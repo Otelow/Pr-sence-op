@@ -2417,6 +2417,7 @@ let craftRequestsListState = {
     page: 1,
     pageSize: 10,
 };
+const CRAFT_BOARD_ACTIVE_STATUSES = ['waiting_materials', 'in_progress', 'crafted'];
 const MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
 
 function compareWeaponsBySalePrice(a, b) {
@@ -3071,7 +3072,7 @@ function getCraftStatusBadge(r) {
 function getCraftBoardActiveRequests() {
     const u = window.currentUser || {};
     const hasFullAccess = canValidateCraftClient();
-    let active = craftRequestsCache.filter(r => ['in_progress', 'crafted'].includes(r.status));
+    let active = craftRequestsCache.filter(r => CRAFT_BOARD_ACTIVE_STATUSES.includes(r.status));
     if (!hasFullAccess) active = active.filter(r => r.user_id === u.id);
     return active;
 }
@@ -3144,12 +3145,12 @@ function renderCraftBoard() {
     const end = Math.min(start + pageSize, total);
     const pageItems = active.slice(start, end);
 
-    // Vue production : uniquement les demandes acceptées/en cours ou déjà craftées.
+    // Vue production : matières attendues, en cours ou déjà craftées.
 
     // Hauts gradés voient toutes les demandes, les autres seulement les leurs
 
     // Compter les "En cours" pour le bandeau de notification
-    const inProgressCount = active.filter(r => r.status === 'in_progress').length;
+    const inProgressCount = active.filter(r => r.status === 'in_progress' || r.status === 'waiting_materials').length;
     const wrapper = document.querySelector('#craftSection-board .craft-board-wrapper');
     let banner = document.getElementById('craftBoardInProgressBanner');
     if (inProgressCount > 0) {
