@@ -2384,11 +2384,13 @@ window.selectSanctionUserCustom = selectSanctionUserCustom;
 // ============================================================
 let craftsLoaded = false;
 let weaponsCache = [];
+let stockMaterialsCache = [];
 let organizationsCache = [];
 let craftRequestsCache = [];
 let isAdminUser = false;
 let craftCatalogFilters = {
     search: '',
+    stock: 'all',
 };
 let craftBoardState = {
     page: 1,
@@ -2451,17 +2453,21 @@ async function initCraftsTab() {
 
 async function loadWeaponsCatalog() {
     try {
-        const r = await fetch('/api/crafts/weapons');
-        if (!r.ok) {
-            console.error('Weapons fetch failed:', r.status);
-            weaponsCache = [];
-            return;
-        }
+        const r = await fetch('/api/crafts/stocks');
+        if (!r.ok) throw new Error(`Stocks fetch failed: ${r.status}`);
         const d = await r.json();
         weaponsCache = d.weapons || [];
+        stockMaterialsCache = d.stocks || [];
     } catch (e) {
         console.error('Weapons catalog:', e);
-        weaponsCache = [];
+        stockMaterialsCache = [];
+        try {
+            const fallback = await fetch('/api/crafts/weapons');
+            const data = await fallback.json();
+            weaponsCache = data.weapons || [];
+        } catch {
+            weaponsCache = [];
+        }
     }
 }
 
@@ -2500,19 +2506,66 @@ function switchCraftSubtab(subtab) {
 function setupCraftCatalogFilters() {
     if (craftCatalogFiltersReady) return;
     const search = document.getElementById('craftCatalogSearch');
-    if (!search) return;
+    const stockFilter = document.getElementById('craftCatalogStockFilter');
+    if (!search && !stockFilter) return;
 
     craftCatalogFiltersReady = true;
     search?.addEventListener('input', e => {
         craftCatalogFilters.search = e.target.value.trim().toLowerCase();
         renderCraftCatalog();
     });
+    stockFilter?.addEventListener('change', e => {
+        craftCatalogFilters.stock = e.target.value || 'all';
+        renderCraftCatalog();
+    });
+}
+
+function getStockLevelClass(quantity) {
+    const value = Number(quantity) || 0;
+    if (value <= 0) return 'danger';
+    if (value <= 5) return 'warning';
+    return 'ok';
+}
+
+function renderCraftStockState() {
+    const panels = [document.getElementById('craftStockPanel'), document.getElementById('craftBoardStockPanel')].filter(Boolean);
+    if (!panels.length) return;
+    if (!stockMaterialsCache.length) {
+        panels.forEach(panel => { panel.innerHTML = ''; });
+        return;
+    }
+
+    const html = `
+        <div class="craft-stock-header">
+            <div>
+                <h4>État des stocks</h4>
+                <p>Matières premières disponibles pour la production.</p>
+            </div>
+        </div>
+        <div class="craft-stock-grid">
+            ${stockMaterialsCache.map(stock => {
+                const level = getStockLevelClass(stock.quantity);
+                const imageUrl = safeImageUrl(stock.image_url);
+                return `
+                    <div class="craft-stock-card stock-${level}">
+                        ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}">` : '<span class="craft-stock-placeholder">Stock</span>'}
+                        <div>
+                            <strong>${escapeHtml(stock.name)}</strong>
+                            <span>${Number(stock.quantity) || 0}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+    panels.forEach(panel => { panel.innerHTML = html; });
 }
 
 function renderCraftCatalog() {
     const grid = document.getElementById('craftsCatalogGrid');
     const count = document.getElementById('craftCatalogCount');
     if (!grid) return;
+    renderCraftStockState();
 
     if (weaponsCache.length === 0) {
         if (count) count.textContent = '';
@@ -2532,6 +2585,12 @@ function renderCraftCatalog() {
         return haystack.includes(q);
     });
 
+    if (craftCatalogFilters.stock === 'craftable') {
+        items = items.filter(w => w.craftable);
+    } else if (craftCatalogFilters.stock === 'blocked') {
+        items = items.filter(w => w.craftable === false);
+    }
+
     items = [...items].sort(compareWeaponsBySalePrice);
 
     if (count) count.textContent = `${items.length} / ${weaponsCache.length} armes`;
@@ -2544,10 +2603,15 @@ function renderCraftCatalog() {
     grid.innerHTML = items.map(w => {
         const ingredientsHTML = (w.ingredients || []).map(ing => {
             const ingImageUrl = safeImageUrl(ing.image_url);
+            const required = Number(ing.required ?? ing.amount ?? 0) || 0;
+            const tracked = ing.tracked === true;
+            const available = tracked ? Number(ing.available) || 0 : null;
+            const stockText = tracked ? `<div class="craft-ingredient-stock ${ing.sufficient ? 'ok' : 'missing'}">${available} / ${required}</div>` : '';
             return `
             <div class="craft-ingredient">
                 ${ingImageUrl ? `<img src="${ingImageUrl}" alt="${escapeHtml(ing.name)}" class="craft-ingredient-img">` : '<div class="craft-ingredient-placeholder">Ingredient</div>'}
-                <div class="craft-ingredient-amount">${ing.amount || 0}</div>
+                <div class="craft-ingredient-amount">${required}</div>
+                ${stockText}
                 <div class="craft-ingredient-name">${escapeHtml(ing.name || '?')}</div>
             </div>
         `;
@@ -2557,6 +2621,9 @@ function renderCraftCatalog() {
         const timeStr = w.craft_time > 0 ? formatCraftTime(w.craft_time) : 'N/A';
         const priceStr = w.craft_price > 0 ? w.craft_price.toLocaleString('fr-FR') + '$' : 'Gratuit';
         const saleStr = w.sale_price > 0 ? `<span class="craft-weapon-saleprice">Vente : ${w.sale_price.toLocaleString('fr-FR')}$</span>` : '';
+        const stockBadge = w.craftable === false
+            ? '<span class="craft-stock-badge blocked">Stock insuffisant</span>'
+            : '<span class="craft-stock-badge ok">Craftable</span>';
 
         return `
             <button type="button" class="craft-weapon-card craft-weapon-card-button" onclick="openCraftWeaponDetails(${w.id})">
@@ -2564,7 +2631,10 @@ function renderCraftCatalog() {
                     ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(w.name)}">` : '<span class="craft-weapon-placeholder">Arme</span>'}
                 </div>
                 <div class="craft-weapon-body">
-                    <div class="craft-weapon-name">${escapeHtml(w.name)}</div>
+                    <div class="craft-weapon-title-row">
+                        <div class="craft-weapon-name">${escapeHtml(w.name)}</div>
+                        ${stockBadge}
+                    </div>
                     <div class="craft-weapon-meta">
                         <span class="craft-weapon-time">&#9201; ${timeStr}</span>
                         <span class="craft-weapon-price">Craft : ${priceStr}</span>
@@ -2623,11 +2693,16 @@ function openCraftWeaponDetails(id) {
         <div class="craft-detail-ingredients">
             ${ingredients.length ? ingredients.map(ing => {
                 const ingImageUrl = safeImageUrl(ing.image_url);
+                const required = Number(ing.required ?? ing.amount ?? 0) || 0;
+                const stockLine = ing.tracked
+                    ? `<small class="${ing.sufficient ? 'stock-ok' : 'stock-missing'}">Stock : ${Number(ing.available) || 0} / ${required}</small>`
+                    : '';
                 return `
                     <div class="craft-detail-ingredient">
                         ${ingImageUrl ? `<img src="${ingImageUrl}" alt="${escapeHtml(ing.name)}">` : '<div class="craft-ingredient-placeholder">Ingredient</div>'}
-                        <strong>${ing.amount || 0}</strong>
+                        <strong>${required}</strong>
                         <span>${escapeHtml(ing.name || '?')}</span>
+                        ${stockLine}
                     </div>
                 `;
             }).join('') : '<p class="empty">Aucun composant renseigné</p>'}
@@ -2998,6 +3073,7 @@ function changeCraftBoardPage(delta) {
 
 function renderCraftBoard() {
     const tbody = document.getElementById('craftBoardBody');
+    renderCraftStockState();
     if (!tbody) return;
 
     const active = sortCraftBoardRequests(getCraftBoardActiveRequests());

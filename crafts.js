@@ -35,6 +35,7 @@ try {
 
 let jsonData = {
     weapons: [],
+    stock_materials: [],
     my_weapon_names: [],
     organizations: [],
     craft_requests: [],
@@ -46,6 +47,7 @@ function loadJSON() {
         if (fs.existsSync(FALLBACK_PATH)) {
             jsonData = JSON.parse(fs.readFileSync(FALLBACK_PATH, 'utf8'));
             jsonData.weapons = jsonData.weapons || [];
+            jsonData.stock_materials = jsonData.stock_materials || [];
             jsonData.my_weapon_names = jsonData.my_weapon_names || [];
             jsonData.organizations = jsonData.organizations || [];
             jsonData.craft_requests = jsonData.craft_requests || [];
@@ -67,6 +69,46 @@ function saveJSON() {
 function nextId(type) {
     jsonData.counters[type] = (jsonData.counters[type] || 0) + 1;
     return jsonData.counters[type];
+}
+
+const STOCK_MATERIAL_NAMES = [
+    'Titane',
+    'Tungstène',
+    'Chrome',
+    'Bloc de titane',
+    'Bloc de tungstène',
+    'Bloc de chrome',
+];
+
+function normalizeStockName(value) {
+    return String(value || '')
+        .replace(/Ã¨/g, 'e')
+        .replace(/Ã©/g, 'e')
+        .replace(/Ãª/g, 'e')
+        .replace(/Ã«/g, 'e')
+        .replace(/Ã /g, 'a')
+        .replace(/Ã¢/g, 'a')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+}
+
+function isStockMaterialName(name) {
+    const normalized = normalizeStockName(name);
+    return STOCK_MATERIAL_NAMES.some(material => normalizeStockName(material) === normalized);
+}
+
+function parseWeaponIngredients(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
 }
 
 function initDB() {
@@ -92,6 +134,13 @@ function initDB() {
                     name TEXT NOT NULL UNIQUE,
                     image_path TEXT,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
+                );
+                CREATE TABLE IF NOT EXISTS stock_materials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ingredient_id INTEGER NOT NULL UNIQUE,
+                    quantity INTEGER NOT NULL DEFAULT 0,
+                    updated_at INTEGER DEFAULT (strftime('%s','now')),
+                    FOREIGN KEY (ingredient_id) REFERENCES ingredients(id) ON DELETE CASCADE
                 );
                 CREATE TABLE IF NOT EXISTS my_weapon_names (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,6 +197,7 @@ function initDB() {
                 CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
                 CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
                 CREATE INDEX IF NOT EXISTS idx_myweapons_user ON my_weapons(user_id);
+                CREATE INDEX IF NOT EXISTS idx_stock_materials_ingredient ON stock_materials(ingredient_id);
             `);
 
             // Migrations
@@ -173,6 +223,7 @@ function initDB() {
             for (const ing of defaultIngredients) {
                 try { db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)').run(ing); } catch {}
             }
+            seedStockMaterials();
             seedMyWeaponNamesFromWeapons();
 
             console.log('💾 DB Crafts initialisée (SQLite)');
@@ -181,12 +232,14 @@ function initDB() {
             useSQLite = false;
             loadJSON();
             seedDefaultIngredientsJSON();
+            seedStockMaterials();
             seedMyWeaponNamesFromWeapons();
             console.log('💾 DB Crafts initialisée (JSON fallback)');
         }
     } else {
         loadJSON();
         seedDefaultIngredientsJSON();
+        seedStockMaterials();
         seedMyWeaponNamesFromWeapons();
         console.log('💾 DB Crafts initialisée (JSON)');
     }
@@ -204,6 +257,56 @@ function seedDefaultIngredientsJSON() {
                 name,
                 image_path: null,
                 created_at: Math.floor(Date.now() / 1000),
+            });
+        }
+    }
+    saveJSON();
+}
+
+function seedStockMaterials() {
+    if (useSQLite) {
+        const insertIngredient = db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)');
+        const insertStock = db.prepare('INSERT OR IGNORE INTO stock_materials (ingredient_id, quantity) VALUES (?, 0)');
+
+        for (const name of STOCK_MATERIAL_NAMES) {
+            const existing = db.prepare('SELECT * FROM ingredients').all()
+                .find(item => normalizeStockName(item.name) === normalizeStockName(name));
+            if (existing && existing.name !== name) {
+                try { db.prepare('UPDATE ingredients SET name = ? WHERE id = ?').run(name, existing.id); } catch {}
+            } else if (!existing) {
+                insertIngredient.run(name);
+            }
+        }
+        for (const ingredient of db.prepare('SELECT * FROM ingredients').all()) {
+            if (isStockMaterialName(ingredient.name)) insertStock.run(ingredient.id);
+        }
+        return;
+    }
+
+    if (!jsonData.ingredients) jsonData.ingredients = [];
+    if (!jsonData.stock_materials) jsonData.stock_materials = [];
+    if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
+
+    for (const name of STOCK_MATERIAL_NAMES) {
+        let ingredient = jsonData.ingredients.find(item => normalizeStockName(item.name) === normalizeStockName(name));
+        if (!ingredient) {
+            jsonData.counters.ingredients++;
+            ingredient = {
+                id: jsonData.counters.ingredients,
+                name,
+                image_path: null,
+                created_at: Math.floor(Date.now() / 1000),
+            };
+            jsonData.ingredients.push(ingredient);
+        } else if (ingredient.name !== name) {
+            ingredient.name = name;
+        }
+        if (!jsonData.stock_materials.some(row => Number(row.ingredient_id) === Number(ingredient.id))) {
+            jsonData.stock_materials.push({
+                id: jsonData.stock_materials.length + 1,
+                ingredient_id: ingredient.id,
+                quantity: 0,
+                updated_at: Math.floor(Date.now() / 1000),
             });
         }
     }
@@ -333,6 +436,138 @@ function deleteIngredient(id) {
     if (useSQLite) { db.prepare('DELETE FROM ingredients WHERE id = ?').run(id); return; }
     jsonData.ingredients = (jsonData.ingredients || []).filter(i => i.id !== id);
     saveJSON();
+}
+
+function toCraftImageUrl(imagePath) {
+    return imagePath ? `/crafts/images/${imagePath}` : null;
+}
+
+function getStockMaterials() {
+    seedStockMaterials();
+
+    if (useSQLite) {
+        const rows = db.prepare(`
+            SELECT sm.id, sm.ingredient_id, sm.quantity, sm.updated_at, i.name, i.image_path
+            FROM stock_materials sm
+            JOIN ingredients i ON i.id = sm.ingredient_id
+            ORDER BY i.name ASC
+        `).all();
+        return rows
+            .filter(row => isStockMaterialName(row.name))
+            .map(row => ({
+                ...row,
+                quantity: Number(row.quantity) || 0,
+                image_url: toCraftImageUrl(row.image_path),
+            }));
+    }
+
+    const ingredients = jsonData.ingredients || [];
+    return (jsonData.stock_materials || [])
+        .map(row => {
+            const ingredient = ingredients.find(item => Number(item.id) === Number(row.ingredient_id));
+            if (!ingredient || !isStockMaterialName(ingredient.name)) return null;
+            return {
+                ...row,
+                name: ingredient.name,
+                image_path: ingredient.image_path,
+                quantity: Number(row.quantity) || 0,
+                image_url: toCraftImageUrl(ingredient.image_path),
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'fr'));
+}
+
+function updateStockMaterial(ingredientId, quantity) {
+    const cleanIngredientId = Number(ingredientId);
+    const cleanQuantity = Math.max(0, parseInt(quantity, 10) || 0);
+    const ingredient = getIngredient(cleanIngredientId);
+    if (!ingredient || !isStockMaterialName(ingredient.name)) {
+        throw new Error('Matiere premiere introuvable');
+    }
+
+    if (useSQLite) {
+        db.prepare(`
+            INSERT INTO stock_materials (ingredient_id, quantity, updated_at)
+            VALUES (?, ?, strftime('%s','now'))
+            ON CONFLICT(ingredient_id) DO UPDATE SET
+                quantity = excluded.quantity,
+                updated_at = excluded.updated_at
+        `).run(cleanIngredientId, cleanQuantity);
+        return getStockMaterials();
+    }
+
+    jsonData.stock_materials = jsonData.stock_materials || [];
+    const existing = jsonData.stock_materials.find(row => Number(row.ingredient_id) === cleanIngredientId);
+    if (existing) {
+        existing.quantity = cleanQuantity;
+        existing.updated_at = Math.floor(Date.now() / 1000);
+    } else {
+        jsonData.stock_materials.push({
+            id: jsonData.stock_materials.length + 1,
+            ingredient_id: cleanIngredientId,
+            quantity: cleanQuantity,
+            updated_at: Math.floor(Date.now() / 1000),
+        });
+    }
+    saveJSON();
+    return getStockMaterials();
+}
+
+function getCraftableWeapons() {
+    const weapons = getAllWeapons();
+    const ingredients = getAllIngredients();
+    const ingredientById = new Map(ingredients.map(item => [Number(item.id), item]));
+    const ingredientByName = new Map(ingredients.map(item => [normalizeStockName(item.name), item]));
+    const stockByIngredientId = new Map(getStockMaterials().map(item => [Number(item.ingredient_id), item]));
+
+    const decoratedWeapons = weapons.map(weapon => {
+        const requiredMaterials = parseWeaponIngredients(weapon.ingredients).map(recipe => {
+            const ingredientId = Number(recipe.ingredient_id || recipe.id || 0);
+            const ingredient = ingredientById.get(ingredientId)
+                || ingredientByName.get(normalizeStockName(recipe.name))
+                || null;
+            const name = ingredient?.name || recipe.name || 'Ingredient';
+            const required = Math.max(0, parseInt(recipe.quantity || recipe.qty || recipe.amount, 10) || 0);
+            const stock = ingredient ? stockByIngredientId.get(Number(ingredient.id)) : null;
+            const tracked = Boolean(stock || isStockMaterialName(name));
+            const available = stock ? Number(stock.quantity) || 0 : 0;
+
+            return {
+                ingredient_id: ingredient ? ingredient.id : ingredientId || null,
+                name,
+                required,
+                available: tracked ? available : null,
+                tracked,
+                sufficient: !tracked || available >= required,
+                image_url: toCraftImageUrl(ingredient?.image_path),
+            };
+        });
+
+        const trackedMaterials = requiredMaterials.filter(item => item.tracked);
+        const craftable = trackedMaterials.length === 0 || trackedMaterials.every(item => item.sufficient);
+        return {
+            ...weapon,
+            ingredients: requiredMaterials,
+            image_url: toCraftImageUrl(weapon.image_path),
+            plan_image_url: toCraftImageUrl(weapon.plan_image_path),
+            requires_plan: Boolean(weapon.requires_plan),
+            craftable,
+            stock_status: craftable ? 'ok' : 'missing',
+        };
+    });
+
+    decoratedWeapons.sort((a, b) => {
+        if (Number(b.craftable) !== Number(a.craftable)) return Number(b.craftable) - Number(a.craftable);
+        const saleDiff = (Number(b.sale_price) || 0) - (Number(a.sale_price) || 0);
+        if (saleDiff !== 0) return saleDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'fr');
+    });
+
+    return {
+        stocks: getStockMaterials(),
+        weapons: decoratedWeapons,
+    };
 }
 
 function getAllMyWeaponNames() {
@@ -499,6 +734,28 @@ const upload = multer({
 function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botState) {
     const express = require('express');
     app.use('/crafts/images', express.static(UPLOADS_DIR));
+
+    app.get('/api/crafts/stocks', requireAuth, (req, res) => {
+        try {
+            res.json(getCraftableWeapons());
+        } catch (e) {
+            console.error('GET stocks:', e);
+            res.status(500).json({ stocks: [], weapons: [], error: e.message });
+        }
+    });
+
+    app.post('/api/admin/stocks/update', requireAdmin, (req, res) => {
+        try {
+            const updates = Array.isArray(req.body?.materials) ? req.body.materials : [req.body];
+            for (const item of updates) {
+                updateStockMaterial(item.ingredient_id, item.quantity);
+            }
+            res.json({ success: true, ...getCraftableWeapons() });
+        } catch (e) {
+            console.error('POST stocks update:', e);
+            res.status(400).json({ success: false, error: e.message });
+        }
+    });
 
     app.get('/api/crafts/weapons', requireAuth, (req, res) => {
         try {

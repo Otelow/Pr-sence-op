@@ -598,8 +598,14 @@
                 <h3 class="section-title">📦 Catalogue des armes craftables</h3>
                 <p class="crafts-section-info">Visualise toutes les armes que tu peux faire crafter, avec leurs ingrédients et prix.</p>
             </div>
+            <div class="craft-stock-panel" id="craftStockPanel"></div>
             <div class="craft-catalog-toolbar">
                 <input type="search" id="craftCatalogSearch" class="craft-filter-input" placeholder="Rechercher une arme ou un ingrédient...">
+                <select id="craftCatalogStockFilter" class="craft-filter-select">
+                    <option value="all">Toutes les armes</option>
+                    <option value="craftable">Craftables</option>
+                    <option value="blocked">Stock insuffisant</option>
+                </select>
                 <span class="craft-filter-count" id="craftCatalogCount"></span>
             </div>
             <div class="crafts-catalog-grid" id="craftsCatalogGrid">
@@ -662,6 +668,8 @@
                 <h3 class="section-title">⚒ Tableau de craft</h3>
                 <p class="crafts-section-info">Tableau pour les <strong>hauts gradés</strong> : remplir <strong>Armes crafté / N°Série</strong> ping automatiquement le demandeur. La <strong>vente</strong> est complétée par le demandeur.</p>
             </div>
+
+            <div class="craft-stock-panel" id="craftBoardStockPanel"></div>
 
             <div class="craft-board-toolbar">
                 <div class="craft-board-sort">

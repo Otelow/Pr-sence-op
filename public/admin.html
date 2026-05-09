@@ -26,6 +26,7 @@
         <button class="admin-tab active" data-admin-tab="weapons" onclick="switchAdminTab('weapons')">🔫 Armes</button>
         <button class="admin-tab" data-admin-tab="saleNames" onclick="switchAdminTab('saleNames')">📋 Armes à vendre</button>
         <button class="admin-tab" data-admin-tab="ingredients" onclick="switchAdminTab('ingredients')">🧪 Ingrédients</button>
+        <button class="admin-tab" data-admin-tab="stocks" onclick="switchAdminTab('stocks')">📦 Stocks matières</button>
         <button class="admin-tab" data-admin-tab="orgs" onclick="switchAdminTab('orgs')">🏢 Organisations</button>
         <button class="admin-tab" data-admin-tab="impersonate" onclick="switchAdminTab('impersonate')">👁 Vue impersonate</button>
     </nav>
@@ -77,6 +78,22 @@
 
             <div class="admin-ingredients-grid" id="adminIngredientsList">
                 <p class="empty">Chargement...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- STOCKS MATIERES -->
+    <section class="admin-tab-content" id="adminTab-stocks" style="display:none;">
+        <div class="admin-section">
+            <h2 class="section-title">📦 Stocks matières premières</h2>
+            <p class="admin-info">Quantités disponibles pour calculer automatiquement les armes craftables.</p>
+
+            <div class="admin-stocks-grid" id="adminStocksList">
+                <p class="empty">Chargement...</p>
+            </div>
+
+            <div class="modal-actions" style="margin-top:18px;">
+                <button class="btn-primary" onclick="saveAdminStocks()">Sauvegarder les stocks</button>
             </div>
         </div>
     </section>

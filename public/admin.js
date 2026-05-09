@@ -4,6 +4,7 @@
 let adminWeapons = [];
 let adminMyWeaponNames = [];
 let adminIngredients = [];
+let adminStocks = [];
 let adminOrgs = [];
 let adminRoles = [];
 let editingIngredients = []; // [{ ingredient_id, name, amount }]
@@ -27,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadAdminWeapons();
     loadAdminMyWeaponNames();
     loadAdminIngredients();
+    loadAdminStocks();
     loadAdminOrgs();
     loadAdminRoles();
 
@@ -650,6 +652,65 @@ async function deleteIngredient(id) {
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 window.deleteIngredient = deleteIngredient;
+
+// STOCKS MATIERES
+async function loadAdminStocks() {
+    try {
+        const r = await fetch('/api/crafts/stocks');
+        const d = await r.json();
+        adminStocks = d.stocks || [];
+        renderAdminStocks();
+    } catch (e) {
+        adminStocks = [];
+        renderAdminStocks();
+    }
+}
+
+function renderAdminStocks() {
+    const list = document.getElementById('adminStocksList');
+    if (!list) return;
+    if (!adminStocks.length) {
+        list.innerHTML = '<p class="empty">Aucune matière première suivie.</p>';
+        return;
+    }
+
+    list.innerHTML = adminStocks.map(stock => {
+        const imageUrl = safeImageUrl(stock.image_url);
+        return `
+            <label class="admin-stock-card">
+                ${imageUrl ? `<img class="admin-stock-img" src="${imageUrl}" alt="${escapeHtml(stock.name)}">` : '<span class="admin-stock-placeholder">Stock</span>'}
+                <span class="admin-stock-name">${escapeHtml(stock.name)}</span>
+                <input class="admin-stock-input" type="number" min="0" step="1" value="${Number(stock.quantity) || 0}" data-stock-ingredient="${stock.ingredient_id}">
+            </label>
+        `;
+    }).join('');
+}
+
+async function saveAdminStocks() {
+    const inputs = [...document.querySelectorAll('[data-stock-ingredient]')];
+    const materials = inputs.map(input => ({
+        ingredient_id: input.dataset.stockIngredient,
+        quantity: input.value,
+    }));
+
+    try {
+        const res = await fetch('/api/admin/stocks/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ materials }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Sauvegarde impossible');
+        adminStocks = data.stocks || [];
+        renderAdminStocks();
+        toast('Stocks sauvegardés');
+    } catch (e) {
+        toast(e.message, 'error');
+    }
+}
+
+window.loadAdminStocks = loadAdminStocks;
+window.saveAdminStocks = saveAdminStocks;
 
 // ─── ORGANISATIONS ──────────────────
 async function loadAdminOrgs() {
