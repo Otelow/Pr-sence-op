@@ -5,7 +5,7 @@ const config = require('./config');
 let sqliteModule = null;
 
 function ensureDataDirs() {
-    for (const dir of [config.paths.data, config.paths.backups, config.paths.uploads]) {
+    for (const dir of [config.paths.data, config.paths.backups, config.paths.uploads, config.paths.craftsUploads]) {
         fs.mkdirSync(dir, { recursive: true });
     }
 }

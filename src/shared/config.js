@@ -16,6 +16,7 @@ const config = {
         database: process.env.DATABASE_PATH || path.join(DATA_DIR, 'crafts.db'),
         backups: process.env.BACKUPS_DIR || path.join(DATA_DIR, 'backups'),
         uploads: process.env.UPLOADS_DIR || path.join(DATA_DIR, 'uploads'),
+        craftsUploads: process.env.CRAFTS_UPLOADS_DIR || path.join(DATA_DIR, 'crafts'),
         public: path.join(ROOT_DIR, 'public')
     },
     discord: {

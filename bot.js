@@ -8,6 +8,14 @@
 const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
+const path = require('path');
+const config = require('./src/shared/config');
+
+fs.mkdirSync(config.paths.data, { recursive: true });
+
+function dataFile(name) {
+    return path.join(config.paths.data, name);
+}
 
 // Helper sleep utilisé partout dans le code
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -155,7 +163,7 @@ let lastRadioMessageId = null;
 const botStartTime = Date.now(); // Pour le fallback welcome : ne traiter que les messages antérieurs au démarrage
 
 // Persistance du welcomeState pour survivre aux redéploiements
-const WELCOME_STATE_FILE = '/data/welcome_state.json';
+const WELCOME_STATE_FILE = dataFile('welcome_state.json');
 
 function saveWelcomeState() {
     try {
@@ -202,7 +210,7 @@ let customPresenceMessage = null;
 
 // Suivi des absences hebdomadaire (persistant via volume, reset dimanche 22h)
 // Map<userId, { count, dates[], username }>
-const TRACKING_FILE = '/data/absence_tracking.json';
+const TRACKING_FILE = dataFile('absence_tracking.json');
 
 function loadAbsenceTracking() {
     try {
@@ -256,7 +264,7 @@ let absencePanelData = {
 // ==========================================
 // PERSISTANCE ÉTAT PRÉSENCE (survie redéploiement)
 // ==========================================
-const STATE_FILE = '/data/presence_state.json';
+const STATE_FILE = dataFile('presence_state.json');
 
 function savePresenceState() {
     try {
@@ -1863,6 +1871,31 @@ async function sendPresenceWarnings(presenceChannel) {
         const today = new Date();
         const todayStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}`;
 
+        function recordUnjustifiedAbsence(member, opName, dateLabel, reason = null) {
+            const t = absenceTracking.get(member.id) || { count: 0, dates: [], details: [], username: '' };
+            t.details = t.details || [];
+            t.dates = t.dates || [];
+
+            const alreadyRecorded = t.details.some(d =>
+                d.date === todayStr &&
+                d.op === opName &&
+                !d.justified &&
+                (d.reason || null) === reason
+            );
+
+            if (!alreadyRecorded) {
+                t.count = (Number(t.count) || 0) + 1;
+                t.dates.push(`${todayStr} (${dateLabel})`);
+                const detail = { date: todayStr, op: opName, justified: false };
+                if (reason) detail.reason = reason;
+                t.details.push(detail);
+            }
+
+            t.username = member.nickname || member.user.username;
+            absenceTracking.set(member.id, t);
+            return t;
+        }
+
         // Utiliser les Maps de réaction (pas d'appel API)
         function processOP(opName, reactionMap) {
             if (!reactionMap || reactionMap.size === 0) return { noReact: [], reacted: new Set() };
@@ -1887,13 +1920,7 @@ async function sendPresenceWarnings(presenceChannel) {
             const { noReact, reacted } = processOP('1ère Présence OP', reactionsOP1);
 
             for (const member of noReact) {
-                const t = absenceTracking.get(member.id) || { count: 0, dates: [], details: [], username: '' };
-                t.count++;
-                t.dates.push(`${todayStr} (1ère OP)`);
-                t.details = t.details || [];
-                t.details.push({ date: todayStr, op: '1ère Présence OP', justified: false });
-                t.username = member.nickname || member.user.username;
-                absenceTracking.set(member.id, t);
+                const t = recordUnjustifiedAbsence(member, '1ère Présence OP', '1ère OP');
 
                 if (avertCh) {
                     await avertCh.send(
@@ -1930,11 +1957,7 @@ async function sendPresenceWarnings(presenceChannel) {
                     if (reacted.has(member.id)) continue;
                     if (!invalidAbsences.has(member.id)) continue;
 
-                    const t = absenceTracking.get(member.id) || { count: 0, dates: [], details: [], username: '' };
-                    t.details = t.details || [];
-                    t.details.push({ date: todayStr, op: '1ère Présence OP', justified: false, reason: 'Template non conforme' });
-                    t.username = member.nickname || member.user.username;
-                    absenceTracking.set(member.id, t);
+                    const t = recordUnjustifiedAbsence(member, '1ère Présence OP', '1ère OP', 'Template non conforme');
 
                     await avertCh.send(
                         `\n⚠️ ${member} — **Template absence non conforme**\n\n` +
@@ -1951,8 +1974,7 @@ async function sendPresenceWarnings(presenceChannel) {
                 }
             }
 
-            // Reset pour ceux qui ont réagi
-            for (const uid of reacted) absenceTracking.delete(uid);
+            // Les réactions ne doivent pas supprimer l'historique hebdomadaire déjà enregistré.
             saveAbsenceTracking();
         }
 
@@ -1961,13 +1983,7 @@ async function sendPresenceWarnings(presenceChannel) {
             const { noReact, reacted } = processOP('2ème Présence OP', reactionsOP2);
 
             for (const member of noReact) {
-                const t = absenceTracking.get(member.id) || { count: 0, dates: [], details: [], username: '' };
-                t.count++;
-                t.dates.push(`${todayStr} (2ème OP)`);
-                t.details = t.details || [];
-                t.details.push({ date: todayStr, op: '2ème Présence OP', justified: false });
-                t.username = member.nickname || member.user.username;
-                absenceTracking.set(member.id, t);
+                const t = recordUnjustifiedAbsence(member, '2ème Présence OP', '2ème OP');
 
                 if (avertCh) {
                     await avertCh.send(
@@ -1997,7 +2013,7 @@ async function sendPresenceWarnings(presenceChannel) {
                 await sleep(500);
             }
 
-            for (const uid of reacted) absenceTracking.delete(uid);
+            // Les réactions ne doivent pas supprimer l'historique hebdomadaire déjà enregistré.
             saveAbsenceTracking();
         }
 
@@ -2046,7 +2062,7 @@ const PANEL_CONFIG = {
     },
 };
 
-const REMINDERS_FILE = '/data/reminders.json';
+const REMINDERS_FILE = dataFile('reminders.json');
 let reminders = [];
 let nextReminderId = 1;
 let reminderLoopTimer = null;

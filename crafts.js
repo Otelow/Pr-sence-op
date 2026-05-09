@@ -4,17 +4,20 @@
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const config = require('./src/shared/config');
+const { ensureDataDirs } = require('./src/shared/database');
 
-const isRailway = !!(process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_PROJECT_ID);
-const DATA_DIR = process.env.DATA_DIR || (isRailway ? '/data' : path.join(__dirname, 'data'));
-const DB_PATH = path.join(DATA_DIR, 'crafts.db');
-const UPLOADS_DIR = path.join(DATA_DIR, 'crafts');
+const DATA_DIR = config.paths.data;
+const DB_PATH = config.paths.database;
+const UPLOADS_DIR = config.paths.craftsUploads;
 const FALLBACK_PATH = path.join(DATA_DIR, 'crafts.json');
 
 // Assurer l'existence des dossiers
 try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    ensureDataDirs();
+    console.log(`[storage] data=${DATA_DIR}`);
+    console.log(`[storage] crafts uploads=${UPLOADS_DIR}`);
+    console.log(`[database] crafts db=${DB_PATH}`);
 } catch (e) {
     console.error('❌ Erreur création dossiers data:', e.message);
 }
@@ -30,6 +33,9 @@ try {
     console.log('✅ better-sqlite3 chargé');
 } catch (e) {
     console.warn('⚠️ better-sqlite3 indisponible, fallback JSON activé');
+    if (config.isProduction) {
+        console.error('❌ Production sans SQLite: vérifie better-sqlite3 et le volume Railway /data.');
+    }
     useSQLite = false;
 }
 
@@ -630,7 +636,11 @@ function getCraftableWeapons() {
         });
 
         const trackedMaterials = requiredMaterials.filter(item => item.tracked);
-        const craftable = trackedMaterials.length === 0 || trackedMaterials.every(item => item.sufficient);
+        const craftableCounts = trackedMaterials
+            .filter(item => Number(item.required) > 0)
+            .map(item => Math.floor((Number(item.available) || 0) / Number(item.required)));
+        const maxCraftable = craftableCounts.length ? Math.max(0, Math.min(...craftableCounts)) : 0;
+        const craftable = maxCraftable > 0;
         return {
             ...weapon,
             ingredients: requiredMaterials,
@@ -638,6 +648,7 @@ function getCraftableWeapons() {
             plan_image_url: toCraftImageUrl(weapon.plan_image_path),
             requires_plan: Boolean(weapon.requires_plan),
             craftable,
+            maxCraftable,
             stock_status: craftable ? 'ok' : 'missing',
         };
     });

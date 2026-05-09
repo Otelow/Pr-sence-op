@@ -6,6 +6,8 @@ const express = require('express');
 const session = require('express-session');
 const axios = require('axios');
 const path = require('path');
+const fs = require('fs');
+const config = require('./src/shared/config');
 const { initDB, registerCraftEndpoints } = require('./crafts');
 
 const PORT = process.env.PORT || 3000;
@@ -1153,8 +1155,8 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Carte interactive (points)
     // ==========================================
-    const fs = require('fs');
-    const MAP_POINTS_FILE = '/data/map_points.json';
+    fs.mkdirSync(config.paths.data, { recursive: true });
+    const MAP_POINTS_FILE = path.join(config.paths.data, 'map_points.json');
 
     function loadMapPoints() {
         try {

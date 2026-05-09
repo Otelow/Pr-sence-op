@@ -62,6 +62,17 @@ function safeImageUrl(url) {
     return '';
 }
 
+function stockImageUrl(stock) {
+    const directUrl = safeImageUrl(stock?.image_url);
+    if (directUrl) return directUrl;
+
+    const imagePath = String(stock?.image_path || '').trim();
+    if (!imagePath) return '';
+    return safeImageUrl(imagePath.startsWith('/') || /^https?:\/\//i.test(imagePath)
+        ? imagePath
+        : `/crafts/images/${imagePath}`);
+}
+
 function safeColor(color) {
     const value = String(color || '').trim();
     return /^#[0-9a-f]{3,8}$/i.test(value) ? value : '#888';
@@ -675,7 +686,7 @@ function renderAdminStocks() {
     }
 
     list.innerHTML = adminStocks.map(stock => {
-        const imageUrl = safeImageUrl(stock.image_url);
+        const imageUrl = stockImageUrl(stock);
         return `
             <label class="admin-stock-card">
                 ${imageUrl ? `<img class="admin-stock-img" src="${imageUrl}" alt="${escapeHtml(stock.name)}">` : '<span class="admin-stock-placeholder">Stock</span>'}

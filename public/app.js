@@ -198,13 +198,19 @@ async function initCommandsTab() {
 async function loadStats() {
     try {
         const res = await fetch('/api/stats');
+        if (!res.ok) throw new Error(`Stats API ${res.status}`);
         const s = await res.json();
         presenceStatsCache = s;
-        document.getElementById('statTotal').textContent = s.totalMembers;
-        document.getElementById('statInscrits').textContent = s.inscritsOP || 0;
-        document.getElementById('statAbsences').textContent = s.totalUnjustified;
-        document.getElementById('statConsecutive').textContent = s.membersWithConsecutive;
-        document.getElementById('statConsecutiveCard').classList.toggle('stat-warning', s.membersWithConsecutive > 0);
+        const statTotal = document.getElementById('statTotal');
+        const statInscrits = document.getElementById('statInscrits');
+        const statAbsences = document.getElementById('statAbsences');
+        const statConsecutive = document.getElementById('statConsecutive');
+        const statConsecutiveCard = document.getElementById('statConsecutiveCard');
+        if (statTotal) statTotal.textContent = s.totalMembers || 0;
+        if (statInscrits) statInscrits.textContent = s.inscritsOP || 0;
+        if (statAbsences) statAbsences.textContent = s.totalUnjustified || 0;
+        if (statConsecutive) statConsecutive.textContent = s.membersWithConsecutive || 0;
+        statConsecutiveCard?.classList.toggle('stat-warning', (s.membersWithConsecutive || 0) > 0);
     } catch (e) {
         console.error('Stats:', e);
     }
@@ -267,6 +273,7 @@ function closePresenceStatDetails() {
 async function loadPresence() {
     try {
         const res = await fetch('/api/presence');
+        if (!res.ok) throw new Error(`Presence API ${res.status}`);
         const data = await res.json();
 
         renderOP('op1', data.op1);
@@ -280,6 +287,8 @@ async function loadPresence() {
 function renderOP(prefix, op) {
     const status = document.getElementById(`${prefix}Status`);
     const cats = document.getElementById(`${prefix}Categories`);
+    if (!status || !cats) return;
+    op = op || { active: false, present: [], late: [], absentReact: [], absentValid: [], noReaction: [] };
 
     if (!op.active) {
         status.textContent = 'INACTIVE';
@@ -328,9 +337,13 @@ function renderOP(prefix, op) {
 function renderAbsencesSalon(data) {
     const validList = document.getElementById('validList');
     const invalidList = document.getElementById('invalidList');
+    const validCount = document.getElementById('validCount');
+    const invalidCount = document.getElementById('invalidCount');
+    if (!validList || !invalidList || !validCount || !invalidCount) return;
+    data = data || { valid: [], invalid: [] };
 
-    document.getElementById('validCount').textContent = data.valid.length;
-    document.getElementById('invalidCount').textContent = data.invalid.length;
+    validCount.textContent = data.valid.length;
+    invalidCount.textContent = data.invalid.length;
 
     const renderChip = (name, isValid) => `
         <div class="absence-chip ${isValid ? 'chip-valid' : 'chip-invalid'}">
@@ -352,12 +365,14 @@ function renderAbsencesSalon(data) {
 async function loadWeekly() {
     try {
         const res = await fetch('/api/weekly');
+        if (!res.ok) throw new Error(`Weekly API ${res.status}`);
         const data = await res.json();
         const tracking = data.tracking || [];
 
         const consecutive = tracking.filter(t => t.consecutiveDays >= 2);
         const consecutiveList = document.getElementById('consecutiveList');
         const calendar = document.getElementById('statsCalendar');
+        if (!consecutiveList || !calendar) return;
 
         // Section consécutifs
         consecutiveList.innerHTML = consecutive.length === 0
@@ -2539,6 +2554,17 @@ function cleanStockName(name) {
         .trim();
 }
 
+function getStockImageUrl(stock) {
+    const directUrl = safeImageUrl(stock?.image_url);
+    if (directUrl) return directUrl;
+
+    const imagePath = String(stock?.image_path || '').trim();
+    if (!imagePath) return '';
+    return safeImageUrl(imagePath.startsWith('/') || /^https?:\/\//i.test(imagePath)
+        ? imagePath
+        : `/crafts/images/${imagePath}`);
+}
+
 function getVisibleStockMaterials() {
     const byName = new Map();
     for (const stock of stockMaterialsCache || []) {
@@ -2547,7 +2573,7 @@ function getVisibleStockMaterials() {
         const key = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         const existing = byName.get(key);
         const cleanStock = { ...stock, name };
-        if (!existing || (!existing.image_url && cleanStock.image_url)) {
+        if (!existing || (!getStockImageUrl(existing) && getStockImageUrl(cleanStock))) {
             byName.set(key, cleanStock);
         }
     }
@@ -2577,7 +2603,7 @@ function renderCraftStockState() {
         <div class="craft-stock-grid">
             ${visibleStocks.map(stock => {
                 const level = getStockLevelClass(stock.quantity);
-                const imageUrl = safeImageUrl(stock.image_url);
+                const imageUrl = getStockImageUrl(stock);
                 return `
                     <div class="craft-stock-card stock-${level}">
                         ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}" onerror="this.outerHTML='<span class=&quot;craft-stock-placeholder&quot; aria-hidden=&quot;true&quot;>◆</span>'">` : '<span class="craft-stock-placeholder" aria-hidden="true">◆</span>'}
@@ -2653,9 +2679,10 @@ function renderCraftCatalog() {
         const timeStr = w.craft_time > 0 ? formatCraftTime(w.craft_time) : 'N/A';
         const priceStr = w.craft_price > 0 ? w.craft_price.toLocaleString('fr-FR') + '$' : 'Gratuit';
         const saleStr = w.sale_price > 0 ? `<span class="craft-weapon-saleprice">Vente : ${w.sale_price.toLocaleString('fr-FR')}$</span>` : '';
-        const stockBadge = w.craftable === false
-            ? '<span class="craft-stock-badge blocked">Stock insuffisant</span>'
-            : '<span class="craft-stock-badge ok">Craftable</span>';
+        const maxCraftable = Number(w.maxCraftable) || 0;
+        const stockBadge = maxCraftable > 0
+            ? `<span class="craft-stock-badge ok">Craftable x${maxCraftable}</span>`
+            : '<span class="craft-stock-badge blocked">Stock insuffisant</span>';
 
         return `
             <button type="button" class="craft-weapon-card craft-weapon-card-button" onclick="openCraftWeaponDetails(${w.id})">

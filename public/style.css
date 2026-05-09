@@ -5875,6 +5875,10 @@ body {
 
 .craft-stock-panel {
     margin-bottom: 18px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .craft-stock-header {
@@ -5899,25 +5903,30 @@ body {
 
 .craft-stock-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
     gap: 10px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .craft-stock-card {
     display: grid;
-    grid-template-columns: 48px 1fr;
+    grid-template-columns: 44px minmax(0, 1fr);
     gap: 10px;
     align-items: center;
     padding: 10px;
     border: 1px solid rgba(255,255,255,.08);
     border-radius: 8px;
     background: rgba(10,10,12,.65);
+    min-width: 0;
+    max-width: 100%;
 }
 
 .craft-stock-card img,
 .craft-stock-placeholder {
-    width: 46px;
-    height: 46px;
+    width: 42px;
+    height: 42px;
     object-fit: contain;
     border-radius: 8px;
     background: rgba(0,0,0,.35);
@@ -5938,6 +5947,8 @@ body {
 .craft-stock-card strong {
     font-size: 12px;
     color: var(--text);
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .craft-stock-card span {
@@ -6221,6 +6232,7 @@ body {
     border-radius: 6px;
     font: 800 10px/1 var(--font-mono);
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .craft-stock-badge.ok {
@@ -6917,6 +6929,14 @@ body {
     animation: fadeIn 0.2s ease-out;
 }
 
+#adminTab-stocks,
+#adminTab-stocks .admin-section {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
 /* Style fix : select de l'impersonate (utilise custom-dropdown) — déjà OK */
 .impersonate-panel-admin {
     max-width: 600px;
@@ -6984,26 +7004,37 @@ body {
 
 .admin-stocks-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
     gap: 12px;
     margin-top: 20px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .admin-stock-card {
     display: grid;
-    grid-template-columns: 58px 1fr 92px;
+    grid-template-columns: 46px minmax(0, 1fr);
+    grid-template-areas:
+        "image name"
+        "image input";
     align-items: center;
-    gap: 12px;
+    gap: 8px 10px;
     padding: 12px;
     background: rgba(12, 12, 14, 0.74);
     border: 1px solid rgba(255, 140, 0, 0.18);
     border-radius: 10px;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .admin-stock-img,
 .admin-stock-placeholder {
-    width: 54px;
-    height: 54px;
+    grid-area: image;
+    width: 44px;
+    height: 44px;
     object-fit: contain;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.35);
@@ -7018,20 +7049,71 @@ body {
 }
 
 .admin-stock-name {
+    grid-area: name;
     color: var(--text);
     font-weight: 700;
     line-height: 1.2;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .admin-stock-input {
-    width: 100%;
+    grid-area: input;
+    width: min(100%, 96px);
+    min-width: 0;
     min-height: 38px;
     padding: 8px 10px;
     color: var(--text);
     background: rgba(0, 0, 0, 0.55);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
-    text-align: right;
+    text-align: center;
+    justify-self: start;
+    box-sizing: border-box;
+}
+
+.admin-stocks-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.admin-stocks-actions .btn-primary {
+    min-width: 190px;
+}
+
+@media (max-width: 900px) {
+    .admin-stocks-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .admin-stocks-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-stock-card {
+        grid-template-columns: 44px minmax(0, 1fr) minmax(68px, 90px);
+        grid-template-areas: "image name input";
+        gap: 8px;
+    }
+
+    .admin-stock-input {
+        justify-self: end;
+    }
+
+    .admin-stocks-actions {
+        justify-content: stretch;
+    }
+
+    .admin-stocks-actions .btn-primary {
+        width: 100%;
+        min-width: 0;
+    }
 }
 
 /* Ingredients editor (dans modal arme) */
