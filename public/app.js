@@ -2884,9 +2884,16 @@ function getCraftRequestSortValue(request, sortBy) {
     return Number(request.created_at || request.id || 0) || 0;
 }
 
+function getCraftRequestStatusPriority(request) {
+    return request?.status === 'pending' ? 1 : 0;
+}
+
 function compareCraftRequests(a, b) {
     const sortBy = craftRequestsListState.sortBy || 'date';
     const sortDir = craftRequestsListState.sortDir === 'asc' ? 1 : -1;
+    const priorityDiff = getCraftRequestStatusPriority(a) - getCraftRequestStatusPriority(b);
+    if (priorityDiff !== 0) return priorityDiff;
+
     const av = getCraftRequestSortValue(a, sortBy);
     const bv = getCraftRequestSortValue(b, sortBy);
     let result = 0;
