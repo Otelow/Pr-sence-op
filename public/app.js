@@ -3013,6 +3013,8 @@ function renderCraftRequestsList() {
         const isSuperAdmin = canDeleteRequestsClient();
         const isMine = r.user_id === myUserId;
         const rejectedClass = r.status === 'rejected' ? ' craft-request-rejected' : '';
+        const statusTone = getCraftStatusTone(r);
+        const statusRowClass = ` request-row-status-${statusTone}${['materials', 'in-progress'].includes(statusTone) ? ' request-row-active-wave' : ''}`;
         const weaponImageUrl = safeImageUrl(r.weapon_image_url);
 
         // Hauts gradés : peuvent changer statut + supprimer
@@ -3037,7 +3039,7 @@ function renderCraftRequestsList() {
         }
 
         return `
-            <div class="craft-request-item${rejectedClass}">
+            <div class="craft-request-item${rejectedClass}${statusRowClass}">
                 ${weaponImageUrl ? `<img class="craft-request-image" src="${weaponImageUrl}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
                 <div class="craft-request-body">
                     <div class="craft-request-name">${escapeHtml(r.weapon_name)}</div>
@@ -3148,6 +3150,15 @@ function getCraftStatusBadge(r) {
     if (r.status === 'materials' || r.status === 'waiting_materials') return '<span class="craft-status-badge craft-status-materials">📦 En attente des matières premières</span>';
     if (r.status === 'in_progress') return '<span class="craft-status-badge craft-status-progress">⏳ En cours</span>';
     return '<span class="craft-status-badge craft-status-pending">📋 En attente</span>';
+}
+
+function getCraftStatusTone(r) {
+    if (r?.status === 'completed') return 'completed';
+    if (r?.status === 'rejected' || r?.status === 'refused') return 'refused';
+    if (r?.crafted || r?.status === 'crafted') return 'crafted';
+    if (r?.status === 'materials' || r?.status === 'waiting_materials') return 'materials';
+    if (r?.status === 'in_progress') return 'in-progress';
+    return 'pending';
 }
 
 function getCraftBoardActiveRequests() {
@@ -3289,7 +3300,10 @@ function renderCraftBoardLine(num, r) {
     const canEditSale = isMine || isAdminUser;
     const completed = r.status === 'completed';
     const craftedPendingSale = !completed && (r.crafted || r.status === 'crafted' || r.craft_date || r.serial_number);
+    const statusTone = getCraftStatusTone(r);
     const rowClass = [
+        `request-row-status-${statusTone}`,
+        ['materials', 'in-progress'].includes(statusTone) ? 'request-row-active-wave' : '',
         completed ? 'craft-board-completed' : '',
         craftedPendingSale ? 'craft-board-crafted-pending-sale' : '',
     ].filter(Boolean).join(' ');
