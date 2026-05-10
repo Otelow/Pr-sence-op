@@ -4257,6 +4257,7 @@ async function confirmMarkSold(e) {
     const sold_to = document.getElementById('markSoldBuyer').value;
     const sold_price = document.getElementById('markSoldPrice').value;
     const soldBy = getSelectedMember('markSoldBy');
+    if (!sold_to) { toast('❌ Choisis le groupe acheteur', 'error'); return; }
     if (!sold_price) { toast('❌ Prix de vente requis', 'error'); return; }
     if (!soldBy.id) { toast('❌ Choisis qui a vendu l\'arme', 'error'); return; }
 

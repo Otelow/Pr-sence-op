@@ -208,6 +208,7 @@ function initDB() {
                     sold_by_name TEXT,
                     discord_message_id TEXT,
                     weapons_log_message_id TEXT,
+                    sale_discord_message_id TEXT,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
                 CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
@@ -233,6 +234,7 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_by_name TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN discord_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN weapons_log_message_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sale_discord_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN stock_consumed_at INTEGER`); } catch {}
@@ -1992,33 +1994,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         return (state?.CONFIG?.CHANNELS?.WEAPONS_LOG) || '1497021044953845791';
     }
 
-    function buildMyWeaponsCraftLogEmbed(base, rows) {
-        const { EmbedBuilder } = require('discord.js');
-        const serials = rows
-            .map(w => `\`${w.serial_number}\``)
-            .join('\n')
-            .slice(0, 1000);
-        const date = new Date().toLocaleDateString('fr-FR');
-
-        return new EmbedBuilder()
-            .setTitle(`Log arme 21BS • ${base.weapon_name}`)
-            .setDescription('Arme craftée par les 21 Block Savage déclarée dans Vos Armes.')
-            .setColor(0xffb84d)
-            .addFields(
-                { name: 'Arme', value: base.weapon_name || 'N/A', inline: true },
-                { name: 'Quantité', value: String(rows.length), inline: true },
-                { name: 'Membre', value: base.user_id ? `<@${base.user_id}>` : (base.user_name || 'N/A'), inline: true },
-                { name: 'Craftée par', value: base.crafted_by_name || 'Non renseigné', inline: true },
-                { name: 'Prix souhaité', value: moneyLabel(base.asking_price), inline: true },
-                { name: 'Prix minimum', value: moneyLabel(base.min_price), inline: true },
-                { name: 'Numéro de série', value: serials || 'N/A', inline: false },
-                { name: 'Date', value: date, inline: true },
-            )
-            .setTimestamp()
-            .setFooter({ text: '21 Block Savage • Logs armes' });
-    }
-
-    async function postMyWeaponsCraftLog(existing) {
+    function getSaleLogReadyRows(existing) {
         let rows;
         if (useSQLite) {
             rows = existing.batch_id
@@ -2028,52 +2004,82 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             rows = (jsonData.my_weapons || []).filter(w => existing.batch_id ? w.batch_id === existing.batch_id : w.id === existing.id);
         }
 
-        rows = rows
+        return rows
             .filter(Boolean)
             .filter(w => {
                 const crafted = w.is_crafted === true || w.is_crafted === 1 || w.is_crafted === '1';
-                return crafted && String(w.serial_number || '').trim();
+                const sold = w.is_sold === true || w.is_sold === 1 || w.is_sold === '1';
+                const hasPrice = w.sold_price !== null && typeof w.sold_price !== 'undefined' && String(w.sold_price).trim() !== '';
+                return crafted
+                    && sold
+                    && !w.sale_discord_message_id
+                    && String(w.serial_number || '').trim()
+                    && String(w.sold_to || '').trim()
+                    && hasPrice;
             });
+    }
 
-        if (!rows.length) return;
-        if (rows.every(w => w.weapons_log_message_id)) return;
+    function buildMyWeaponsSaleLogEmbed(base, rows) {
+        const { EmbedBuilder } = require('discord.js');
+        const serials = rows
+            .map(w => `\`${w.serial_number}\``)
+            .join('\n')
+            .slice(0, 1000);
+        const saleDates = [...new Set(rows
+            .map(w => w.sold_at ? new Date(w.sold_at * 1000).toLocaleDateString('fr-FR') : null)
+            .filter(Boolean))];
+        const saleDate = saleDates.length === 1 ? saleDates[0] : new Date().toLocaleDateString('fr-FR');
+        const soldByLabel = base.sold_by_id && base.sold_by_id !== 'former-21bs'
+            ? `<@${base.sold_by_id}>`
+            : (base.sold_by_name || base.user_name || 'N/A');
+        const declaredByLabel = base.user_id ? `<@${base.user_id}>` : (base.user_name || 'N/A');
 
-        const existingLogId = rows.find(w => w.weapons_log_message_id)?.weapons_log_message_id;
-        if (existingLogId) {
-            if (useSQLite) {
-                const ids = rows.filter(w => !w.weapons_log_message_id).map(w => w.id);
-                const stmt = db.prepare('UPDATE my_weapons SET weapons_log_message_id = ? WHERE id = ?');
-                for (const rowId of ids) stmt.run(existingLogId, rowId);
-            } else {
-                for (const w of rows) {
-                    if (!w.weapons_log_message_id) w.weapons_log_message_id = existingLogId;
-                }
-                saveJSON();
-            }
-            return;
-        }
+        return new EmbedBuilder()
+            .setTitle(`Justification de vente 21BS • ${base.weapon_name}`)
+            .setDescription('Arme craftée par les 21 Block Savage déclarée vendue.')
+            .setColor(0xffb84d)
+            .addFields(
+                { name: 'Arme', value: base.weapon_name || 'N/A', inline: true },
+                { name: 'Quantité', value: String(rows.length), inline: true },
+                { name: 'Vendeur', value: soldByLabel, inline: true },
+                { name: 'Déclarée par', value: declaredByLabel, inline: true },
+                { name: 'Acheteur', value: base.sold_to || 'N/A', inline: true },
+                { name: 'Montant vendu', value: moneyLabel(base.sold_price), inline: true },
+                { name: 'Date vente', value: saleDate, inline: true },
+                { name: 'Craftée par', value: base.crafted_by_name || 'Non renseigné', inline: true },
+                { name: 'Numéro de série', value: serials || 'N/A', inline: false },
+            )
+            .setTimestamp()
+            .setFooter({ text: '21 Block Savage • Justification d’arme' });
+    }
+
+    async function postMyWeaponsSaleLog(existing) {
+        const rows = getSaleLogReadyRows(existing);
+        if (!rows.length) return false;
 
         const channelId = getWeaponsLogChannelId();
         const channel = await fetchDiscordChannel(channelId, 'WEAPONS_LOG');
-        if (!channel) return;
+        if (!channel) return false;
 
         const base = rows[0];
-        const embed = buildMyWeaponsCraftLogEmbed(base, rows);
+        const embed = buildMyWeaponsSaleLogEmbed(base, rows);
         try {
             const msg = await channel.send({
-                content: `📋 Log arme 21BS • **${base.weapon_name}** • ${rows.length} série(s) enregistrée(s).`,
+                content: `✅ Vente 21BS déclarée • **${base.weapon_name}** • ${rows.length} série(s).`,
                 embeds: [embed],
                 allowedMentions: { parse: [] },
             });
             if (useSQLite) {
-                const stmt = db.prepare('UPDATE my_weapons SET weapons_log_message_id = ? WHERE id = ?');
+                const stmt = db.prepare('UPDATE my_weapons SET sale_discord_message_id = ? WHERE id = ?');
                 for (const row of rows) stmt.run(msg.id, row.id);
             } else {
-                for (const w of rows) w.weapons_log_message_id = msg.id;
+                for (const row of rows) row.sale_discord_message_id = msg.id;
                 saveJSON();
             }
+            return true;
         } catch (e) {
-            console.error(`[discord] WEAPONS_LOG: envoi impossible pour ${base.weapon_name}: ${e.message}`);
+            console.error(`[discord] WEAPONS_LOG: log vente impossible pour ${base.weapon_name}: ${e.message}`);
+            return false;
         }
     }
 
@@ -2169,7 +2175,6 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             try {
                 const first = useSQLite ? db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id) : (jsonData.my_weapons || []).find(w => w.id === id);
                 if (first) {
-                    await postMyWeaponsCraftLog(first);
                     await updateMyWeaponsDiscordBatch(first);
                 }
             } catch (e) { console.error('Erreur post Discord myweapons:', e.message); }
@@ -2274,19 +2279,26 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
 
             const now = Math.floor(Date.now() / 1000);
-            const soldPrice = parseInt(sold_price) || null;
+            const soldTo = String(sold_to || '').trim();
+            if (!soldTo) return res.status(400).json({ error: 'Groupe acheteur obligatoire' });
+            const rawSoldPrice = String(sold_price ?? '').trim();
+            if (!rawSoldPrice) return res.status(400).json({ error: 'Montant vendu obligatoire' });
+            const soldPrice = parseInt(rawSoldPrice, 10);
+            if (!Number.isFinite(soldPrice) || soldPrice < 0) {
+                return res.status(400).json({ error: 'Montant vendu invalide' });
+            }
             const soldById = String(sold_by_id || '').trim();
             const soldByName = String(sold_by_name || '').trim();
             if (!soldById) return res.status(400).json({ error: 'Vendeur obligatoire' });
 
             if (useSQLite) {
                 db.prepare(`UPDATE my_weapons SET is_sold = 1, sold_to = ?, sold_price = ?, sold_at = ?, sold_by_id = ?, sold_by_name = ? WHERE id = ?`)
-                    .run(sold_to || null, soldPrice, now, soldById, soldByName, id);
+                    .run(soldTo, soldPrice, now, soldById, soldByName, id);
             } else {
                 const w = jsonData.my_weapons.find(w => w.id === id);
                 if (w) {
                     w.is_sold = 1;
-                    w.sold_to = sold_to || null;
+                    w.sold_to = soldTo;
                     w.sold_price = soldPrice;
                     w.sold_at = now;
                     w.sold_by_id = soldById;
@@ -2306,7 +2318,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         .setColor(0x4ade80)
                         .addFields(
                             { name: 'Vendeur', value: `<@${existing.user_id}>`, inline: true },
-                            { name: 'Acheteur', value: sold_to || 'N/A', inline: true },
+                            { name: 'Acheteur', value: soldTo, inline: true },
                             { name: 'Prix final', value: moneyLabel(soldPrice), inline: true },
                         )
                         .setTimestamp()
@@ -2342,6 +2354,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             } catch (e) { console.error('Erreur update Discord lot myweapons:', e.message); }
 
             let autoFilledCraft = null;
+            let matchedRequestForLog = null;
             if (existing.is_crafted && existing.serial_number) {
                 try {
                     let matchedRequest;
@@ -2366,14 +2379,15 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     }
 
                     if (matchedRequest) {
+                        matchedRequestForLog = matchedRequest;
                         // Compléter la demande craft avec les infos de vente
                         if (useSQLite) {
                             db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
-                                .run(sold_to || null, soldPrice, now, userId, existing.user_name, matchedRequest.id);
+                                .run(soldTo, soldPrice, now, userId, existing.user_name, matchedRequest.id);
                         } else {
                             const r = jsonData.craft_requests.find(r => r.id === matchedRequest.id);
                             if (r) {
-                                r.buyer_org = sold_to || null;
+                                r.buyer_org = soldTo;
                                 r.sale_price = soldPrice;
                                 r.sale_date = now;
                                 r.completed_by_id = userId;
@@ -2384,40 +2398,20 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         }
                         autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
 
-                        // Posté le récap dans le salon WEAPONS_LOG
-                        try {
-                            const stateData = botState();
-                            const recapChannel = botClient.channels.cache.get((stateData?.CONFIG?.CHANNELS?.WEAPONS_LOG) || '1497021044953845791');
-                            if (recapChannel && !matchedRequest.posted_to_channel) {
-                                const saleDate = new Date(now * 1000).toLocaleDateString('fr-FR');
-                                const { EmbedBuilder } = require('discord.js');
-                                const recapEmbed = new EmbedBuilder()
-                                    .setTitle(`Justification automatique • ${matchedRequest.weapon_name}`)
-                                    .setColor(0xffb84d)
-                                    .addFields(
-                                        { name: 'Vendeur', value: `<@${existing.user_id}>`, inline: true },
-                                        { name: 'Numéro de série', value: `\`${existing.serial_number || 'N/A'}\``, inline: true },
-                                        { name: 'Acheteur', value: sold_to || 'N/A', inline: true },
-                                        { name: 'Prix final', value: moneyLabel(soldPrice), inline: true },
-                                        { name: 'Date vente', value: saleDate, inline: true },
-                                    )
-                                    .setTimestamp()
-                                    .setFooter({ text: '21 Block Savage • Récap craft automatique' });
-                                await recapChannel.send({
-                                    content: `✅ Dossier craft synchronisé • **${matchedRequest.weapon_name}**`,
-                                    embeds: [recapEmbed],
-                                    allowedMentions: { parse: [] }
-                                });
-                                if (useSQLite) {
-                                    db.prepare('UPDATE craft_requests SET posted_to_channel = 1 WHERE id = ?').run(matchedRequest.id);
-                                } else {
-                                    const r = jsonData.craft_requests.find(r => r.id === matchedRequest.id);
-                                    if (r) { r.posted_to_channel = 1; saveJSON(); }
-                                }
-                            }
-                        } catch (e) { console.error('Erreur récap auto:', e.message); }
                     }
                 } catch (e) { console.error('Erreur auto-fill craft:', e.message); }
+            }
+
+            try {
+                const soldWeaponForLog = useSQLite
+                    ? db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id)
+                    : (jsonData.my_weapons || []).find(w => Number(w.id) === Number(id));
+                const saleLogged = soldWeaponForLog ? await postMyWeaponsSaleLog(soldWeaponForLog) : false;
+                if (saleLogged && matchedRequestForLog && !matchedRequestForLog.posted_to_channel) {
+                    markRequestPosted(matchedRequestForLog.id);
+                }
+            } catch (e) {
+                console.error('Erreur log vente WEAPONS_LOG:', e.message);
             }
 
             res.json({ success: true, autoFilledCraft });
