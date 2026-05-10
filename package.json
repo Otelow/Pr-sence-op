@@ -4,7 +4,7 @@
   "description": "Bot Discord 21 Block Savage + Dashboard Web",
   "main": "index.js",
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "start": "node index.js"
@@ -17,6 +17,6 @@
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "multer": "^1.4.5-lts.1",
-    "better-sqlite3": "^11.3.0"
+    "better-sqlite3": "^12.9.0"
   }
 }
