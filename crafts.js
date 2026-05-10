@@ -87,6 +87,7 @@ const STOCK_MATERIAL_NAMES = [
 ];
 
 const CRAFT_PRODUCTION_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
+const CRAFT_STOCK_RESERVED_STATUSES = ['materials', 'waiting_materials', 'in_progress'];
 
 function normalizeStockName(value) {
     return String(value || '')
@@ -580,7 +581,7 @@ function getReservedStockByActiveRequests() {
     const activeRequests = getRequests('all', { productionOnly: true });
 
     for (const request of activeRequests) {
-        if (!CRAFT_PRODUCTION_STATUSES.includes(request.status)) continue;
+        if (!CRAFT_STOCK_RESERVED_STATUSES.includes(request.status)) continue;
         const weapon = weaponsById.get(Number(request.weapon_id));
         if (!weapon) continue;
 
