@@ -5874,7 +5874,7 @@ body {
 }
 
 .craft-stock-panel {
-    margin-bottom: 18px;
+    margin-bottom: 14px;
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -5885,14 +5885,14 @@ body {
     display: flex;
     align-items: end;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .craft-stock-header h4 {
     margin: 0;
     color: var(--accent);
     font-family: var(--font-display);
-    font-size: 22px;
+    font-size: 18px;
 }
 
 .craft-stock-header p {
@@ -5903,8 +5903,8 @@ body {
 
 .craft-stock-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(min(118px, 100%), 1fr));
+    gap: 8px;
     width: 100%;
     max-width: 100%;
     min-width: 0;
@@ -5912,10 +5912,10 @@ body {
 
 .craft-stock-card {
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 8px;
     align-items: center;
-    padding: 10px;
+    padding: 8px;
     border: 1px solid rgba(255,255,255,.08);
     border-radius: 8px;
     background: rgba(10,10,12,.65);
@@ -5925,8 +5925,8 @@ body {
 
 .craft-stock-card img,
 .craft-stock-placeholder {
-    width: 42px;
-    height: 42px;
+    width: 36px;
+    height: 36px;
     object-fit: contain;
     border-radius: 8px;
     background: rgba(0,0,0,.35);
@@ -5945,14 +5945,14 @@ body {
 }
 
 .craft-stock-card strong {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text);
     min-width: 0;
     overflow-wrap: anywhere;
 }
 
 .craft-stock-card span {
-    font: 800 18px/1.1 var(--font-mono);
+    font: 900 19px/1 var(--font-mono);
 }
 
 .craft-stock-card small {
@@ -5960,6 +5960,10 @@ body {
     margin-top: 3px;
     color: var(--text-muted);
     font: 600 10px/1.2 var(--font-mono);
+}
+
+#craftBoardStockPanel .craft-stock-header {
+    display: none;
 }
 
 .craft-stock-card.stock-ok { border-color: rgba(74,222,128,.35); }
@@ -6508,6 +6512,32 @@ body {
     background: rgba(12, 12, 14, 0.58);
 }
 
+.craft-requests-search {
+    flex: 1 1 260px;
+    min-width: 220px;
+}
+
+.craft-requests-search-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.craft-requests-search-input {
+    min-height: 38px !important;
+}
+
+.craft-requests-clear {
+    width: 38px;
+    min-height: 38px;
+    border: 0.5px solid rgba(255, 140, 0, 0.24);
+    border-radius: 8px;
+    background: rgba(255, 140, 0, 0.08);
+    color: var(--accent);
+    font: 800 18px/1 var(--font-mono);
+    cursor: pointer;
+}
+
 .craft-requests-toolbar .craft-requests-pagination {
     margin: 0 0 0 auto;
 }
@@ -6584,10 +6614,10 @@ body {
 }
 
 .craft-board-table tbody td {
-    padding: 8px;
+    padding: 12px 10px;
     border-bottom: 0.5px solid rgba(255, 255, 255, 0.04);
     vertical-align: middle;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .craft-board-table tbody tr:hover {
@@ -6603,15 +6633,25 @@ body {
     opacity: 0.5;
 }
 
+.craft-board-crafted-pending-sale {
+    opacity: 0.68;
+    filter: grayscale(0.32);
+    background: rgba(255, 255, 255, 0.018);
+}
+
+.craft-board-crafted-pending-sale:hover {
+    opacity: 0.82;
+}
+
 .craft-board-request {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
 }
 
 .craft-board-img {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     border-radius: 6px;
     object-fit: contain;
     background: rgba(0, 0, 0, 0.3);
@@ -6619,7 +6659,7 @@ body {
 
 .craft-board-request strong {
     display: block;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .craft-board-request small {
@@ -6632,7 +6672,8 @@ body {
     background: rgba(0, 0, 0, 0.3);
     border: 0.5px solid rgba(255, 255, 255, 0.08);
     border-radius: 6px;
-    padding: 6px 8px;
+    min-height: 38px;
+    padding: 8px 10px;
     color: var(--text);
     font-size: 12px;
     width: 100%;
@@ -6657,9 +6698,16 @@ body {
     background: rgba(0, 0, 0, 0.3);
     border: 0.5px solid rgba(255, 255, 255, 0.08);
     border-radius: 6px;
-    padding: 6px 8px;
+    min-height: 38px;
+    padding: 8px 10px;
     color: var(--text);
-    font-size: 12px;
+    font-size: 13px;
+}
+
+.craft-checkbox-crafted {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
 }
 
 .craft-org-select option {
@@ -6671,9 +6719,10 @@ body {
     background: linear-gradient(135deg, var(--green), #16a34a);
     color: white;
     border: 0;
-    padding: 6px 12px;
+    min-height: 38px;
+    padding: 8px 14px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -7584,6 +7633,34 @@ body {
     line-height: 1.5;
 }
 
+.mw-serial-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.mw-serial-row {
+    display: grid;
+    gap: 6px;
+}
+
+.mw-serial-row span {
+    color: var(--text-muted);
+    font: 700 11px/1 var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.mw-serial-input {
+    min-height: 42px !important;
+}
+
+.mw-serial-hint {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
 .myweapons-history {
     margin-top: 16px;
 }
@@ -7607,7 +7684,7 @@ body {
     min-height: 28px;
     padding: 6px 12px;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 800;
     letter-spacing: 0.05em;
     text-transform: uppercase;

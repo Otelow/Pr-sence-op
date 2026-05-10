@@ -656,6 +656,13 @@
             <div class="craft-recent-requests">
                 <h4>📜 Demandes récentes</h4>
                 <div class="craft-requests-toolbar">
+                    <div class="craft-requests-search">
+                        <label class="comm-label" for="craftRequestsUserSearch">Recherche utilisateur</label>
+                        <div class="craft-requests-search-row">
+                            <input type="search" id="craftRequestsUserSearch" class="comm-input craft-requests-search-input" placeholder="Rechercher un utilisateur..." oninput="updateCraftRequestsUserSearch()">
+                            <button type="button" class="craft-requests-clear" onclick="clearCraftRequestsUserSearch()" title="Vider la recherche">×</button>
+                        </div>
+                    </div>
                     <div class="craft-board-sort">
                         <label class="comm-label" for="craftRequestsSortBy">Trier par</label>
                         <select id="craftRequestsSortBy" class="comm-input craft-board-select" onchange="updateCraftRequestsSort()">
@@ -838,9 +845,15 @@
                     </select>
                 </div>
 
+                <div class="comm-field" id="mwQuantityField">
+                    <label class="comm-label">Nombre d'exemplaires *</label>
+                    <input type="number" id="mwQuantity" class="comm-input" min="1" max="50" value="1" oninput="updateMwSerialFields()" onchange="updateMwSerialFields()">
+                </div>
+
                 <div class="comm-field" id="mwSerialField">
                     <label class="comm-label">N° de série *</label>
-                    <textarea id="mwSerial" class="comm-input mw-serial-textarea" required rows="4" placeholder="Ex: ABC123XYZ&#10;DEF456UVW&#10;GHI789RST"></textarea>
+                    <div id="mwSerialList" class="mw-serial-list"></div>
+                    <p class="mw-serial-hint" id="mwSerialHint">Un champ par exemplaire.</p>
                 </div>
 
                 <div class="craft-field-row">

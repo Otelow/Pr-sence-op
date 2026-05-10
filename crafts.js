@@ -1956,7 +1956,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.post('/api/crafts/myweapons', requireAuth, async (req, res, next) => {
         try {
-            const { weapon_name, is_crafted, serial_number, serial_numbers, asking_price, min_price, crafted_by_id, crafted_by_name } = req.body;
+            const { weapon_name, is_crafted, serial_number, serial_numbers, quantity, asking_price, min_price, crafted_by_id, crafted_by_name } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
             const userAvatar = req.session.user.avatar || null;
@@ -1976,8 +1976,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
 
             let serials = normalizeSerialList(serial_numbers || serial_number);
-            if (isCrafted21BS && !serials.length) return res.status(400).json({ error: 'N° de série obligatoire pour une arme 21BS' });
-            if (!isCrafted21BS && !serials.length) serials = [null];
+            const requestedQuantity = Math.min(50, Math.max(1, parseInt(quantity, 10) || serials.length || 1));
+            if (isCrafted21BS && serials.length !== requestedQuantity) {
+                return res.status(400).json({ error: `Renseigne ${requestedQuantity} N° de série distinct${requestedQuantity > 1 ? 's' : ''}` });
+            }
+            if (!isCrafted21BS && serials.length < requestedQuantity) {
+                serials = [...serials, ...Array(requestedQuantity - serials.length).fill(null)];
+            }
 
             const askingPrice = parseInt(asking_price) || null;
             const minPrice = parseInt(min_price) || null;
