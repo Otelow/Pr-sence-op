@@ -185,6 +185,7 @@ function initDB() {
                     completed_by_id TEXT,
                     completed_by_name TEXT,
                     posted_to_channel INTEGER DEFAULT 0,
+                    stock_consumed_at INTEGER,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
                 CREATE TABLE IF NOT EXISTS my_weapons (
@@ -234,6 +235,7 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN weapons_log_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN stock_consumed_at INTEGER`); } catch {}
 
             const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
@@ -581,6 +583,7 @@ function getReservedStockByActiveRequests() {
     const activeRequests = getRequests('all', { productionOnly: true });
 
     for (const request of activeRequests) {
+        if (request.stock_consumed_at) continue;
         if (!CRAFT_STOCK_RESERVED_STATUSES.includes(request.status)) continue;
         const weapon = weaponsById.get(Number(request.weapon_id));
         if (!weapon) continue;
@@ -606,6 +609,126 @@ function getReservedStockByActiveRequests() {
     }
 
     return { byIngredientId: reservedByIngredientId, byName: reservedByName };
+}
+
+function createStockError(message) {
+    const err = new Error(message);
+    err.statusCode = 400;
+    return err;
+}
+
+function getStockRequirementsForWeapon(weapon) {
+    if (!weapon) throw createStockError('Arme introuvable pour le calcul du stock');
+
+    const ingredients = getAllIngredients();
+    const ingredientById = new Map(ingredients.map(item => [Number(item.id), item]));
+    const ingredientByName = new Map(ingredients.map(item => [normalizeStockName(item.name), item]));
+    const stockMaterials = getStockMaterials();
+    const stockByIngredientId = new Map(stockMaterials.map(item => [Number(item.ingredient_id), item]));
+    const stockByName = new Map(stockMaterials.map(item => [normalizeStockName(item.name), item]));
+    const requirementsByIngredient = new Map();
+
+    for (const recipe of parseWeaponIngredients(weapon.ingredients)) {
+        const recipeIngredientId = Number(recipe.ingredient_id || recipe.id || 0);
+        const ingredient = ingredientById.get(recipeIngredientId)
+            || ingredientByName.get(normalizeStockName(recipe.name))
+            || null;
+        const name = ingredient?.name || recipe.name || '';
+        if (!isStockMaterialName(name)) continue;
+
+        const required = Math.max(0, parseInt(recipe.quantity || recipe.qty || recipe.amount, 10) || 0);
+        if (!required) continue;
+
+        const stock = (ingredient ? stockByIngredientId.get(Number(ingredient.id)) : null)
+            || stockByName.get(normalizeStockName(name));
+        if (!stock) throw createStockError(`Stock introuvable pour ${getCanonicalStockMaterialName(name) || name}`);
+
+        const stockIngredientId = Number(stock.ingredient_id);
+        const existing = requirementsByIngredient.get(stockIngredientId);
+        if (existing) {
+            existing.quantity += required;
+        } else {
+            requirementsByIngredient.set(stockIngredientId, {
+                ingredient_id: stockIngredientId,
+                name: stock.name,
+                quantity: required,
+            });
+        }
+    }
+
+    return [...requirementsByIngredient.values()];
+}
+
+function applyStockDelta(requirements, delta, now) {
+    if (!requirements.length) return;
+
+    if (useSQLite) {
+        const selectStock = db.prepare('SELECT quantity FROM stock_materials WHERE ingredient_id = ?');
+        const updateStock = db.prepare('UPDATE stock_materials SET quantity = ?, updated_at = ? WHERE ingredient_id = ?');
+
+        if (delta < 0) {
+            for (const requirement of requirements) {
+                const current = selectStock.get(requirement.ingredient_id);
+                const currentQuantity = Number(current?.quantity) || 0;
+                if (currentQuantity < requirement.quantity) {
+                    throw createStockError(`Stock insuffisant pour ${requirement.name} (${currentQuantity}/${requirement.quantity})`);
+                }
+            }
+        }
+
+        for (const requirement of requirements) {
+            const current = selectStock.get(requirement.ingredient_id);
+            const currentQuantity = Number(current?.quantity) || 0;
+            const nextQuantity = currentQuantity + delta * requirement.quantity;
+            updateStock.run(nextQuantity, now, requirement.ingredient_id);
+        }
+        return;
+    }
+
+    jsonData.stock_materials = jsonData.stock_materials || [];
+    if (delta < 0) {
+        for (const requirement of requirements) {
+            const row = jsonData.stock_materials.find(item => Number(item.ingredient_id) === Number(requirement.ingredient_id));
+            const currentQuantity = Number(row?.quantity) || 0;
+            if (currentQuantity < requirement.quantity) {
+                throw createStockError(`Stock insuffisant pour ${requirement.name} (${currentQuantity}/${requirement.quantity})`);
+            }
+        }
+    }
+
+    for (const requirement of requirements) {
+        const row = jsonData.stock_materials.find(item => Number(item.ingredient_id) === Number(requirement.ingredient_id));
+        const currentQuantity = Number(row?.quantity) || 0;
+        const nextQuantity = currentQuantity + delta * requirement.quantity;
+        if (row) {
+            row.quantity = nextQuantity;
+            row.updated_at = now;
+        }
+    }
+}
+
+function consumeStockForCraftRequest(request, now) {
+    const weapon = getWeapon(request.weapon_id);
+    const requirements = getStockRequirementsForWeapon(weapon);
+    applyStockDelta(requirements, -1, now);
+
+    if (useSQLite) {
+        db.prepare('UPDATE craft_requests SET stock_consumed_at = ? WHERE id = ?').run(now, request.id);
+    } else {
+        request.stock_consumed_at = now;
+    }
+}
+
+function restoreStockForCraftRequest(request, now) {
+    const weapon = getWeapon(request.weapon_id);
+    const requirements = getStockRequirementsForWeapon(weapon);
+    applyStockDelta(requirements, 1, now);
+
+    if (useSQLite) {
+        db.prepare('UPDATE craft_requests SET stock_consumed_at = NULL WHERE id = ?').run(request.id);
+    } else {
+        request.stock_consumed_at = null;
+    }
 }
 
 function getAvailableStock() {
@@ -834,12 +957,29 @@ function insertRequest(user_id, user_name, weapon_id, has_plan, has_money) {
 function updateRequestCraft(id, crafted, serial, userId, userName) {
     const now = Math.floor(Date.now() / 1000);
     if (useSQLite) {
-        db.prepare(`UPDATE craft_requests SET crafted = ?, serial_number = ?, craft_date = ?, crafted_by_id = ?, crafted_by_name = ?, status = CASE WHEN ? = 1 THEN 'crafted' ELSE 'in_progress' END WHERE id = ?`)
-            .run(crafted ? 1 : 0, serial || null, crafted ? now : null, userId, userName, crafted ? 1 : 0, id);
+        const tx = db.transaction(() => {
+            const current = getRequest(id);
+            if (!current) throw createStockError('Demande introuvable');
+
+            if (crafted && !current.stock_consumed_at) {
+                consumeStockForCraftRequest(current, now);
+            } else if (!crafted && current.stock_consumed_at) {
+                restoreStockForCraftRequest(current, now);
+            }
+
+            db.prepare(`UPDATE craft_requests SET crafted = ?, serial_number = ?, craft_date = ?, crafted_by_id = ?, crafted_by_name = ?, status = CASE WHEN ? = 1 THEN 'crafted' ELSE 'in_progress' END WHERE id = ?`)
+                .run(crafted ? 1 : 0, serial || null, crafted ? now : null, userId, userName, crafted ? 1 : 0, id);
+        });
+        tx();
         return;
     }
     const r = jsonData.craft_requests.find(r => r.id === id);
     if (r) {
+        if (crafted && !r.stock_consumed_at) {
+            consumeStockForCraftRequest(r, now);
+        } else if (!crafted && r.stock_consumed_at) {
+            restoreStockForCraftRequest(r, now);
+        }
         r.crafted = crafted ? 1 : 0;
         r.serial_number = serial || null;
         r.craft_date = crafted ? now : null;
@@ -1590,7 +1730,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 }
             }
             res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { res.status(e.statusCode || 500).json({ error: e.message }); }
     });
 
     // Changement de statut (En attente / Matières / En cours / Refusé)

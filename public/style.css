@@ -6706,16 +6706,19 @@ body {
     background: linear-gradient(90deg, var(--request-bg), rgba(255, 255, 255, 0.035) 70%);
 }
 
-.craft-board-table tbody tr.request-row-active-wave td {
-    background-image: linear-gradient(112deg, transparent 0%, transparent 38%, var(--request-wave) 50%, transparent 62%, transparent 100%);
-    background-size: 220% 100%;
-    animation: craftBoardCellWave 5.2s ease-in-out infinite;
+.craft-board-table tbody tr.request-row-active-wave {
+    background-image:
+        linear-gradient(90deg, var(--request-bg), rgba(20, 20, 24, 0.42) 64%),
+        linear-gradient(112deg, transparent 0%, transparent 38%, var(--request-wave) 50%, transparent 62%, transparent 100%);
+    background-size: 100% 100%, 220% 100%;
+    background-position: 0 0, 140% 0;
+    animation: craftBoardRowWave 5.2s ease-in-out infinite;
 }
 
-@keyframes craftBoardCellWave {
-    0% { background-position: 140% 0; }
-    58% { background-position: -80% 0; }
-    100% { background-position: -80% 0; }
+@keyframes craftBoardRowWave {
+    0% { background-position: 0 0, 140% 0; }
+    58% { background-position: 0 0, -80% 0; }
+    100% { background-position: 0 0, -80% 0; }
 }
 
 .craft-board-empty {

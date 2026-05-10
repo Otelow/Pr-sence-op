@@ -3373,7 +3373,7 @@ async function updateCraftRequestCraft(requestId, crafted, serial) {
         const data = await res.json();
         if (res.ok) {
             toast(crafted ? '⚒ Craft validé, demandeur ping' : '↩ Annulé');
-            await loadCraftRequests();
+            await Promise.all([loadCraftRequests(), loadWeaponsCatalog()]);
             renderCraftBoard();
         } else {
             toast(`❌ ${data.error}`, 'error');
