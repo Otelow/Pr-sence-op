@@ -19,7 +19,9 @@ if (missingEnv.length) {
 const { client, getBotState } = require('./bot.js');
 const { startServer } = require('./server.js');
 
-// Démarrer le serveur web après que le bot soit prêt
+// Le dashboard doit rester disponible meme si Discord met du temps a se connecter.
+startServer(client, getBotState);
+
 client.once('ready', () => {
-    startServer(client, getBotState);
+    console.log('Bot Discord pret, dashboard deja demarre.');
 });

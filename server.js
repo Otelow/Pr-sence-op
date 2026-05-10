@@ -25,6 +25,7 @@ function startServer(client, getState) {
 
     const app = express();
 
+    app.set('trust proxy', 1);
     app.use(express.json());
     app.use(express.static(path.join(__dirname, 'public')));
     app.use(session({
@@ -32,7 +33,12 @@ function startServer(client, getState) {
         resave: false,
         saveUninitialized: false,
         rolling: true,
-        cookie: { maxAge: 10 * 60 * 1000 } // 10 minutes
+        cookie: {
+            maxAge: config.web.sessionMaxAgeMs,
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: config.isProduction || config.isRailway,
+        },
     }));
 
     // ==========================================
@@ -237,6 +243,46 @@ body.login-body { overflow: hidden; }
         next();
     }
 
+    function getGuild() {
+        const state = botState?.();
+        const guildId = state?.CONFIG?.GUILD_ID;
+        return guildId ? botClient?.guilds?.cache?.get(guildId) : null;
+    }
+
+    function canRoleViewChannel(channel, role) {
+        if (!channel?.permissionsFor || !role) return false;
+        return channel.permissionsFor(role)?.has('ViewChannel') ?? false;
+    }
+
+    function userCanViewChannel(channel, user) {
+        if (isUserAdmin(user)) return true;
+        const guild = getGuild();
+        if (!guild || !channel?.permissionsFor) return false;
+        const roleIds = user?.roles || [];
+        const everyoneCanView = guild.roles?.everyone
+            ? canRoleViewChannel(channel, guild.roles.everyone)
+            : false;
+        const roleCanView = roleIds.some(roleId => canRoleViewChannel(channel, guild.roles.cache.get(roleId)));
+        return Boolean(everyoneCanView || roleCanView);
+    }
+
+    function userCanSendToChannel(channel, user) {
+        if (!userCanViewChannel(channel, user)) return false;
+        if (isUserAdmin(user)) return true;
+        const guild = getGuild();
+        if (!guild || !channel?.permissionsFor) return false;
+        return (user?.roles || []).some(roleId => {
+            const role = guild.roles.cache.get(roleId);
+            const permissions = role ? channel.permissionsFor(role) : null;
+            return Boolean(permissions?.has('SendMessages') || permissions?.has('SendMessagesInThreads'));
+        });
+    }
+
+    async function fetchDiscordChannel(channelId) {
+        return botClient?.channels?.cache?.get(channelId)
+            || await botClient?.channels?.fetch(channelId).catch(() => null);
+    }
+
     // Initialiser la DB crafts
     try {
         initDB();
@@ -334,7 +380,7 @@ body.login-body { overflow: hidden; }
     });
 
     // Suivi hebdomadaire
-    app.get('/api/weekly', requireAuth, async (req, res) => {
+    app.get('/api/weekly', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
 
@@ -594,7 +640,7 @@ body.login-body { overflow: hidden; }
     });
 
     // Reset le suivi d'un membre
-    app.post('/api/tracking/reset', requireAuth, (req, res) => {
+    app.post('/api/tracking/reset', requireAuth, requireFullSiteAccess, (req, res) => {
         const { userId } = req.body;
         const state = botState();
         if (state.absenceTracking.has(userId)) {
@@ -606,7 +652,7 @@ body.login-body { overflow: hidden; }
     });
 
     // Stats globales
-    app.get('/api/stats', requireAuth, async (req, res) => {
+    app.get('/api/stats', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
 
@@ -699,9 +745,8 @@ body.login-body { overflow: hidden; }
             const canImpersonate = !!impersonateRole && isUserAdmin(req.session.user);
             const impersonatedRole = canImpersonate ? guild.roles.cache.get(impersonateRole) : null;
             const canSeeChannel = (ch) => {
-                if (!canImpersonate) return true;
-                if (!impersonatedRole || !ch?.permissionsFor) return false;
-                return ch.permissionsFor(impersonatedRole)?.has('ViewChannel') ?? false;
+                if (canImpersonate) return canRoleViewChannel(ch, impersonatedRole);
+                return userCanViewChannel(ch, req.session.user);
             };
             const categories = [];
             const orphans = [];
@@ -709,6 +754,7 @@ body.login-body { overflow: hidden; }
             // Collecter les catégories
             for (const [, ch] of channels) {
                 if (ch.type === 4) { // CategoryChannel
+                    if (!canSeeChannel(ch)) continue;
                     categories.push({
                         id: ch.id,
                         name: ch.name,
@@ -781,8 +827,11 @@ body.login-body { overflow: hidden; }
         const after = req.query.after;
 
         try {
-            const channel = botClient.channels.cache.get(channelId);
+            const channel = await fetchDiscordChannel(channelId);
             if (!channel) return res.status(404).json({ error: 'Salon introuvable' });
+            if (!userCanViewChannel(channel, req.session.user)) {
+                return res.status(403).json({ error: 'Acces au salon refuse' });
+            }
 
             // Forums : on retourne les threads à la place des messages
             if (channel.type === 15) {
@@ -957,8 +1006,11 @@ body.login-body { overflow: hidden; }
         }
 
         try {
-            const channel = botClient.channels.cache.get(channelId);
+            const channel = await fetchDiscordChannel(channelId);
             if (!channel) return res.status(404).json({ error: 'Salon introuvable' });
+            if (!userCanSendToChannel(channel, req.session.user)) {
+                return res.status(403).json({ error: 'Permission d\'envoi refusee pour ce salon' });
+            }
 
             // Threads : on envoie directement dans le thread
             const isThread = [10, 11, 12].includes(channel.type);
@@ -993,7 +1045,7 @@ body.login-body { overflow: hidden; }
                 avatarURL: req.session.user.avatar || undefined,
                 threadId: isThread ? channelId : undefined,
                 allowedMentions: {
-                    parse: ['users', 'roles'],
+                    parse: hasFullSiteAccess(req.session.user) ? ['users', 'roles'] : [],
                 },
             });
 
@@ -1066,8 +1118,11 @@ body.login-body { overflow: hidden; }
 
     app.get('/api/channel/:id/pinned', requireAuth, async (req, res) => {
         try {
-            const channel = botClient.channels.cache.get(req.params.id);
+            const channel = await fetchDiscordChannel(req.params.id);
             if (!channel) return res.status(404).json({ error: 'Salon introuvable' });
+            if (!userCanViewChannel(channel, req.session.user)) {
+                return res.status(403).json({ error: 'Acces au salon refuse' });
+            }
 
             const pinned = await channel.messages.fetchPinned();
             const result = [...pinned.values()].map(m => ({

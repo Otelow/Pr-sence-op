@@ -130,6 +130,8 @@ function initDB() {
         try {
             db = new Database(DB_PATH);
             db.pragma('journal_mode = WAL');
+            db.pragma('foreign_keys = ON');
+            db.pragma('busy_timeout = 5000');
             db.exec(`
                 CREATE TABLE IF NOT EXISTS weapons (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -995,7 +997,7 @@ function updateRequestCraft(id, crafted, serial, userId, userName) {
 function updateRequestSale(id, buyer_org, sale_price, sale_date, userId, userName) {
     if (useSQLite) {
         db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
-            .run(buyer_org || null, sale_price || null, sale_date, userId, userName, id);
+            .run(buyer_org || null, sale_price ?? null, sale_date, userId, userName, id);
         return;
     }
     const r = jsonData.craft_requests.find(r => r.id === id);
@@ -1774,7 +1776,12 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const isAdmin = req.session.user.isAdmin;
             if (existing.user_id !== userId && !isAdmin) return res.status(403).json({ error: 'Action non autorisée' });
             const saleTimestamp = sale_date ? Math.floor(new Date(sale_date).getTime() / 1000) : Math.floor(Date.now() / 1000);
-            updateRequestSale(id, buyer_org, parseInt(sale_price) || null, saleTimestamp, userId, userName);
+            const rawSalePrice = String(sale_price ?? '').trim();
+            const parsedSalePrice = rawSalePrice === '' ? null : Number.parseInt(rawSalePrice, 10);
+            if (parsedSalePrice !== null && (!Number.isFinite(parsedSalePrice) || parsedSalePrice < 0)) {
+                return res.status(400).json({ error: 'Prix de vente invalide' });
+            }
+            updateRequestSale(id, buyer_org, parsedSalePrice, saleTimestamp, userId, userName);
             const updated = getRequest(id);
             if (!existing.posted_to_channel) {
                 const state = botState();
@@ -2186,6 +2193,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     });
 
     app.post('/api/crafts/myweapons-legacy', requireAuth, async (req, res) => {
+        return res.status(410).json({ error: 'Endpoint legacy desactive. Utilise /api/crafts/myweapons.' });
+
         try {
             const { weapon_name, is_crafted, serial_number, asking_price, min_price } = req.body;
             const userId = req.session.user.id;
