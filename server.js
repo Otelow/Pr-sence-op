@@ -27,7 +27,14 @@ function startServer(client, getState) {
 
     app.set('trust proxy', 1);
     app.use(express.json());
-    app.use(express.static(path.join(__dirname, 'public')));
+    app.use(express.static(path.join(__dirname, 'public'), {
+        maxAge: config.isProduction || config.isRailway ? '1h' : 0,
+        setHeaders: (res, filePath) => {
+            if (/\.(png|jpe?g|webp|gif|svg|ico)$/i.test(filePath)) {
+                res.setHeader('Cache-Control', 'public, max-age=604800');
+            }
+        },
+    }));
     app.use(session({
         secret: SESSION_SECRET,
         resave: false,
@@ -40,6 +47,18 @@ function startServer(client, getState) {
             secure: config.isProduction || config.isRailway,
         },
     }));
+    app.use((req, res, next) => {
+        const startedAt = process.hrtime.bigint();
+        res.on('finish', () => {
+            const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+            if (durationMs < 1000) return;
+            const level = durationMs >= 5000 ? 'CRITICAL' : 'WARNING';
+            const pathOnly = req.originalUrl.split('?')[0];
+            const userId = req.session?.user?.id || 'anonymous';
+            console.warn(`[PERF ${level}] ${req.method} ${pathOnly} ${res.statusCode} ${Math.round(durationMs)}ms user=${userId}`);
+        });
+        next();
+    });
 
     // ==========================================
     // OAuth2 Discord
@@ -287,7 +306,8 @@ body.login-body { overflow: hidden; }
     try {
         initDB();
     } catch (e) {
-        console.error('❌ Erreur init DB crafts:', e.message);
+        console.error('Erreur init DB crafts:', e.message);
+        if (config.isProduction || config.isRailway) process.exit(1);
     }
 
     // ==========================================

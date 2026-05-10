@@ -15,6 +15,7 @@ const PAGE_TITLES = {
 
 let currentTab = 'presence';
 let refreshTimer = null;
+let refreshAllInFlight = false;
 const SITE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 let idleLogoutTimer = null;
 let userPermissions = { canEditMap: false };
@@ -164,26 +165,32 @@ function switchTab(tab) {
 }
 
 async function refreshAll() {
-    if (!checkUserAccess() && ['presence', 'commands'].includes(currentTab)) {
-        applyPermissionsUI();
-        return;
-    }
-    if (currentTab === 'presence') {
-        await Promise.all([loadStats(), loadPresence()]);
-    } else if (currentTab === 'stats') {
-        await loadWeekly();
-    } else if (currentTab === 'sanctions') {
-        await loadSanctions();
-    } else if (currentTab === 'channels') {
-        if (!channelsLoaded) await loadChannels();
-    } else if (currentTab === 'map') {
-        await loadMapPoints();
-    } else if (currentTab === 'commands') {
-        if (!commandsLoaded) await initCommandsTab();
-    } else if (currentTab === 'crafts') {
-        await initCraftsTab();
-    } else if (currentTab === 'myweapons') {
-        await initMyWeaponsTab();
+    if (refreshAllInFlight) return;
+    refreshAllInFlight = true;
+    try {
+        if (!checkUserAccess() && ['presence', 'commands'].includes(currentTab)) {
+            applyPermissionsUI();
+            return;
+        }
+        if (currentTab === 'presence') {
+            await Promise.all([loadStats(), loadPresence()]);
+        } else if (currentTab === 'stats') {
+            await loadWeekly();
+        } else if (currentTab === 'sanctions') {
+            await loadSanctions();
+        } else if (currentTab === 'channels') {
+            if (!channelsLoaded) await loadChannels();
+        } else if (currentTab === 'map') {
+            await loadMapPoints();
+        } else if (currentTab === 'commands') {
+            if (!commandsLoaded) await initCommandsTab();
+        } else if (currentTab === 'crafts') {
+            await refreshCraftsTab();
+        } else if (currentTab === 'myweapons') {
+            await initMyWeaponsTab();
+        }
+    } finally {
+        refreshAllInFlight = false;
     }
 }
 
@@ -2398,6 +2405,9 @@ window.selectSanctionUserCustom = selectSanctionUserCustom;
 // SECTION CRAFT D'ARMES
 // ============================================================
 let craftsLoaded = false;
+let craftsInitPromise = null;
+let craftsRefreshInFlight = false;
+let currentCraftSubtab = 'catalog';
 let weaponsCache = [];
 let stockMaterialsCache = [];
 let organizationsCache = [];
@@ -2440,7 +2450,38 @@ function displayName(name) {
 }
 let craftCatalogFiltersReady = false;
 
+function renderActiveCraftSubtab() {
+    if (currentCraftSubtab === 'catalog') renderCraftCatalog();
+    else if (currentCraftSubtab === 'request') renderCraftRequestsList();
+    else if (currentCraftSubtab === 'board') renderCraftBoard();
+    else if (currentCraftSubtab === 'history') renderCraftHistory();
+}
+
+async function refreshCraftsTab() {
+    if (!craftsLoaded) return initCraftsTab();
+    if (craftsRefreshInFlight) return;
+    craftsRefreshInFlight = true;
+    try {
+        if (currentCraftSubtab === 'catalog') {
+            await loadWeaponsCatalog();
+        } else if (currentCraftSubtab === 'request') {
+            await loadCraftRequests();
+        } else if (currentCraftSubtab === 'board') {
+            await Promise.all([loadCraftRequests(), loadWeaponsCatalog()]);
+        } else if (currentCraftSubtab === 'history') {
+            await loadCraftRequests();
+        }
+        renderActiveCraftSubtab();
+    } catch (e) {
+        console.error('Refresh crafts:', e);
+    } finally {
+        craftsRefreshInFlight = false;
+    }
+}
+
 async function initCraftsTab() {
+    if (craftsInitPromise) return craftsInitPromise;
+    craftsInitPromise = (async () => {
     setupCraftCatalogFilters();
     // Afficher tout de suite un état d'attente cohérent
     renderCraftCatalog();
@@ -2468,6 +2509,13 @@ async function initCraftsTab() {
     renderCraftBoard();
     renderCraftHistory();
     renderCraftWeaponDropdown();
+    })();
+
+    try {
+        await craftsInitPromise;
+    } finally {
+        craftsInitPromise = null;
+    }
 }
 
 async function loadWeaponsCatalog() {
@@ -2491,12 +2539,15 @@ async function loadWeaponsCatalog() {
 }
 
 async function loadOrganizations() {
+    if (organizationsCache.length > 0) return organizationsCache;
     try {
         const r = await fetch('/api/crafts/organizations');
         const d = await r.json();
         organizationsCache = d.organizations || [];
+        return organizationsCache;
     } catch {
         organizationsCache = [];
+        return organizationsCache;
     }
 }
 
@@ -2511,6 +2562,7 @@ async function loadCraftRequests() {
 }
 
 function switchCraftSubtab(subtab) {
+    currentCraftSubtab = subtab || 'catalog';
     document.querySelectorAll('.crafts-subtab').forEach(b => b.classList.toggle('active', b.dataset.subtab === subtab));
     document.querySelectorAll('.crafts-section').forEach(s => {
         s.style.display = (s.id === `craftSection-${subtab}`) ? 'block' : 'none';

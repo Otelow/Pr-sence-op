@@ -88,6 +88,15 @@ const STOCK_MATERIAL_NAMES = [
 
 const CRAFT_PRODUCTION_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
 const CRAFT_STOCK_RESERVED_STATUSES = ['materials', 'waiting_materials', 'in_progress'];
+const CRAFTABLE_CACHE_TTL_MS = 10_000;
+
+let craftableWeaponsCache = null;
+let craftableWeaponsCacheExpiresAt = 0;
+
+function invalidateCraftCaches() {
+    craftableWeaponsCache = null;
+    craftableWeaponsCacheExpiresAt = 0;
+}
 
 function normalizeStockName(value) {
     return String(value || '')
@@ -251,6 +260,10 @@ function initDB() {
             console.log('💾 DB Crafts initialisée (SQLite)');
         } catch (e) {
             console.error('❌ SQLite init error, fallback JSON:', e.message);
+            if (config.isProduction || config.isRailway) {
+                console.error('SQLite init error en production, fallback JSON desactive:', e.message);
+                throw e;
+            }
             useSQLite = false;
             loadJSON();
             seedDefaultIngredientsJSON();
@@ -325,6 +338,7 @@ function seedStockMaterials() {
                 if (Number(ingredient.id) !== Number(preferred.id)) deleteDuplicateStock.run(ingredient.id);
             }
         }
+        invalidateCraftCaches();
         return;
     }
 
@@ -372,6 +386,7 @@ function seedStockMaterials() {
         jsonData.stock_materials = jsonData.stock_materials.filter(row => !duplicateIds.has(Number(row.ingredient_id)));
     }
     saveJSON();
+    invalidateCraftCaches();
 }
 
 function seedMyWeaponNamesFromWeapons() {
@@ -417,11 +432,13 @@ function insertWeapon(name, image_path, plan_image_path, requires_plan, craft_ti
     if (useSQLite) {
         const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(name, image_path, plan_image_path, requires_plan ? 1 : 0, craft_time, craft_price, sale_price, ingredients);
+        invalidateCraftCaches();
         return r.lastInsertRowid;
     }
     const id = nextId('weapons');
     jsonData.weapons.push({ id, name, image_path, plan_image_path, requires_plan: requires_plan ? 1 : 0, craft_time, craft_price, sale_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
     saveJSON();
+    invalidateCraftCaches();
     return id;
 }
 
@@ -429,6 +446,7 @@ function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craf
     if (useSQLite) {
         db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, sale_price = ?, ingredients = ?, requires_plan = ?, image_path = COALESCE(?, image_path), plan_image_path = COALESCE(?, plan_image_path) WHERE id = ?`)
             .run(name, craft_time, craft_price, sale_price, ingredients, requires_plan ? 1 : 0, image_path, plan_image_path, id);
+        invalidateCraftCaches();
         return;
     }
     const w = jsonData.weapons.find(w => w.id === id);
@@ -442,13 +460,15 @@ function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craf
         if (image_path) w.image_path = image_path;
         if (plan_image_path) w.plan_image_path = plan_image_path;
         saveJSON();
+        invalidateCraftCaches();
     }
 }
 
 function deleteWeapon(id) {
-    if (useSQLite) { db.prepare('DELETE FROM weapons WHERE id = ?').run(id); return; }
+    if (useSQLite) { db.prepare('DELETE FROM weapons WHERE id = ?').run(id); invalidateCraftCaches(); return; }
     jsonData.weapons = jsonData.weapons.filter(w => w.id !== id);
     saveJSON();
+    invalidateCraftCaches();
 }
 
 // ─── INGREDIENTS ───────────────
@@ -465,6 +485,8 @@ function getIngredient(id) {
 function insertIngredient(name, image_path) {
     if (useSQLite) {
         const r = db.prepare('INSERT OR IGNORE INTO ingredients (name, image_path) VALUES (?, ?)').run(name, image_path);
+        if (isStockMaterialName(name)) seedStockMaterials();
+        else invalidateCraftCaches();
         return r.lastInsertRowid;
     }
     if (!jsonData.ingredients) jsonData.ingredients = [];
@@ -477,12 +499,16 @@ function insertIngredient(name, image_path) {
         created_at: Math.floor(Date.now() / 1000),
     });
     saveJSON();
+    if (isStockMaterialName(name)) seedStockMaterials();
+    else invalidateCraftCaches();
     return jsonData.counters.ingredients;
 }
 
 function updateIngredient(id, name, image_path) {
     if (useSQLite) {
         db.prepare(`UPDATE ingredients SET name = ?, image_path = COALESCE(?, image_path) WHERE id = ?`).run(name, image_path, id);
+        if (isStockMaterialName(name)) seedStockMaterials();
+        else invalidateCraftCaches();
         return;
     }
     const ing = (jsonData.ingredients || []).find(i => i.id === id);
@@ -490,13 +516,23 @@ function updateIngredient(id, name, image_path) {
         if (name) ing.name = name;
         if (image_path) ing.image_path = image_path;
         saveJSON();
+        if (isStockMaterialName(ing.name)) seedStockMaterials();
+        else invalidateCraftCaches();
     }
 }
 
 function deleteIngredient(id) {
-    if (useSQLite) { db.prepare('DELETE FROM ingredients WHERE id = ?').run(id); return; }
+    const existing = getIngredient(id);
+    if (useSQLite) {
+        db.prepare('DELETE FROM ingredients WHERE id = ?').run(id);
+        if (existing && isStockMaterialName(existing.name)) seedStockMaterials();
+        else invalidateCraftCaches();
+        return;
+    }
     jsonData.ingredients = (jsonData.ingredients || []).filter(i => i.id !== id);
     saveJSON();
+    if (existing && isStockMaterialName(existing.name)) seedStockMaterials();
+    else invalidateCraftCaches();
 }
 
 function toCraftImageUrl(imagePath) {
@@ -546,8 +582,6 @@ function dedupeStockRows(rows, ingredients = []) {
 }
 
 function getStockMaterials() {
-    seedStockMaterials();
-
     if (useSQLite) {
         const ingredients = db.prepare('SELECT * FROM ingredients').all();
         const rows = db.prepare(`
@@ -686,6 +720,7 @@ function applyStockDelta(requirements, delta, now) {
             const nextQuantity = currentQuantity + delta * requirement.quantity;
             updateStock.run(nextQuantity, now, requirement.ingredient_id);
         }
+        invalidateCraftCaches();
         return;
     }
 
@@ -709,6 +744,7 @@ function applyStockDelta(requirements, delta, now) {
             row.updated_at = now;
         }
     }
+    invalidateCraftCaches();
 }
 
 function consumeStockForCraftRequest(request, now) {
@@ -771,6 +807,7 @@ function updateStockMaterial(ingredientId, quantity) {
                 quantity = excluded.quantity,
                 updated_at = excluded.updated_at
         `).run(cleanIngredientId, cleanQuantity);
+        invalidateCraftCaches();
         return getStockMaterials();
     }
 
@@ -788,10 +825,17 @@ function updateStockMaterial(ingredientId, quantity) {
         });
     }
     saveJSON();
+    invalidateCraftCaches();
     return getStockMaterials();
 }
 
-function getCraftableWeapons() {
+function getCraftableWeapons(options = {}) {
+    const useCache = options.useCache !== false;
+    const nowMs = Date.now();
+    if (useCache && craftableWeaponsCache && craftableWeaponsCacheExpiresAt > nowMs) {
+        return craftableWeaponsCache;
+    }
+
     const weapons = getAllWeapons();
     const ingredients = getAllIngredients();
     const ingredientById = new Map(ingredients.map(item => [Number(item.id), item]));
@@ -852,10 +896,13 @@ function getCraftableWeapons() {
         return String(a.name || '').localeCompare(String(b.name || ''), 'fr');
     });
 
-    return {
+    const result = {
         stocks: stockMaterials,
         weapons: decoratedWeapons,
     };
+    craftableWeaponsCache = result;
+    craftableWeaponsCacheExpiresAt = nowMs + CRAFTABLE_CACHE_TTL_MS;
+    return result;
 }
 
 function getAllMyWeaponNames() {
@@ -998,6 +1045,7 @@ function updateRequestSale(id, buyer_org, sale_price, sale_date, userId, userNam
     if (useSQLite) {
         db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
             .run(buyer_org || null, sale_price ?? null, sale_date, userId, userName, id);
+        invalidateCraftCaches();
         return;
     }
     const r = jsonData.craft_requests.find(r => r.id === id);
@@ -1009,6 +1057,7 @@ function updateRequestSale(id, buyer_org, sale_price, sale_date, userId, userNam
         r.completed_by_name = userName;
         r.status = 'completed';
         saveJSON();
+        invalidateCraftCaches();
     }
 }
 
@@ -1291,7 +1340,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const fullReq = getRequest(requestId);
             if (!fullReq) return;
 
-            const channel = botClient.channels.cache.get(CRAFT_REQUEST_CHANNEL);
+            const channel = await fetchDiscordChannel(CRAFT_REQUEST_CHANNEL, 'CRAFT_REQUEST');
             if (!channel) return;
 
             const statusMeta = {
@@ -1423,7 +1472,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         try {
             const fullReq = getRequest(requestId);
             if (!fullReq) return;
-            const channel = botClient.channels.cache.get(CRAFT_STATUS_CHANNEL);
+            const channel = await fetchDiscordChannel(CRAFT_STATUS_CHANNEL, 'CRAFT_STATUS');
             if (!channel) return;
 
             const statusMeta = {
@@ -1487,7 +1536,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const id = insertRequest(userId, userName, weapon_id, has_plan, has_money);
 
             // Message Discord
-            await postOrUpdateCraftRequestMessage(id);
+            postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
 
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1708,7 +1757,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             updateRequestCraft(id, crafted, serial_number, userId, userName);
 
             // Mettre à jour le message Discord original
-            await postOrUpdateCraftRequestMessage(id);
+            postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
 
             if (crafted) {
                 const channel = botClient.channels.cache.get(CRAFT_STATUS_CHANNEL);
@@ -1726,7 +1775,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         .setTimestamp()
                         .setFooter({ text: '21 Block Savage • Atelier craft' });
 
-                    await channel.send({
+                    channel.send({
                         content: `✅ <@${existing.user_id}> ton arme est prête : **${existing.weapon_name}**.`,
                         embeds: [embed],
                         allowedMentions: { users: [existing.user_id] },
@@ -1754,12 +1803,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 const r = jsonData.craft_requests.find(r => r.id === id);
                 if (r) { r.status = status; saveJSON(); }
             }
+            invalidateCraftCaches();
 
             // Mettre à jour le message Discord original (édition embed)
-            await postOrUpdateCraftRequestMessage(id);
+            postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
 
             // Notification dans le salon de statut
-            await postCraftStatusUpdate(id, status);
+            postCraftStatusUpdate(id, status).catch(e => console.error('post craft status async:', e.message));
 
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }

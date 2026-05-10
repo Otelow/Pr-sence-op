@@ -1,5 +1,13 @@
 node_modules/
 .env
+.env.local
+.env.production
 data/
+uploads/
+logs/
+dist/
+build/
+*.zip
+*.log
 npm-debug.log*
 .DS_Store
