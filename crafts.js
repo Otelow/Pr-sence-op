@@ -2743,7 +2743,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.get('/api/crafts/myweapons/available-crafts', requireAuth, (req, res) => {
         try {
-            const userId = req.session.user.id;
+            const requesterId = req.session.user.id;
+            const requestedUserId = String(req.query.userId || '').trim();
+            const viewingOtherUser = requestedUserId && requestedUserId !== requesterId;
+            if (viewingOtherUser && !canValidateCraft(req.session.user) && !canDeleteMyWeapons(req.session.user)) {
+                return res.status(403).json({ crafts: [], error: 'Action non autorisée' });
+            }
+            const userId = viewingOtherUser ? requestedUserId : requesterId;
             let rows;
             if (useSQLite) {
                 rows = db.prepare(`
@@ -2768,6 +2774,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 .filter(r => getWeaponSaleStateForCraftRequest(r).state === 'not_listed')
                 .map(r => ({
                     id: r.id,
+                    user_id: r.user_id,
+                    user_name: r.user_name,
                     weapon_name: r.weapon_name,
                     serial_number: r.serial_number,
                     craft_date: r.craft_date,

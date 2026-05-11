@@ -4124,10 +4124,13 @@ async function loadMyWeapons() {
     } catch { myWeaponsCache = []; }
 }
 
-async function loadMyWeaponsAvailableCrafts() {
+async function loadMyWeaponsAvailableCrafts(userId = '') {
     try {
-        const r = await fetch('/api/crafts/myweapons/available-crafts');
+        const params = new URLSearchParams();
+        if (userId) params.set('userId', userId);
+        const r = await fetch(`/api/crafts/myweapons/available-crafts${params.toString() ? `?${params}` : ''}`);
         const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Chargement des crafts impossible');
         const seen = new Set();
         myWeaponsAvailableCraftsCache = (d.crafts || []).filter(c => {
             const key = String(c.id || '');
@@ -4135,9 +4138,16 @@ async function loadMyWeaponsAvailableCrafts() {
             seen.add(key);
             return true;
         });
-    } catch {
+    } catch (e) {
         myWeaponsAvailableCraftsCache = [];
+        if (e?.message) toast(`❌ ${e.message}`, 'error');
     }
+}
+
+async function reloadMyWeaponsAvailableCraftsForSelectedUser() {
+    const sellFor = getSelectedMember('mwSellFor');
+    await loadMyWeaponsAvailableCrafts(sellFor.id || '');
+    populateMyWeaponsAvailableCraftsSelect('');
 }
 
 async function loadMyWeaponNames() {
@@ -4168,10 +4178,10 @@ function populateMyWeaponNameSelect() {
     select.onchange = () => updateMwSerialFields();
 }
 
-function populateMyWeaponsAvailableCraftsSelect() {
+function populateMyWeaponsAvailableCraftsSelect(preferredValue = null) {
     const select = document.getElementById('mwLinkedCraft');
     if (!select) return;
-    const previous = myWeaponsSelectedCraftRequestId || select.value || '';
+    const previous = preferredValue !== null ? preferredValue : (myWeaponsSelectedCraftRequestId || select.value || '');
     const options = myWeaponsAvailableCraftsCache.map(c => {
         const date = c.craft_date ? ` - ${new Date(c.craft_date * 1000).toLocaleDateString('fr-FR')}` : '';
         const label = `${c.weapon_name || 'Arme'} - ${c.serial_number || 'N/S'}${date}`;
@@ -4181,6 +4191,24 @@ function populateMyWeaponsAvailableCraftsSelect() {
     if (previous && myWeaponsAvailableCraftsCache.some(c => String(c.id) === String(previous))) {
         select.value = String(previous);
     }
+}
+
+function resetMwLinkedCraftFields(clearPrefill = false) {
+    myWeaponsSelectedCraftRequestId = null;
+    const linkedSelect = document.getElementById('mwLinkedCraft');
+    if (linkedSelect) linkedSelect.value = '';
+    if (!clearPrefill) return;
+    const nameSelect = document.getElementById('mwName');
+    if (nameSelect) nameSelect.value = '';
+    const qty = document.getElementById('mwQuantity');
+    if (qty) qty.value = '1';
+    updateMwSerialFields();
+    document.querySelectorAll('.mw-serial-input').forEach(input => { input.value = ''; });
+}
+
+async function handleMwSellForChange() {
+    resetMwLinkedCraftFields(true);
+    await reloadMyWeaponsAvailableCraftsForSelectedUser();
 }
 
 function selectMwLinkedCraft() {
@@ -4197,6 +4225,13 @@ function selectMwLinkedCraft() {
             nameSelect.add(new Option(craft.weapon_name, craft.weapon_name));
         }
         nameSelect.value = craft.weapon_name || '';
+    }
+    const sellForSelect = document.getElementById('mwSellFor');
+    if (sellForSelect && craft.user_id && (canValidateCraftClient() || canDeleteMyWeaponsClient())) {
+        if (![...sellForSelect.options].some(opt => opt.value === String(craft.user_id))) {
+            sellForSelect.add(new Option(craft.user_name || craft.user_id, String(craft.user_id)));
+        }
+        sellForSelect.value = String(craft.user_id);
     }
     const qty = document.getElementById('mwQuantity');
     if (qty) qty.value = '1';
@@ -4604,6 +4639,7 @@ async function deleteMyWeapon(id) {
 }
 
 window.toggleMwCrafted = toggleMwCrafted;
+window.handleMwSellForChange = handleMwSellForChange;
 window.updateMwSerialFields = updateMwSerialFields;
 window.submitMyWeapon = submitMyWeapon;
 window.openMarkSoldModal = openMarkSoldModal;
