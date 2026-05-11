@@ -840,72 +840,124 @@
             <h3 class="section-title">🔫 Mettre une arme en vente</h3>
 
             <div class="myweapons-form">
-                <div class="comm-field">
-                    <label class="comm-label">Nom de l'arme *</label>
-                    <select id="mwName" class="comm-input" required>
-                        <option value="">Chargement des armes...</option>
-                    </select>
-                </div>
+                <div class="mw-form-section mw-section-weapon">
+                    <div class="mw-section-head">
+                        <span>01</span>
+                        <div>
+                            <strong>Arme</strong>
+                            <small>Modele et origine de la mise en vente</small>
+                        </div>
+                    </div>
+                    <div class="mw-section-grid">
+                        <div class="comm-field">
+                            <label class="comm-label">Nom de l'arme *</label>
+                            <select id="mwName" class="comm-input" required>
+                                <option value="">Chargement des armes...</option>
+                            </select>
+                        </div>
 
-                <div class="comm-field">
-                    <label class="comm-label">Origine de l'arme *</label>
-                    <div class="myweapons-origin-choice">
-                        <label class="myweapons-origin-option">
-                            <input type="radio" name="mwOrigin" value="crafted" checked onchange="toggleMwCrafted()">
-                            <span>⚒ Arme craftée par les <strong>21 Block Savage</strong></span>
-                        </label>
-                        <label class="myweapons-origin-option">
-                            <input type="radio" name="mwOrigin" value="external" onchange="toggleMwCrafted()">
-                            <span>⛔ Arme non craftée par les <strong>21 Block Savage</strong></span>
-                        </label>
+                        <div class="comm-field">
+                            <label class="comm-label">Origine de l'arme *</label>
+                            <div class="myweapons-origin-choice">
+                                <label class="myweapons-origin-option">
+                                    <input type="radio" name="mwOrigin" value="crafted" checked onchange="toggleMwCrafted()">
+                                    <span>⚒ Arme craftée par les <strong>21 Block Savage</strong></span>
+                                </label>
+                                <label class="myweapons-origin-option">
+                                    <input type="radio" name="mwOrigin" value="external" onchange="toggleMwCrafted()">
+                                    <span>⛔ Arme non craftée par les <strong>21 Block Savage</strong></span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="comm-field" id="mwCraftedByField">
-                    <label class="comm-label">Craftée par *</label>
-                    <select id="mwCraftedBy" class="comm-input">
-                        <option value="">Chargement des membres...</option>
-                    </select>
-                </div>
-
-                <div class="comm-field" id="mwLinkedCraftField" style="display:none;">
-                    <label class="comm-label">Craft termine disponible</label>
-                    <select id="mwLinkedCraft" class="comm-input" onchange="selectMwLinkedCraft()">
-                        <option value="">-- Choisir un craft termine --</option>
-                    </select>
-                    <p class="mw-serial-hint">Optionnel : pre-remplit l'arme et le numero de serie avec un craft termine.</p>
-                </div>
-
-                <div class="comm-field" id="mwSellForField" style="display:none;">
-                    <label class="comm-label">Vendre au nom de</label>
-                    <select id="mwSellFor" class="comm-input" onchange="handleMwSellForChange()">
-                        <option value="">Moi-même</option>
-                    </select>
-                </div>
-
-                <div class="comm-field" id="mwQuantityField">
-                    <label class="comm-label">Nombre d'exemplaires *</label>
-                    <input type="number" id="mwQuantity" class="comm-input" min="1" max="50" value="1" oninput="updateMwSerialFields()" onchange="updateMwSerialFields()">
-                </div>
-
-                <div class="comm-field" id="mwSerialField">
-                    <label class="comm-label">N° de série *</label>
-                    <div id="mwSerialList" class="mw-serial-list"></div>
-                    <p class="mw-serial-hint" id="mwSerialHint">Un champ par exemplaire.</p>
-                </div>
-
-                <div class="craft-field-row">
-                    <div class="comm-field" style="flex:1;">
-                        <label class="comm-label">Prix souhaité ($)</label>
-                        <input type="number" id="mwAskingPrice" class="comm-input" min="0" placeholder="Ex: 1000000">
+                <div class="mw-form-section mw-section-craft">
+                    <div class="mw-section-head">
+                        <span>02</span>
+                        <div>
+                            <strong>Craft 21BS</strong>
+                            <small>Liaison avec un craft termine disponible</small>
+                        </div>
                     </div>
-                    <div class="comm-field" style="flex:1;">
-                        <label class="comm-label">Prix minimum accepté ($)</label>
-                        <input type="number" id="mwMinPrice" class="comm-input" min="0" placeholder="Ex: 800000">
+                    <div class="mw-section-grid">
+                        <div class="comm-field" id="mwCraftedByField">
+                            <label class="comm-label">Craftée par *</label>
+                            <select id="mwCraftedBy" class="comm-input">
+                                <option value="">Chargement des membres...</option>
+                            </select>
+                        </div>
+
+                        <div class="comm-field" id="mwLinkedCraftField" style="display:none;">
+                            <label class="comm-label">Craft termine disponible</label>
+                            <select id="mwLinkedCraft" class="comm-input" onchange="selectMwLinkedCraft()">
+                                <option value="">-- Choisir un craft termine --</option>
+                            </select>
+                            <p class="mw-serial-hint">Optionnel - pre-remplit automatiquement l'arme et le numero de serie depuis un craft termine disponible.</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="craft-actions">
+                <div class="mw-form-section mw-section-sale">
+                    <div class="mw-section-head">
+                        <span>03</span>
+                        <div>
+                            <strong>Vente</strong>
+                            <small>Proprietaire et nombre d'exemplaires</small>
+                        </div>
+                    </div>
+                    <div class="mw-section-grid mw-section-grid-compact">
+                        <div class="comm-field" id="mwSellForField" style="display:none;">
+                            <label class="comm-label">Vendre au nom de</label>
+                            <select id="mwSellFor" class="comm-input" onchange="handleMwSellForChange()">
+                                <option value="">Moi-même</option>
+                            </select>
+                            <p class="mw-serial-hint">Cette vente sera creee au nom de l'utilisateur selectionne.</p>
+                        </div>
+
+                        <div class="comm-field" id="mwQuantityField">
+                            <label class="comm-label">Nombre d'exemplaires *</label>
+                            <input type="number" id="mwQuantity" class="comm-input" min="1" max="50" value="1" oninput="updateMwSerialFields()" onchange="updateMwSerialFields()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mw-form-section mw-section-serials">
+                    <div class="mw-section-head">
+                        <span>04</span>
+                        <div>
+                            <strong>Numeros de serie</strong>
+                            <small>Un champ distinct par exemplaire</small>
+                        </div>
+                    </div>
+                    <div class="comm-field" id="mwSerialField">
+                        <label class="comm-label">N° de série *</label>
+                        <div id="mwSerialList" class="mw-serial-list"></div>
+                        <p class="mw-serial-hint" id="mwSerialHint">Un champ par exemplaire.</p>
+                    </div>
+                </div>
+
+                <div class="mw-form-section mw-section-price">
+                    <div class="mw-section-head">
+                        <span>05</span>
+                        <div>
+                            <strong>Prix</strong>
+                            <small>Prix souhaite et seuil minimum accepte</small>
+                        </div>
+                    </div>
+                    <div class="craft-field-row">
+                        <div class="comm-field" style="flex:1;">
+                            <label class="comm-label">Prix souhaité ($)</label>
+                            <input type="number" id="mwAskingPrice" class="comm-input" min="0" placeholder="Ex: 1000000">
+                        </div>
+                        <div class="comm-field" style="flex:1;">
+                            <label class="comm-label">Prix minimum accepté ($)</label>
+                            <input type="number" id="mwMinPrice" class="comm-input" min="0" placeholder="Ex: 800000">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mw-form-actions">
                     <button id="mwSubmitBtn" class="btn-primary" onclick="submitMyWeapon()">📤 Mettre en vente</button>
                 </div>
             </div>
