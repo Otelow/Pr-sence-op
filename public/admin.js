@@ -788,6 +788,22 @@ function moneyDisplay(value) {
     return `${(Number(value) || 0).toLocaleString('fr-FR')}$`;
 }
 
+function formatEuropeanDate(value) {
+    if (!value) return 'Date non renseignée';
+    const clean = String(value).slice(0, 10);
+    const parts = clean.split('-');
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    return clean;
+}
+
+function todayDateValue() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function orderAdvanceTitle(order) {
+    return `Commande matières premières du ${formatEuropeanDate(order?.order_date)}`;
+}
+
 function advanceStatusMeta(order) {
     const remaining = Number(order?.remaining_amount) || 0;
     const recovered = Number(order?.recovered_amount) || 0;
@@ -836,33 +852,26 @@ function ensureAdvanceParticipantRows() {
         <div class="order-advance-participant-row" data-advance-participant="${index}">
             <div class="advance-participant-badge">${index + 1}</div>
             <div class="comm-field">
-                <label class="comm-label">Personne</label>
+                <label class="comm-label">Participant</label>
                 <select class="comm-input order-advance-participant-user">${memberOptions()}</select>
             </div>
             <div class="comm-field">
-                <label class="comm-label">Montant avancé</label>
+                <label class="comm-label">Montant mis ($)</label>
                 <input type="number" min="0" class="comm-input order-advance-participant-contributed" placeholder="0">
-            </div>
-            <div class="comm-field">
-                <label class="comm-label">Montant récupéré</label>
-                <input type="number" min="0" class="comm-input order-advance-participant-recovered" placeholder="0">
-            </div>
-            <div class="comm-field">
-                <label class="comm-label">Compensation prochaine commande</label>
-                <input type="number" min="0" class="comm-input order-advance-participant-compensate" placeholder="0">
-            </div>
-            <div class="comm-field advance-participant-note">
-                <label class="comm-label">Note</label>
-                <input type="text" class="comm-input order-advance-participant-note" placeholder="Détail">
             </div>
         </div>
     `).join('');
+    container.querySelectorAll('select, input').forEach(input => {
+        input.addEventListener('input', updateOrderAdvanceBalance);
+        input.addEventListener('change', updateOrderAdvanceBalance);
+    });
 }
 
 function initOrderAdvanceParticipants() {
     normalizeOrderAdvanceLabels();
     ensureAdvanceParticipantRows();
     populateAdvanceParticipantSelects();
+    setOrderAdvanceParticipantCount();
 }
 
 function normalizeOrderAdvanceLabels() {
@@ -871,22 +880,11 @@ function normalizeOrderAdvanceLabels() {
     const title = section.querySelector('.section-title');
     const info = section.querySelector('.admin-info');
     if (title) title.textContent = 'Suivi commandes / avances';
-    if (info) info.textContent = 'Suivi admin des commandes avancées, montants récupérés et compensations.';
-    const labels = {
-        orderAdvanceTitle: 'Nom commande *',
-        orderAdvanceDate: 'Date commande *',
-        orderAdvanceTotal: 'Montant total ($)',
-        orderAdvanceRecovered: 'Montant récupéré global ($)',
-        orderAdvanceNote: 'Note',
-    };
-    Object.entries(labels).forEach(([id, text]) => {
-        const label = document.getElementById(id)?.closest('.comm-field')?.querySelector('.comm-label');
-        if (label) label.textContent = text;
-    });
+    if (info) info.textContent = 'Suivi admin des commandes de matières premières et remboursements détaillés.';
     const resetButton = section.querySelector('button[onclick="resetOrderAdvanceForm()"]');
     if (resetButton) resetButton.textContent = 'Réinitialiser';
     const submitButton = section.querySelector('button[type="submit"]');
-    if (submitButton) submitButton.textContent = "Enregistrer l'avance";
+    if (submitButton) submitButton.textContent = 'Enregistrer la commande';
 }
 
 function populateAdvanceParticipantSelects() {
@@ -905,6 +903,36 @@ function populateAdvanceParticipantSelects() {
     });
 }
 
+function setOrderAdvanceParticipantCount(count) {
+    ensureAdvanceParticipantRows();
+    const select = document.getElementById('orderAdvanceParticipantCount');
+    const wanted = Math.min(3, Math.max(1, Number(count || select?.value || 1) || 1));
+    if (select) select.value = String(wanted);
+    document.querySelectorAll('[data-advance-participant]').forEach((row, index) => {
+        row.style.display = index < wanted ? 'grid' : 'none';
+    });
+    updateOrderAdvanceBalance();
+}
+
+function getVisibleAdvanceParticipantRows() {
+    return [...document.querySelectorAll('[data-advance-participant]')].filter(row => row.style.display !== 'none');
+}
+
+function updateOrderAdvanceBalance() {
+    const target = document.getElementById('orderAdvanceBalance');
+    if (!target) return;
+    const total = Number(document.getElementById('orderAdvanceTotal')?.value || 0) || 0;
+    const participantTotal = getVisibleAdvanceParticipantRows()
+        .reduce((sum, row) => sum + (Number(row.querySelector('.order-advance-participant-contributed')?.value || 0) || 0), 0);
+    const diff = participantTotal - total;
+    const className = diff === 0 ? 'ok' : 'warning';
+    target.innerHTML = `
+        <span>Total commande : <strong>${moneyDisplay(total)}</strong></span>
+        <span>Total participants : <strong>${moneyDisplay(participantTotal)}</strong></span>
+        <span class="${className}">${diff === 0 ? 'Équilibré' : `Écart : ${moneyDisplay(Math.abs(diff))}`}</span>
+    `;
+}
+
 async function loadAdminOrderAdvances() {
     try {
         const res = await fetch('/api/admin/order-advances');
@@ -918,30 +946,22 @@ async function loadAdminOrderAdvances() {
 }
 
 function collectOrderAdvancePayload() {
-    const title = document.getElementById('orderAdvanceTitle')?.value.trim();
     const orderDate = document.getElementById('orderAdvanceDate')?.value;
-    if (!title) { toast('Nom de commande requis', 'error'); return null; }
     if (!orderDate) { toast('Date de commande requise', 'error'); return null; }
 
     const participants = [];
-    for (const row of document.querySelectorAll('[data-advance-participant]')) {
+    for (const row of getVisibleAdvanceParticipantRows()) {
         const select = row.querySelector('.order-advance-participant-user');
         const userId = select?.value || '';
         const userName = select?.selectedOptions?.[0]?.dataset?.name || select?.selectedOptions?.[0]?.textContent || '';
         const contributed = row.querySelector('.order-advance-participant-contributed')?.value || '';
-        const recovered = row.querySelector('.order-advance-participant-recovered')?.value || '';
-        const compensate = row.querySelector('.order-advance-participant-compensate')?.value || '';
-        const note = row.querySelector('.order-advance-participant-note')?.value.trim() || '';
-        const hasMoney = Number(contributed) || Number(recovered) || Number(compensate);
-        if (!userId && !hasMoney && !note) continue;
+        if (!userId && !Number(contributed)) continue;
         if (!userId) { toast('Choisis une personne pour chaque ligne renseignée', 'error'); return null; }
+        if (!Number(contributed)) { toast('Renseigne le montant mis par chaque participant', 'error'); return null; }
         participants.push({
             user_id: userId,
             user_name: userName,
             amount_contributed: contributed,
-            amount_recovered: recovered,
-            amount_to_compensate_next_order: compensate,
-            note,
         });
     }
 
@@ -951,11 +971,8 @@ function collectOrderAdvancePayload() {
     }
 
     return {
-        title,
         order_date: orderDate,
         total_amount: document.getElementById('orderAdvanceTotal')?.value || 0,
-        recovered_amount: document.getElementById('orderAdvanceRecovered')?.value || 0,
-        note: document.getElementById('orderAdvanceNote')?.value.trim() || '',
         participants,
     };
 }
@@ -976,7 +993,7 @@ async function saveOrderAdvance(event) {
         adminOrderAdvances = data.advances || [];
         renderOrderAdvances();
         resetOrderAdvanceForm();
-        toast('Avance enregistrée');
+        toast('Commande enregistrée');
     } catch (e) {
         toast(e.message, 'error');
     }
@@ -996,9 +1013,6 @@ function fillParticipantRow(row, participant = {}) {
         }
     }
     row.querySelector('.order-advance-participant-contributed').value = participant.amount_contributed || '';
-    row.querySelector('.order-advance-participant-recovered').value = participant.amount_recovered || '';
-    row.querySelector('.order-advance-participant-compensate').value = participant.amount_to_compensate_next_order || '';
-    row.querySelector('.order-advance-participant-note').value = participant.note || '';
 }
 
 function editOrderAdvance(id) {
@@ -1006,13 +1020,13 @@ function editOrderAdvance(id) {
     if (!order) return;
     initOrderAdvanceParticipants();
     document.getElementById('orderAdvanceId').value = order.id;
-    document.getElementById('orderAdvanceTitle').value = order.title || '';
     document.getElementById('orderAdvanceDate').value = order.order_date || '';
     document.getElementById('orderAdvanceTotal').value = order.total_amount || '';
-    document.getElementById('orderAdvanceRecovered').value = order.recovered_amount || '';
-    document.getElementById('orderAdvanceNote').value = order.note || '';
     const rows = [...document.querySelectorAll('[data-advance-participant]')];
+    const participantCount = Math.min(3, Math.max(1, (order.participants || []).length || 1));
+    setOrderAdvanceParticipantCount(participantCount);
     rows.forEach((row, index) => fillParticipantRow(row, (order.participants || [])[index] || {}));
+    updateOrderAdvanceBalance();
     document.getElementById('orderAdvanceForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -1021,7 +1035,10 @@ function resetOrderAdvanceForm() {
     if (form) form.reset();
     const idInput = document.getElementById('orderAdvanceId');
     if (idInput) idInput.value = '';
+    document.getElementById('orderAdvanceDate').value = todayDateValue();
+    setOrderAdvanceParticipantCount(1);
     document.querySelectorAll('[data-advance-participant]').forEach(row => fillParticipantRow(row, {}));
+    updateOrderAdvanceBalance();
 }
 
 async function deleteOrderAdvance(id) {
@@ -1052,6 +1069,84 @@ async function settleOrderAdvance(id) {
     }
 }
 
+function repaymentParticipantOptions(order, selectedId = '') {
+    return '<option value="">-- Choisir --</option>' + (order.participants || []).map(p => (
+        `<option value="${p.id}" ${String(p.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(p.user_name)}</option>`
+    )).join('');
+}
+
+function toggleOrderRepaymentForm(orderId, repaymentId = '') {
+    const form = document.getElementById(`orderRepaymentForm-${orderId}`);
+    if (!form) return;
+    form.style.display = form.style.display === 'none' || !form.style.display ? 'grid' : 'none';
+    if (!repaymentId && form.style.display !== 'none') {
+        form.querySelector('.order-repayment-id').value = '';
+        form.querySelector('.order-repayment-participant').value = '';
+        form.querySelector('.order-repayment-amount').value = '';
+        form.querySelector('.order-repayment-reason').value = '';
+        form.querySelector('.order-repayment-weapon').value = '';
+        form.querySelector('.order-repayment-date').value = todayDateValue();
+    }
+}
+
+async function saveOrderRepayment(orderId) {
+    const form = document.getElementById(`orderRepaymentForm-${orderId}`);
+    if (!form) return;
+    const repaymentId = form.querySelector('.order-repayment-id')?.value;
+    const payload = {
+        participant_id: form.querySelector('.order-repayment-participant')?.value,
+        amount: form.querySelector('.order-repayment-amount')?.value,
+        reason: form.querySelector('.order-repayment-reason')?.value.trim(),
+        weapon_name: form.querySelector('.order-repayment-weapon')?.value.trim(),
+        repayment_date: form.querySelector('.order-repayment-date')?.value,
+    };
+    try {
+        const res = await fetch(
+            repaymentId ? `/api/admin/order-advances/${orderId}/repayments/${repaymentId}` : `/api/admin/order-advances/${orderId}/repayments`,
+            {
+                method: repaymentId ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            },
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Remboursement impossible');
+        adminOrderAdvances = data.advances || [];
+        renderOrderAdvances();
+        toast('Remboursement enregistré');
+    } catch (e) {
+        toast(e.message, 'error');
+    }
+}
+
+function editOrderRepayment(orderId, repaymentId) {
+    const order = adminOrderAdvances.find(item => Number(item.id) === Number(orderId));
+    const repayment = order?.repayments?.find(item => Number(item.id) === Number(repaymentId));
+    const form = document.getElementById(`orderRepaymentForm-${orderId}`);
+    if (!order || !repayment || !form) return;
+    form.style.display = 'grid';
+    form.querySelector('.order-repayment-id').value = repayment.id;
+    form.querySelector('.order-repayment-participant').value = repayment.participant_id || '';
+    form.querySelector('.order-repayment-amount').value = repayment.amount || '';
+    form.querySelector('.order-repayment-reason').value = repayment.reason || '';
+    form.querySelector('.order-repayment-weapon').value = repayment.weapon_name || '';
+    form.querySelector('.order-repayment-date').value = repayment.repayment_date || todayDateValue();
+}
+
+async function deleteOrderRepayment(orderId, repaymentId) {
+    if (!await confirmAction({ title: 'Supprimer le remboursement', message: 'Supprimer ce remboursement ?', confirmText: 'Supprimer', danger: true })) return;
+    try {
+        const res = await fetch(`/api/admin/order-advances/${orderId}/repayments/${repaymentId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Suppression impossible');
+        adminOrderAdvances = data.advances || [];
+        renderOrderAdvances();
+        toast('Remboursement supprimé');
+    } catch (e) {
+        toast(e.message, 'error');
+    }
+}
+
 function renderOrderAdvances() {
     const list = document.getElementById('orderAdvanceList');
     if (!list) return;
@@ -1062,32 +1157,68 @@ function renderOrderAdvances() {
 
     list.innerHTML = adminOrderAdvances.map(order => {
         const meta = advanceStatusMeta(order);
-        const participants = (order.participants || []).map(p => `
-            <div class="order-advance-participant-chip">
-                <strong>${escapeHtml(p.user_name)}</strong>
-                <span>Mis : ${moneyDisplay(p.amount_contributed)}</span>
-                <span>Récupéré : ${moneyDisplay(p.amount_recovered)}</span>
-                <span>Restant : ${moneyDisplay(p.amount_remaining)}</span>
-                ${Number(p.amount_to_compensate_next_order) ? `<span>Compensation : ${moneyDisplay(p.amount_to_compensate_next_order)}</span>` : ''}
-                ${p.note ? `<small>${escapeHtml(p.note)}</small>` : ''}
+        const orderTitle = orderAdvanceTitle(order);
+        const recoveredClass = Number(order.recovered_amount) > 0 ? 'amount-positive' : 'amount-neutral';
+        const remainingClass = Number(order.remaining_amount) > 0 ? 'amount-danger' : 'amount-positive';
+        const participantOptions = repaymentParticipantOptions(order);
+        const participants = (order.participants || []).map(p => {
+            const participantRemainingClass = Number(p.amount_remaining) > 0 ? 'amount-danger' : 'amount-positive';
+            const participantRecoveredClass = Number(p.amount_recovered) > 0 ? 'amount-positive' : 'amount-neutral';
+            return `
+                <div class="order-advance-participant-chip">
+                    <strong>${escapeHtml(p.user_name)}</strong>
+                    <span>Mis : <b>${moneyDisplay(p.amount_contributed)}</b></span>
+                    <span>Récupéré : <b class="${participantRecoveredClass}">${moneyDisplay(p.amount_recovered)}</b></span>
+                    <span>Restant : <b class="${participantRemainingClass}">${moneyDisplay(p.amount_remaining)}</b></span>
+                </div>
+            `;
+        }).join('');
+        const repayments = (order.repayments || []).map(repayment => `
+            <div class="order-repayment-item">
+                <div>
+                    <strong>${escapeHtml(repayment.user_name || 'Participant')}</strong>
+                    <span>${formatEuropeanDate(repayment.repayment_date)} • <b class="amount-positive">${moneyDisplay(repayment.amount)}</b></span>
+                    ${repayment.reason ? `<small>${escapeHtml(repayment.reason)}</small>` : ''}
+                    ${repayment.weapon_name ? `<small>Arme : ${escapeHtml(repayment.weapon_name)}</small>` : ''}
+                </div>
+                <div class="order-repayment-actions">
+                    <button class="btn-secondary btn-small" onclick="editOrderRepayment(${order.id}, ${repayment.id})">Modifier</button>
+                    <button class="btn-danger btn-small" onclick="deleteOrderRepayment(${order.id}, ${repayment.id})">Supprimer</button>
+                </div>
             </div>
         `).join('');
         return `
             <article class="order-advance-card ${meta.className}">
                 <div class="order-advance-card-head">
                     <div>
-                        <h3>${escapeHtml(order.title)}</h3>
-                        <p>${escapeHtml(order.order_date || 'Date non renseignée')}</p>
+                        <h3>${escapeHtml(orderTitle)}</h3>
+                        <p>${formatEuropeanDate(order.order_date)}</p>
                     </div>
                     <span class="order-advance-status">${meta.label}</span>
                 </div>
                 <div class="order-advance-totals">
                     <span>Total <strong>${moneyDisplay(order.total_amount)}</strong></span>
-                    <span>Récupéré <strong>${moneyDisplay(order.recovered_amount)}</strong></span>
-                    <span>Restant <strong>${moneyDisplay(order.remaining_amount)}</strong></span>
+                    <span>Récupéré <strong class="${recoveredClass}">${moneyDisplay(order.recovered_amount)}</strong></span>
+                    <span>Restant <strong class="${remainingClass}">${moneyDisplay(order.remaining_amount)}</strong></span>
+                    ${!order.has_detailed_repayments && Number(order.legacy_recovered_amount) > 0 ? '<span class="order-advance-legacy">Ancien montant récupéré global</span>' : ''}
                 </div>
-                ${order.note ? `<p class="order-advance-note-display">${escapeHtml(order.note)}</p>` : ''}
                 <div class="order-advance-participants-list">${participants}</div>
+                <div class="order-repayment-section">
+                    <div class="order-repayment-head">
+                        <h4>Remboursements</h4>
+                        <button class="btn-primary btn-small" onclick="toggleOrderRepaymentForm(${order.id})">Ajouter remboursement</button>
+                    </div>
+                    <div class="order-repayment-form" id="orderRepaymentForm-${order.id}" style="display:none;">
+                        <input type="hidden" class="order-repayment-id">
+                        <select class="comm-input order-repayment-participant">${participantOptions}</select>
+                        <input type="number" min="1" class="comm-input order-repayment-amount" placeholder="Montant récupéré">
+                        <input type="text" class="comm-input order-repayment-reason" placeholder="Raison / description">
+                        <input type="text" class="comm-input order-repayment-weapon" placeholder="Arme concernée (optionnel)">
+                        <input type="date" class="comm-input order-repayment-date" value="${todayDateValue()}">
+                        <button class="btn-primary btn-small" onclick="saveOrderRepayment(${order.id})">Enregistrer</button>
+                    </div>
+                    <div class="order-repayment-list">${repayments || '<p class="empty">Aucun remboursement détaillé.</p>'}</div>
+                </div>
                 <div class="order-advance-actions">
                     <button class="btn-secondary btn-small" onclick="editOrderAdvance(${order.id})">Modifier</button>
                     <button class="btn-primary btn-small" onclick="settleOrderAdvance(${order.id})" ${meta.className === 'settled' ? 'disabled' : ''}>Solder</button>
@@ -1100,8 +1231,13 @@ function renderOrderAdvances() {
 
 window.loadAdminMembers = loadAdminMembers;
 window.loadAdminOrderAdvances = loadAdminOrderAdvances;
+window.setOrderAdvanceParticipantCount = setOrderAdvanceParticipantCount;
 window.saveOrderAdvance = saveOrderAdvance;
 window.editOrderAdvance = editOrderAdvance;
 window.resetOrderAdvanceForm = resetOrderAdvanceForm;
 window.deleteOrderAdvance = deleteOrderAdvance;
 window.settleOrderAdvance = settleOrderAdvance;
+window.toggleOrderRepaymentForm = toggleOrderRepaymentForm;
+window.saveOrderRepayment = saveOrderRepayment;
+window.editOrderRepayment = editOrderRepayment;
+window.deleteOrderRepayment = deleteOrderRepayment;

@@ -118,15 +118,11 @@
     <section class="admin-tab-content" id="adminTab-advances" style="display:none;">
         <div class="admin-section">
             <h2 class="section-title">💰 Suivi commandes / avances</h2>
-            <p class="admin-info">Suivi admin des commandes avancées, montants récupérés et compensations.</p>
+            <p class="admin-info">Suivi admin des commandes de matières premières et remboursements détaillés.</p>
 
             <form id="orderAdvanceForm" class="order-advance-form" onsubmit="saveOrderAdvance(event)">
                 <input type="hidden" id="orderAdvanceId">
                 <div class="order-advance-grid">
-                    <div class="comm-field">
-                        <label class="comm-label">Nom commande *</label>
-                        <input type="text" id="orderAdvanceTitle" class="comm-input" required placeholder="Ex: Commande Otelow">
-                    </div>
                     <div class="comm-field">
                         <label class="comm-label">Date commande *</label>
                         <input type="date" id="orderAdvanceDate" class="comm-input" required>
@@ -136,21 +132,22 @@
                         <input type="number" id="orderAdvanceTotal" class="comm-input" min="0" placeholder="11948000">
                     </div>
                     <div class="comm-field">
-                        <label class="comm-label">Montant récupéré global ($)</label>
-                        <input type="number" id="orderAdvanceRecovered" class="comm-input" min="0" placeholder="11006000">
-                    </div>
-                    <div class="comm-field order-advance-note">
-                        <label class="comm-label">Note</label>
-                        <input type="text" id="orderAdvanceNote" class="comm-input" placeholder="Contexte, compensation, détails...">
+                        <label class="comm-label">Nombre de participants</label>
+                        <select id="orderAdvanceParticipantCount" class="comm-input" onchange="setOrderAdvanceParticipantCount()">
+                            <option value="1">1 participant</option>
+                            <option value="2">2 participants</option>
+                            <option value="3">3 participants</option>
+                        </select>
                     </div>
                 </div>
 
                 <h3 class="admin-subtitle">Participants</h3>
                 <div class="order-advance-participants" id="orderAdvanceParticipants"></div>
+                <div class="order-advance-balance" id="orderAdvanceBalance"></div>
 
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="resetOrderAdvanceForm()">Réinitialiser</button>
-                    <button type="submit" class="btn-primary">Enregistrer l'avance</button>
+                    <button type="submit" class="btn-primary">Enregistrer la commande</button>
                 </div>
             </form>
 

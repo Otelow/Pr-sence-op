@@ -49,6 +49,7 @@ let jsonData = {
     my_weapons: [],
     order_advances: [],
     order_advance_participants: [],
+    order_advance_repayments: [],
     counters: {
         weapons: 0,
         ingredients: 0,
@@ -58,6 +59,7 @@ let jsonData = {
         myweapons: 0,
         order_advances: 0,
         order_advance_participants: 0,
+        order_advance_repayments: 0,
     },
 };
 
@@ -73,6 +75,7 @@ function loadJSON() {
             jsonData.my_weapons = jsonData.my_weapons || [];
             jsonData.order_advances = jsonData.order_advances || [];
             jsonData.order_advance_participants = jsonData.order_advance_participants || [];
+            jsonData.order_advance_repayments = jsonData.order_advance_repayments || [];
             jsonData.counters = {
                 weapons: 0,
                 ingredients: 0,
@@ -82,6 +85,7 @@ function loadJSON() {
                 myweapons: 0,
                 order_advances: 0,
                 order_advance_participants: 0,
+                order_advance_repayments: 0,
                 ...(jsonData.counters || {}),
             };
         }
@@ -278,10 +282,26 @@ function initDB() {
                     updated_at INTEGER DEFAULT (strftime('%s','now')),
                     FOREIGN KEY (order_id) REFERENCES order_advances(id) ON DELETE CASCADE
                 );
+                CREATE TABLE IF NOT EXISTS order_advance_repayments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_id INTEGER NOT NULL,
+                    participant_id INTEGER,
+                    user_id TEXT,
+                    user_name TEXT,
+                    amount INTEGER DEFAULT 0,
+                    reason TEXT,
+                    weapon_name TEXT,
+                    repayment_date TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s','now')),
+                    updated_at INTEGER DEFAULT (strftime('%s','now')),
+                    FOREIGN KEY (order_id) REFERENCES order_advances(id) ON DELETE CASCADE,
+                    FOREIGN KEY (participant_id) REFERENCES order_advance_participants(id) ON DELETE SET NULL
+                );
                 CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
                 CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
                 CREATE INDEX IF NOT EXISTS idx_myweapons_user ON my_weapons(user_id);
                 CREATE INDEX IF NOT EXISTS idx_stock_materials_ingredient ON stock_materials(ingredient_id);
+                CREATE INDEX IF NOT EXISTS idx_order_repayments_order ON order_advance_repayments(order_id);
             `);
 
             // Migrations
@@ -1020,6 +1040,14 @@ function cleanMoney(value) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
+function todayIsoDate() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function orderAdvanceTitle(orderDate) {
+    return `Commande matières premières du ${orderDate || todayIsoDate()}`;
+}
+
 function normalizeAdvanceParticipants(participants = []) {
     return (Array.isArray(participants) ? participants : [])
         .slice(0, 3)
@@ -1041,10 +1069,12 @@ function normalizeAdvanceParticipants(participants = []) {
         .filter(Boolean);
 }
 
-function calculateAdvanceTotals(payload, participants) {
+function calculateAdvanceTotals(payload, participants, legacyRecoveredAmount = 0) {
     const contributedTotal = participants.reduce((sum, p) => sum + p.amount_contributed, 0);
     const totalAmount = cleanMoney(payload.total_amount) || contributedTotal;
-    const recoveredFromPayload = cleanMoney(payload.recovered_amount);
+    const recoveredFromPayload = Object.prototype.hasOwnProperty.call(payload, 'recovered_amount')
+        ? cleanMoney(payload.recovered_amount)
+        : cleanMoney(legacyRecoveredAmount);
     const recoveredFromParticipants = participants.reduce((sum, p) => sum + p.amount_recovered, 0);
     const recoveredAmount = recoveredFromPayload || recoveredFromParticipants;
     return {
@@ -1054,33 +1084,116 @@ function calculateAdvanceTotals(payload, participants) {
     };
 }
 
+function hydrateOrderAdvance(order, participants = [], repayments = []) {
+    const totalAmount = cleanMoney(order.total_amount);
+    const legacyRecoveredAmount = cleanMoney(order.recovered_amount);
+    const detailedRepayments = Array.isArray(repayments) ? repayments : [];
+    const hasDetailedRepayments = detailedRepayments.length > 0;
+    const repaymentByParticipant = new Map();
+    const repaymentByUser = new Map();
+
+    for (const repayment of detailedRepayments) {
+        const amount = cleanMoney(repayment.amount);
+        if (repayment.participant_id) {
+            const key = String(repayment.participant_id);
+            repaymentByParticipant.set(key, (repaymentByParticipant.get(key) || 0) + amount);
+        }
+        if (repayment.user_id) {
+            const key = String(repayment.user_id);
+            repaymentByUser.set(key, (repaymentByUser.get(key) || 0) + amount);
+        }
+    }
+
+    const hydratedParticipants = participants.map(participant => {
+        let recovered = cleanMoney(participant.amount_recovered);
+        if (hasDetailedRepayments) {
+            recovered = repaymentByParticipant.get(String(participant.id)) || repaymentByUser.get(String(participant.user_id)) || 0;
+        } else if (participants.length === 1 && legacyRecoveredAmount > recovered) {
+            recovered = legacyRecoveredAmount;
+        }
+        const contributed = cleanMoney(participant.amount_contributed);
+        return {
+            ...participant,
+            amount_contributed: contributed,
+            amount_recovered: recovered,
+            amount_remaining: Math.max(0, contributed - recovered),
+        };
+    });
+
+    let recoveredAmount = hasDetailedRepayments
+        ? detailedRepayments.reduce((sum, repayment) => sum + cleanMoney(repayment.amount), 0)
+        : (legacyRecoveredAmount || hydratedParticipants.reduce((sum, participant) => sum + cleanMoney(participant.amount_recovered), 0));
+    let remainingAmount = Math.max(0, totalAmount - recoveredAmount);
+
+    if (order.status === 'settled') {
+        recoveredAmount = totalAmount;
+        remainingAmount = 0;
+        for (const participant of hydratedParticipants) {
+            participant.amount_recovered = participant.amount_contributed;
+            participant.amount_remaining = 0;
+        }
+    }
+
+    return {
+        ...order,
+        title: order.title || orderAdvanceTitle(order.order_date),
+        total_amount: totalAmount,
+        recovered_amount: recoveredAmount,
+        legacy_recovered_amount: legacyRecoveredAmount,
+        remaining_amount: remainingAmount,
+        status: order.status === 'settled' || remainingAmount <= 0 ? 'settled' : (recoveredAmount > 0 ? 'partial' : 'open'),
+        has_detailed_repayments: hasDetailedRepayments,
+        participants: hydratedParticipants,
+        repayments: detailedRepayments,
+    };
+}
+
 function getOrderAdvances() {
     if (useSQLite) {
         const orders = db.prepare('SELECT * FROM order_advances ORDER BY status ASC, order_date DESC, id DESC').all();
         const getParticipants = db.prepare('SELECT * FROM order_advance_participants WHERE order_id = ? ORDER BY id ASC');
-        return orders.map(order => ({ ...order, participants: getParticipants.all(order.id) }));
+        const getRepayments = db.prepare('SELECT * FROM order_advance_repayments WHERE order_id = ? ORDER BY repayment_date DESC, id DESC');
+        return orders.map(order => hydrateOrderAdvance(order, getParticipants.all(order.id), getRepayments.all(order.id)));
     }
     const participants = jsonData.order_advance_participants || [];
+    const repayments = jsonData.order_advance_repayments || [];
     return [...(jsonData.order_advances || [])]
         .sort((a, b) => String(a.status || '').localeCompare(String(b.status || '')) || String(b.order_date || '').localeCompare(String(a.order_date || '')) || (b.id || 0) - (a.id || 0))
-        .map(order => ({ ...order, participants: participants.filter(p => Number(p.order_id) === Number(order.id)) }));
+        .map(order => hydrateOrderAdvance(
+            order,
+            participants.filter(p => Number(p.order_id) === Number(order.id)),
+            repayments.filter(r => Number(r.order_id) === Number(order.id)),
+        ));
 }
 
 function upsertOrderAdvance(payload, id = null) {
-    const title = String(payload.title || '').trim();
-    if (!title) throw new Error('Nom de commande requis');
+    const orderIdForUpdate = Number(id);
+    let existingOrder = null;
+    if (orderIdForUpdate) {
+        existingOrder = useSQLite
+            ? db.prepare('SELECT * FROM order_advances WHERE id = ?').get(orderIdForUpdate)
+            : (jsonData.order_advances || []).find(o => Number(o.id) === orderIdForUpdate);
+        if (!existingOrder) throw new Error('Commande introuvable');
+    }
     const participants = normalizeAdvanceParticipants(payload.participants);
     if (!participants.length) throw new Error('Ajoute au moins un participant');
-    const totals = calculateAdvanceTotals(payload, participants);
     const now = Math.floor(Date.now() / 1000);
     const orderDate = String(payload.order_date || '').trim() || null;
-    const note = String(payload.note || '').trim() || null;
+    if (!orderDate) throw new Error('Date de commande requise');
+    const title = String(payload.title || existingOrder?.title || orderAdvanceTitle(orderDate)).trim();
+    const legacyRecovered = existingOrder && !Object.prototype.hasOwnProperty.call(payload, 'recovered_amount')
+        ? existingOrder.recovered_amount
+        : payload.recovered_amount;
+    const totals = calculateAdvanceTotals(payload, participants, legacyRecovered);
+    const note = Object.prototype.hasOwnProperty.call(payload, 'note')
+        ? (String(payload.note || '').trim() || null)
+        : (existingOrder?.note || null);
     const requestedStatus = String(payload.status || 'open').trim();
     const status = requestedStatus === 'settled' ? 'settled' : (totals.remaining_amount <= 0 ? 'settled' : 'open');
 
     if (useSQLite) {
         const tx = db.transaction(() => {
-            let orderId = Number(id);
+            let orderId = orderIdForUpdate;
             if (orderId) {
                 db.prepare(`UPDATE order_advances SET title = ?, order_date = ?, total_amount = ?, recovered_amount = ?, remaining_amount = ?, note = ?, status = ?, updated_at = ? WHERE id = ?`)
                     .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, orderId);
@@ -1099,11 +1212,9 @@ function upsertOrderAdvance(payload, id = null) {
         return tx();
     }
 
-    let orderId = Number(id);
+    let orderId = orderIdForUpdate;
     if (orderId) {
-        const existing = jsonData.order_advances.find(o => Number(o.id) === orderId);
-        if (!existing) throw new Error('Commande introuvable');
-        Object.assign(existing, { title, order_date: orderDate, ...totals, note, status, updated_at: now });
+        Object.assign(existingOrder, { title, order_date: orderDate, ...totals, note, status, updated_at: now });
         jsonData.order_advance_participants = (jsonData.order_advance_participants || []).filter(p => Number(p.order_id) !== orderId);
     } else {
         orderId = nextId('order_advances');
@@ -1124,10 +1235,12 @@ function upsertOrderAdvance(payload, id = null) {
 
 function deleteOrderAdvance(id) {
     if (useSQLite) {
+        db.prepare('DELETE FROM order_advance_repayments WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advances WHERE id = ?').run(id);
         return;
     }
+    jsonData.order_advance_repayments = (jsonData.order_advance_repayments || []).filter(r => Number(r.order_id) !== Number(id));
     jsonData.order_advance_participants = (jsonData.order_advance_participants || []).filter(p => Number(p.order_id) !== Number(id));
     jsonData.order_advances = (jsonData.order_advances || []).filter(o => Number(o.id) !== Number(id));
     saveJSON();
@@ -1155,6 +1268,77 @@ function settleOrderAdvance(id) {
             p.updated_at = now;
         }
     });
+    saveJSON();
+}
+
+function normalizeOrderAdvanceRepayment(orderId, payload) {
+    const participantId = parseInt(payload.participant_id, 10);
+    const amount = cleanMoney(payload.amount);
+    const repaymentDate = String(payload.repayment_date || todayIsoDate()).trim();
+    if (!orderId) throw new Error('Commande introuvable');
+    if (!participantId) throw new Error('Participant obligatoire');
+    if (!amount) throw new Error('Montant récupéré obligatoire');
+    if (!repaymentDate) throw new Error('Date de remboursement obligatoire');
+
+    let participant;
+    if (useSQLite) {
+        participant = db.prepare('SELECT * FROM order_advance_participants WHERE id = ? AND order_id = ?').get(participantId, orderId);
+    } else {
+        participant = (jsonData.order_advance_participants || []).find(p => Number(p.id) === participantId && Number(p.order_id) === orderId);
+    }
+    if (!participant) throw new Error('Participant introuvable pour cette commande');
+
+    return {
+        order_id: orderId,
+        participant_id: participantId,
+        user_id: participant.user_id || null,
+        user_name: participant.user_name,
+        amount,
+        reason: String(payload.reason || '').trim() || null,
+        weapon_name: String(payload.weapon_name || '').trim() || null,
+        repayment_date: repaymentDate,
+    };
+}
+
+function saveOrderAdvanceRepayment(orderId, payload, repaymentId = null) {
+    const normalized = normalizeOrderAdvanceRepayment(orderId, payload);
+    const now = Math.floor(Date.now() / 1000);
+    if (useSQLite) {
+        if (repaymentId) {
+            const existing = db.prepare('SELECT * FROM order_advance_repayments WHERE id = ? AND order_id = ?').get(repaymentId, orderId);
+            if (!existing) throw new Error('Remboursement introuvable');
+            db.prepare(`UPDATE order_advance_repayments SET participant_id = ?, user_id = ?, user_name = ?, amount = ?, reason = ?, weapon_name = ?, repayment_date = ?, updated_at = ? WHERE id = ? AND order_id = ?`)
+                .run(normalized.participant_id, normalized.user_id, normalized.user_name, normalized.amount, normalized.reason, normalized.weapon_name, normalized.repayment_date, now, repaymentId, orderId);
+            return repaymentId;
+        }
+        const result = db.prepare(`INSERT INTO order_advance_repayments (order_id, participant_id, user_id, user_name, amount, reason, weapon_name, repayment_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(orderId, normalized.participant_id, normalized.user_id, normalized.user_name, normalized.amount, normalized.reason, normalized.weapon_name, normalized.repayment_date, now, now);
+        return result.lastInsertRowid;
+    }
+
+    if (!jsonData.order_advance_repayments) jsonData.order_advance_repayments = [];
+    if (repaymentId) {
+        const existing = jsonData.order_advance_repayments.find(r => Number(r.id) === Number(repaymentId) && Number(r.order_id) === orderId);
+        if (!existing) throw new Error('Remboursement introuvable');
+        Object.assign(existing, normalized, { updated_at: now });
+        saveJSON();
+        return Number(repaymentId);
+    }
+    const id = nextId('order_advance_repayments');
+    jsonData.order_advance_repayments.push({ id, ...normalized, created_at: now, updated_at: now });
+    saveJSON();
+    return id;
+}
+
+function deleteOrderAdvanceRepayment(orderId, repaymentId) {
+    if (useSQLite) {
+        const result = db.prepare('DELETE FROM order_advance_repayments WHERE id = ? AND order_id = ?').run(repaymentId, orderId);
+        if (!result.changes) throw new Error('Remboursement introuvable');
+        return;
+    }
+    const before = (jsonData.order_advance_repayments || []).length;
+    jsonData.order_advance_repayments = (jsonData.order_advance_repayments || []).filter(r => !(Number(r.id) === Number(repaymentId) && Number(r.order_id) === Number(orderId)));
+    if (jsonData.order_advance_repayments.length === before) throw new Error('Remboursement introuvable');
     saveJSON();
 }
 
@@ -1622,6 +1806,36 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.delete('/api/admin/order-advances/:id', requireAdmin, (req, res) => {
         try {
             deleteOrderAdvance(parseInt(req.params.id, 10));
+            res.json({ success: true, advances: getOrderAdvances() });
+        } catch (e) {
+            res.status(400).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/admin/order-advances/:id/repayments', requireAdmin, (req, res) => {
+        try {
+            const orderId = parseInt(req.params.id, 10);
+            const repaymentId = saveOrderAdvanceRepayment(orderId, req.body || {});
+            res.json({ success: true, id: repaymentId, advances: getOrderAdvances() });
+        } catch (e) {
+            res.status(400).json({ error: e.message });
+        }
+    });
+
+    app.put('/api/admin/order-advances/:id/repayments/:repaymentId', requireAdmin, (req, res) => {
+        try {
+            const orderId = parseInt(req.params.id, 10);
+            const repaymentId = parseInt(req.params.repaymentId, 10);
+            saveOrderAdvanceRepayment(orderId, req.body || {}, repaymentId);
+            res.json({ success: true, id: repaymentId, advances: getOrderAdvances() });
+        } catch (e) {
+            res.status(400).json({ error: e.message });
+        }
+    });
+
+    app.delete('/api/admin/order-advances/:id/repayments/:repaymentId', requireAdmin, (req, res) => {
+        try {
+            deleteOrderAdvanceRepayment(parseInt(req.params.id, 10), parseInt(req.params.repaymentId, 10));
             res.json({ success: true, advances: getOrderAdvances() });
         } catch (e) {
             res.status(400).json({ error: e.message });

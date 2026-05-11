@@ -6004,16 +6004,50 @@ body {
     border: 1px solid rgba(255, 140, 0, 0.22);
     border-radius: 10px;
     background: linear-gradient(135deg, rgba(255, 140, 0, 0.08), rgba(10, 10, 12, 0.58) 34%);
+    color: var(--text);
 }
 
 .order-advance-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
     gap: 14px;
+    align-items: end;
 }
 
-.order-advance-note {
-    grid-column: span 4;
+.order-advance-balance {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.24);
+    color: var(--text);
+}
+
+.order-advance-balance span {
+    color: var(--text-dim);
+}
+
+.order-advance-balance strong,
+.amount-neutral {
+    color: var(--text) !important;
+}
+
+.order-advance-balance .ok,
+.amount-positive {
+    color: #4ade80 !important;
+}
+
+.order-advance-balance .warning,
+.order-advance-legacy {
+    color: #fbbf24 !important;
+}
+
+.amount-danger {
+    color: #fb7185 !important;
 }
 
 .admin-subtitle {
@@ -6030,7 +6064,7 @@ body {
 
 .order-advance-participant-row {
     display: grid;
-    grid-template-columns: 34px 1.35fr repeat(3, minmax(120px, .8fr)) 1fr;
+    grid-template-columns: 34px minmax(240px, 1fr) minmax(180px, .6fr);
     gap: 10px;
     align-items: end;
     padding: 12px;
@@ -6148,6 +6182,79 @@ body {
     background: rgba(0, 0, 0, 0.22);
 }
 
+.order-advance-legacy {
+    border-color: rgba(251, 191, 36, 0.28) !important;
+    background: rgba(251, 191, 36, 0.08) !important;
+}
+
+.order-repayment-section {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.20);
+}
+
+.order-repayment-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.order-repayment-head h4 {
+    margin: 0;
+    color: var(--text);
+    font: 800 14px/1 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.order-repayment-form {
+    display: grid;
+    grid-template-columns: minmax(170px, 1fr) minmax(130px, .65fr) minmax(200px, 1fr) minmax(170px, 1fr) minmax(140px, .65fr) auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.order-repayment-list {
+    display: grid;
+    gap: 8px;
+}
+
+.order-repayment-item {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(10, 10, 12, 0.62);
+}
+
+.order-repayment-item strong {
+    display: block;
+    color: var(--text);
+}
+
+.order-repayment-item span,
+.order-repayment-item small {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-dim);
+}
+
+.order-repayment-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
 .order-advance-actions {
     display: flex;
     flex-wrap: wrap;
@@ -6161,40 +6268,37 @@ body {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .order-advance-note {
-        grid-column: span 2;
-    }
-
     .order-advance-participant-row {
-        grid-template-columns: 34px repeat(2, minmax(0, 1fr));
+        grid-template-columns: 34px minmax(0, 1fr) minmax(160px, .7fr);
     }
 
-    .advance-participant-note {
-        grid-column: 2 / -1;
+    .order-repayment-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 680px) {
     .craft-request-type-choice,
     .order-advance-grid,
-    .order-advance-participant-row {
+    .order-advance-participant-row,
+    .order-repayment-form {
         grid-template-columns: 1fr;
-    }
-
-    .order-advance-note,
-    .advance-participant-note {
-        grid-column: auto;
     }
 
     .advance-participant-badge {
         justify-self: start;
     }
 
+    .order-repayment-item {
+        flex-direction: column;
+    }
+
     .order-advance-actions {
         justify-content: stretch;
     }
 
-    .order-advance-actions button {
+    .order-advance-actions button,
+    .order-repayment-actions button {
         flex: 1 1 140px;
     }
 }
