@@ -7,6 +7,9 @@ let adminIngredients = [];
 let adminStocks = [];
 let adminOrgs = [];
 let adminRoles = [];
+let adminMembers = [];
+let adminOrderAdvances = [];
+let adminMembersLoadedAt = 0;
 let editingIngredients = []; // [{ ingredient_id, name, amount }]
 let adminWeaponQuery = '';
 let adminIngredientQuery = '';
@@ -31,6 +34,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadAdminStocks();
     loadAdminOrgs();
     loadAdminRoles();
+    loadAdminOrderAdvances();
+    initOrderAdvanceParticipants();
 
     document.getElementById('adminWeaponSearch')?.addEventListener('input', e => {
         adminWeaponQuery = e.target.value.trim().toLowerCase();
@@ -152,6 +157,10 @@ function switchAdminTab(name) {
     document.querySelectorAll('.admin-tab-content').forEach(s => {
         s.style.display = (s.id === `adminTab-${name}`) ? 'block' : 'none';
     });
+    if (name === 'advances') {
+        loadAdminMembers();
+        loadAdminOrderAdvances();
+    }
 }
 window.switchAdminTab = switchAdminTab;
 
@@ -773,3 +782,326 @@ async function deleteOrg(id) {
 }
 window.addOrgFromAdmin = addOrgFromAdmin;
 window.deleteOrg = deleteOrg;
+
+// ─── AVANCES COMMANDES ─────────────────────────────────────
+function moneyDisplay(value) {
+    return `${(Number(value) || 0).toLocaleString('fr-FR')}$`;
+}
+
+function advanceStatusMeta(order) {
+    const remaining = Number(order?.remaining_amount) || 0;
+    const recovered = Number(order?.recovered_amount) || 0;
+    if (order?.status === 'settled' || remaining <= 0) {
+        return { className: 'settled', label: 'Soldée' };
+    }
+    if (recovered > 0) {
+        return { className: 'partial', label: 'Partiel' };
+    }
+    return { className: 'open', label: 'À récupérer' };
+}
+
+async function loadAdminMembers(force = false) {
+    if (!force && adminMembers.length && Date.now() - adminMembersLoadedAt < 10 * 60 * 1000) {
+        populateAdvanceParticipantSelects();
+        return;
+    }
+    try {
+        const res = await fetch('/api/members/all');
+        const data = await res.json();
+        adminMembers = data.members || [];
+        adminMembersLoadedAt = Date.now();
+        populateAdvanceParticipantSelects();
+    } catch {
+        adminMembers = [];
+        populateAdvanceParticipantSelects();
+    }
+}
+
+function memberOptions(selectedId = '') {
+    const selected = String(selectedId || '');
+    return [
+        '<option value="">-- Choisir une personne --</option>',
+        ...adminMembers.map(member => {
+            const id = escapeHtml(member.id);
+            const name = escapeHtml(member.name || member.username || member.id);
+            return `<option value="${id}" data-name="${name}" ${String(member.id) === selected ? 'selected' : ''}>${name}</option>`;
+        }),
+    ].join('');
+}
+
+function ensureAdvanceParticipantRows() {
+    const container = document.getElementById('orderAdvanceParticipants');
+    if (!container || container.children.length) return;
+    container.innerHTML = [0, 1, 2].map(index => `
+        <div class="order-advance-participant-row" data-advance-participant="${index}">
+            <div class="advance-participant-badge">${index + 1}</div>
+            <div class="comm-field">
+                <label class="comm-label">Personne</label>
+                <select class="comm-input order-advance-participant-user">${memberOptions()}</select>
+            </div>
+            <div class="comm-field">
+                <label class="comm-label">Montant avancé</label>
+                <input type="number" min="0" class="comm-input order-advance-participant-contributed" placeholder="0">
+            </div>
+            <div class="comm-field">
+                <label class="comm-label">Montant récupéré</label>
+                <input type="number" min="0" class="comm-input order-advance-participant-recovered" placeholder="0">
+            </div>
+            <div class="comm-field">
+                <label class="comm-label">Compensation prochaine commande</label>
+                <input type="number" min="0" class="comm-input order-advance-participant-compensate" placeholder="0">
+            </div>
+            <div class="comm-field advance-participant-note">
+                <label class="comm-label">Note</label>
+                <input type="text" class="comm-input order-advance-participant-note" placeholder="Détail">
+            </div>
+        </div>
+    `).join('');
+}
+
+function initOrderAdvanceParticipants() {
+    normalizeOrderAdvanceLabels();
+    ensureAdvanceParticipantRows();
+    populateAdvanceParticipantSelects();
+}
+
+function normalizeOrderAdvanceLabels() {
+    const section = document.getElementById('adminTab-advances');
+    if (!section) return;
+    const title = section.querySelector('.section-title');
+    const info = section.querySelector('.admin-info');
+    if (title) title.textContent = 'Suivi commandes / avances';
+    if (info) info.textContent = 'Suivi admin des commandes avancées, montants récupérés et compensations.';
+    const labels = {
+        orderAdvanceTitle: 'Nom commande *',
+        orderAdvanceDate: 'Date commande *',
+        orderAdvanceTotal: 'Montant total ($)',
+        orderAdvanceRecovered: 'Montant récupéré global ($)',
+        orderAdvanceNote: 'Note',
+    };
+    Object.entries(labels).forEach(([id, text]) => {
+        const label = document.getElementById(id)?.closest('.comm-field')?.querySelector('.comm-label');
+        if (label) label.textContent = text;
+    });
+    const resetButton = section.querySelector('button[onclick="resetOrderAdvanceForm()"]');
+    if (resetButton) resetButton.textContent = 'Réinitialiser';
+    const submitButton = section.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.textContent = "Enregistrer l'avance";
+}
+
+function populateAdvanceParticipantSelects() {
+    document.querySelectorAll('.order-advance-participant-user').forEach(select => {
+        const selected = select.value;
+        const selectedName = select.selectedOptions?.[0]?.dataset?.name || select.selectedOptions?.[0]?.textContent || '';
+        select.innerHTML = memberOptions(selected);
+        if (selected && !select.value) {
+            const option = document.createElement('option');
+            option.value = selected;
+            option.dataset.name = selectedName;
+            option.textContent = selectedName || selected;
+            option.selected = true;
+            select.appendChild(option);
+        }
+    });
+}
+
+async function loadAdminOrderAdvances() {
+    try {
+        const res = await fetch('/api/admin/order-advances');
+        const data = await res.json();
+        adminOrderAdvances = data.advances || [];
+        renderOrderAdvances();
+    } catch (e) {
+        adminOrderAdvances = [];
+        renderOrderAdvances();
+    }
+}
+
+function collectOrderAdvancePayload() {
+    const title = document.getElementById('orderAdvanceTitle')?.value.trim();
+    const orderDate = document.getElementById('orderAdvanceDate')?.value;
+    if (!title) { toast('Nom de commande requis', 'error'); return null; }
+    if (!orderDate) { toast('Date de commande requise', 'error'); return null; }
+
+    const participants = [];
+    for (const row of document.querySelectorAll('[data-advance-participant]')) {
+        const select = row.querySelector('.order-advance-participant-user');
+        const userId = select?.value || '';
+        const userName = select?.selectedOptions?.[0]?.dataset?.name || select?.selectedOptions?.[0]?.textContent || '';
+        const contributed = row.querySelector('.order-advance-participant-contributed')?.value || '';
+        const recovered = row.querySelector('.order-advance-participant-recovered')?.value || '';
+        const compensate = row.querySelector('.order-advance-participant-compensate')?.value || '';
+        const note = row.querySelector('.order-advance-participant-note')?.value.trim() || '';
+        const hasMoney = Number(contributed) || Number(recovered) || Number(compensate);
+        if (!userId && !hasMoney && !note) continue;
+        if (!userId) { toast('Choisis une personne pour chaque ligne renseignée', 'error'); return null; }
+        participants.push({
+            user_id: userId,
+            user_name: userName,
+            amount_contributed: contributed,
+            amount_recovered: recovered,
+            amount_to_compensate_next_order: compensate,
+            note,
+        });
+    }
+
+    if (!participants.length) {
+        toast('Ajoute au moins un participant', 'error');
+        return null;
+    }
+
+    return {
+        title,
+        order_date: orderDate,
+        total_amount: document.getElementById('orderAdvanceTotal')?.value || 0,
+        recovered_amount: document.getElementById('orderAdvanceRecovered')?.value || 0,
+        note: document.getElementById('orderAdvanceNote')?.value.trim() || '',
+        participants,
+    };
+}
+
+async function saveOrderAdvance(event) {
+    if (event) event.preventDefault();
+    const payload = collectOrderAdvancePayload();
+    if (!payload) return;
+    const id = document.getElementById('orderAdvanceId')?.value;
+    try {
+        const res = await fetch(id ? `/api/admin/order-advances/${id}` : '/api/admin/order-advances', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Sauvegarde impossible');
+        adminOrderAdvances = data.advances || [];
+        renderOrderAdvances();
+        resetOrderAdvanceForm();
+        toast('Avance enregistrée');
+    } catch (e) {
+        toast(e.message, 'error');
+    }
+}
+
+function fillParticipantRow(row, participant = {}) {
+    const select = row.querySelector('.order-advance-participant-user');
+    if (select) {
+        select.innerHTML = memberOptions(participant.user_id);
+        if (participant.user_id && !select.value) {
+            const option = document.createElement('option');
+            option.value = participant.user_id;
+            option.dataset.name = participant.user_name || participant.user_id;
+            option.textContent = participant.user_name || participant.user_id;
+            option.selected = true;
+            select.appendChild(option);
+        }
+    }
+    row.querySelector('.order-advance-participant-contributed').value = participant.amount_contributed || '';
+    row.querySelector('.order-advance-participant-recovered').value = participant.amount_recovered || '';
+    row.querySelector('.order-advance-participant-compensate').value = participant.amount_to_compensate_next_order || '';
+    row.querySelector('.order-advance-participant-note').value = participant.note || '';
+}
+
+function editOrderAdvance(id) {
+    const order = adminOrderAdvances.find(item => Number(item.id) === Number(id));
+    if (!order) return;
+    initOrderAdvanceParticipants();
+    document.getElementById('orderAdvanceId').value = order.id;
+    document.getElementById('orderAdvanceTitle').value = order.title || '';
+    document.getElementById('orderAdvanceDate').value = order.order_date || '';
+    document.getElementById('orderAdvanceTotal').value = order.total_amount || '';
+    document.getElementById('orderAdvanceRecovered').value = order.recovered_amount || '';
+    document.getElementById('orderAdvanceNote').value = order.note || '';
+    const rows = [...document.querySelectorAll('[data-advance-participant]')];
+    rows.forEach((row, index) => fillParticipantRow(row, (order.participants || [])[index] || {}));
+    document.getElementById('orderAdvanceForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetOrderAdvanceForm() {
+    const form = document.getElementById('orderAdvanceForm');
+    if (form) form.reset();
+    const idInput = document.getElementById('orderAdvanceId');
+    if (idInput) idInput.value = '';
+    document.querySelectorAll('[data-advance-participant]').forEach(row => fillParticipantRow(row, {}));
+}
+
+async function deleteOrderAdvance(id) {
+    if (!await confirmAction({ title: 'Supprimer la commande', message: 'Supprimer ce suivi de commande ?', confirmText: 'Supprimer', danger: true })) return;
+    try {
+        const res = await fetch(`/api/admin/order-advances/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Suppression impossible');
+        adminOrderAdvances = data.advances || [];
+        renderOrderAdvances();
+        toast('Commande supprimée');
+    } catch (e) {
+        toast(e.message, 'error');
+    }
+}
+
+async function settleOrderAdvance(id) {
+    if (!await confirmAction({ title: 'Marquer soldée', message: 'Marquer cette commande comme entièrement récupérée ?', confirmText: 'Marquer soldée' })) return;
+    try {
+        const res = await fetch(`/api/admin/order-advances/${id}/settle`, { method: 'PUT' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Action impossible');
+        adminOrderAdvances = data.advances || [];
+        renderOrderAdvances();
+        toast('Commande soldée');
+    } catch (e) {
+        toast(e.message, 'error');
+    }
+}
+
+function renderOrderAdvances() {
+    const list = document.getElementById('orderAdvanceList');
+    if (!list) return;
+    if (!adminOrderAdvances.length) {
+        list.innerHTML = '<p class="empty">Aucune avance commande enregistrée.</p>';
+        return;
+    }
+
+    list.innerHTML = adminOrderAdvances.map(order => {
+        const meta = advanceStatusMeta(order);
+        const participants = (order.participants || []).map(p => `
+            <div class="order-advance-participant-chip">
+                <strong>${escapeHtml(p.user_name)}</strong>
+                <span>Mis : ${moneyDisplay(p.amount_contributed)}</span>
+                <span>Récupéré : ${moneyDisplay(p.amount_recovered)}</span>
+                <span>Restant : ${moneyDisplay(p.amount_remaining)}</span>
+                ${Number(p.amount_to_compensate_next_order) ? `<span>Compensation : ${moneyDisplay(p.amount_to_compensate_next_order)}</span>` : ''}
+                ${p.note ? `<small>${escapeHtml(p.note)}</small>` : ''}
+            </div>
+        `).join('');
+        return `
+            <article class="order-advance-card ${meta.className}">
+                <div class="order-advance-card-head">
+                    <div>
+                        <h3>${escapeHtml(order.title)}</h3>
+                        <p>${escapeHtml(order.order_date || 'Date non renseignée')}</p>
+                    </div>
+                    <span class="order-advance-status">${meta.label}</span>
+                </div>
+                <div class="order-advance-totals">
+                    <span>Total <strong>${moneyDisplay(order.total_amount)}</strong></span>
+                    <span>Récupéré <strong>${moneyDisplay(order.recovered_amount)}</strong></span>
+                    <span>Restant <strong>${moneyDisplay(order.remaining_amount)}</strong></span>
+                </div>
+                ${order.note ? `<p class="order-advance-note-display">${escapeHtml(order.note)}</p>` : ''}
+                <div class="order-advance-participants-list">${participants}</div>
+                <div class="order-advance-actions">
+                    <button class="btn-secondary btn-small" onclick="editOrderAdvance(${order.id})">Modifier</button>
+                    <button class="btn-primary btn-small" onclick="settleOrderAdvance(${order.id})" ${meta.className === 'settled' ? 'disabled' : ''}>Solder</button>
+                    <button class="btn-danger btn-small" onclick="deleteOrderAdvance(${order.id})">Supprimer</button>
+                </div>
+            </article>
+        `;
+    }).join('');
+}
+
+window.loadAdminMembers = loadAdminMembers;
+window.loadAdminOrderAdvances = loadAdminOrderAdvances;
+window.saveOrderAdvance = saveOrderAdvance;
+window.editOrderAdvance = editOrderAdvance;
+window.resetOrderAdvanceForm = resetOrderAdvanceForm;
+window.deleteOrderAdvance = deleteOrderAdvance;
+window.settleOrderAdvance = settleOrderAdvance;

@@ -41,11 +41,24 @@ try {
 
 let jsonData = {
     weapons: [],
+    ingredients: [],
     stock_materials: [],
     my_weapon_names: [],
     organizations: [],
     craft_requests: [],
-    counters: { weapons: 0, my_weapon_names: 0, organizations: 0, requests: 0 },
+    my_weapons: [],
+    order_advances: [],
+    order_advance_participants: [],
+    counters: {
+        weapons: 0,
+        ingredients: 0,
+        my_weapon_names: 0,
+        organizations: 0,
+        requests: 0,
+        myweapons: 0,
+        order_advances: 0,
+        order_advance_participants: 0,
+    },
 };
 
 function loadJSON() {
@@ -57,7 +70,20 @@ function loadJSON() {
             jsonData.my_weapon_names = jsonData.my_weapon_names || [];
             jsonData.organizations = jsonData.organizations || [];
             jsonData.craft_requests = jsonData.craft_requests || [];
-            jsonData.counters = jsonData.counters || { weapons: 0, my_weapon_names: 0, organizations: 0, requests: 0 };
+            jsonData.my_weapons = jsonData.my_weapons || [];
+            jsonData.order_advances = jsonData.order_advances || [];
+            jsonData.order_advance_participants = jsonData.order_advance_participants || [];
+            jsonData.counters = {
+                weapons: 0,
+                ingredients: 0,
+                my_weapon_names: 0,
+                organizations: 0,
+                requests: 0,
+                myweapons: 0,
+                order_advances: 0,
+                order_advance_participants: 0,
+                ...(jsonData.counters || {}),
+            };
         }
     } catch (e) {
         console.error('Erreur chargement crafts.json:', e.message);
@@ -184,7 +210,9 @@ function initDB() {
                     weapon_id INTEGER NOT NULL,
                     has_plan INTEGER DEFAULT 0,
                     has_money INTEGER DEFAULT 0,
+                    request_type TEXT,
                     status TEXT DEFAULT 'pending',
+                    refusal_reason TEXT,
                     crafted INTEGER DEFAULT 0,
                     serial_number TEXT,
                     buyer_org TEXT,
@@ -220,7 +248,35 @@ function initDB() {
                     discord_message_id TEXT,
                     weapons_log_message_id TEXT,
                     sale_discord_message_id TEXT,
+                    created_by_id TEXT,
+                    created_by_name TEXT,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
+                );
+                CREATE TABLE IF NOT EXISTS order_advances (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    order_date TEXT,
+                    total_amount INTEGER DEFAULT 0,
+                    recovered_amount INTEGER DEFAULT 0,
+                    remaining_amount INTEGER DEFAULT 0,
+                    note TEXT,
+                    status TEXT DEFAULT 'open',
+                    created_at INTEGER DEFAULT (strftime('%s','now')),
+                    updated_at INTEGER DEFAULT (strftime('%s','now'))
+                );
+                CREATE TABLE IF NOT EXISTS order_advance_participants (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_id INTEGER NOT NULL,
+                    user_id TEXT,
+                    user_name TEXT NOT NULL,
+                    amount_contributed INTEGER DEFAULT 0,
+                    amount_recovered INTEGER DEFAULT 0,
+                    amount_remaining INTEGER DEFAULT 0,
+                    amount_to_compensate_next_order INTEGER DEFAULT 0,
+                    note TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s','now')),
+                    updated_at INTEGER DEFAULT (strftime('%s','now')),
+                    FOREIGN KEY (order_id) REFERENCES order_advances(id) ON DELETE CASCADE
                 );
                 CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
                 CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
@@ -247,8 +303,12 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN weapons_log_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sale_discord_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN created_by_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN created_by_name TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN stock_consumed_at INTEGER`); } catch {}
+            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN request_type TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN refusal_reason TEXT`); } catch {}
 
             const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
@@ -955,6 +1015,149 @@ function deleteOrg(id) {
     saveJSON();
 }
 
+function cleanMoney(value) {
+    const parsed = parseInt(String(value ?? '').replace(/[^\d-]/g, ''), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function normalizeAdvanceParticipants(participants = []) {
+    return (Array.isArray(participants) ? participants : [])
+        .slice(0, 3)
+        .map(p => {
+            const userName = String(p.user_name || p.name || '').trim();
+            if (!userName) return null;
+            const amountContributed = cleanMoney(p.amount_contributed);
+            const amountRecovered = cleanMoney(p.amount_recovered);
+            return {
+                user_id: String(p.user_id || '').trim() || null,
+                user_name: userName,
+                amount_contributed: amountContributed,
+                amount_recovered: amountRecovered,
+                amount_remaining: Math.max(0, amountContributed - amountRecovered),
+                amount_to_compensate_next_order: cleanMoney(p.amount_to_compensate_next_order),
+                note: String(p.note || '').trim() || null,
+            };
+        })
+        .filter(Boolean);
+}
+
+function calculateAdvanceTotals(payload, participants) {
+    const contributedTotal = participants.reduce((sum, p) => sum + p.amount_contributed, 0);
+    const totalAmount = cleanMoney(payload.total_amount) || contributedTotal;
+    const recoveredFromPayload = cleanMoney(payload.recovered_amount);
+    const recoveredFromParticipants = participants.reduce((sum, p) => sum + p.amount_recovered, 0);
+    const recoveredAmount = recoveredFromPayload || recoveredFromParticipants;
+    return {
+        total_amount: totalAmount,
+        recovered_amount: recoveredAmount,
+        remaining_amount: Math.max(0, totalAmount - recoveredAmount),
+    };
+}
+
+function getOrderAdvances() {
+    if (useSQLite) {
+        const orders = db.prepare('SELECT * FROM order_advances ORDER BY status ASC, order_date DESC, id DESC').all();
+        const getParticipants = db.prepare('SELECT * FROM order_advance_participants WHERE order_id = ? ORDER BY id ASC');
+        return orders.map(order => ({ ...order, participants: getParticipants.all(order.id) }));
+    }
+    const participants = jsonData.order_advance_participants || [];
+    return [...(jsonData.order_advances || [])]
+        .sort((a, b) => String(a.status || '').localeCompare(String(b.status || '')) || String(b.order_date || '').localeCompare(String(a.order_date || '')) || (b.id || 0) - (a.id || 0))
+        .map(order => ({ ...order, participants: participants.filter(p => Number(p.order_id) === Number(order.id)) }));
+}
+
+function upsertOrderAdvance(payload, id = null) {
+    const title = String(payload.title || '').trim();
+    if (!title) throw new Error('Nom de commande requis');
+    const participants = normalizeAdvanceParticipants(payload.participants);
+    if (!participants.length) throw new Error('Ajoute au moins un participant');
+    const totals = calculateAdvanceTotals(payload, participants);
+    const now = Math.floor(Date.now() / 1000);
+    const orderDate = String(payload.order_date || '').trim() || null;
+    const note = String(payload.note || '').trim() || null;
+    const requestedStatus = String(payload.status || 'open').trim();
+    const status = requestedStatus === 'settled' ? 'settled' : (totals.remaining_amount <= 0 ? 'settled' : 'open');
+
+    if (useSQLite) {
+        const tx = db.transaction(() => {
+            let orderId = Number(id);
+            if (orderId) {
+                db.prepare(`UPDATE order_advances SET title = ?, order_date = ?, total_amount = ?, recovered_amount = ?, remaining_amount = ?, note = ?, status = ?, updated_at = ? WHERE id = ?`)
+                    .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, orderId);
+                db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(orderId);
+            } else {
+                const r = db.prepare(`INSERT INTO order_advances (title, order_date, total_amount, recovered_amount, remaining_amount, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+                    .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, now);
+                orderId = r.lastInsertRowid;
+            }
+            const stmt = db.prepare(`INSERT INTO order_advance_participants (order_id, user_id, user_name, amount_contributed, amount_recovered, amount_remaining, amount_to_compensate_next_order, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            for (const p of participants) {
+                stmt.run(orderId, p.user_id, p.user_name, p.amount_contributed, p.amount_recovered, p.amount_remaining, p.amount_to_compensate_next_order, p.note, now, now);
+            }
+            return orderId;
+        });
+        return tx();
+    }
+
+    let orderId = Number(id);
+    if (orderId) {
+        const existing = jsonData.order_advances.find(o => Number(o.id) === orderId);
+        if (!existing) throw new Error('Commande introuvable');
+        Object.assign(existing, { title, order_date: orderDate, ...totals, note, status, updated_at: now });
+        jsonData.order_advance_participants = (jsonData.order_advance_participants || []).filter(p => Number(p.order_id) !== orderId);
+    } else {
+        orderId = nextId('order_advances');
+        jsonData.order_advances.push({ id: orderId, title, order_date: orderDate, ...totals, note, status, created_at: now, updated_at: now });
+    }
+    for (const p of participants) {
+        jsonData.order_advance_participants.push({
+            id: nextId('order_advance_participants'),
+            order_id: orderId,
+            ...p,
+            created_at: now,
+            updated_at: now,
+        });
+    }
+    saveJSON();
+    return orderId;
+}
+
+function deleteOrderAdvance(id) {
+    if (useSQLite) {
+        db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(id);
+        db.prepare('DELETE FROM order_advances WHERE id = ?').run(id);
+        return;
+    }
+    jsonData.order_advance_participants = (jsonData.order_advance_participants || []).filter(p => Number(p.order_id) !== Number(id));
+    jsonData.order_advances = (jsonData.order_advances || []).filter(o => Number(o.id) !== Number(id));
+    saveJSON();
+}
+
+function settleOrderAdvance(id) {
+    const now = Math.floor(Date.now() / 1000);
+    if (useSQLite) {
+        const order = db.prepare('SELECT * FROM order_advances WHERE id = ?').get(id);
+        if (!order) throw new Error('Commande introuvable');
+        db.prepare(`UPDATE order_advances SET recovered_amount = total_amount, remaining_amount = 0, status = 'settled', updated_at = ? WHERE id = ?`).run(now, id);
+        db.prepare(`UPDATE order_advance_participants SET amount_recovered = amount_contributed, amount_remaining = 0, updated_at = ? WHERE order_id = ?`).run(now, id);
+        return;
+    }
+    const order = (jsonData.order_advances || []).find(o => Number(o.id) === Number(id));
+    if (!order) throw new Error('Commande introuvable');
+    order.recovered_amount = order.total_amount;
+    order.remaining_amount = 0;
+    order.status = 'settled';
+    order.updated_at = now;
+    (jsonData.order_advance_participants || []).forEach(p => {
+        if (Number(p.order_id) === Number(id)) {
+            p.amount_recovered = p.amount_contributed;
+            p.amount_remaining = 0;
+            p.updated_at = now;
+        }
+    });
+    saveJSON();
+}
+
 function getRequests(status, options = {}) {
     if (useSQLite) {
         let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image, w.craft_price as weapon_craft_price FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
@@ -988,16 +1191,23 @@ function getRequest(id) {
     return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null };
 }
 
-function insertRequest(user_id, user_name, weapon_id, has_plan, has_money) {
+function normalizeCraftRequestType(value) {
+    const clean = String(value || '').trim();
+    return ['sale', 'personal'].includes(clean) ? clean : null;
+}
+
+function insertRequest(user_id, user_name, weapon_id, has_plan, has_money, request_type) {
+    const normalizedType = normalizeCraftRequestType(request_type);
     if (useSQLite) {
-        const r = db.prepare(`INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money) VALUES (?, ?, ?, ?, ?)`)
-            .run(user_id, user_name, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0);
+        const r = db.prepare(`INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money, request_type) VALUES (?, ?, ?, ?, ?, ?)`)
+            .run(user_id, user_name, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0, normalizedType);
         return r.lastInsertRowid;
     }
     const id = nextId('requests');
     jsonData.craft_requests.push({
         id, user_id, user_name, weapon_id,
         has_plan: has_plan ? 1 : 0, has_money: has_money ? 1 : 0,
+        request_type: normalizedType,
         status: 'pending', crafted: 0,
         created_at: Math.floor(Date.now() / 1000),
     });
@@ -1095,6 +1305,66 @@ const upload = multer({
 function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botState) {
     const express = require('express');
     app.use('/crafts/images', express.static(UPLOADS_DIR));
+
+    const memberPresenceCache = new Map();
+    let lastMissingMemberSweep = 0;
+    const MEMBER_CACHE_TTL_MS = 15 * 60 * 1000;
+    const MEMBER_SWEEP_TTL_MS = 5 * 60 * 1000;
+    const MEMBER_SWEEP_LIMIT = 25;
+    const ABSENT_MEMBER_CHECK_STATUSES = ['pending', 'materials', 'waiting_materials', 'in_progress'];
+
+    async function guildHasMember(userId) {
+        const cleanUserId = String(userId || '').trim();
+        if (!cleanUserId || !botClient?.guilds) return true;
+        const cached = memberPresenceCache.get(cleanUserId);
+        if (cached && Date.now() - cached.checkedAt < MEMBER_CACHE_TTL_MS) return cached.exists;
+
+        const guildId = config.discord?.guildId || process.env.GUILD_ID || botState?.()?.CONFIG?.GUILD_ID;
+        const guild = guildId
+            ? (botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null))
+            : botClient.guilds.cache.first();
+        if (!guild?.members) return true;
+
+        const exists = !!(await guild.members.fetch(cleanUserId).catch(() => null));
+        memberPresenceCache.set(cleanUserId, { exists, checkedAt: Date.now() });
+        return exists;
+    }
+
+    function markRequestsRejectedForAbsentMember(userId) {
+        const now = Math.floor(Date.now() / 1000);
+        const reason = 'Membre plus présent sur le Discord';
+        if (useSQLite) {
+            db.prepare(`UPDATE craft_requests SET status = 'rejected', refusal_reason = ? WHERE user_id = ? AND status IN (${ABSENT_MEMBER_CHECK_STATUSES.map(() => '?').join(',')})`)
+                .run(reason, userId, ...ABSENT_MEMBER_CHECK_STATUSES);
+        } else {
+            for (const request of (jsonData.craft_requests || [])) {
+                if (String(request.user_id) === String(userId) && ABSENT_MEMBER_CHECK_STATUSES.includes(request.status)) {
+                    request.status = 'rejected';
+                    request.refusal_reason = reason;
+                    request.updated_at = now;
+                }
+            }
+            saveJSON();
+        }
+        invalidateCraftCaches();
+    }
+
+    async function sweepRequestsForMissingMembers() {
+        if (!botClient?.isReady?.() || Date.now() - lastMissingMemberSweep < MEMBER_SWEEP_TTL_MS) return;
+        lastMissingMemberSweep = Date.now();
+        const activeRequests = getRequests('all')
+            .filter(r => ABSENT_MEMBER_CHECK_STATUSES.includes(r.status))
+            .filter(r => r.user_id)
+            .slice(0, 250);
+        const uniqueUserIds = [...new Set(activeRequests.map(r => String(r.user_id)))].slice(0, MEMBER_SWEEP_LIMIT);
+        for (const userId of uniqueUserIds) {
+            const exists = await guildHasMember(userId);
+            if (!exists) {
+                console.warn(`[craft] demandes refusées automatiquement: membre absent ${userId}`);
+                markRequestsRejectedForAbsentMember(userId);
+            }
+        }
+    }
 
     app.get('/api/crafts/stocks', requireAuth, (req, res) => {
         try {
@@ -1314,8 +1584,53 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         catch (e) { res.status(500).json({ error: e.message }); }
     });
 
+    app.get('/api/admin/order-advances', requireAdmin, (req, res) => {
+        try {
+            res.json({ advances: getOrderAdvances() });
+        } catch (e) {
+            res.status(500).json({ advances: [], error: e.message });
+        }
+    });
+
+    app.post('/api/admin/order-advances', requireAdmin, (req, res) => {
+        try {
+            const id = upsertOrderAdvance(req.body || {});
+            res.json({ success: true, id, advances: getOrderAdvances() });
+        } catch (e) {
+            res.status(400).json({ error: e.message });
+        }
+    });
+
+    app.put('/api/admin/order-advances/:id', requireAdmin, (req, res) => {
+        try {
+            const id = upsertOrderAdvance(req.body || {}, parseInt(req.params.id, 10));
+            res.json({ success: true, id, advances: getOrderAdvances() });
+        } catch (e) {
+            res.status(400).json({ error: e.message });
+        }
+    });
+
+    app.put('/api/admin/order-advances/:id/settle', requireAdmin, (req, res) => {
+        try {
+            settleOrderAdvance(parseInt(req.params.id, 10));
+            res.json({ success: true, advances: getOrderAdvances() });
+        } catch (e) {
+            res.status(400).json({ error: e.message });
+        }
+    });
+
+    app.delete('/api/admin/order-advances/:id', requireAdmin, (req, res) => {
+        try {
+            deleteOrderAdvance(parseInt(req.params.id, 10));
+            res.json({ success: true, advances: getOrderAdvances() });
+        } catch (e) {
+            res.status(400).json({ error: e.message });
+        }
+    });
+
     app.get('/api/crafts/requests', requireAuth, (req, res) => {
         try {
+            sweepRequestsForMissingMembers().catch(e => console.error('[craft] vérification membres absents:', e.message));
             const requests = getRequests(req.query.status, {
                 productionOnly: req.query.view === 'board',
             });
@@ -1527,13 +1842,15 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     }
     app.post('/api/crafts/requests', requireAuth, async (req, res) => {
         try {
-            const { weapon_id, has_plan, has_money } = req.body;
+            const { weapon_id, has_plan, has_money, request_type } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
             if (!weapon_id) return res.status(400).json({ error: 'Arme requise' });
+            const normalizedType = normalizeCraftRequestType(request_type);
+            if (!normalizedType) return res.status(400).json({ error: 'Type de demande obligatoire' });
             const weapon = getWeapon(weapon_id);
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
-            const id = insertRequest(userId, userName, weapon_id, has_plan, has_money);
+            const id = insertRequest(userId, userName, weapon_id, has_plan, has_money, normalizedType);
 
             // Message Discord
             postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
@@ -2160,10 +2477,33 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.post('/api/crafts/myweapons', requireAuth, async (req, res, next) => {
         try {
-            const { weapon_name, is_crafted, serial_number, serial_numbers, quantity, asking_price, min_price, crafted_by_id, crafted_by_name } = req.body;
+            const {
+                weapon_name,
+                is_crafted,
+                serial_number,
+                serial_numbers,
+                quantity,
+                asking_price,
+                min_price,
+                crafted_by_id,
+                crafted_by_name,
+                sell_for_user_id,
+                sell_for_user_name,
+            } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
             const userAvatar = req.session.user.avatar || null;
+            const targetUserId = String(sell_for_user_id || '').trim();
+            const targetUserName = String(sell_for_user_name || '').trim();
+            const sellingForOther = targetUserId && targetUserId !== userId;
+            if (sellingForOther && !canValidateCraft(req.session.user) && !canDeleteMyWeapons(req.session.user)) {
+                return res.status(403).json({ error: 'Tu ne peux pas vendre au nom d’un autre membre' });
+            }
+            const ownerId = sellingForOther ? targetUserId : userId;
+            const ownerName = sellingForOther ? (targetUserName || targetUserId) : userName;
+            const ownerAvatar = sellingForOther ? null : userAvatar;
+            const createdById = sellingForOther ? userId : null;
+            const createdByName = sellingForOther ? userName : null;
             const requestedWeaponName = String(weapon_name || '').trim();
             if (!requestedWeaponName) return res.status(400).json({ error: "Nom de l'arme requis" });
             const allowedWeaponNames = getAllMyWeaponNames();
@@ -2196,9 +2536,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             let id;
 
             if (useSQLite) {
-                const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price, batch_id, crafted_by_id, crafted_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+                const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price, batch_id, crafted_by_id, crafted_by_name, created_by_id, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
                 for (const serial of serials) {
-                    const r = stmt.run(userId, userName, userAvatar, weaponName, isCrafted21BS ? 1 : 0, serial, askingPrice, minPrice, batchId, craftedById, craftedByName);
+                    const r = stmt.run(ownerId, ownerName, ownerAvatar, weaponName, isCrafted21BS ? 1 : 0, serial, askingPrice, minPrice, batchId, craftedById, craftedByName, createdById, createdByName);
                     if (!id) id = r.lastInsertRowid;
                 }
             } else {
@@ -2211,9 +2551,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     if (!id) id = rowId;
                     jsonData.my_weapons.push({
                         id: rowId,
-                        user_id: userId,
-                        user_name: userName,
-                        user_avatar: userAvatar,
+                        user_id: ownerId,
+                        user_name: ownerName,
+                        user_avatar: ownerAvatar,
                         weapon_name: weaponName,
                         is_crafted: isCrafted21BS ? 1 : 0,
                         serial_number: serial,
@@ -2223,6 +2563,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         batch_id: batchId,
                         crafted_by_id: craftedById,
                         crafted_by_name: craftedByName,
+                        created_by_id: createdById,
+                        created_by_name: createdByName,
                         created_at: createdAt,
                     });
                 }

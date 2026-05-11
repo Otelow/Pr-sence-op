@@ -5911,6 +5911,294 @@ body {
     min-width: 0;
 }
 
+/* === Craft request type, catalogue states, admin advances === */
+.craft-section-title-with-icon {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.craft-title-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 140, 0, 0.42);
+    background: rgba(255, 140, 0, 0.14);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    box-shadow: 0 0 16px rgba(255, 140, 0, 0.12);
+}
+
+.craft-request-type-choice {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.craft-request-type-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(10, 10, 12, 0.58);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.craft-request-type-option:hover {
+    border-color: rgba(255, 140, 0, 0.34);
+    background: rgba(255, 140, 0, 0.06);
+}
+
+.craft-request-type-option:has(input:checked) {
+    border-color: rgba(255, 140, 0, 0.72);
+    background: rgba(255, 140, 0, 0.13);
+    box-shadow: inset 0 0 0 1px rgba(255, 140, 0, 0.18);
+}
+
+.craft-request-type-option input {
+    accent-color: var(--accent);
+}
+
+.craft-request-type-chip {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    margin-top: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 140, 0, 0.24);
+    background: rgba(255, 140, 0, 0.08);
+    color: var(--accent);
+    font: 800 10px/1.2 var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.craft-weapon-card-craftable {
+    border-color: rgba(74, 222, 128, 0.38) !important;
+    background:
+        linear-gradient(145deg, rgba(74, 222, 128, 0.08), rgba(20, 20, 24, 0.58) 45%),
+        rgba(20, 20, 24, 0.55) !important;
+    box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.08), 0 0 22px rgba(74, 222, 128, 0.06) !important;
+}
+
+.craft-weapon-card-blocked {
+    border-color: rgba(248, 113, 113, 0.30) !important;
+    background:
+        linear-gradient(145deg, rgba(248, 113, 113, 0.065), rgba(20, 20, 24, 0.58) 45%),
+        rgba(20, 20, 24, 0.55) !important;
+    box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.06) !important;
+}
+
+.order-advance-form {
+    margin-top: 18px;
+    padding: 18px;
+    border: 1px solid rgba(255, 140, 0, 0.22);
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(255, 140, 0, 0.08), rgba(10, 10, 12, 0.58) 34%);
+}
+
+.order-advance-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.order-advance-note {
+    grid-column: span 4;
+}
+
+.admin-subtitle {
+    margin: 22px 0 12px;
+    color: var(--accent);
+    font: 700 20px/1 var(--font-display);
+    letter-spacing: .03em;
+}
+
+.order-advance-participants {
+    display: grid;
+    gap: 12px;
+}
+
+.order-advance-participant-row {
+    display: grid;
+    grid-template-columns: 34px 1.35fr repeat(3, minmax(120px, .8fr)) 1fr;
+    gap: 10px;
+    align-items: end;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.advance-participant-badge {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: rgba(255, 140, 0, 0.16);
+    color: var(--accent);
+    font: 900 14px/1 var(--font-mono);
+    align-self: center;
+}
+
+.order-advance-list {
+    display: grid;
+    gap: 14px;
+    margin-top: 20px;
+}
+
+.order-advance-card {
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(20, 20, 24, 0.62);
+}
+
+.order-advance-card.open {
+    border-color: rgba(248, 113, 113, 0.35);
+    box-shadow: inset 3px 0 0 rgba(248, 113, 113, 0.72);
+}
+
+.order-advance-card.partial {
+    border-color: rgba(251, 191, 36, 0.35);
+    box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.72);
+}
+
+.order-advance-card.settled {
+    border-color: rgba(74, 222, 128, 0.35);
+    box-shadow: inset 3px 0 0 rgba(74, 222, 128, 0.72);
+}
+
+.order-advance-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.order-advance-card h3 {
+    margin: 0;
+    color: var(--text);
+    font-size: 18px;
+}
+
+.order-advance-card p {
+    margin: 4px 0 0;
+    color: var(--text-dim);
+}
+
+.order-advance-status {
+    flex: 0 0 auto;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(255, 140, 0, 0.12);
+    color: var(--accent);
+    font: 800 11px/1 var(--font-mono);
+    text-transform: uppercase;
+}
+
+.order-advance-totals,
+.order-advance-participants-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.order-advance-totals span,
+.order-advance-participant-chip {
+    padding: 9px 11px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.28);
+    color: var(--text-dim);
+}
+
+.order-advance-totals strong,
+.order-advance-participant-chip strong {
+    color: var(--text);
+}
+
+.order-advance-participant-chip {
+    display: grid;
+    gap: 4px;
+    min-width: min(230px, 100%);
+}
+
+.order-advance-participant-chip span,
+.order-advance-participant-chip small {
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.order-advance-note-display {
+    margin-top: 12px !important;
+    padding: 10px 12px;
+    border-left: 3px solid rgba(255, 140, 0, 0.58);
+    background: rgba(0, 0, 0, 0.22);
+}
+
+.order-advance-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+@media (max-width: 1100px) {
+    .order-advance-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .order-advance-note {
+        grid-column: span 2;
+    }
+
+    .order-advance-participant-row {
+        grid-template-columns: 34px repeat(2, minmax(0, 1fr));
+    }
+
+    .advance-participant-note {
+        grid-column: 2 / -1;
+    }
+}
+
+@media (max-width: 680px) {
+    .craft-request-type-choice,
+    .order-advance-grid,
+    .order-advance-participant-row {
+        grid-template-columns: 1fr;
+    }
+
+    .order-advance-note,
+    .advance-participant-note {
+        grid-column: auto;
+    }
+
+    .advance-participant-badge {
+        justify-self: start;
+    }
+
+    .order-advance-actions {
+        justify-content: stretch;
+    }
+
+    .order-advance-actions button {
+        flex: 1 1 140px;
+    }
+}
+
 .craft-stock-card {
     display: grid;
     grid-template-columns: 34px minmax(0, 1fr);

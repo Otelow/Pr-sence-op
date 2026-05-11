@@ -595,7 +595,7 @@
         <!-- Sous-section : Catalogue -->
         <div class="crafts-section" id="craftSection-catalog">
             <div class="crafts-section-header">
-                <h3 class="section-title">📦 Catalogue des armes craftables</h3>
+                <h3 class="section-title craft-section-title-with-icon"><span class="craft-title-icon" aria-hidden="true">▣</span> Catalogue des armes craftables</h3>
                 <p class="crafts-section-info">Visualise toutes les armes que tu peux faire crafter, avec leurs ingrédients et prix.</p>
             </div>
             <div class="craft-stock-panel" id="craftStockPanel"></div>
@@ -636,6 +636,20 @@
                     </div>
                 </div>
 
+                <div class="craft-field">
+                    <label>Type de demande *</label>
+                    <div class="craft-request-type-choice">
+                        <label class="craft-request-type-option">
+                            <input type="radio" name="craftRequestType" value="sale">
+                            <span>Arme à vendre</span>
+                        </label>
+                        <label class="craft-request-type-option">
+                            <input type="radio" name="craftRequestType" value="personal">
+                            <span>Arme personnelle</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="craft-field-row">
                     <label class="craft-checkbox-label">
                         <input type="checkbox" id="craftHasPlan">
@@ -669,7 +683,18 @@
                             <option value="date">Date</option>
                             <option value="user">Utilisateur</option>
                             <option value="weapon">Arme</option>
-                            <option value="price">Prix craft</option>
+                            <option value="status">Statut</option>
+                        </select>
+                    </div>
+                    <div class="craft-board-sort">
+                        <label class="comm-label" for="craftRequestsStatusFilter">Statut</label>
+                        <select id="craftRequestsStatusFilter" class="comm-input craft-board-select" onchange="updateCraftRequestsStatusFilter()">
+                            <option value="all">Tous</option>
+                            <option value="crafted">⚒ Crafté</option>
+                            <option value="in_progress">⏳ En cours</option>
+                            <option value="waiting_materials">📦 En attente des matières premières</option>
+                            <option value="rejected">✗ Refusé</option>
+                            <option value="pending">📋 En attente</option>
                         </select>
                     </div>
                     <div class="craft-board-sort">
@@ -842,6 +867,13 @@
                     <label class="comm-label">Craftée par *</label>
                     <select id="mwCraftedBy" class="comm-input">
                         <option value="">Chargement des membres...</option>
+                    </select>
+                </div>
+
+                <div class="comm-field" id="mwSellForField" style="display:none;">
+                    <label class="comm-label">Vendre au nom de</label>
+                    <select id="mwSellFor" class="comm-input">
+                        <option value="">Moi-même</option>
                     </select>
                 </div>
 
