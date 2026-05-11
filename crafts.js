@@ -237,6 +237,7 @@ function initDB() {
                     user_name TEXT NOT NULL,
                     user_avatar TEXT,
                     weapon_name TEXT NOT NULL,
+                    craft_request_id INTEGER,
                     is_crafted INTEGER DEFAULT 0,
                     serial_number TEXT,
                     asking_price INTEGER,
@@ -325,10 +326,12 @@ function initDB() {
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN created_by_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN created_by_name TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN craft_request_id INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN stock_consumed_at INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN request_type TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN refusal_reason TEXT`); } catch {}
+            try { db.exec(`CREATE INDEX IF NOT EXISTS idx_myweapons_craft_request ON my_weapons(craft_request_id)`); } catch {}
 
             const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
@@ -1467,6 +1470,48 @@ function markRequestPosted(id) {
     if (r) { r.posted_to_channel = 1; saveJSON(); }
 }
 
+function getWeaponSaleStateForCraftRequest(request) {
+    if (!request) return { state: 'not_listed' };
+    const requestId = Number(request.id);
+    const serial = String(request.serial_number || '').trim();
+    let rows = [];
+    if (useSQLite) {
+        if (requestId) {
+            rows = db.prepare('SELECT * FROM my_weapons WHERE craft_request_id = ? ORDER BY id ASC').all(requestId);
+        }
+        if (!rows.length && serial) {
+            rows = db.prepare('SELECT * FROM my_weapons WHERE serial_number = ? ORDER BY id ASC').all(serial);
+        }
+    } else {
+        rows = (jsonData.my_weapons || []).filter(w =>
+            (requestId && Number(w.craft_request_id) === requestId) ||
+            (serial && String(w.serial_number || '').trim() === serial)
+        );
+    }
+    if (!rows.length) return { state: 'not_listed' };
+    const sold = rows.every(w => w.is_sold === true || w.is_sold === 1 || w.is_sold === '1');
+    return {
+        state: sold ? 'sold' : 'listed',
+        my_weapon_id: rows[0].id,
+        discord_message_id: rows.find(w => w.discord_message_id)?.discord_message_id || null,
+    };
+}
+
+function serialAlreadyListed(serial, excludeId = null) {
+    const clean = String(serial || '').trim();
+    if (!clean) return false;
+    if (useSQLite) {
+        const row = excludeId
+            ? db.prepare('SELECT id FROM my_weapons WHERE serial_number = ? AND id != ? LIMIT 1').get(clean, excludeId)
+            : db.prepare('SELECT id FROM my_weapons WHERE serial_number = ? LIMIT 1').get(clean);
+        return !!row;
+    }
+    return (jsonData.my_weapons || []).some(w =>
+        String(w.serial_number || '').trim() === clean &&
+        (!excludeId || Number(w.id) !== Number(excludeId))
+    );
+}
+
 function deleteRequest(id) {
     if (useSQLite) { db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id); return; }
     jsonData.craft_requests = jsonData.craft_requests.filter(r => r.id !== id);
@@ -1857,6 +1902,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const list = requests.map(r => ({
                 ...r,
                 weapon_image_url: r.weapon_image ? `/crafts/images/${r.weapon_image}` : null,
+                sale_state: getWeaponSaleStateForCraftRequest(r).state,
                 has_plan: !!r.has_plan, has_money: !!r.has_money, crafted: !!r.crafted,
             }));
             res.json({ requests: list });
@@ -2111,7 +2157,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
         const state = botState();
         const channelId = (state?.CONFIG?.CHANNELS?.WEAPONS_LOG) || '1497021044953845791';
-        const channel = botClient.channels.cache.get(channelId);
+        const channel = await fetchDiscordChannel(channelId, 'WEAPONS_LOG_MANUAL_CRAFT');
         if (!channel) return;
 
         const saleDate = saleTimestamp ? new Date(saleTimestamp * 1000).toLocaleDateString('fr-FR') : 'N/A';
@@ -2297,7 +2343,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
 
             if (crafted) {
-                const channel = botClient.channels.cache.get(CRAFT_STATUS_CHANNEL);
+                const channel = await fetchDiscordChannel(CRAFT_STATUS_CHANNEL, 'CRAFT_STATUS_READY');
                 if (channel) {
                     const { EmbedBuilder } = require('discord.js');
                     const embed = new EmbedBuilder()
@@ -2372,7 +2418,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const updated = getRequest(id);
             if (!existing.posted_to_channel) {
                 const state = botState();
-                const channel = botClient.channels.cache.get(state.CONFIG.CHANNELS.WEAPONS_LOG || '1497021044953845791');
+                const channel = await fetchDiscordChannel(state.CONFIG.CHANNELS.WEAPONS_LOG || '1497021044953845791', 'WEAPONS_LOG_LEGACY_SALE');
                 if (channel) {
                     const saleDate = updated.sale_date ? new Date(updated.sale_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
                     const { EmbedBuilder } = require('discord.js');
@@ -2544,7 +2590,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
         const base = rows[0];
         const available = rows.filter(w => !w.is_sold).length;
-        const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
+        const channel = await fetchDiscordChannel(MYWEAPONS_CHANNEL, 'MYWEAPONS_LISTING');
         if (!channel) return;
         const embed = buildMyWeaponsEmbed(base, rows);
         const content = available > 0
@@ -2695,6 +2741,45 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         } catch (e) { res.json({ myweapons: [], error: e.message }); }
     });
 
+    app.get('/api/crafts/myweapons/available-crafts', requireAuth, (req, res) => {
+        try {
+            const userId = req.session.user.id;
+            let rows;
+            if (useSQLite) {
+                rows = db.prepare(`
+                    SELECT r.*, w.name as weapon_name
+                    FROM craft_requests r
+                    JOIN weapons w ON r.weapon_id = w.id
+                    WHERE r.user_id = ?
+                      AND r.status = 'crafted'
+                      AND TRIM(COALESCE(r.serial_number, '')) != ''
+                    ORDER BY r.craft_date DESC, r.created_at DESC
+                `).all(userId);
+            } else {
+                rows = (jsonData.craft_requests || [])
+                    .filter(r => r.user_id === userId && r.status === 'crafted' && String(r.serial_number || '').trim())
+                    .map(r => {
+                        const w = (jsonData.weapons || []).find(weapon => Number(weapon.id) === Number(r.weapon_id));
+                        return { ...r, weapon_name: w ? w.name : 'Arme inconnue' };
+                    })
+                    .sort((a, b) => (b.craft_date || b.created_at || 0) - (a.craft_date || a.created_at || 0));
+            }
+            const crafts = rows
+                .filter(r => getWeaponSaleStateForCraftRequest(r).state === 'not_listed')
+                .map(r => ({
+                    id: r.id,
+                    weapon_name: r.weapon_name,
+                    serial_number: r.serial_number,
+                    craft_date: r.craft_date,
+                    crafted_by_id: r.crafted_by_id,
+                    crafted_by_name: r.crafted_by_name,
+                }));
+            res.json({ crafts });
+        } catch (e) {
+            res.status(500).json({ crafts: [], error: e.message });
+        }
+    });
+
     app.post('/api/crafts/myweapons', requireAuth, async (req, res, next) => {
         try {
             const {
@@ -2709,6 +2794,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 crafted_by_name,
                 sell_for_user_id,
                 sell_for_user_name,
+                craft_request_id,
             } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
@@ -2734,12 +2820,36 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const weaponName = matchedWeaponName ? matchedWeaponName.name : requestedWeaponName;
             if (typeof is_crafted === 'undefined') return res.status(400).json({ error: "Origine de l'arme obligatoire" });
             const isCrafted21BS = is_crafted === true || is_crafted === 1 || is_crafted === '1' || is_crafted === 'true';
+            const linkedCraftRequestId = parseInt(craft_request_id, 10) || null;
+            let linkedCraftRequest = null;
+            if (linkedCraftRequestId) {
+                if (!isCrafted21BS) {
+                    return res.status(400).json({ error: 'Une demande de craft liée doit être déclarée comme arme craftée 21BS' });
+                }
+                linkedCraftRequest = getRequest(linkedCraftRequestId);
+                if (!linkedCraftRequest) return res.status(404).json({ error: 'Demande de craft introuvable' });
+                if (String(linkedCraftRequest.user_id || '') !== String(ownerId || '')) {
+                    return res.status(400).json({ error: 'La mise en vente doit être faite au nom du demandeur du craft' });
+                }
+                if (linkedCraftRequest.user_id !== ownerId && !canValidateCraft(req.session.user) && !canDeleteMyWeapons(req.session.user)) {
+                    return res.status(403).json({ error: 'Tu ne peux pas lier une demande de craft qui ne t’appartient pas' });
+                }
+                if (linkedCraftRequest.status !== 'crafted' || !String(linkedCraftRequest.serial_number || '').trim()) {
+                    return res.status(400).json({ error: 'Cette demande de craft n’est pas prête à la vente' });
+                }
+                if (getWeaponSaleStateForCraftRequest(linkedCraftRequest).state !== 'not_listed') {
+                    return res.status(409).json({ error: 'Cette arme est déjà en vente ou déjà vendue' });
+                }
+            }
             const authorizedCrafter = isCrafted21BS ? resolveAuthorizedCrafter(crafted_by_id, crafted_by_name) : null;
             if (isCrafted21BS && !authorizedCrafter) {
                 return res.status(400).json({ error: "Armurier autorisé obligatoire : Otelow, Ney ou Le H" });
             }
 
             let serials = normalizeSerialList(serial_numbers || serial_number);
+            if (linkedCraftRequest) {
+                serials = [String(linkedCraftRequest.serial_number).trim()];
+            }
             const requestedQuantity = Math.min(50, Math.max(1, parseInt(quantity, 10) || serials.length || 1));
             if (isCrafted21BS && serials.length !== requestedQuantity) {
                 return res.status(400).json({ error: `Renseigne ${requestedQuantity} N° de série distinct${requestedQuantity > 1 ? 's' : ''}` });
@@ -2747,18 +2857,22 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (!isCrafted21BS && serials.length < requestedQuantity) {
                 serials = [...serials, ...Array(requestedQuantity - serials.length).fill(null)];
             }
+            const duplicateSerial = serials.find(serial => serial && serialAlreadyListed(serial));
+            if (duplicateSerial) {
+                return res.status(409).json({ error: `Le N° de série ${duplicateSerial} est déjà en vente ou vendu` });
+            }
 
             const askingPrice = parseInt(asking_price) || null;
             const minPrice = parseInt(min_price) || null;
-            const craftedById = isCrafted21BS ? authorizedCrafter.id : null;
-            const craftedByName = isCrafted21BS ? authorizedCrafter.name : null;
+            const craftedById = linkedCraftRequest?.crafted_by_id || (isCrafted21BS ? authorizedCrafter.id : null);
+            const craftedByName = linkedCraftRequest?.crafted_by_name || (isCrafted21BS ? authorizedCrafter.name : null);
             const batchId = `mw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             let id;
 
             if (useSQLite) {
-                const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number, asking_price, min_price, batch_id, crafted_by_id, crafted_by_name, created_by_id, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+                const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, craft_request_id, is_crafted, serial_number, asking_price, min_price, batch_id, crafted_by_id, crafted_by_name, created_by_id, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
                 for (const serial of serials) {
-                    const r = stmt.run(ownerId, ownerName, ownerAvatar, weaponName, isCrafted21BS ? 1 : 0, serial, askingPrice, minPrice, batchId, craftedById, craftedByName, createdById, createdByName);
+                    const r = stmt.run(ownerId, ownerName, ownerAvatar, weaponName, linkedCraftRequestId, isCrafted21BS ? 1 : 0, serial, askingPrice, minPrice, batchId, craftedById, craftedByName, createdById, createdByName);
                     if (!id) id = r.lastInsertRowid;
                 }
             } else {
@@ -2775,6 +2889,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         user_name: ownerName,
                         user_avatar: ownerAvatar,
                         weapon_name: weaponName,
+                        craft_request_id: linkedCraftRequestId,
                         is_crafted: isCrafted21BS ? 1 : 0,
                         serial_number: serial,
                         asking_price: askingPrice,
@@ -2843,7 +2958,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             // Envoyer le résumé sur Discord avec ping
             try {
-                const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
+                const channel = await fetchDiscordChannel(MYWEAPONS_CHANNEL, 'MYWEAPONS_LISTING');
                 if (channel) {
                     const { EmbedBuilder } = require('discord.js');
                     const embed = new EmbedBuilder()
@@ -2930,7 +3045,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             // Mettre à jour le message Discord (édit ou nouveau message)
             try {
-                const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
+                const channel = await fetchDiscordChannel(MYWEAPONS_CHANNEL, 'MYWEAPONS_LISTING');
                 if (channel) {
                     const { EmbedBuilder } = require('discord.js');
                     const embed = new EmbedBuilder()
@@ -3056,7 +3171,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             if (existing.discord_message_id) {
                 try {
-                    const channel = botClient.channels.cache.get(MYWEAPONS_CHANNEL);
+                    const channel = await fetchDiscordChannel(MYWEAPONS_CHANNEL, 'MYWEAPONS_LISTING_DELETE');
                     const msg = channel ? await channel.messages.fetch(existing.discord_message_id) : null;
                     if (msg) await msg.delete();
                 } catch {}

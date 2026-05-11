@@ -2556,7 +2556,13 @@ async function loadCraftRequests() {
     try {
         const r = await fetch('/api/crafts/requests');
         const d = await r.json();
-        craftRequestsCache = d.requests || [];
+        const seen = new Set();
+        craftRequestsCache = (d.requests || []).filter(req => {
+            const key = String(req.id || '');
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     } catch {
         craftRequestsCache = [];
     }
@@ -3381,7 +3387,7 @@ function renderCraftBoard() {
 
     renderCraftBoardPagination(total, totalPages, start, end);
     if (!pageItems.length) {
-        tbody.innerHTML = '<tr class="craft-board-empty"><td colspan="9"><em>Aucune demande a afficher</em></td></tr>';
+        tbody.innerHTML = '<tr class="craft-board-empty"><td colspan="7"><em>Aucune demande a afficher</em></td></tr>';
         return;
     }
 
@@ -3409,12 +3415,11 @@ function renderCraftBoard() {
 
 function renderCraftBoardLine(num, r) {
     const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : '—';
-    const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : '—';
-    const isMine = r.user_id === window.currentUserId;
-    const canEditCraft = isAdminUser; // Hauts gradés peuvent cocher crafté + remplir N°série
-    const canEditSale = isMine || isAdminUser;
+    const canEditCraft = isAdminUser;
     const completed = r.status === 'completed';
     const craftedPendingSale = !completed && (r.crafted || r.status === 'crafted' || r.craft_date || r.serial_number);
+    const saleState = r.sale_state || 'not_listed';
+    const canListWeapon = canEditCraft && craftedPendingSale && saleState === 'not_listed' && String(r.serial_number || '').trim();
     const statusTone = getCraftStatusTone(r);
     const rowClass = [
         `request-row-status-${statusTone}`,
@@ -3441,21 +3446,72 @@ function renderCraftBoardLine(num, r) {
             <td>
                 <input type="text" class="craft-input-serial" placeholder="N°Série" value="${r.serial_number || ''}" ${canEditCraft ? '' : 'disabled'} onblur="updateCraftSerial(${r.id}, this.value)">
             </td>
-            <td>
-                <select class="craft-org-select" data-current-value="${escapeHtml(r.buyer_org || '')}" ${canEditSale && r.crafted ? '' : 'disabled'} onchange="handleOrgChange(${r.id}, this)">
-                    <option value="${escapeHtml(r.buyer_org || '')}">${escapeHtml(r.buyer_org || '— Choisir —')}</option>
-                </select>
-            </td>
-            <td>
-                <input type="number" class="craft-input-price" placeholder="Prix" value="${r.sale_price || ''}" ${canEditSale && r.crafted ? '' : 'disabled'} onblur="updateCraftSalePrice(${r.id}, this.value)">
-            </td>
             <td>${craftDate}</td>
-            <td>${saleDate}</td>
+            <td>${renderCraftBoardSaleState(r, saleState)}</td>
             <td>
-                ${canEditSale && r.crafted && !completed ? `<button class="btn-craft-validate" onclick="validateCraftSale(${r.id})">✓ Valider</button>` : ''}
+                ${canListWeapon ? `<button class="btn-craft-validate" onclick="openCraftListingFromBoard(${r.id})">Mettre en vente</button>` : ''}
             </td>
         </tr>
     `;
+}
+
+function renderCraftBoardSaleState(request, saleState) {
+    if (saleState === 'sold') return '<span class="craft-sale-state sold">Vendu</span>';
+    if (saleState === 'listed') return '<span class="craft-sale-state listed">En vente</span>';
+    if (request.status === 'crafted' || request.crafted || request.serial_number) {
+        return '<span class="craft-sale-state ready">Pret a vendre</span>';
+    }
+    return '<span class="craft-sale-state muted">Non crafté</span>';
+}
+async function openCraftListingFromBoard(requestId) {
+    const request = craftRequestsCache.find(r => Number(r.id) === Number(requestId));
+    if (!request) {
+        toast('Demande introuvable', 'error');
+        return;
+    }
+    if (!String(request.serial_number || '').trim()) {
+        toast('N° de série requis avant mise en vente', 'error');
+        return;
+    }
+
+    switchTab('myweapons');
+    await initMyWeaponsTab();
+
+    const craftedOrigin = document.querySelector('input[name="mwOrigin"][value="crafted"]');
+    if (craftedOrigin) craftedOrigin.checked = true;
+    myWeaponsSelectedCraftRequestId = request.id;
+
+    const linkedSelect = document.getElementById('mwLinkedCraft');
+    if (linkedSelect && ![...linkedSelect.options].some(opt => opt.value === String(request.id))) {
+        linkedSelect.add(new Option(`${request.weapon_name || 'Arme'} - ${request.serial_number}`, String(request.id)));
+    }
+    if (linkedSelect) linkedSelect.value = String(request.id);
+
+    const nameSelect = document.getElementById('mwName');
+    if (nameSelect) {
+        if (![...nameSelect.options].some(opt => opt.value === request.weapon_name)) {
+            nameSelect.add(new Option(request.weapon_name, request.weapon_name));
+        }
+        nameSelect.value = request.weapon_name || '';
+    }
+
+    const sellForSelect = document.getElementById('mwSellFor');
+    if (sellForSelect) {
+        if (request.user_id && ![...sellForSelect.options].some(opt => opt.value === String(request.user_id))) {
+            sellForSelect.add(new Option(request.user_name || request.user_id, String(request.user_id)));
+        }
+        sellForSelect.value = request.user_id || '';
+    }
+
+    const qty = document.getElementById('mwQuantity');
+    if (qty) qty.value = '1';
+    toggleMwCrafted();
+    const craftedBy = document.getElementById('mwCraftedBy');
+    if (craftedBy && request.crafted_by_id) craftedBy.value = request.crafted_by_id;
+    updateMwSerialFields();
+    const serialInput = document.querySelector('.mw-serial-input');
+    if (serialInput) serialInput.value = request.serial_number || '';
+    document.getElementById('mwAskingPrice')?.focus();
 }
 
 async function toggleCraftCrafted(requestId, crafted) {
@@ -4000,7 +4056,10 @@ function setupAdminSlide() {
 // ============================================================
 let myWeaponsCache = [];
 let myWeaponNamesCache = [];
+let myWeaponsAvailableCraftsCache = [];
 let myWeaponsFormHydrated = false;
+let myWeaponsSelectedCraftRequestId = null;
+let myWeaponsSubmitInFlight = false;
 const myWeaponsAuthorizedCrafters = [
     { id: 'otelow', name: 'Otelow' },
     { id: 'ney', name: 'Ney' },
@@ -4013,9 +4072,11 @@ async function initMyWeaponsTab() {
     }
     await loadMyWeaponNames();
     await loadAllMembers();
+    await loadMyWeaponsAvailableCrafts();
     if (!myWeaponsFormHydrated || !isMyWeaponsFormActive()) {
         populateMyWeaponNameSelect();
         populateMyWeaponsMemberSelects();
+        populateMyWeaponsAvailableCraftsSelect();
         toggleMwCrafted();
         renderMarkSoldBuyerDropdown();
         myWeaponsFormHydrated = true;
@@ -4026,7 +4087,7 @@ async function initMyWeaponsTab() {
 
 function isMyWeaponsFormActive() {
     const activeId = document.activeElement?.id || '';
-    return ['mwName', 'mwCraftedBy', 'mwSellFor', 'mwQuantity', 'mwAskingPrice', 'mwMinPrice'].includes(activeId)
+    return ['mwName', 'mwLinkedCraft', 'mwCraftedBy', 'mwSellFor', 'mwQuantity', 'mwAskingPrice', 'mwMinPrice'].includes(activeId)
         || document.activeElement?.classList?.contains('mw-serial-input');
 }
 
@@ -4034,8 +4095,24 @@ async function loadMyWeapons() {
     try {
         const r = await fetch('/api/crafts/myweapons');
         const d = await r.json();
-        myWeaponsCache = d.myweapons || [];
+        const seen = new Set();
+        myWeaponsCache = (d.myweapons || []).filter(w => {
+            const key = String(w.id || '');
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     } catch { myWeaponsCache = []; }
+}
+
+async function loadMyWeaponsAvailableCrafts() {
+    try {
+        const r = await fetch('/api/crafts/myweapons/available-crafts');
+        const d = await r.json();
+        myWeaponsAvailableCraftsCache = d.crafts || [];
+    } catch {
+        myWeaponsAvailableCraftsCache = [];
+    }
 }
 
 async function loadMyWeaponNames() {
@@ -4064,6 +4141,46 @@ function populateMyWeaponNameSelect() {
         select.value = previousValue;
     }
     select.onchange = () => updateMwSerialFields();
+}
+
+function populateMyWeaponsAvailableCraftsSelect() {
+    const select = document.getElementById('mwLinkedCraft');
+    if (!select) return;
+    const previous = myWeaponsSelectedCraftRequestId || select.value || '';
+    const options = myWeaponsAvailableCraftsCache.map(c => {
+        const date = c.craft_date ? ` - ${new Date(c.craft_date * 1000).toLocaleDateString('fr-FR')}` : '';
+        const label = `${c.weapon_name || 'Arme'} - ${c.serial_number || 'N/S'}${date}`;
+        return `<option value="${escapeHtml(c.id)}">${escapeHtml(label)}</option>`;
+    }).join('');
+    select.innerHTML = '<option value="">-- Choisir un craft termine --</option>' + options;
+    if (previous && myWeaponsAvailableCraftsCache.some(c => String(c.id) === String(previous))) {
+        select.value = String(previous);
+    }
+}
+
+function selectMwLinkedCraft() {
+    const select = document.getElementById('mwLinkedCraft');
+    const craft = myWeaponsAvailableCraftsCache.find(c => String(c.id) === String(select?.value || ''));
+    myWeaponsSelectedCraftRequestId = craft ? craft.id : null;
+    if (!craft) return;
+
+    const craftedOrigin = document.querySelector('input[name="mwOrigin"][value="crafted"]');
+    if (craftedOrigin) craftedOrigin.checked = true;
+    const nameSelect = document.getElementById('mwName');
+    if (nameSelect) {
+        if (![...nameSelect.options].some(opt => opt.value === craft.weapon_name)) {
+            nameSelect.add(new Option(craft.weapon_name, craft.weapon_name));
+        }
+        nameSelect.value = craft.weapon_name || '';
+    }
+    const qty = document.getElementById('mwQuantity');
+    if (qty) qty.value = '1';
+    toggleMwCrafted();
+    const craftedBy = document.getElementById('mwCraftedBy');
+    if (craftedBy && craft.crafted_by_id) craftedBy.value = craft.crafted_by_id;
+    updateMwSerialFields();
+    const serialInput = document.querySelector('.mw-serial-input');
+    if (serialInput) serialInput.value = craft.serial_number || '';
 }
 
 function getMwQuantity() {
@@ -4109,10 +4226,17 @@ function updateMwSerialFields() {
 function toggleMwCrafted() {
     const origin = document.querySelector('input[name="mwOrigin"]:checked')?.value;
     const field = document.getElementById('mwCraftedByField');
+    const linkedCraftField = document.getElementById('mwLinkedCraftField');
+    const linkedCraftSelect = document.getElementById('mwLinkedCraft');
     const select = document.getElementById('mwCraftedBy');
     const serialLabel = document.querySelector('#mwSerialField .comm-label');
     const crafted = origin === 'crafted';
     if (field) field.style.display = crafted ? 'block' : 'none';
+    if (linkedCraftField) linkedCraftField.style.display = crafted ? 'block' : 'none';
+    if (!crafted) {
+        myWeaponsSelectedCraftRequestId = null;
+        if (linkedCraftSelect) linkedCraftSelect.value = '';
+    }
     if (select) {
         select.required = crafted;
         if (!crafted) select.value = '';
@@ -4162,6 +4286,7 @@ function getSelectedMember(selectId) {
 }
 
 async function submitMyWeapon() {
+    if (myWeaponsSubmitInFlight) return;
     const weapon_name = document.getElementById('mwName').value.trim();
     const origin = document.querySelector('input[name="mwOrigin"]:checked')?.value;
     const is_crafted = origin === 'crafted';
@@ -4183,6 +4308,9 @@ async function submitMyWeapon() {
         return;
     }
 
+    myWeaponsSubmitInFlight = true;
+    const submitBtn = document.getElementById('mwSubmitBtn');
+    if (submitBtn) submitBtn.disabled = true;
     try {
         const res = await fetch('/api/crafts/myweapons', {
             method: 'POST',
@@ -4190,6 +4318,7 @@ async function submitMyWeapon() {
             body: JSON.stringify({
                 weapon_name,
                 is_crafted,
+                craft_request_id: myWeaponsSelectedCraftRequestId,
                 serial_numbers,
                 quantity,
                 asking_price,
@@ -4211,11 +4340,18 @@ async function submitMyWeapon() {
             if (sellForSelect) sellForSelect.value = '';
             const defaultOrigin = document.querySelector('input[name="mwOrigin"][value="crafted"]');
             if (defaultOrigin) defaultOrigin.checked = true;
+            myWeaponsSelectedCraftRequestId = null;
             toggleMwCrafted();
-            await loadMyWeapons();
+            await Promise.all([loadMyWeapons(), loadMyWeaponsAvailableCrafts(), loadCraftRequests()]);
+            populateMyWeaponsAvailableCraftsSelect();
             renderMyWeapons();
+            if (currentCraftSubtab === 'board') renderCraftBoard();
         } else { toast(`❌ ${data.error}`, 'error'); }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    finally {
+        myWeaponsSubmitInFlight = false;
+        if (submitBtn) submitBtn.disabled = false;
+    }
 }
 
 function renderMyWeapons() {
@@ -4328,7 +4464,10 @@ function openMarkSoldModal(id) {
     const serialField = document.getElementById('markSoldSerialField');
     const serialSelect = document.getElementById('markSoldSerial');
     if (serialSelect && serialField) {
-        serialSelect.innerHTML = availableSerials.map(s => `<option value="${s.id}">${escapeHtml(s.serial_number || 'Arme sans N° série')}</option>`).join('');
+        serialSelect.innerHTML = availableSerials.map((s, index) => {
+            const label = String(s.serial_number || '').trim() || `Arme ${index + 1}`;
+            return `<option value="${s.id}">${escapeHtml(label)}</option>`;
+        }).join('');
         serialField.style.display = availableSerials.length > 1 ? 'block' : 'none';
         serialSelect.onchange = () => { soldIdInput.value = serialSelect.value; };
     }

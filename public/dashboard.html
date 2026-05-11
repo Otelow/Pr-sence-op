@@ -748,10 +748,8 @@
                             <th>Demande</th>
                             <th>Crafté ?</th>
                             <th>N°Série</th>
-                            <th>Vendu à</th>
-                            <th>Prix</th>
                             <th>Date craft</th>
-                            <th>Date vente</th>
+                            <th>Vente</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -870,6 +868,14 @@
                     </select>
                 </div>
 
+                <div class="comm-field" id="mwLinkedCraftField" style="display:none;">
+                    <label class="comm-label">Craft termine disponible</label>
+                    <select id="mwLinkedCraft" class="comm-input" onchange="selectMwLinkedCraft()">
+                        <option value="">-- Choisir un craft termine --</option>
+                    </select>
+                    <p class="mw-serial-hint">Optionnel : pre-remplit l'arme et le numero de serie avec un craft termine.</p>
+                </div>
+
                 <div class="comm-field" id="mwSellForField" style="display:none;">
                     <label class="comm-label">Vendre au nom de</label>
                     <select id="mwSellFor" class="comm-input">
@@ -900,7 +906,7 @@
                 </div>
 
                 <div class="craft-actions">
-                    <button class="btn-primary" onclick="submitMyWeapon()">📤 Mettre en vente</button>
+                    <button id="mwSubmitBtn" class="btn-primary" onclick="submitMyWeapon()">📤 Mettre en vente</button>
                 </div>
             </div>
         </div>
