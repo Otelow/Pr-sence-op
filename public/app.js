@@ -2413,6 +2413,9 @@ let stockMaterialsCache = [];
 let organizationsCache = [];
 let craftRequestsCache = [];
 let isAdminUser = false;
+let craftRequestsLoadPromise = null;
+let craftRequestSubmitInFlight = false;
+const craftStatusActionLocks = new Set();
 let craftCatalogFilters = {
     search: '',
     stock: 'all',
@@ -2553,6 +2556,8 @@ async function loadOrganizations() {
 }
 
 async function loadCraftRequests() {
+    if (craftRequestsLoadPromise) return craftRequestsLoadPromise;
+    craftRequestsLoadPromise = (async () => {
     try {
         const r = await fetch('/api/crafts/requests');
         const d = await r.json();
@@ -2565,7 +2570,11 @@ async function loadCraftRequests() {
         });
     } catch {
         craftRequestsCache = [];
+    } finally {
+        craftRequestsLoadPromise = null;
     }
+    })();
+    return craftRequestsLoadPromise;
 }
 
 function switchCraftSubtab(subtab) {
@@ -2898,12 +2907,17 @@ function selectCraftWeapon(id, name, imageUrl) {
 }
 
 async function submitCraftRequest() {
+    if (craftRequestSubmitInFlight) return;
     const weaponId = document.getElementById('craftWeaponId').value;
     const hasPlan = document.getElementById('craftHasPlan').checked;
     const hasMoney = document.getElementById('craftHasMoney').checked;
     const requestType = document.querySelector('input[name="craftRequestType"]:checked')?.value || '';
 
     if (!weaponId) { toast('❌ Choisis une arme', 'error'); return; }
+
+    craftRequestSubmitInFlight = true;
+    const submitBtn = document.getElementById('craftSubmitRequestBtn');
+    if (submitBtn) submitBtn.disabled = true;
 
     try {
         if (!requestType) { toast('Type de demande obligatoire', 'error'); return; }
@@ -2933,6 +2947,9 @@ async function submitCraftRequest() {
         }
     } catch (e) {
         toast(`❌ ${e.message}`, 'error');
+    } finally {
+        craftRequestSubmitInFlight = false;
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 
@@ -3211,6 +3228,8 @@ function canDeleteMyWeaponsClient() {
 }
 
 async function updateRequestStatus(requestId, status) {
+    const lockKey = `${requestId}:${status}`;
+    if (craftStatusActionLocks.has(lockKey)) return;
     const labels = {
         materials: 'En attente des matières premières',
         waiting_materials: 'En attente des matières premières',
@@ -3219,6 +3238,8 @@ async function updateRequestStatus(requestId, status) {
         pending: 'En attente'
     };
     if (!await confirmAction({ title: 'Changer le statut', message: `Passer cette demande en "${labels[status]}" ?`, confirmText: 'Changer le statut', danger: status === 'rejected' })) return;
+    craftStatusActionLocks.add(lockKey);
+    document.querySelectorAll(`[onclick="updateRequestStatus(${requestId}, '${status}')"]`).forEach(btn => { btn.disabled = true; });
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}/status`, {
             method: 'PATCH',
@@ -3235,6 +3256,10 @@ async function updateRequestStatus(requestId, status) {
             toast(`❌ ${data.error}`, 'error');
         }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    finally {
+        craftStatusActionLocks.delete(lockKey);
+        document.querySelectorAll(`[onclick="updateRequestStatus(${requestId}, '${status}')"]`).forEach(btn => { btn.disabled = false; });
+    }
 }
 
 async function deleteCraftRequest(requestId) {
@@ -3397,20 +3422,12 @@ function renderCraftBoard() {
         if (r) {
             lines.push(renderCraftBoardLine(start + i + 1, r));
         } else {
-            lines.push(`<tr class="craft-board-empty"><td>${i + 1}</td><td colspan="8"><em>— Emplacement libre —</em></td></tr>`);
+            lines.push(`<tr class="craft-board-empty"><td>${i + 1}</td><td colspan="6"><em>— Emplacement libre —</em></td></tr>`);
         }
     }
 
     tbody.innerHTML = lines.join('');
 
-    // Charger les organisations dans les selects
-    document.querySelectorAll('.craft-org-select').forEach(select => {
-        const currentValue = select.dataset.currentValue || select.value || '';
-        select.innerHTML = '<option value="">— Choisir —</option>' +
-            organizationsCache.map(o => `<option value="${escapeHtml(o.name)}">${escapeHtml(o.name)}</option>`).join('') +
-            '<option value="__add__">+ Ajouter une organisation</option>';
-        select.value = currentValue;
-    });
 }
 
 function renderCraftBoardLine(num, r) {
@@ -3511,6 +3528,7 @@ async function openCraftListingFromBoard(requestId) {
     updateMwSerialFields();
     const serialInput = document.querySelector('.mw-serial-input');
     if (serialInput) serialInput.value = request.serial_number || '';
+    document.querySelector('.myweapons-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById('mwAskingPrice')?.focus();
 }
 
@@ -4060,6 +4078,7 @@ let myWeaponsAvailableCraftsCache = [];
 let myWeaponsFormHydrated = false;
 let myWeaponsSelectedCraftRequestId = null;
 let myWeaponsSubmitInFlight = false;
+let myWeaponsMarkSoldInFlight = false;
 const myWeaponsAuthorizedCrafters = [
     { id: 'otelow', name: 'Otelow' },
     { id: 'ney', name: 'Ney' },
@@ -4109,7 +4128,13 @@ async function loadMyWeaponsAvailableCrafts() {
     try {
         const r = await fetch('/api/crafts/myweapons/available-crafts');
         const d = await r.json();
-        myWeaponsAvailableCraftsCache = d.crafts || [];
+        const seen = new Set();
+        myWeaponsAvailableCraftsCache = (d.crafts || []).filter(c => {
+            const key = String(c.id || '');
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
     } catch {
         myWeaponsAvailableCraftsCache = [];
     }
@@ -4526,6 +4551,7 @@ function selectMarkSoldBuyer(name) {
 
 async function confirmMarkSold(e) {
     e.preventDefault();
+    if (myWeaponsMarkSoldInFlight) return;
     const id = document.getElementById('markSoldId').value;
     const sold_to = document.getElementById('markSoldBuyer').value;
     const sold_price = document.getElementById('markSoldPrice').value;
@@ -4534,6 +4560,9 @@ async function confirmMarkSold(e) {
     if (!sold_price) { toast('❌ Prix de vente requis', 'error'); return; }
     if (!soldBy.id) { toast('❌ Choisis qui a vendu l\'arme', 'error'); return; }
 
+    myWeaponsMarkSoldInFlight = true;
+    const submitBtn = document.querySelector('#markSoldForm button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
     try {
         const res = await fetch(`/api/crafts/myweapons/${id}/sold`, {
             method: 'PATCH',
@@ -4556,6 +4585,10 @@ async function confirmMarkSold(e) {
             }
         } else { toast(`❌ ${data.error}`, 'error'); }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    finally {
+        myWeaponsMarkSoldInFlight = false;
+        if (submitBtn) submitBtn.disabled = false;
+    }
 }
 
 async function deleteMyWeapon(id) {
