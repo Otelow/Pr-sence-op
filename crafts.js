@@ -1049,24 +1049,30 @@ function orderAdvanceTitle(orderDate) {
 }
 
 function normalizeAdvanceParticipants(participants = []) {
-    return (Array.isArray(participants) ? participants : [])
-        .slice(0, 3)
-        .map(p => {
-            const userName = String(p.user_name || p.name || '').trim();
-            if (!userName) return null;
-            const amountContributed = cleanMoney(p.amount_contributed);
-            const amountRecovered = cleanMoney(p.amount_recovered);
-            return {
-                user_id: String(p.user_id || '').trim() || null,
-                user_name: userName,
-                amount_contributed: amountContributed,
-                amount_recovered: amountRecovered,
-                amount_remaining: Math.max(0, amountContributed - amountRecovered),
-                amount_to_compensate_next_order: cleanMoney(p.amount_to_compensate_next_order),
-                note: String(p.note || '').trim() || null,
-            };
-        })
-        .filter(Boolean);
+    const seenParticipants = new Set();
+    const normalized = [];
+    for (const p of (Array.isArray(participants) ? participants : []).slice(0, 3)) {
+        const userName = String(p.user_name || p.name || '').trim();
+        if (!userName) continue;
+        const userId = String(p.user_id || '').trim() || null;
+        const uniqueKey = (userId || userName).toLowerCase();
+        if (seenParticipants.has(uniqueKey)) {
+            throw new Error('Chaque participant ne peut être choisi qu’une seule fois');
+        }
+        seenParticipants.add(uniqueKey);
+        const amountContributed = cleanMoney(p.amount_contributed);
+        const amountRecovered = cleanMoney(p.amount_recovered);
+        normalized.push({
+            user_id: userId,
+            user_name: userName,
+            amount_contributed: amountContributed,
+            amount_recovered: amountRecovered,
+            amount_remaining: Math.max(0, amountContributed - amountRecovered),
+            amount_to_compensate_next_order: cleanMoney(p.amount_to_compensate_next_order),
+            note: String(p.note || '').trim() || null,
+        });
+    }
+    return normalized;
 }
 
 function calculateAdvanceTotals(payload, participants, legacyRecoveredAmount = 0) {

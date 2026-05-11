@@ -12,6 +12,12 @@ let adminOrderAdvances = [];
 let adminMembersLoadedAt = 0;
 let editingIngredients = []; // [{ ingredient_id, name, amount }]
 let adminWeaponQuery = '';
+
+const ORDER_ADVANCE_PARTICIPANTS = [
+    { id: 'otelow', name: 'Otelow' },
+    { id: 'ney', name: 'Ney' },
+    { id: 'le-h', name: 'Le H' },
+];
 let adminIngredientQuery = '';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -816,32 +822,36 @@ function advanceStatusMeta(order) {
     return { className: 'open', label: 'À récupérer' };
 }
 
-async function loadAdminMembers(force = false) {
-    if (!force && adminMembers.length && Date.now() - adminMembersLoadedAt < 10 * 60 * 1000) {
-        populateAdvanceParticipantSelects();
-        return;
-    }
-    try {
-        const res = await fetch('/api/members/all');
-        const data = await res.json();
-        adminMembers = data.members || [];
-        adminMembersLoadedAt = Date.now();
-        populateAdvanceParticipantSelects();
-    } catch {
-        adminMembers = [];
-        populateAdvanceParticipantSelects();
-    }
+async function loadAdminMembers() {
+    adminMembers = [...ORDER_ADVANCE_PARTICIPANTS];
+    adminMembersLoadedAt = Date.now();
+    populateAdvanceParticipantSelects();
 }
 
-function memberOptions(selectedId = '') {
+function selectedAdvanceParticipantIds(currentSelect = null) {
+    return getVisibleAdvanceParticipantRows()
+        .map(row => row.querySelector('.order-advance-participant-user'))
+        .filter(select => select && select !== currentSelect && select.value)
+        .map(select => String(select.value));
+}
+
+function memberOptions(selectedId = '', currentSelect = null, selectedNameOverride = '') {
     const selected = String(selectedId || '');
+    const selectedElsewhere = new Set(selectedAdvanceParticipantIds(currentSelect));
+    const knownIds = new Set(adminMembers.map(member => String(member.id)));
+    const legacyName = selectedNameOverride || currentSelect?.selectedOptions?.[0]?.dataset?.name || currentSelect?.selectedOptions?.[0]?.textContent || selected;
+    const legacySelected = selected && !knownIds.has(selected)
+        ? `<option value="${escapeHtml(selected)}" data-name="${escapeHtml(legacyName)}" selected>${escapeHtml(legacyName)} (ancien)</option>`
+        : '';
     return [
         '<option value="">-- Choisir une personne --</option>',
         ...adminMembers.map(member => {
             const id = escapeHtml(member.id);
             const name = escapeHtml(member.name || member.username || member.id);
-            return `<option value="${id}" data-name="${name}" ${String(member.id) === selected ? 'selected' : ''}>${name}</option>`;
+            const disabled = selectedElsewhere.has(String(member.id)) && String(member.id) !== selected ? 'disabled' : '';
+            return `<option value="${id}" data-name="${name}" ${String(member.id) === selected ? 'selected' : ''} ${disabled}>${name}</option>`;
         }),
+        legacySelected,
     ].join('');
 }
 
@@ -863,7 +873,10 @@ function ensureAdvanceParticipantRows() {
     `).join('');
     container.querySelectorAll('select, input').forEach(input => {
         input.addEventListener('input', updateOrderAdvanceBalance);
-        input.addEventListener('change', updateOrderAdvanceBalance);
+        input.addEventListener('change', () => {
+            populateAdvanceParticipantSelects();
+            updateOrderAdvanceBalance();
+        });
     });
 }
 
@@ -891,7 +904,7 @@ function populateAdvanceParticipantSelects() {
     document.querySelectorAll('.order-advance-participant-user').forEach(select => {
         const selected = select.value;
         const selectedName = select.selectedOptions?.[0]?.dataset?.name || select.selectedOptions?.[0]?.textContent || '';
-        select.innerHTML = memberOptions(selected);
+        select.innerHTML = memberOptions(selected, select, selectedName);
         if (selected && !select.value) {
             const option = document.createElement('option');
             option.value = selected;
@@ -950,6 +963,7 @@ function collectOrderAdvancePayload() {
     if (!orderDate) { toast('Date de commande requise', 'error'); return null; }
 
     const participants = [];
+    const participantIds = new Set();
     for (const row of getVisibleAdvanceParticipantRows()) {
         const select = row.querySelector('.order-advance-participant-user');
         const userId = select?.value || '';
@@ -957,7 +971,9 @@ function collectOrderAdvancePayload() {
         const contributed = row.querySelector('.order-advance-participant-contributed')?.value || '';
         if (!userId && !Number(contributed)) continue;
         if (!userId) { toast('Choisis une personne pour chaque ligne renseignée', 'error'); return null; }
+        if (participantIds.has(userId)) { toast('Chaque participant ne peut être choisi qu’une seule fois', 'error'); return null; }
         if (!Number(contributed)) { toast('Renseigne le montant mis par chaque participant', 'error'); return null; }
+        participantIds.add(userId);
         participants.push({
             user_id: userId,
             user_name: userName,
@@ -1002,7 +1018,7 @@ async function saveOrderAdvance(event) {
 function fillParticipantRow(row, participant = {}) {
     const select = row.querySelector('.order-advance-participant-user');
     if (select) {
-        select.innerHTML = memberOptions(participant.user_id);
+        select.innerHTML = memberOptions(participant.user_id, select, participant.user_name);
         if (participant.user_id && !select.value) {
             const option = document.createElement('option');
             option.value = participant.user_id;
@@ -1026,6 +1042,7 @@ function editOrderAdvance(id) {
     const participantCount = Math.min(3, Math.max(1, (order.participants || []).length || 1));
     setOrderAdvanceParticipantCount(participantCount);
     rows.forEach((row, index) => fillParticipantRow(row, (order.participants || [])[index] || {}));
+    populateAdvanceParticipantSelects();
     updateOrderAdvanceBalance();
     document.getElementById('orderAdvanceForm')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -1174,10 +1191,10 @@ function renderOrderAdvances() {
             `;
         }).join('');
         const repayments = (order.repayments || []).map(repayment => `
-            <div class="order-repayment-item">
+            <div class="order-repayment-item order-repayment-positive">
                 <div>
                     <strong>${escapeHtml(repayment.user_name || 'Participant')}</strong>
-                    <span>${formatEuropeanDate(repayment.repayment_date)} • <b class="amount-positive">${moneyDisplay(repayment.amount)}</b></span>
+                    <span>${formatEuropeanDate(repayment.repayment_date)} • <b class="amount-positive">+${moneyDisplay(repayment.amount)}</b></span>
                     ${repayment.reason ? `<small>${escapeHtml(repayment.reason)}</small>` : ''}
                     ${repayment.weapon_name ? `<small>Arme : ${escapeHtml(repayment.weapon_name)}</small>` : ''}
                 </div>
