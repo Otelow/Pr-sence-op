@@ -10,7 +10,7 @@ const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
 const config = require('./src/shared/config');
-const { processClipMessage, backfillClipForum, getBackfillStatus } = require('./src/shared/clipBackup');
+const { processClipMessage, backfillClipForum, getBackfillStatus, extractClipLinks, isClipAttachment } = require('./src/shared/clipBackup');
 
 fs.mkdirSync(config.paths.data, { recursive: true });
 
@@ -2557,10 +2557,48 @@ client.on('messageCreate', async (message) => {
     }
 });
 
+const clipReminderCooldown = new Map();
+
+function isClipForumMessage(message) {
+    const forumId = config.clips.forumChannelId;
+    return String(message.channelId) === String(forumId) || String(message.channel?.parentId || '') === String(forumId);
+}
+
+function messageHasClipPayload(message) {
+    const hasClipLink = extractClipLinks(message.content).length > 0;
+    const hasClipAttachment = message.attachments?.some(attachment => isClipAttachment(attachment));
+    return hasClipLink || hasClipAttachment;
+}
+
+async function maybeRemindClipForum(message) {
+    if (!message || message.author?.bot) return;
+    if (isClipForumMessage(message)) return;
+    if (!messageHasClipPayload(message)) return;
+
+    const now = Date.now();
+    const cooldownKey = String(message.author.id);
+    const last = clipReminderCooldown.get(cooldownKey) || 0;
+    if (now - last < 60_000) return;
+    clipReminderCooldown.set(cooldownKey, now);
+
+    try {
+        await message.reply({
+            content: `Merci pour ton clip ! Pour qu'on puisse le retrouver et le sauvegarder correctement, poste-le dans le salon <#${config.clips.forumChannelId}> s'il te plait 🙏`,
+            allowedMentions: { repliedUser: true, parse: [] },
+        });
+    } catch (e) {
+        console.error(`[clips] rappel salon clips echoue: ${e.message}`);
+    }
+}
+
 // Sauvegarde clips Supabase limitee au forum clips 21BS.
 client.on('messageCreate', async (message) => {
     try {
-        await processClipMessage(message);
+        if (isClipForumMessage(message)) {
+            await processClipMessage(message);
+        } else {
+            await maybeRemindClipForum(message);
+        }
     } catch (e) {
         console.error(`[clips] traitement temps reel echoue: ${e.message}`);
     }
