@@ -37,7 +37,7 @@ async function uploadLocalFile(file, options = {}) {
 }
 
 async function uploadFile(file, options = {}) {
-    const provider = options.provider || (config.supabase.url && config.supabase.key ? 'supabase' : 'local');
+    const provider = options.provider || 'local';
     if (provider === 'supabase') {
         const validation = validateFile(file, options);
         if (!validation.ok) throw new Error(validation.error);

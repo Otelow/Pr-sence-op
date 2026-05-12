@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const config = require('./src/shared/config');
 const { initDB, registerCraftEndpoints } = require('./crafts');
+const { backfillClipForum, getBackfillStatus, getRecentClipBackups } = require('./src/shared/clipBackup');
 
 const PORT = process.env.PORT || 3000;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -344,6 +345,34 @@ body.login-body { overflow: hidden; }
     } catch (e) {
         console.error('❌ Erreur endpoints crafts:', e.message);
     }
+
+    app.post('/api/admin/clips/backfill', requireAdmin, async (req, res) => {
+        try {
+            if (!botClient?.isReady?.()) {
+                return res.status(503).json({ error: 'Bot Discord non pret pour le backfill clips' });
+            }
+            backfillClipForum(botClient).catch(e => console.error(`[clips] backfill background echoue: ${e.message}`));
+            res.json({ success: true, status: getBackfillStatus() });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/admin/clips/backfill/status', requireAdmin, (req, res) => {
+        try {
+            res.json({ status: getBackfillStatus() });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.get('/api/admin/clip-backups', requireAdmin, (req, res) => {
+        try {
+            res.json({ clips: getRecentClipBackups(req.query.limit) });
+        } catch (e) {
+            res.status(500).json({ clips: [], error: e.message });
+        }
+    });
 
     // ==========================================
     // API

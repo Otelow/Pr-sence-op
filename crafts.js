@@ -1637,6 +1637,27 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         return exists;
     }
 
+    async function getDiscordUserAvatar(userId) {
+        const cleanUserId = String(userId || '').trim();
+        if (!cleanUserId || !botClient?.guilds) return null;
+
+        try {
+            const guildId = config.discord?.guildId || process.env.GUILD_ID || botState?.()?.CONFIG?.GUILD_ID;
+            const guild = guildId
+                ? (botClient.guilds.cache.get(guildId) || await botClient.guilds.fetch(guildId).catch(() => null))
+                : botClient.guilds.cache.first();
+            if (!guild?.members) return null;
+
+            const fetchMember = guild.members.fetch(cleanUserId).catch(() => null);
+            const timeout = new Promise(resolve => setTimeout(() => resolve(null), 2500));
+            const member = await Promise.race([fetchMember, timeout]);
+            return member?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null;
+        } catch (e) {
+            console.warn(`[discord] avatar introuvable pour ${cleanUserId}: ${e.message}`);
+            return null;
+        }
+    }
+
     function markRequestsRejectedForAbsentMember(userId) {
         const now = Math.floor(Date.now() / 1000);
         const reason = 'Membre plus présent sur le Discord';
@@ -2902,7 +2923,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             const ownerId = sellingForOther ? targetUserId : userId;
             const ownerName = sellingForOther ? (targetUserName || targetUserId) : userName;
-            const ownerAvatar = sellingForOther ? null : userAvatar;
+            const ownerAvatar = sellingForOther ? await getDiscordUserAvatar(ownerId) : userAvatar;
             const createdById = sellingForOther ? userId : null;
             const createdByName = sellingForOther ? userName : null;
             const requestedWeaponName = String(weapon_name || '').trim();

@@ -10,6 +10,7 @@ const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
 const config = require('./src/shared/config');
+const { processClipMessage } = require('./src/shared/clipBackup');
 
 fs.mkdirSync(config.paths.data, { recursive: true });
 
@@ -2516,6 +2517,15 @@ client.on('messageCreate', async (message) => {
             );
             setTimeout(() => warn.delete().catch(() => {}), 5000);
         } catch {}
+    }
+});
+
+// Sauvegarde clips Supabase limitee au forum clips 21BS.
+client.on('messageCreate', async (message) => {
+    try {
+        await processClipMessage(message);
+    } catch (e) {
+        console.error(`[clips] traitement temps reel echoue: ${e.message}`);
     }
 });
 

@@ -6,6 +6,10 @@ function assertSupabaseConfigured() {
     }
 }
 
+function isSupabaseConfigured() {
+    return Boolean(config.supabase.url && config.supabase.key);
+}
+
 function validateFile(file, options = {}) {
     if (!file) return { ok: false, error: 'Fichier manquant' };
     const maxFileSizeBytes = options.maxFileSizeBytes || config.uploads.maxFileSizeBytes;
@@ -79,6 +83,7 @@ function getPublicUrl(bucket, objectPath) {
 }
 
 module.exports = {
+    isSupabaseConfigured,
     uploadFile,
     deleteFile,
     getPublicUrl,

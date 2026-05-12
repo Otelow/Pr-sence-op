@@ -41,6 +41,12 @@ const config = {
         key: process.env.SUPABASE_KEY || '',
         bucket: process.env.SUPABASE_BUCKET || 'uploads'
     },
+    clips: {
+        forumChannelId: process.env.CLIPS_FORUM_CHANNEL_ID || '1500520790678962317',
+        bucket: process.env.SUPABASE_CLIPS_BUCKET || 'clips',
+        maxFileSizeBytes: Number(process.env.CLIPS_MAX_FILE_SIZE_MB || 100) * 1024 * 1024,
+        backfillBatchSize: Number(process.env.CLIPS_BACKFILL_BATCH_SIZE || 50)
+    },
     timeouts: {
         requestMs: Number(process.env.REQUEST_TIMEOUT_MS || 15000),
         discordMs: Number(process.env.DISCORD_TIMEOUT_MS || 15000)
