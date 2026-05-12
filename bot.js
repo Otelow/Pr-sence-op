@@ -10,7 +10,7 @@ const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
 const config = require('./src/shared/config');
-const { processClipMessage } = require('./src/shared/clipBackup');
+const { processClipMessage, backfillClipForum, getBackfillStatus } = require('./src/shared/clipBackup');
 
 fs.mkdirSync(config.paths.data, { recursive: true });
 
@@ -641,6 +641,8 @@ async function registerCommands() {
             .addStringOption(o => o.setName('message').setDescription('Message').setRequired(true)),
         new SlashCommandBuilder().setName('presence-force').setDescription('🔄 Force le démarrage de la présence OP (si redéployé en cours)'),
         new SlashCommandBuilder().setName('panel').setDescription('🎮 Ouvrir le panneau de contrôle (rappels programmés)'),
+        new SlashCommandBuilder().setName('clips-backfill').setDescription('Lancer le scan historique des clips du forum'),
+        new SlashCommandBuilder().setName('clips-backfill-status').setDescription('Voir l etat du scan historique des clips'),
     ];
 
     const rest = new REST().setToken(CONFIG.TOKEN);
@@ -1218,7 +1220,7 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: '❌ Pas la permission.', ephemeral: true });
     }
 
-    const exempt = ['presence-test', 'presence-test2', 'clear', 'clearmessage', 'absence', 'presence-force', 'panel'];
+    const exempt = ['presence-test', 'presence-test2', 'clear', 'clearmessage', 'absence', 'presence-force', 'panel', 'clips-backfill', 'clips-backfill-status'];
     if (!exempt.includes(interaction.commandName) && interaction.channelId !== CONFIG.CHANNELS.COMMANDES) {
         return interaction.reply({ content: `❌ Utilise <#${CONFIG.CHANNELS.COMMANDES}>`, ephemeral: true });
     }
@@ -1247,8 +1249,43 @@ client.on('interactionCreate', async (interaction) => {
         case 'presence2': return handlePresence2(interaction);
         case 'presence-force': return handlePresenceForce(interaction);
         case 'panel': return handlePanel(interaction);
+        case 'clips-backfill': return handleClipsBackfill(interaction);
+        case 'clips-backfill-status': return handleClipsBackfillStatus(interaction);
     }
 });
+
+async function handleClipsBackfill(interaction) {
+    await interaction.reply({
+        content: 'Scan historique des clips lance. Utilise `/clips-backfill-status` pour suivre l avancement.',
+        ephemeral: true,
+    });
+
+    backfillClipForum(client)
+        .then(summary => {
+            console.log(`[clips] backfill slash termine: threads=${summary.threadsScanned || 0} messages=${summary.messagesScanned || 0} uploads=${summary.filesUploaded || 0} erreurs=${summary.errors || 0}`);
+        })
+        .catch(error => {
+            console.error(`[clips] backfill slash echoue: ${error.message}`);
+        });
+}
+
+async function handleClipsBackfillStatus(interaction) {
+    const status = getBackfillStatus();
+    const lines = [
+        '**Backfill clips**',
+        `Etat : ${status.running ? 'en cours' : 'inactif / termine'}`,
+        `Threads scannes : ${status.threadsScanned || 0}`,
+        `Messages scannes : ${status.messagesScanned || 0}`,
+        `Liens trouves : ${status.linksFound || 0}`,
+        `Fichiers uploades : ${status.filesUploaded || 0}`,
+        `Doublons ignores : ${status.duplicatesIgnored || 0}`,
+        `Erreurs : ${status.errors || 0}`,
+    ];
+    if (status.startedAt) lines.push(`Demarre : ${status.startedAt}`);
+    if (status.completedAt) lines.push(`Termine : ${status.completedAt}`);
+    if (status.error) lines.push(`Derniere erreur : ${status.error}`);
+    return interaction.reply({ content: lines.join('\n'), ephemeral: true });
+}
 
 // ==========================================
 // /absence
