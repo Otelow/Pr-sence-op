@@ -203,7 +203,7 @@ function markClipBackupFailed(id, error) {
         .run('failed', String(error?.message || error || 'Erreur upload'), Math.floor(Date.now() / 1000), id);
 }
 
-async function uploadAttachmentToSupabase(message, attachment, rowId) {
+async function uploadAttachmentToSupabase(message, attachment, rowId, options = {}) {
     if (!supabase.isSupabaseConfigured()) {
         throw new Error('Supabase clips non configure');
     }
@@ -217,10 +217,47 @@ async function uploadAttachmentToSupabase(message, attachment, rowId) {
     const objectPath = clipStoragePath(message, attachment.name || attachment.filename);
     const uploaded = await supabase.uploadFile(config.clips.bucket, objectPath, buffer, {
         contentType: attachment.contentType || 'application/octet-stream',
-        upsert: false,
+        upsert: !!options.upsert,
     });
     markClipBackupUploaded(rowId, uploaded);
     return uploaded;
+}
+
+async function retryFailedClipBackupRow(client, row) {
+    const channel = await client.channels.fetch(row.thread_id).catch(() => null);
+    if (!channel?.messages) throw new Error(`Thread clips introuvable (${row.thread_id})`);
+    const message = await channel.messages.fetch(row.message_id).catch(() => null);
+    if (!message) throw new Error(`Message clip introuvable (${row.message_id})`);
+    const attachment = [...message.attachments.values()].find(item =>
+        String(item.id || '') === String(row.attachment_id || '')
+    );
+    if (!attachment) throw new Error(`Attachment clip introuvable (${row.attachment_id})`);
+    await uploadAttachmentToSupabase(message, attachment, row.id, { upsert: true });
+    return true;
+}
+
+async function retryFailedClipBackups(client, limit = 25) {
+    const rows = getDb().prepare(`
+        SELECT * FROM clip_backups
+        WHERE status = 'failed'
+          AND source_type = 'discord_attachment'
+          AND (storage_url IS NULL OR TRIM(storage_url) = '')
+        ORDER BY backed_up_at ASC, id ASC
+        LIMIT ?
+    `).all(Math.max(1, Math.min(100, Number(limit) || 25)));
+    const summary = { scanned: rows.length, retried: 0, uploaded: 0, errors: 0 };
+    for (const row of rows) {
+        summary.retried++;
+        try {
+            await retryFailedClipBackupRow(client, row);
+            summary.uploaded++;
+        } catch (e) {
+            summary.errors++;
+            markClipBackupFailed(row.id, e);
+            console.error(`[clips] retry failed id=${row.id}: ${e.message}`);
+        }
+    }
+    return summary;
 }
 
 async function processClipMessage(message) {
@@ -270,6 +307,20 @@ async function processClipMessage(message) {
         found++;
         if (!result.inserted) {
             duplicates++;
+            if (
+                result.row?.status === 'failed'
+                && result.row?.source_type === 'discord_attachment'
+                && !String(result.row?.storage_url || '').trim()
+            ) {
+                try {
+                    await uploadAttachmentToSupabase(message, attachment, result.row.id, { upsert: true });
+                    uploaded++;
+                } catch (e) {
+                    errors++;
+                    markClipBackupFailed(result.row.id, e);
+                    console.error(`[clips] retry upload echoue message=${message.id}: ${e.message}`);
+                }
+            }
             continue;
         }
         try {
@@ -402,6 +453,7 @@ module.exports = {
     backfillClipForum,
     getBackfillStatus,
     getRecentClipBackups,
+    retryFailedClipBackups,
     extractClipLinks,
     isClipAttachment,
 };

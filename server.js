@@ -9,7 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const config = require('./src/shared/config');
 const { initDB, registerCraftEndpoints } = require('./crafts');
-const { backfillClipForum, getBackfillStatus, getRecentClipBackups } = require('./src/shared/clipBackup');
+const { backfillClipForum, getBackfillStatus, getRecentClipBackups, retryFailedClipBackups } = require('./src/shared/clipBackup');
 
 const PORT = process.env.PORT || 3000;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
@@ -385,6 +385,18 @@ body.login-body { overflow: hidden; }
             res.json({ clips: getRecentClipBackups(req.query.limit) });
         } catch (e) {
             res.status(500).json({ clips: [], error: e.message });
+        }
+    });
+
+    app.post('/api/admin/clips/retry-failed', requireAdmin, async (req, res) => {
+        try {
+            if (!botClient?.isReady?.()) {
+                return res.status(503).json({ error: 'Bot Discord non pret pour retenter les clips' });
+            }
+            const summary = await retryFailedClipBackups(botClient, req.body?.limit || req.query.limit);
+            res.json({ success: true, summary });
+        } catch (e) {
+            res.status(500).json({ success: false, error: e.message });
         }
     });
 
@@ -891,7 +903,7 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Historique messages d'un salon
     // ==========================================
-    app.get('/api/channel/:id/messages', requireAuth, async (req, res) => {
+    app.get('/api/channel/:id/messages', requireAuth, requireFullSiteAccess, async (req, res) => {
         const channelId = req.params.id;
         const before = req.query.before;
         const after = req.query.after;
@@ -1064,7 +1076,7 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Envoyer un message dans un salon (via webhook)
     // ==========================================
-    app.post('/api/channel/:id/send', requireAuth, async (req, res) => {
+    app.post('/api/channel/:id/send', requireAuth, requireFullSiteAccess, async (req, res) => {
         const channelId = req.params.id;
         const { content } = req.body;
 
@@ -1186,7 +1198,7 @@ body.login-body { overflow: hidden; }
         }
     });
 
-    app.get('/api/channel/:id/pinned', requireAuth, async (req, res) => {
+    app.get('/api/channel/:id/pinned', requireAuth, requireFullSiteAccess, async (req, res) => {
         try {
             const channel = await fetchDiscordChannel(req.params.id);
             if (!channel) return res.status(404).json({ error: 'Salon introuvable' });

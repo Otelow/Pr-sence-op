@@ -33,8 +33,9 @@ try {
     console.log('✅ better-sqlite3 chargé');
 } catch (e) {
     console.warn('⚠️ better-sqlite3 indisponible, fallback JSON activé');
-    if (config.isProduction) {
+    if (config.isProduction || config.isRailway) {
         console.error('❌ Production sans SQLite: vérifie better-sqlite3 et le volume Railway /data.');
+        process.exit(1);
     }
     useSQLite = false;
 }
