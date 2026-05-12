@@ -106,6 +106,7 @@ function setupNav() {
 
 // Permissions UI
 const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
+const LIMITED_CRAFT_ACCESS_ROLES = ['1495448653945634987'];
 let userHasFullAccess = false;
 
 function checkUserAccess() {
@@ -117,13 +118,34 @@ function checkUserAccess() {
     return FULL_ACCESS_ROLES.some(r => roles.includes(r));
 }
 
+function hasLimitedCraftAccess() {
+    if (!window.currentUser) return false;
+    const impersonateRole = localStorage.getItem('impersonate_role');
+    if (impersonateRole) return LIMITED_CRAFT_ACCESS_ROLES.includes(impersonateRole);
+    const roles = window.currentUser.roles || [];
+    return LIMITED_CRAFT_ACCESS_ROLES.some(r => roles.includes(r));
+}
+
+function canAccessCraftsTab() {
+    return checkUserAccess() || hasLimitedCraftAccess();
+}
+
+function canAccessMyWeaponsTab() {
+    return checkUserAccess() || hasLimitedCraftAccess();
+}
+
+function canAccessDashboardTab(tabName) {
+    if (tabName === 'crafts') return canAccessCraftsTab();
+    if (tabName === 'myweapons') return canAccessMyWeaponsTab();
+    return checkUserAccess();
+}
+
 function applyPermissionsUI() {
     userHasFullAccess = checkUserAccess();
-    const lockedTabs = ['presence', 'commands'];
-    lockedTabs.forEach(tabName => {
+    Object.keys(PAGE_TITLES).forEach(tabName => {
         const sec = document.getElementById(`tab-${tabName}`);
         if (!sec) return;
-        if (userHasFullAccess) {
+        if (canAccessDashboardTab(tabName)) {
             sec.classList.remove('access-locked');
             sec.querySelector('.access-locked-overlay')?.remove();
         } else if (!sec.querySelector('.access-locked-overlay')) {
@@ -168,7 +190,7 @@ async function refreshAll() {
     if (refreshAllInFlight) return;
     refreshAllInFlight = true;
     try {
-        if (!checkUserAccess() && ['presence', 'commands'].includes(currentTab)) {
+        if (!canAccessDashboardTab(currentTab)) {
             applyPermissionsUI();
             return;
         }

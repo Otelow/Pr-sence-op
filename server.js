@@ -229,6 +229,7 @@ body.login-body { overflow: hidden; }
     const ADMIN_USER_ID = '952986899667103804';
     const ADMIN_ROLE_ID = '1485279148246175764';
     const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
+    const LIMITED_CRAFT_ACCESS_ROLES = ['1495448653945634987'];
 
     function requireAuth(req, res, next) {
         if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
@@ -246,6 +247,19 @@ body.login-body { overflow: hidden; }
         if (!user) return false;
         if (user.id === ADMIN_USER_ID) return true;
         return FULL_ACCESS_ROLES.some(roleId => (user.roles || []).includes(roleId));
+    }
+
+    function hasLimitedCraftAccess(user) {
+        if (!user) return false;
+        return LIMITED_CRAFT_ACCESS_ROLES.some(roleId => (user.roles || []).includes(roleId));
+    }
+
+    function canAccessCrafts(user) {
+        return hasFullSiteAccess(user) || hasLimitedCraftAccess(user);
+    }
+
+    function canAccessMyWeapons(user) {
+        return hasFullSiteAccess(user) || hasLimitedCraftAccess(user);
     }
 
     function requireFullSiteAccess(req, res, next) {
@@ -378,7 +392,14 @@ body.login-body { overflow: hidden; }
     // API
     // ==========================================
     app.get('/api/me', requireAuth, (req, res) => {
-        const user = { ...req.session.user, isAdmin: isUserAdmin(req.session.user) };
+        const user = {
+            ...req.session.user,
+            isAdmin: isUserAdmin(req.session.user),
+            hasFullSiteAccess: hasFullSiteAccess(req.session.user),
+            hasLimitedCraftAccess: hasLimitedCraftAccess(req.session.user),
+            canAccessCrafts: canAccessCrafts(req.session.user),
+            canAccessMyWeapons: canAccessMyWeapons(req.session.user),
+        };
         res.json(user);
     });
 
@@ -614,7 +635,7 @@ body.login-body { overflow: hidden; }
     });
 
     // Liste des sanctions/avertissements (depuis les channels)
-    app.get('/api/sanctions', requireAuth, async (req, res) => {
+    app.get('/api/sanctions', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = botState();
         try {
             const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
@@ -783,7 +804,7 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Salons Discord
     // ==========================================
-    app.get('/api/channels', requireAuth, async (req, res) => {
+    app.get('/api/channels', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
         if (!guild) return res.json({ categories: [] });
@@ -1108,7 +1129,7 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Recherche de membres (pour @mentions)
     // ==========================================
-    app.get('/api/members/search', requireAuth, async (req, res) => {
+    app.get('/api/members/search', requireAuth, requireFullSiteAccess, async (req, res) => {
         const query = (req.query.q || '').toLowerCase().trim();
         if (query.length < 1) return res.json({ members: [] });
 
@@ -1137,7 +1158,7 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Tous les membres du serveur (pour dropdown)
     // ==========================================
-    app.get('/api/members/all', requireAuth, async (req, res) => {
+    app.get('/api/members/all', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
         if (!guild) return res.json({ members: [] });
@@ -1190,7 +1211,7 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Liste des commandes disponibles (pour mise à jour auto du site)
     // ==========================================
-    app.get('/api/commands', requireAuth, (req, res) => {
+    app.get('/api/commands', requireAuth, requireFullSiteAccess, (req, res) => {
         const commands = [
             // Alertes terrain
             { id: 'qg', icon: '📍', name: 'QG', desc: 'Rendez-vous au Hood (5 min)', category: 'alert', danger: true },
@@ -1216,7 +1237,7 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Liste des rôles (pour /annonce et carte)
     // ==========================================
-    app.get('/api/roles', requireAuth, (req, res) => {
+    app.get('/api/roles', requireAuth, requireFullSiteAccess, (req, res) => {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
         if (!guild) return res.json({ roles: [] });
@@ -1240,7 +1261,7 @@ body.login-body { overflow: hidden; }
     // ==========================================
     // API — Liste des emojis du serveur
     // ==========================================
-    app.get('/api/emojis', requireAuth, (req, res) => {
+    app.get('/api/emojis', requireAuth, requireFullSiteAccess, (req, res) => {
         const state = botState();
         const guild = botClient.guilds.cache.get(state.CONFIG.GUILD_ID);
         if (!guild) return res.json({ emojis: [] });
@@ -1279,7 +1300,7 @@ body.login-body { overflow: hidden; }
         }
     }
 
-    app.get('/api/map/points', requireAuth, (req, res) => {
+    app.get('/api/map/points', requireAuth, requireFullSiteAccess, (req, res) => {
         const userId = req.session.user?.id;
         let userRoles = req.session.user?.roles || [];
 
@@ -1404,6 +1425,10 @@ body.login-body { overflow: hidden; }
         res.json({
             canEditMap: canEditMap(req),
             isAdmin: isUserAdmin(req.session.user),
+            hasFullSiteAccess: hasFullSiteAccess(req.session.user),
+            hasLimitedCraftAccess: hasLimitedCraftAccess(req.session.user),
+            canAccessCrafts: canAccessCrafts(req.session.user),
+            canAccessMyWeapons: canAccessMyWeapons(req.session.user),
         });
     });
 
