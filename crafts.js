@@ -215,6 +215,7 @@ function initDB() {
                     has_plan INTEGER DEFAULT 0,
                     has_money INTEGER DEFAULT 0,
                     request_type TEXT,
+                    is_test INTEGER DEFAULT 0,
                     status TEXT DEFAULT 'pending',
                     refusal_reason TEXT,
                     crafted INTEGER DEFAULT 0,
@@ -330,6 +331,7 @@ function initDB() {
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN stock_consumed_at INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN request_type TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN is_test INTEGER DEFAULT 0`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN refusal_reason TEXT`); } catch {}
             try { db.exec(`CREATE INDEX IF NOT EXISTS idx_myweapons_craft_request ON my_weapons(craft_request_id)`); } catch {}
 
@@ -704,6 +706,7 @@ function getReservedStockByActiveRequests() {
     const activeRequests = getRequests('all', { productionOnly: true });
 
     for (const request of activeRequests) {
+        if (request.is_test) continue;
         if (request.stock_consumed_at) continue;
         if (!CRAFT_STOCK_RESERVED_STATUSES.includes(request.status)) continue;
         const weapon = weaponsById.get(Number(request.weapon_id));
@@ -1355,19 +1358,25 @@ function getRequests(status, options = {}) {
     if (useSQLite) {
         let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image, w.craft_price as weapon_craft_price FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
         const params = [];
+        const where = [];
         if (options.productionOnly) {
-            query += ` WHERE r.status IN (${CRAFT_PRODUCTION_STATUSES.map(() => '?').join(',')})`;
+            where.push(`r.status IN (${CRAFT_PRODUCTION_STATUSES.map(() => '?').join(',')})`);
             params.push(...CRAFT_PRODUCTION_STATUSES);
         } else if (status && status !== 'all') {
-            query += ' WHERE r.status = ?';
+            where.push('r.status = ?');
             params.push(status);
         }
+        if (options.hideTests) {
+            where.push('COALESCE(r.is_test, 0) = 0');
+        }
+        if (where.length) query += ` WHERE ${where.join(' AND ')}`;
         query += ' ORDER BY r.created_at DESC';
         return db.prepare(query).all(...params);
     }
     let arr = jsonData.craft_requests;
     if (options.productionOnly) arr = arr.filter(r => CRAFT_PRODUCTION_STATUSES.includes(r.status));
     else if (status && status !== 'all') arr = arr.filter(r => r.status === status);
+    if (options.hideTests) arr = arr.filter(r => !r.is_test);
     return [...arr].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => {
         const w = jsonData.weapons.find(w => w.id === r.weapon_id);
         return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null, weapon_craft_price: w ? w.craft_price : 0 };
@@ -1389,11 +1398,11 @@ function normalizeCraftRequestType(value) {
     return ['sale', 'personal'].includes(clean) ? clean : null;
 }
 
-function insertRequest(user_id, user_name, weapon_id, has_plan, has_money, request_type) {
+function insertRequest(user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test = false) {
     const normalizedType = normalizeCraftRequestType(request_type);
     if (useSQLite) {
-        const r = db.prepare(`INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money, request_type) VALUES (?, ?, ?, ?, ?, ?)`)
-            .run(user_id, user_name, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0, normalizedType);
+        const r = db.prepare(`INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            .run(user_id, user_name, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0, normalizedType, is_test ? 1 : 0);
         return r.lastInsertRowid;
     }
     const id = nextId('requests');
@@ -1401,6 +1410,7 @@ function insertRequest(user_id, user_name, weapon_id, has_plan, has_money, reque
         id, user_id, user_name, weapon_id,
         has_plan: has_plan ? 1 : 0, has_money: has_money ? 1 : 0,
         request_type: normalizedType,
+        is_test: is_test ? 1 : 0,
         status: 'pending', crafted: 0,
         created_at: Math.floor(Date.now() / 1000),
     });
@@ -1415,7 +1425,7 @@ function updateRequestCraft(id, crafted, serial, userId, userName) {
             const current = getRequest(id);
             if (!current) throw createStockError('Demande introuvable');
 
-            if (crafted && !current.stock_consumed_at) {
+            if (!current.is_test && crafted && !current.stock_consumed_at) {
                 consumeStockForCraftRequest(current, now);
             } else if (!crafted && current.stock_consumed_at) {
                 restoreStockForCraftRequest(current, now);
@@ -1429,7 +1439,7 @@ function updateRequestCraft(id, crafted, serial, userId, userName) {
     }
     const r = jsonData.craft_requests.find(r => r.id === id);
     if (r) {
-        if (crafted && !r.stock_consumed_at) {
+        if (!r.is_test && crafted && !r.stock_consumed_at) {
             consumeStockForCraftRequest(r, now);
         } else if (!crafted && r.stock_consumed_at) {
             restoreStockForCraftRequest(r, now);
@@ -1497,6 +1507,25 @@ function getWeaponSaleStateForCraftRequest(request) {
     };
 }
 
+function getLinkedMyWeaponsForRequest(request) {
+    if (!request) return [];
+    const requestId = Number(request.id);
+    const serial = String(request.serial_number || '').trim();
+    if (useSQLite) {
+        const rowsByRequest = requestId
+            ? db.prepare('SELECT * FROM my_weapons WHERE craft_request_id = ? ORDER BY id ASC').all(requestId)
+            : [];
+        const rowsBySerial = serial
+            ? db.prepare('SELECT * FROM my_weapons WHERE serial_number = ? ORDER BY id ASC').all(serial)
+            : [];
+        return [...new Map([...rowsByRequest, ...rowsBySerial].map(row => [Number(row.id), row])).values()];
+    }
+    return (jsonData.my_weapons || []).filter(w =>
+        (requestId && Number(w.craft_request_id) === requestId) ||
+        (serial && String(w.serial_number || '').trim() === serial)
+    );
+}
+
 function serialAlreadyListed(serial, excludeId = null) {
     const clean = String(serial || '').trim();
     if (!clean) return false;
@@ -1516,6 +1545,45 @@ function deleteRequest(id) {
     if (useSQLite) { db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id); return; }
     jsonData.craft_requests = jsonData.craft_requests.filter(r => r.id !== id);
     saveJSON();
+}
+
+function deleteCraftRequestCleanly(id) {
+    const request = getRequest(id);
+    if (!request) throw new Error('Demande introuvable');
+
+    const runDelete = () => {
+        const linkedWeapons = getLinkedMyWeaponsForRequest(request);
+        const soldOrLogged = linkedWeapons.find(w =>
+            w.is_sold === 1 || w.is_sold === true || w.is_sold === '1' ||
+            w.sale_discord_message_id || w.weapons_log_message_id
+        );
+        if (soldOrLogged) {
+            const err = new Error('Impossible de supprimer une demande déjà vendue ou loguée définitivement');
+            err.statusCode = 409;
+            throw err;
+        }
+
+        if (request.stock_consumed_at) {
+            restoreStockForCraftRequest(request, Math.floor(Date.now() / 1000));
+        }
+
+        if (useSQLite) {
+            if (linkedWeapons.length) {
+                const deleteWeapon = db.prepare('DELETE FROM my_weapons WHERE id = ?');
+                linkedWeapons.forEach(w => deleteWeapon.run(w.id));
+            }
+            db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id);
+        } else {
+            const linkedIds = new Set(linkedWeapons.map(w => Number(w.id)));
+            jsonData.my_weapons = (jsonData.my_weapons || []).filter(w => !linkedIds.has(Number(w.id)));
+            jsonData.craft_requests = jsonData.craft_requests.filter(r => Number(r.id) !== Number(id));
+            saveJSON();
+        }
+        invalidateCraftCaches();
+    };
+
+    if (useSQLite) db.transaction(runDelete)();
+    else runDelete();
 }
 
 const storage = multer.diskStorage({
@@ -1547,6 +1615,10 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     const MEMBER_SWEEP_TTL_MS = 5 * 60 * 1000;
     const MEMBER_SWEEP_LIMIT = 25;
     const ABSENT_MEMBER_CHECK_STATUSES = ['pending', 'materials', 'waiting_materials', 'in_progress'];
+
+    function isCraftManager(user) {
+        return canValidateCraft(user) || canDeleteRequests(user);
+    }
 
     async function guildHasMember(userId) {
         const cleanUserId = String(userId || '').trim();
@@ -1895,9 +1967,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.get('/api/crafts/requests', requireAuth, (req, res) => {
         try {
+            if (req.query.view === 'board' && !isCraftManager(req.session.user)) {
+                return res.status(403).json({ requests: [], error: 'Accès réservé aux hauts gradés' });
+            }
             sweepRequestsForMissingMembers().catch(e => console.error('[craft] vérification membres absents:', e.message));
             const requests = getRequests(req.query.status, {
                 productionOnly: req.query.view === 'board',
+                hideTests: !isCraftManager(req.session.user),
             });
             const list = requests.map(r => ({
                 ...r,
@@ -2108,7 +2184,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     }
     app.post('/api/crafts/requests', requireAuth, async (req, res) => {
         try {
-            const { weapon_id, has_plan, has_money, request_type } = req.body;
+            const { weapon_id, has_plan, has_money, request_type, is_test } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
             if (!weapon_id) return res.status(400).json({ error: 'Arme requise' });
@@ -2116,10 +2192,16 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (!normalizedType) return res.status(400).json({ error: 'Type de demande obligatoire' });
             const weapon = getWeapon(weapon_id);
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
-            const id = insertRequest(userId, userName, weapon_id, has_plan, has_money, normalizedType);
+            const requestIsTest = !!is_test && isCraftManager(req.session.user);
+            if (is_test && !requestIsTest) {
+                return res.status(403).json({ error: 'Mode test réservé aux hauts gradés' });
+            }
+            const id = insertRequest(userId, userName, weapon_id, has_plan, has_money, normalizedType, requestIsTest);
 
             // Message Discord
-            postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
+            if (!requestIsTest) {
+                postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
+            }
 
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -2340,9 +2422,11 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             updateRequestCraft(id, crafted, serial_number, userId, userName);
 
             // Mettre à jour le message Discord original
-            postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
+            if (!existing.is_test) {
+                postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
+            }
 
-            if (crafted) {
+            if (crafted && !existing.is_test) {
                 const channel = await fetchDiscordChannel(CRAFT_STATUS_CHANNEL, 'CRAFT_STATUS_READY');
                 if (channel) {
                     const { EmbedBuilder } = require('discord.js');
@@ -2388,11 +2472,14 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             invalidateCraftCaches();
 
-            // Mettre à jour le message Discord original (édition embed)
-            postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
+            const updatedForDiscord = getRequest(id);
+            if (!updatedForDiscord?.is_test) {
+                // Mettre à jour le message Discord original (édition embed)
+                postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
 
-            // Notification dans le salon de statut
-            postCraftStatusUpdate(id, status).catch(e => console.error('post craft status async:', e.message));
+                // Notification dans le salon de statut
+                postCraftStatusUpdate(id, status).catch(e => console.error('post craft status async:', e.message));
+            }
 
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -2416,7 +2503,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             updateRequestSale(id, buyer_org, parsedSalePrice, saleTimestamp, userId, userName);
             const updated = getRequest(id);
-            if (!existing.posted_to_channel) {
+            if (!existing.is_test && !existing.posted_to_channel) {
                 const state = botState();
                 const channel = await fetchDiscordChannel(state.CONFIG.CHANNELS.WEAPONS_LOG || '1497021044953845791', 'WEAPONS_LOG_LEGACY_SALE');
                 if (channel) {
@@ -2472,12 +2559,12 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.delete('/api/crafts/requests/:id', requireAuth, (req, res) => {
         try {
-            if (!canDeleteRequests(req.session.user)) {
-                return res.status(403).json({ error: 'Action réservée à Otelow / Super Admin' });
+            if (!isCraftManager(req.session.user)) {
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
-            deleteRequest(parseInt(req.params.id));
+            deleteCraftRequestCleanly(parseInt(req.params.id));
             res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { res.status(e.statusCode || 500).json({ error: e.message }); }
     });
 
     // ─── MY WEAPONS ─────────────────────

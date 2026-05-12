@@ -2416,6 +2416,7 @@ let isAdminUser = false;
 let craftRequestsLoadPromise = null;
 let craftRequestSubmitInFlight = false;
 const craftStatusActionLocks = new Set();
+const craftDeleteActionLocks = new Set();
 let craftCatalogFilters = {
     search: '',
     stock: 'all',
@@ -2912,6 +2913,7 @@ async function submitCraftRequest() {
     const hasPlan = document.getElementById('craftHasPlan').checked;
     const hasMoney = document.getElementById('craftHasMoney').checked;
     const requestType = document.querySelector('input[name="craftRequestType"]:checked')?.value || '';
+    const isTest = !!document.getElementById('craftIsTest')?.checked && canValidateCraftClient();
 
     if (!weaponId) { toast('❌ Choisis une arme', 'error'); return; }
 
@@ -2924,7 +2926,7 @@ async function submitCraftRequest() {
         const res = await fetch('/api/crafts/requests', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ weapon_id: parseInt(weaponId), has_plan: hasPlan, has_money: hasMoney, request_type: requestType })
+            body: JSON.stringify({ weapon_id: parseInt(weaponId), has_plan: hasPlan, has_money: hasMoney, request_type: requestType, is_test: isTest })
         });
         const data = await res.json();
         if (res.ok) {
@@ -2933,6 +2935,8 @@ async function submitCraftRequest() {
             document.getElementById('craftWeaponId').value = '';
             document.getElementById('craftHasPlan').checked = false;
             document.getElementById('craftHasMoney').checked = false;
+            const testInput = document.getElementById('craftIsTest');
+            if (testInput) testInput.checked = false;
             document.querySelectorAll('input[name="craftRequestType"]').forEach(input => { input.checked = false; });
             const label = document.getElementById('craftWeaponLabel');
             if (label) {
@@ -3036,13 +3040,7 @@ function clearCraftRequestsUserSearch() {
 }
 
 function getVisibleCraftRequests() {
-    const u = window.currentUser || {};
-    const hasFullAccess = canValidateCraftClient();
     let requests = craftRequestsCache.filter(r => craftStatusMatchesFilter(r, craftRequestsListState.statusFilter));
-
-    if (!hasFullAccess) {
-        requests = requests.filter(r => r.user_id === u.id);
-    }
 
     const userSearch = craftRequestsListState.userSearch;
     if (userSearch) {
@@ -3100,6 +3098,7 @@ function normalizeCraftRequestsToolbarLabels() {
 function renderCraftRequestsList() {
     const list = document.getElementById('craftRequestsList');
     if (!list) return;
+    syncCraftPermissionUI();
     normalizeCraftRequestsToolbarLabels();
     const sortBySelect = document.getElementById('craftRequestsSortBy');
     const sortDirSelect = document.getElementById('craftRequestsSortDir');
@@ -3136,7 +3135,6 @@ function renderCraftRequestsList() {
         const date = new Date(r.created_at * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
         const status = getCraftStatusBadge(r);
         const canChangeStatus = hasFullAccess;
-        const isSuperAdmin = canDeleteRequestsClient();
         const isMine = r.user_id === myUserId;
         const rejectedClass = r.status === 'rejected' ? ' craft-request-rejected' : '';
         const statusTone = getCraftStatusTone(r);
@@ -3153,7 +3151,7 @@ function renderCraftRequestsList() {
                     ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
                     ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
                     ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
-                    ${isSuperAdmin ? `<button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">🗑</button>` : ''}
+                    <button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">🗑</button>
                 </div>
             `;
         } else if (isMine && r.status !== 'crafted' && r.status !== 'completed') {
@@ -3169,7 +3167,10 @@ function renderCraftRequestsList() {
                 ${weaponImageUrl ? `<img class="craft-request-image" src="${weaponImageUrl}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
                 <div class="craft-request-body">
                     <div class="craft-request-name">${escapeHtml(r.weapon_name)}</div>
-                    <div class="craft-request-type-chip">${escapeHtml(getCraftRequestTypeLabel(r.request_type))}</div>
+                    <div class="craft-request-chip-row">
+                        <div class="craft-request-type-chip">${escapeHtml(getCraftRequestTypeLabel(r.request_type))}</div>
+                        ${r.is_test ? '<div class="craft-request-test-chip">TEST</div>' : ''}
+                    </div>
                     <div class="craft-request-meta">
                         <span>👤 ${escapeHtml(r.user_name)}</span>
                         <span>📅 ${date}</span>
@@ -3227,6 +3228,14 @@ function canDeleteMyWeaponsClient() {
     return roles.includes(MY_WEAPONS_DELETE_ROLE) || canDeleteRequestsClient();
 }
 
+function syncCraftPermissionUI() {
+    const canManageCraft = canValidateCraftClient();
+    const testField = document.getElementById('craftTestField');
+    const testInput = document.getElementById('craftIsTest');
+    if (testField) testField.style.display = canManageCraft ? 'flex' : 'none';
+    if (!canManageCraft && testInput) testInput.checked = false;
+}
+
 async function updateRequestStatus(requestId, status) {
     const lockKey = `${requestId}:${status}`;
     if (craftStatusActionLocks.has(lockKey)) return;
@@ -3263,7 +3272,14 @@ async function updateRequestStatus(requestId, status) {
 }
 
 async function deleteCraftRequest(requestId) {
-    if (!await confirmAction({ title: 'Supprimer la demande', message: 'Supprimer définitivement cette demande ?', confirmText: 'Supprimer', danger: true })) return;
+    if (craftDeleteActionLocks.has(requestId)) return;
+    const request = craftRequestsCache.find(r => Number(r.id) === Number(requestId));
+    const message = request?.is_test
+        ? 'Supprimer définitivement cette demande test et ses données liées non vendues ?'
+        : 'Supprimer définitivement cette demande ? Si le stock a été consommé et que la vente n’est pas finalisée, il sera restauré.';
+    if (!await confirmAction({ title: 'Supprimer la demande', message, confirmText: 'Supprimer', danger: true })) return;
+    craftDeleteActionLocks.add(requestId);
+    document.querySelectorAll(`[onclick="deleteCraftRequest(${requestId})"]`).forEach(btn => { btn.disabled = true; });
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}`, { method: 'DELETE' });
         const data = await res.json();
@@ -3277,6 +3293,10 @@ async function deleteCraftRequest(requestId) {
             toast(`❌ ${data.error}`, 'error');
         }
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
+    finally {
+        craftDeleteActionLocks.delete(requestId);
+        document.querySelectorAll(`[onclick="deleteCraftRequest(${requestId})"]`).forEach(btn => { btn.disabled = false; });
+    }
 }
 
 window.updateRequestStatus = updateRequestStatus;
@@ -3308,10 +3328,9 @@ function getCraftRequestTypeLabel(type) {
 }
 
 function getCraftBoardActiveRequests() {
-    const u = window.currentUser || {};
     const hasFullAccess = canValidateCraftClient();
+    if (!hasFullAccess) return [];
     let active = craftRequestsCache.filter(r => CRAFT_BOARD_ACTIVE_STATUSES.includes(r.status));
-    if (!hasFullAccess) active = active.filter(r => r.user_id === u.id);
     return active;
 }
 
@@ -3375,8 +3394,32 @@ function changeCraftBoardPage(delta) {
 
 function renderCraftBoard() {
     const tbody = document.getElementById('craftBoardBody');
-    renderCraftStockState();
     if (!tbody) return;
+    syncCraftPermissionUI();
+
+    const boardSection = document.getElementById('craftSection-board');
+    if (!canValidateCraftClient()) {
+        document.getElementById('craftBoardInProgressBanner')?.remove();
+        const pagination = document.getElementById('craftBoardPagination');
+        if (pagination) pagination.innerHTML = '';
+        const stockPanel = document.getElementById('craftBoardStockPanel');
+        if (stockPanel) stockPanel.innerHTML = '';
+        tbody.innerHTML = `
+            <tr class="craft-board-empty">
+                <td colspan="7">
+                    <div class="danger-lock-panel craft-board-confidential">
+                        <span class="danger-lock-kicker">ACCÈS PRODUCTION BLOQUÉ</span>
+                        <span class="confidential-text">CONFIDENTIAL</span>
+                        <span class="danger-lock-sub">TABLEAU CRAFT RÉSERVÉ AUX HAUTS GRADÉS</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+        boardSection?.classList.add('craft-board-locked');
+        return;
+    }
+    boardSection?.classList.remove('craft-board-locked');
+    renderCraftStockState();
 
     const active = sortCraftBoardRequests(getCraftBoardActiveRequests());
     const total = active.length;
@@ -3432,7 +3475,7 @@ function renderCraftBoard() {
 
 function renderCraftBoardLine(num, r) {
     const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : '—';
-    const canEditCraft = isAdminUser;
+    const canEditCraft = canValidateCraftClient();
     const completed = r.status === 'completed';
     const craftedPendingSale = !completed && (r.crafted || r.status === 'crafted' || r.craft_date || r.serial_number);
     const saleState = r.sale_state || 'not_listed';
@@ -3467,6 +3510,7 @@ function renderCraftBoardLine(num, r) {
             <td>${renderCraftBoardSaleState(r, saleState)}</td>
             <td>
                 ${canListWeapon ? `<button class="btn-craft-validate" onclick="openCraftListingFromBoard(${r.id})">Mettre en vente</button>` : ''}
+                ${canEditCraft ? `<button class="btn-status-delete btn-craft-delete" onclick="deleteCraftRequest(${r.id})">Supprimer</button>` : ''}
             </td>
         </tr>
     `;
