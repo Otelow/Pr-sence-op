@@ -1901,6 +1901,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.post('/api/crafts/organizations', requireAuth, (req, res) => {
         try {
+            if (!canValidateCraft(req.session.user)) {
+                return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
+            }
             const { name } = req.body;
             if (!name || !name.trim()) return res.status(400).json({ error: 'Nom requis' });
             const id = insertOrg(name.trim());
@@ -2563,15 +2566,20 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
 
-            // Le demandeur peut annuler tant que c'est pas crafté/finalisé
+            // Le demandeur peut annuler uniquement une demande encore en attente.
+            // Les hauts gradés passent par la suppression propre pour restaurer le stock/liens éventuels.
             const isOwner = existing.user_id === userId;
             const isSuperAdmin = canDeleteRequests(req.session.user);
 
             if (!isOwner && !isSuperAdmin) {
                 return res.status(403).json({ error: 'Tu peux annuler uniquement tes propres demandes' });
             }
-            if (isOwner && !isSuperAdmin && (existing.status === 'crafted' || existing.status === 'completed')) {
-                return res.status(403).json({ error: 'Demande déjà craftée, contacte un admin' });
+            if (isSuperAdmin) {
+                deleteCraftRequestCleanly(id);
+                return res.json({ success: true });
+            }
+            if (existing.status !== 'pending') {
+                return res.status(403).json({ error: 'Demande déjà active, contacte un haut gradé' });
             }
 
             deleteRequest(id);
@@ -3306,7 +3314,6 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 }
 
 module.exports = { initDB, registerCraftEndpoints };
-
 
 
 

@@ -87,3 +87,13 @@ Pousse tous les fichiers sur GitHub. Railway redéploie automatiquement.
 
 - Auto toutes les 15 secondes
 - Manuel avec le bouton ↻ en haut à droite
+
+## Notes exploitation
+
+- Railway doit garder les donnees persistantes dans `/data` : SQLite, backups et fichiers runtime.
+- Supabase est reserve aux clips du forum Discord `1500520790678962317`. Les liens externes sont stockes en SQLite, les videos attachees sont envoyees dans le bucket clips.
+- Backfill clips : lancer `/clips-backfill` sur Discord ou `POST /api/admin/clips/backfill`. Les uploads echoues peuvent etre retentes via `POST /api/admin/clips/retry-failed`.
+- Role limite `1495448653945634987` : acces uniquement a Craft d'armes et Vos Armes. Les autres sections restent confidentielles.
+- Stock dynamique : le stock disponible tient compte des demandes actives et le stock admin est consomme quand une arme passe craftee.
+- Mode test craft : reserve aux hauts grades pour tester sans polluer les vrais logs Discord.
+- Suivi commandes / avances : section admin separee pour suivre participants, remboursements et restes a recuperer.
