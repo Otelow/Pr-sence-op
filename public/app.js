@@ -4539,19 +4539,19 @@ function renderMyWeapons() {
             <div class="mw-actions">
                 <button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>
                 <button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>
-                <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>
+                <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>
             </div>
-        ` : (isMine && isSold ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>` : '');
+        ` : (isMine && isSold ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : '');
 
         if (!isMine && canDeleteWeapon) {
-            actions = `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>`;
+            actions = `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>`;
         }
 
         if ((!isMine || isSold) && canEditWeapon) {
             actions = `
                 <div class="mw-actions">
                     <button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>
-                    ${canDeleteWeapon ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">ðŸ—‘</button>` : ''}
+                    ${canDeleteWeapon ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : ''}
                 </div>
             `;
         }
