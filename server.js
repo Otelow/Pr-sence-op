@@ -232,7 +232,11 @@ body.login-body { overflow: hidden; }
     const ADMIN_USER_ID = '952986899667103804';
     const ADMIN_ROLE_ID = '1485279148246175764';
     const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
-    const LIMITED_CRAFT_ACCESS_ROLES = ['1495448653945634987'];
+    const LIMITED_CRAFT_ACCESS_ROLES = [
+        '1495448653945634987',
+        '1485636099853516982',
+        '1485270431291277383',
+    ];
 
     function requireAuth(req, res, next) {
         if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
