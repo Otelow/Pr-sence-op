@@ -3677,45 +3677,6 @@ function updateCraftSalePrice(requestId, value) {
     if (tr) tr.dataset.salePrice = value;
 }
 
-async function validateCraftSale(requestId) {
-    const tr = document.querySelector(`tr[data-request-id="${requestId}"]`);
-    if (!tr) return;
-
-    const select = tr.querySelector('.craft-org-select');
-    const priceInput = tr.querySelector('.craft-input-price');
-
-    const buyerOrg = select.value;
-    const salePrice = priceInput.value;
-
-    if (!buyerOrg || buyerOrg === '__add__') { toast('❌ Choisis une organisation', 'error'); return; }
-    if (!salePrice) { toast('❌ Entre un prix de vente', 'error'); return; }
-
-    if (!await confirmAction({ title: 'Valider la vente', message: 'Valider cette vente ? Un récap sera posté dans le salon.', confirmText: 'Valider la vente' })) return;
-
-    try {
-        const res = await fetch(`/api/crafts/requests/${requestId}/sale`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                buyer_org: buyerOrg,
-                sale_price: parseInt(salePrice),
-                sale_date: new Date().toISOString(),
-            })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            toast('✅ Vente validée, récap posté');
-            await Promise.all([loadCraftRequests(), loadWeaponsCatalog()]);
-            renderCraftBoard();
-            renderCraftHistory();
-        } else {
-            toast(`❌ ${data.error}`, 'error');
-        }
-    } catch (e) {
-        toast(`❌ ${e.message}`, 'error');
-    }
-}
-
 function renderCraftHistory() {
     const list = document.getElementById('craftHistoryList');
     if (!list) return;
@@ -3974,7 +3935,6 @@ window.toggleCraftCrafted = toggleCraftCrafted;
 window.updateCraftSerial = updateCraftSerial;
 window.handleOrgChange = handleOrgChange;
 window.updateCraftSalePrice = updateCraftSalePrice;
-window.validateCraftSale = validateCraftSale;
 window.toggleManualCraftSaleFields = toggleManualCraftSaleFields;
 window.toggleManualCraftFreeSale = toggleManualCraftFreeSale;
 window.submitManualCraft = submitManualCraft;

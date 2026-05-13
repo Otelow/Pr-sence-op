@@ -2533,30 +2533,6 @@ async function handlePanelInteraction(interaction) {
     return false;
 }
 
-// ==========================================
-// FILTRE SALON CLIPS — videos uniquement
-// ==========================================
-const VIDEO_URL_REGEX = /https?:\/\/[^\s]+\.(mp4|mov|avi|webm|mkv)|https?:\/\/(www\.)?(youtube\.com|youtu\.be|twitch\.tv|clips\.twitch\.tv|streamable\.com|medal\.tv|tiktok\.com|vm\.tiktok\.com|x\.com|twitter\.com|instagram\.com|facebook\.com|fb\.watch|dailymotion\.com|vimeo\.com|kick\.com)/i;
-
-client.on('messageCreate', async (message) => {
-    if (message.channelId !== CONFIG.CHANNELS.CLIPS) return;
-    if (message.author.bot) return;
-    if (message.author.id === PANEL_CONFIG.PROTECTED_USER_ID) return;
-
-    const hasVideoLink = VIDEO_URL_REGEX.test(message.content);
-    const hasVideoAttachment = message.attachments.some(a => a.contentType && a.contentType.startsWith('video/'));
-
-    if (!hasVideoLink && !hasVideoAttachment) {
-        try {
-            await message.delete();
-            const warn = await message.channel.send(
-                `${message.author} ❌ Seuls les liens vidéo / clips sont autorisés ici.`
-            );
-            setTimeout(() => warn.delete().catch(() => {}), 5000);
-        } catch {}
-    }
-});
-
 const clipReminderCooldown = new Map();
 
 function isClipForumMessage(message) {

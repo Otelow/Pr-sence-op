@@ -2511,51 +2511,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     });
 
     app.patch('/api/crafts/requests/:id/sale', requireAuth, async (req, res) => {
-        try {
-            const id = parseInt(req.params.id);
-            const { buyer_org, sale_price, sale_date } = req.body;
-            const userId = req.session.user.id;
-            const userName = req.session.user.username;
-            const existing = getRequest(id);
-            if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
-            const isAdmin = req.session.user.isAdmin;
-            if (existing.user_id !== userId && !isAdmin) return res.status(403).json({ error: 'Action non autorisée' });
-            const saleTimestamp = sale_date ? Math.floor(new Date(sale_date).getTime() / 1000) : Math.floor(Date.now() / 1000);
-            const rawSalePrice = String(sale_price ?? '').trim();
-            const parsedSalePrice = rawSalePrice === '' ? null : Number.parseInt(rawSalePrice, 10);
-            if (parsedSalePrice !== null && (!Number.isFinite(parsedSalePrice) || parsedSalePrice < 0)) {
-                return res.status(400).json({ error: 'Prix de vente invalide' });
-            }
-            updateRequestSale(id, buyer_org, parsedSalePrice, saleTimestamp, userId, userName);
-            const updated = getRequest(id);
-            if (!existing.is_test && !existing.posted_to_channel) {
-                const state = botState();
-                const channel = await fetchDiscordChannel(state.CONFIG.CHANNELS.WEAPONS_LOG || '1497021044953845791', 'WEAPONS_LOG_LEGACY_SALE');
-                if (channel) {
-                    const saleDate = updated.sale_date ? new Date(updated.sale_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
-                    const { EmbedBuilder } = require('discord.js');
-                    const embed = new EmbedBuilder()
-                        .setTitle(`Justification de vente • ${updated.weapon_name}`)
-                        .setColor(0xffb84d)
-                        .addFields(
-                            { name: 'Gestionnaire', value: `<@${updated.completed_by_id}>`, inline: true },
-                            { name: 'Numéro de série', value: `\`${updated.serial_number || 'N/A'}\``, inline: true },
-                            { name: 'Acheteur', value: updated.buyer_org || 'N/A', inline: true },
-                            { name: 'Prix final', value: moneyLabel(updated.sale_price), inline: true },
-                            { name: 'Date vente', value: saleDate, inline: true },
-                        )
-                        .setTimestamp()
-                        .setFooter({ text: '21 Block Savage • Vente craft clôturée' });
-                    await channel.send({
-                        content: `✅ Vente craft clôturée • **${updated.weapon_name}**`,
-                        embeds: [embed],
-                        allowedMentions: { parse: [] }
-                    }).catch(e => console.error('Erreur récap:', e.message));
-                    markRequestPosted(id);
-                }
-            }
-            res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        return res.status(410).json({
+            error: 'Route legacy désactivée. Utiliser le workflow Vos Armes / Marquer vendu.'
+        });
     });
 
     // Annuler/supprimer sa propre demande (pour le demandeur uniquement, ou super admin)
