@@ -2588,16 +2588,30 @@ async function maybeRemindClipForum(message) {
     const now = Date.now();
     const cooldownKey = String(message.author.id);
     const last = clipReminderCooldown.get(cooldownKey) || 0;
-    if (now - last < 60_000) return;
-    clipReminderCooldown.set(cooldownKey, now);
+    const shouldReply = now - last >= 60_000;
+
+    if (shouldReply) {
+        clipReminderCooldown.set(cooldownKey, now);
+
+        try {
+            await message.reply({
+                content: `Merci pour ton clip ! Pour qu'on puisse le retrouver et le sauvegarder correctement, poste-le dans le salon <#${config.clips.forumChannelId}> s'il te plait 🙏`,
+                allowedMentions: { repliedUser: true, parse: [] },
+            });
+        } catch (e) {
+            console.error(`[clips] rappel salon clips echoue: ${e.message}`);
+        }
+    }
 
     try {
-        await message.reply({
-            content: `Merci pour ton clip ! Pour qu'on puisse le retrouver et le sauvegarder correctement, poste-le dans le salon <#${config.clips.forumChannelId}> s'il te plait 🙏`,
-            allowedMentions: { repliedUser: true, parse: [] },
-        });
+        if (!message.deletable) {
+            console.warn('[clips] suppression message clip hors forum impossible: permission Manage Messages manquante ou message non supprimable');
+            return;
+        }
+
+        await message.delete();
     } catch (e) {
-        console.error(`[clips] rappel salon clips echoue: ${e.message}`);
+        console.warn(`[clips] suppression message clip hors forum impossible: ${e.message}`);
     }
 }
 
