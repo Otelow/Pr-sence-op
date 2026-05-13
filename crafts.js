@@ -2282,9 +2282,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 { name: 'Acheteur', value: updated.buyer_org || 'N/A', inline: true },
                 { name: 'Prix final', value: moneyLabel(updated.sale_price), inline: true },
                 { name: 'Date vente', value: saleDate, inline: true },
-            )
-            .setTimestamp()
-            .setFooter({ text: '21 Block Savage • Justification d’arme' });
+            );
 
         await channel.send({
             content: `✅ Vente archivée • **${updated.weapon_name}**`,
@@ -2736,10 +2734,15 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     function buildMyWeaponsSaleLogEmbed(base, rows) {
         const { EmbedBuilder } = require('discord.js');
-        const serials = rows
-            .map(w => `\`${w.serial_number}\``)
-            .join('\n')
-            .slice(0, 1000);
+        const serialValues = rows
+            .map(w => String(w.serial_number || '').trim())
+            .filter(Boolean);
+        const serials = serialValues.length <= 1
+            ? (serialValues[0] ? `\`${serialValues[0]}\`` : 'N/A')
+            : serialValues
+                .map((serial, index) => `${index + 1}. \`${serial}\``)
+                .join('\n')
+                .slice(0, 1000);
         const saleDates = [...new Set(rows
             .map(w => w.sold_at ? new Date(w.sold_at * 1000).toLocaleDateString('fr-FR') : null)
             .filter(Boolean))];
@@ -2747,25 +2750,40 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         const soldByLabel = base.sold_by_id && base.sold_by_id !== 'former-21bs'
             ? `<@${base.sold_by_id}>`
             : (base.sold_by_name || base.user_name || 'N/A');
-        const declaredByLabel = base.user_id ? `<@${base.user_id}>` : (base.user_name || 'N/A');
+        const declaredById = String(base.created_by_id || '').trim();
+        const soldById = String(base.sold_by_id || '').trim();
+        const ownerId = String(base.user_id || '').trim();
+        const shouldShowDeclaredBy = declaredById
+            && declaredById !== 'former-21bs'
+            && declaredById !== soldById
+            && declaredById !== ownerId;
+        const declaredByLabel = shouldShowDeclaredBy
+            ? `<@${declaredById}>`
+            : null;
+
+        const fields = [
+            { name: 'Arme', value: base.weapon_name || 'N/A', inline: true },
+            { name: 'Quantité', value: String(rows.length), inline: true },
+            { name: 'Acheteur', value: base.sold_to || 'N/A', inline: true },
+            { name: 'Montant vendu', value: moneyLabel(base.sold_price), inline: true },
+            { name: 'Date de vente', value: saleDate, inline: true },
+            { name: 'Vendeur', value: soldByLabel, inline: true },
+        ];
+
+        if (declaredByLabel) {
+            fields.push({ name: 'Déclarée par', value: declaredByLabel, inline: true });
+        }
+
+        fields.push(
+            { name: 'Craftée par', value: base.crafted_by_name || 'Non renseigné', inline: true },
+            { name: serialValues.length > 1 ? 'Numéros de série' : 'Numéro de série', value: serials, inline: false },
+        );
 
         return new EmbedBuilder()
-            .setTitle(`Justification de vente 21BS • ${base.weapon_name}`)
-            .setDescription('Arme craftée par les 21 Block Savage déclarée vendue.')
-            .setColor(0xffb84d)
-            .addFields(
-                { name: 'Arme', value: base.weapon_name || 'N/A', inline: true },
-                { name: 'Quantité', value: String(rows.length), inline: true },
-                { name: 'Vendeur', value: soldByLabel, inline: true },
-                { name: 'Déclarée par', value: declaredByLabel, inline: true },
-                { name: 'Acheteur', value: base.sold_to || 'N/A', inline: true },
-                { name: 'Montant vendu', value: moneyLabel(base.sold_price), inline: true },
-                { name: 'Date vente', value: saleDate, inline: true },
-                { name: 'Craftée par', value: base.crafted_by_name || 'Non renseigné', inline: true },
-                { name: 'Numéro de série', value: serials || 'N/A', inline: false },
-            )
-            .setTimestamp()
-            .setFooter({ text: '21 Block Savage • Justification d’arme' });
+            .setTitle('✅ Vente d’arme 21BS')
+            .setDescription('Une arme craftée par les 21 Block Savage vient d’être déclarée vendue.')
+            .setColor(0x22c55e)
+            .addFields(...fields);
     }
 
     async function postMyWeaponsSaleLog(existing) {
@@ -2780,7 +2798,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         const embed = buildMyWeaponsSaleLogEmbed(base, rows);
         try {
             const msg = await channel.send({
-                content: `✅ Vente 21BS déclarée • **${base.weapon_name}** • ${rows.length} série(s).`,
+                content: `✅ Vente déclarée • **${base.weapon_name}** • ${rows.length} série${rows.length > 1 ? 's' : ''}`,
                 embeds: [embed],
                 allowedMentions: { parse: [] },
             });
@@ -3200,7 +3218,5 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 }
 
 module.exports = { initDB, registerCraftEndpoints };
-
-
 
 
