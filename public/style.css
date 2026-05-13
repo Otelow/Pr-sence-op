@@ -8439,6 +8439,17 @@ body {
     margin-top: 16px;
 }
 
+.myweapons-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 12px;
+}
+
+.myweapons-search-input {
+    width: min(100%, 320px);
+    min-height: 40px !important;
+}
+
 #myWeaponsList {
     display: grid;
     gap: 12px;
@@ -8855,6 +8866,24 @@ body:has(#impersonateBanner[style*="flex"]) {
 .btn-mw-sold:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+}
+
+.btn-mw-edit {
+    background: rgba(255, 140, 0, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(255, 140, 0, 0.34);
+    border-radius: 7px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-mw-edit:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 140, 0, 0.18);
+    box-shadow: 0 4px 12px rgba(255, 140, 0, 0.18);
 }
 
 /* ============================================================

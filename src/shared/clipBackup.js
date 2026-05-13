@@ -8,6 +8,9 @@ let backfillRunning = false;
 let lastBackfillSummary = null;
 
 const VIDEO_EXT_RE = /\.(mp4|mov|webm|m4v)(?:[?#].*)?$/i;
+const IMAGE_EXT_RE = /\.(gif|jpe?g|png|webp)(?:[?#].*)?$/i;
+const IMAGE_MIME_RE = /^image\//i;
+const GIF_LINK_RE = /(?:giphy\.com|tenor\.com)/i;
 const CLIP_DOMAIN_RE = /(?:medal\.tv|streamable\.com|youtube\.com|youtu\.be|twitch\.tv|clips\.twitch\.tv|discord(?:app)?\.com\/channels|cdn\.discordapp\.com|media\.discordapp\.net)/i;
 const URL_RE = /https?:\/\/[^\s<>"')]+/gi;
 
@@ -134,12 +137,17 @@ function isForumClipMessage(message) {
 function extractClipLinks(content) {
     const urls = String(content || '').match(URL_RE) || [];
     return [...new Set(urls.map(url => url.replace(/[.,;:!?]+$/, '')))]
-        .filter(url => VIDEO_EXT_RE.test(url) || CLIP_DOMAIN_RE.test(url));
+        .filter(url => {
+            if (IMAGE_EXT_RE.test(url)) return false;
+            if (GIF_LINK_RE.test(url) && !VIDEO_EXT_RE.test(url)) return false;
+            return VIDEO_EXT_RE.test(url) || CLIP_DOMAIN_RE.test(url);
+        });
 }
 
 function isClipAttachment(attachment) {
     const contentType = String(attachment?.contentType || attachment?.mimeType || '').toLowerCase();
     const name = String(attachment?.name || attachment?.filename || '').toLowerCase();
+    if (IMAGE_MIME_RE.test(contentType) || IMAGE_EXT_RE.test(name)) return false;
     return contentType.startsWith('video/') || VIDEO_EXT_RE.test(name);
 }
 

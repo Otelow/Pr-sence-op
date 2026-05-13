@@ -1545,6 +1545,15 @@ function serialAlreadyListed(serial, excludeId = null) {
     );
 }
 
+function getMyWeaponById(id) {
+    const weaponId = Number(id);
+    if (!weaponId) return null;
+    if (useSQLite) {
+        return db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(weaponId) || null;
+    }
+    return (jsonData.my_weapons || []).find(w => Number(w.id) === weaponId) || null;
+}
+
 function deleteRequest(id) {
     if (useSQLite) { db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id); return; }
     jsonData.craft_requests = jsonData.craft_requests.filter(r => r.id !== id);
@@ -3027,6 +3036,124 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.post('/api/crafts/myweapons-legacy', requireAuth, async (req, res) => {
         return res.status(410).json({ error: 'Endpoint legacy desactive. Utilise /api/crafts/myweapons.' });
+    });
+
+    app.get('/api/crafts/myweapons/:id', requireAuth, (req, res) => {
+        try {
+            const id = parseInt(req.params.id, 10);
+            const existing = getMyWeaponById(id);
+            if (!existing) return res.status(404).json({ error: 'Annonce introuvable' });
+            const canManageAny = canValidateCraft(req.session.user) || canDeleteMyWeapons(req.session.user);
+            if (String(existing.user_id) !== String(req.session.user.id) && !canManageAny) {
+                return res.status(403).json({ error: 'Action non autorisee' });
+            }
+            if (!canManageAny && existing.is_sold) {
+                return res.status(403).json({ error: 'Une annonce vendue ne peut etre modifiee que par un haut grade' });
+            }
+            res.json({ weapon: existing });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
+    app.put('/api/crafts/myweapons/:id', requireAuth, async (req, res) => {
+        try {
+            const id = parseInt(req.params.id, 10);
+            const existing = getMyWeaponById(id);
+            if (!existing) return res.status(404).json({ error: 'Annonce introuvable' });
+
+            const canManageAny = canValidateCraft(req.session.user) || canDeleteMyWeapons(req.session.user);
+            const isOwner = String(existing.user_id) === String(req.session.user.id);
+            if (!isOwner && !canManageAny) return res.status(403).json({ error: 'Action non autorisee' });
+            if (!canManageAny && existing.is_sold) {
+                return res.status(403).json({ error: 'Une annonce vendue ne peut etre modifiee que par un haut grade' });
+            }
+
+            const weaponName = String(req.body.weapon_name || '').trim();
+            if (!weaponName) return res.status(400).json({ error: "Nom de l'arme requis" });
+            const isCrafted = req.body.is_crafted === true || req.body.is_crafted === 1 || req.body.is_crafted === '1' || req.body.is_crafted === 'true';
+            const serial = String(req.body.serial_number || '').trim();
+            if (serial && serialAlreadyListed(serial, id)) {
+                return res.status(409).json({ error: `Le N° de série ${serial} est déjà en vente ou vendu` });
+            }
+            const parseOptionalAmount = value => {
+                const raw = String(value ?? '').trim();
+                if (!raw) return null;
+                const amount = parseInt(raw, 10);
+                return Number.isFinite(amount) && amount >= 0 ? amount : null;
+            };
+            const askingPrice = parseOptionalAmount(req.body.asking_price);
+            const minPrice = parseOptionalAmount(req.body.min_price);
+            const nextIsSold = req.body.is_sold === true || req.body.is_sold === 1 || req.body.is_sold === '1' || req.body.is_sold === 'true';
+            if (nextIsSold && !canManageAny) {
+                return res.status(403).json({ error: 'Utilise le bouton Marquer vendu pour declarer une vente' });
+            }
+            const soldTo = nextIsSold ? String(req.body.sold_to || '').trim() : null;
+            const soldPrice = nextIsSold ? parseOptionalAmount(req.body.sold_price) : null;
+            let soldAt = null;
+            if (nextIsSold) {
+                if (!soldTo || soldPrice === null) return res.status(400).json({ error: 'Acheteur et prix vendu requis' });
+                const rawSoldAt = String(req.body.sold_at || '').trim();
+                soldAt = rawSoldAt
+                    ? Math.floor(new Date(`${rawSoldAt}T12:00:00+01:00`).getTime() / 1000)
+                    : (existing.sold_at || Math.floor(Date.now() / 1000));
+                if (!Number.isFinite(soldAt)) return res.status(400).json({ error: 'Date de vente invalide' });
+            }
+
+            let ownerId = existing.user_id;
+            let ownerName = existing.user_name;
+            let ownerAvatar = existing.user_avatar || null;
+            if (canManageAny && req.body.user_id && String(req.body.user_id) !== String(existing.user_id)) {
+                ownerId = String(req.body.user_id).trim();
+                ownerName = String(req.body.user_name || ownerId).trim();
+                ownerAvatar = await getDiscordUserAvatar(ownerId);
+            } else if (canManageAny && req.body.user_name) {
+                ownerName = String(req.body.user_name).trim() || ownerName;
+            }
+
+            const batchId = existing.batch_id || null;
+            if (useSQLite) {
+                if (batchId) {
+                    db.prepare(`
+                        UPDATE my_weapons
+                        SET user_id = ?, user_name = ?, user_avatar = ?, weapon_name = ?, is_crafted = ?,
+                            asking_price = ?, min_price = ?
+                        WHERE batch_id = ?
+                    `).run(ownerId, ownerName, ownerAvatar, weaponName, isCrafted ? 1 : 0, askingPrice, minPrice, batchId);
+                }
+                db.prepare(`
+                    UPDATE my_weapons
+                    SET user_id = ?, user_name = ?, user_avatar = ?, weapon_name = ?, is_crafted = ?,
+                        serial_number = ?, asking_price = ?, min_price = ?, is_sold = ?,
+                        sold_to = ?, sold_price = ?, sold_at = ?
+                    WHERE id = ?
+                `).run(ownerId, ownerName, ownerAvatar, weaponName, isCrafted ? 1 : 0, serial || null, askingPrice, minPrice, nextIsSold ? 1 : 0, soldTo, soldPrice, soldAt, id);
+            } else {
+                const rows = (jsonData.my_weapons || []).filter(w => batchId ? w.batch_id === batchId : Number(w.id) === id);
+                for (const row of rows) {
+                    row.user_id = ownerId;
+                    row.user_name = ownerName;
+                    row.user_avatar = ownerAvatar;
+                    row.weapon_name = weaponName;
+                    row.is_crafted = isCrafted ? 1 : 0;
+                    row.asking_price = askingPrice;
+                    row.min_price = minPrice;
+                }
+                const row = rows.find(w => Number(w.id) === id);
+                if (row) {
+                    row.serial_number = serial || null;
+                    row.is_sold = nextIsSold ? 1 : 0;
+                    row.sold_to = soldTo;
+                    row.sold_price = soldPrice;
+                    row.sold_at = soldAt;
+                }
+                saveJSON();
+            }
+
+            res.json({ success: true, weapon: getMyWeaponById(id) });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
     });
 
     // Marquer comme vendu

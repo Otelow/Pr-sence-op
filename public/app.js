@@ -4119,6 +4119,8 @@ let myWeaponsFormHydrated = false;
 let myWeaponsSelectedCraftRequestId = null;
 let myWeaponsSubmitInFlight = false;
 let myWeaponsMarkSoldInFlight = false;
+let myWeaponsEditInFlight = false;
+let myWeaponsSearchQuery = '';
 const myWeaponsAuthorizedCrafters = [
     { id: 'otelow', name: 'Otelow' },
     { id: 'ney', name: 'Ney' },
@@ -4126,6 +4128,7 @@ const myWeaponsAuthorizedCrafters = [
 ];
 
 async function initMyWeaponsTab() {
+    bindMyWeaponsSearch();
     if (!organizationsCache || organizationsCache.length === 0) {
         await loadOrganizations();
     }
@@ -4142,6 +4145,17 @@ async function initMyWeaponsTab() {
     }
     await loadMyWeapons();
     renderMyWeapons();
+}
+
+function bindMyWeaponsSearch() {
+    const input = document.getElementById('myWeaponsSearch');
+    if (!input || input.dataset.bound === '1') return;
+    input.value = myWeaponsSearchQuery;
+    input.addEventListener('input', () => {
+        myWeaponsSearchQuery = input.value.trim().toLowerCase();
+        renderMyWeapons();
+    });
+    input.dataset.bound = '1';
 }
 
 function isMyWeaponsFormActive() {
@@ -4461,6 +4475,14 @@ function renderMyWeapons() {
         list.innerHTML = '<p class="empty">Aucune arme en vente</p>';
         return;
     }
+    const query = myWeaponsSearchQuery.trim().toLowerCase();
+    const visibleWeapons = query
+        ? myWeaponsCache.filter(w => String(w.weapon_name || '').toLowerCase().includes(query))
+        : myWeaponsCache;
+    if (visibleWeapons.length === 0) {
+        list.innerHTML = '<p class="empty">Aucune arme ne correspond à cette recherche</p>';
+        return;
+    }
 
     const getAvailableQty = (weapon) => (
         typeof weapon.quantity_available === 'number'
@@ -4468,7 +4490,7 @@ function renderMyWeapons() {
             : (weapon.is_sold ? 0 : 1)
     );
     const getTotalQty = (weapon) => weapon.quantity_total || 1;
-    const sortedWeapons = [...myWeaponsCache].sort((a, b) => {
+    const sortedWeapons = [...visibleWeapons].sort((a, b) => {
         const aSold = getAvailableQty(a) <= 0;
         const bSold = getAvailableQty(b) <= 0;
         if (aSold !== bSold) return aSold ? 1 : -1;
@@ -4511,9 +4533,11 @@ function renderMyWeapons() {
                 ${w.min_price ? `<span class="mw-min-price">📉 Min : ${w.min_price.toLocaleString('fr-FR')}$</span>` : ''}
             `;
 
+        const canEditWeapon = (isMine && !isSold) || canDeleteMyWeaponsClient();
         const canDeleteWeapon = isMine || canDeleteMyWeaponsClient();
         let actions = isMine && !isSold ? `
             <div class="mw-actions">
+                <button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>
                 <button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>
                 <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>
             </div>
@@ -4521,6 +4545,15 @@ function renderMyWeapons() {
 
         if (!isMine && canDeleteWeapon) {
             actions = `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">🗑</button>`;
+        }
+
+        if ((!isMine || isSold) && canEditWeapon) {
+            actions = `
+                <div class="mw-actions">
+                    <button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>
+                    ${canDeleteWeapon ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})">ðŸ—‘</button>` : ''}
+                </div>
+            `;
         }
 
         return `
@@ -4547,6 +4580,114 @@ function renderMyWeapons() {
     }).join('');
 
     list.innerHTML = summary + rows;
+}
+
+function formatDateInputFromTimestamp(timestamp) {
+    const value = Number(timestamp);
+    if (!value) return '';
+    const date = new Date(value * 1000);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+}
+
+function toggleEditMyWeaponSoldFields() {
+    const sold = document.getElementById('editMwSold')?.value === '1';
+    const fields = document.getElementById('editMwSoldFields');
+    if (fields) fields.style.display = sold ? 'block' : 'none';
+}
+
+function populateEditMyWeaponOwnerSelect(selectedId) {
+    const field = document.getElementById('editMwOwnerField');
+    const select = document.getElementById('editMwOwner');
+    const canEditOwner = canValidateCraftClient() || canDeleteMyWeaponsClient();
+    if (field) field.style.display = canEditOwner ? 'block' : 'none';
+    if (!select) return;
+    const members = allMembersCache || [];
+    select.innerHTML = members.map(m => (
+        `<option value="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`
+    )).join('');
+    if (selectedId && members.some(m => String(m.id) === String(selectedId))) {
+        select.value = String(selectedId);
+    }
+}
+
+async function openEditMyWeaponModal(id) {
+    try {
+        const res = await fetch(`/api/crafts/myweapons/${id}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Annonce introuvable');
+        const weapon = data.weapon;
+        document.getElementById('editMwId').value = weapon.id;
+        document.getElementById('editMwName').value = weapon.weapon_name || '';
+        document.getElementById('editMwCrafted').value = weapon.is_crafted ? '1' : '0';
+        document.getElementById('editMwSerial').value = weapon.serial_number || '';
+        document.getElementById('editMwAskingPrice').value = weapon.asking_price || '';
+        document.getElementById('editMwMinPrice').value = weapon.min_price || '';
+        document.getElementById('editMwSold').value = weapon.is_sold ? '1' : '0';
+        document.getElementById('editMwSoldTo').value = weapon.sold_to || '';
+        document.getElementById('editMwSoldPrice').value = weapon.sold_price || '';
+        document.getElementById('editMwSoldAt').value = formatDateInputFromTimestamp(weapon.sold_at);
+        populateEditMyWeaponOwnerSelect(weapon.user_id);
+        toggleEditMyWeaponSoldFields();
+        document.getElementById('editMyWeaponModal').style.display = 'flex';
+    } catch (e) {
+        toast(`âŒ ${e.message}`, 'error');
+    }
+}
+
+function closeEditMyWeaponModal() {
+    const modal = document.getElementById('editMyWeaponModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitEditMyWeapon(e) {
+    e.preventDefault();
+    if (myWeaponsEditInFlight) return;
+    const id = document.getElementById('editMwId').value;
+    const owner = getSelectedMember('editMwOwner');
+    const canEditOwner = canValidateCraftClient() || canDeleteMyWeaponsClient();
+    const payload = {
+        weapon_name: document.getElementById('editMwName').value.trim(),
+        is_crafted: document.getElementById('editMwCrafted').value === '1',
+        serial_number: document.getElementById('editMwSerial').value.trim(),
+        asking_price: document.getElementById('editMwAskingPrice').value,
+        min_price: document.getElementById('editMwMinPrice').value,
+        is_sold: document.getElementById('editMwSold').value === '1',
+        sold_to: document.getElementById('editMwSoldTo').value.trim(),
+        sold_price: document.getElementById('editMwSoldPrice').value,
+        sold_at: document.getElementById('editMwSoldAt').value
+    };
+    if (canEditOwner && owner.id) {
+        payload.user_id = owner.id;
+        payload.user_name = owner.name;
+    }
+    if (!payload.weapon_name) { toast('âŒ Nom de l\'arme requis', 'error'); return; }
+    if (payload.is_sold && (!payload.sold_to || !payload.sold_price)) {
+        toast('âŒ Acheteur et prix vendu requis si l\'annonce est vendue', 'error');
+        return;
+    }
+
+    myWeaponsEditInFlight = true;
+    const submitBtn = document.querySelector('#editMyWeaponForm button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+        const res = await fetch(`/api/crafts/myweapons/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Modification impossible');
+        toast('âœ… Annonce mise à jour');
+        closeEditMyWeaponModal();
+        await loadMyWeapons();
+        renderMyWeapons();
+    } catch (err) {
+        toast(`âŒ ${err.message}`, 'error');
+    } finally {
+        myWeaponsEditInFlight = false;
+        if (submitBtn) submitBtn.disabled = false;
+    }
 }
 
 // ─── Modal "Marquer comme vendu" ───
@@ -4684,6 +4825,10 @@ window.updateMwSerialFields = updateMwSerialFields;
 window.submitMyWeapon = submitMyWeapon;
 window.openMarkSoldModal = openMarkSoldModal;
 window.closeMarkSoldModal = closeMarkSoldModal;
+window.openEditMyWeaponModal = openEditMyWeaponModal;
+window.closeEditMyWeaponModal = closeEditMyWeaponModal;
+window.toggleEditMyWeaponSoldFields = toggleEditMyWeaponSoldFields;
+window.submitEditMyWeapon = submitEditMyWeapon;
 window.toggleMarkSoldBuyerDropdown = toggleMarkSoldBuyerDropdown;
 window.selectMarkSoldBuyer = selectMarkSoldBuyer;
 window.confirmMarkSold = confirmMarkSold;

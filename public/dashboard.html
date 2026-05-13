@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260513-2">
+<link rel="stylesheet" href="/style.css?v=20260513-3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -969,6 +969,9 @@
 
         <div class="myweapons-history">
             <h4 class="section-title" style="font-size:18px;margin-top:32px;">📜 Armes en vente / Vendues</h4>
+            <div class="myweapons-toolbar">
+                <input type="search" id="myWeaponsSearch" class="comm-input myweapons-search-input" placeholder="Rechercher une arme..." autocomplete="off">
+            </div>
             <div id="myWeaponsList">
                 <p class="empty">Chargement...</p>
             </div>
@@ -1022,11 +1025,85 @@
         </div>
     </div>
 
+    <!-- Modal "Modifier une annonce" -->
+    <div class="modal-backdrop" id="editMyWeaponModal" style="display:none;">
+        <div class="modal-content">
+            <h3 class="modal-title">Modifier l'annonce</h3>
+            <form id="editMyWeaponForm" onsubmit="submitEditMyWeapon(event)">
+                <input type="hidden" id="editMwId">
+
+                <div class="comm-field">
+                    <label class="comm-label">Nom de l'arme *</label>
+                    <input type="text" id="editMwName" class="comm-input" required>
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">Origine de l'arme</label>
+                    <select id="editMwCrafted" class="comm-input">
+                        <option value="1">Craftée 21BS</option>
+                        <option value="0">Non craftée 21BS</option>
+                    </select>
+                </div>
+
+                <div class="comm-field" id="editMwOwnerField" style="display:none;">
+                    <label class="comm-label">Vendeur / propriétaire</label>
+                    <select id="editMwOwner" class="comm-input"></select>
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">N° série</label>
+                    <input type="text" id="editMwSerial" class="comm-input" placeholder="Laisser vide si aucun N° série">
+                </div>
+
+                <div class="craft-field-row">
+                    <div class="comm-field" style="flex:1;">
+                        <label class="comm-label">Prix souhaité ($)</label>
+                        <input type="number" id="editMwAskingPrice" class="comm-input" min="0">
+                    </div>
+                    <div class="comm-field" style="flex:1;">
+                        <label class="comm-label">Prix minimum accepté ($)</label>
+                        <input type="number" id="editMwMinPrice" class="comm-input" min="0">
+                    </div>
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">Statut</label>
+                    <select id="editMwSold" class="comm-input" onchange="toggleEditMyWeaponSoldFields()">
+                        <option value="0">En vente</option>
+                        <option value="1">Vendue</option>
+                    </select>
+                </div>
+
+                <div id="editMwSoldFields" style="display:none;">
+                    <div class="comm-field">
+                        <label class="comm-label">Groupe acheteur</label>
+                        <input type="text" id="editMwSoldTo" class="comm-input">
+                    </div>
+                    <div class="craft-field-row">
+                        <div class="comm-field" style="flex:1;">
+                            <label class="comm-label">Prix vendu ($)</label>
+                            <input type="number" id="editMwSoldPrice" class="comm-input" min="0">
+                        </div>
+                        <div class="comm-field" style="flex:1;">
+                            <label class="comm-label">Date de vente</label>
+                            <input type="date" id="editMwSoldAt" class="comm-input">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeEditMyWeaponModal()">Annuler</button>
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </main>
 
 <!-- Toast -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="/app.js?v=20260513-2"></script>
+<script src="/app.js?v=20260513-3"></script>
 </body>
 </html>
