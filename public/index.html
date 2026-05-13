@@ -28,6 +28,8 @@
                 Connecte-toi avec ton compte Discord.
             </p>
 
+            <div class="login-notice" id="loginNotice" hidden></div>
+
             <a href="/auth/login" class="btn-discord" id="discordBtn" onclick="handleDiscordClick(event)">
                 <span class="btn-discord-content">
                     <svg width="20" height="20" viewBox="0 0 71 55" fill="currentColor">
@@ -86,6 +88,26 @@ function handleDiscordClick(e) {
     btn.classList.add('loading');
     setTimeout(() => { window.location.href = '/auth/login'; }, 600);
 }
+
+(function showLogoutNotice() {
+    const params = new URLSearchParams(window.location.search);
+    const notice = document.getElementById('loginNotice');
+    if (!notice) return;
+
+    let message = '';
+    if (params.get('timeout') === '1') {
+        message = 'Session expirée après inactivité. Reconnecte-toi avec Discord.';
+        notice.classList.add('login-notice-timeout');
+    } else if (params.get('logout') === '1') {
+        message = 'Tu as bien été déconnecté.';
+        notice.classList.add('login-notice-logout');
+    }
+
+    if (!message) return;
+    notice.textContent = message;
+    notice.hidden = false;
+    window.history.replaceState({}, document.title, window.location.pathname);
+})();
 </script>
 
 </body>

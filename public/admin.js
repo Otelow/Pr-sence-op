@@ -280,6 +280,7 @@ function renderAdminWeapons() {
             w.name,
             w.craft_price,
             w.sale_price,
+            w.max_sale_price,
             ...(w.ingredients || []).map(i => i.name),
         ].join(' ').toLowerCase();
         return haystack.includes(adminWeaponQuery);
@@ -301,6 +302,7 @@ function renderAdminWeapons() {
                     ${w.craft_time ? formatTime(w.craft_time) : ''}
                     ${w.craft_price ? ' - Craft : ' + w.craft_price.toLocaleString('fr-FR') + '$' : ''}
                     ${w.sale_price ? ' - Vente : ' + w.sale_price.toLocaleString('fr-FR') + '$' : ''}
+                    ${w.max_sale_price ? ' - Max : ' + w.max_sale_price.toLocaleString('fr-FR') + '$' : ''}
                     - ${(w.ingredients || []).length} ingredients
                 </small>
             </div>
@@ -331,6 +333,8 @@ function openWeaponEditor(id) {
 
     const saleInput = document.getElementById('weaponSalePrice');
     if (saleInput) saleInput.value = 0;
+    const maxSaleInput = document.getElementById('weaponMaxSalePrice');
+    if (maxSaleInput) maxSaleInput.value = 0;
 
     if (id) {
         const w = adminWeapons.find(w => w.id === id);
@@ -344,6 +348,7 @@ function openWeaponEditor(id) {
 
         // Prix de vente conseillé
         if (saleInput) saleInput.value = w.sale_price || 0;
+        if (maxSaleInput) maxSaleInput.value = w.max_sale_price || 0;
 
         document.getElementById('weaponRequiresPlan').checked = !!w.requires_plan;
         if (w.requires_plan) document.getElementById('planImageField').style.display = 'block';
@@ -472,6 +477,8 @@ async function saveWeapon(e) {
     // Prix de vente conseillé
     const saleInput = document.getElementById('weaponSalePrice');
     formData.append('sale_price', saleInput ? (saleInput.value || '0') : '0');
+    const maxSaleInput = document.getElementById('weaponMaxSalePrice');
+    formData.append('max_sale_price', maxSaleInput ? (maxSaleInput.value || '0') : '0');
 
     formData.append('requires_plan', document.getElementById('weaponRequiresPlan').checked ? '1' : '0');
     formData.append('ingredients', JSON.stringify(editingIngredients));

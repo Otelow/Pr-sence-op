@@ -220,7 +220,10 @@ body.login-body { overflow: hidden; }
     });
 
     app.get('/auth/logout', (req, res) => {
-        req.session.destroy(() => res.redirect('/'));
+        const isTimeout = req.query.timeout === '1';
+        req.session.destroy(() => {
+            res.redirect(isTimeout ? '/?timeout=1' : '/?logout=1');
+        });
     });
 
     // ==========================================

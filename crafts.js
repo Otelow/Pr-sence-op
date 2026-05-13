@@ -182,6 +182,7 @@ function initDB() {
                     craft_time INTEGER DEFAULT 0,
                     craft_price INTEGER DEFAULT 0,
                     sale_price INTEGER DEFAULT 0,
+                    max_sale_price INTEGER DEFAULT 0,
                     ingredients TEXT DEFAULT '[]',
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
@@ -311,6 +312,7 @@ function initDB() {
             try { db.exec(`ALTER TABLE weapons ADD COLUMN plan_image_path TEXT`); } catch {}
             try { db.exec(`ALTER TABLE weapons ADD COLUMN requires_plan INTEGER DEFAULT 0`); } catch {}
             try { db.exec(`ALTER TABLE weapons ADD COLUMN sale_price INTEGER DEFAULT 0`); } catch {}
+            try { db.exec(`ALTER TABLE weapons ADD COLUMN max_sale_price INTEGER DEFAULT 0`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN user_avatar TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN asking_price INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN min_price INTEGER`); } catch {}
@@ -514,24 +516,24 @@ function getWeapon(id) {
     return jsonData.weapons.find(w => w.id === id);
 }
 
-function insertWeapon(name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, ingredients) {
+function insertWeapon(name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) {
     if (useSQLite) {
-        const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-            .run(name, image_path, plan_image_path, requires_plan ? 1 : 0, craft_time, craft_price, sale_price, ingredients);
+        const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(name, image_path, plan_image_path, requires_plan ? 1 : 0, craft_time, craft_price, sale_price, max_sale_price, ingredients);
         invalidateCraftCaches();
         return r.lastInsertRowid;
     }
     const id = nextId('weapons');
-    jsonData.weapons.push({ id, name, image_path, plan_image_path, requires_plan: requires_plan ? 1 : 0, craft_time, craft_price, sale_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
+    jsonData.weapons.push({ id, name, image_path, plan_image_path, requires_plan: requires_plan ? 1 : 0, craft_time, craft_price, sale_price, max_sale_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
     saveJSON();
     invalidateCraftCaches();
     return id;
 }
 
-function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, ingredients) {
+function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) {
     if (useSQLite) {
-        db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, sale_price = ?, ingredients = ?, requires_plan = ?, image_path = COALESCE(?, image_path), plan_image_path = COALESCE(?, plan_image_path) WHERE id = ?`)
-            .run(name, craft_time, craft_price, sale_price, ingredients, requires_plan ? 1 : 0, image_path, plan_image_path, id);
+        db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, sale_price = ?, max_sale_price = ?, ingredients = ?, requires_plan = ?, image_path = COALESCE(?, image_path), plan_image_path = COALESCE(?, plan_image_path) WHERE id = ?`)
+            .run(name, craft_time, craft_price, sale_price, max_sale_price, ingredients, requires_plan ? 1 : 0, image_path, plan_image_path, id);
         invalidateCraftCaches();
         return;
     }
@@ -541,6 +543,7 @@ function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craf
         w.craft_time = craft_time;
         w.craft_price = craft_price;
         w.sale_price = sale_price;
+        w.max_sale_price = max_sale_price;
         w.ingredients = ingredients;
         w.requires_plan = requires_plan ? 1 : 0;
         if (image_path) w.image_path = image_path;
@@ -1760,7 +1763,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.post('/api/crafts/weapons', requireAdmin, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'plan_image', maxCount: 1 }]), (req, res) => {
         try {
-            const { name, craft_time, craft_price, sale_price, ingredients, requires_plan } = req.body;
+            const { name, craft_time, craft_price, sale_price, max_sale_price, ingredients, requires_plan } = req.body;
             if (!name) return res.status(400).json({ error: 'Nom requis' });
             const imagePath = req.files?.image?.[0]?.filename || null;
             const planImagePath = req.files?.plan_image?.[0]?.filename || null;
@@ -1770,6 +1773,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 parseInt(craft_time) || 0,
                 parseInt(craft_price) || 0,
                 parseInt(sale_price) || 0,
+                parseInt(max_sale_price) || 0,
                 ingredients || '[]'
             );
             res.json({ success: true, id });
@@ -1779,7 +1783,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     app.put('/api/crafts/weapons/:id', requireAdmin, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'plan_image', maxCount: 1 }]), (req, res) => {
         try {
             const id = parseInt(req.params.id);
-            const { name, craft_time, craft_price, sale_price, ingredients, requires_plan } = req.body;
+            const { name, craft_time, craft_price, sale_price, max_sale_price, ingredients, requires_plan } = req.body;
             const existing = getWeapon(id);
             if (!existing) return res.status(404).json({ error: 'Arme introuvable' });
 
@@ -1801,6 +1805,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 parseInt(craft_time) || existing.craft_time || 0,
                 parseInt(craft_price) || existing.craft_price || 0,
                 parseInt(sale_price) || existing.sale_price || 0,
+                max_sale_price !== undefined ? (parseInt(max_sale_price) || 0) : (existing.max_sale_price || 0),
                 ingredients || (typeof existing.ingredients === 'string' ? existing.ingredients : JSON.stringify(existing.ingredients || []))
             );
             res.json({ success: true });
@@ -3218,5 +3223,3 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 }
 
 module.exports = { initDB, registerCraftEndpoints };
-
-

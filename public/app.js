@@ -2738,6 +2738,7 @@ function renderCraftCatalog() {
             w.name,
             w.craft_price,
             w.sale_price,
+            w.max_sale_price,
             ...(w.ingredients || []).map(ing => ing.name),
         ].join(' ').toLowerCase();
         return haystack.includes(q);
@@ -2779,6 +2780,7 @@ function renderCraftCatalog() {
         const timeStr = w.craft_time > 0 ? formatCraftTime(w.craft_time) : 'N/A';
         const priceStr = w.craft_price > 0 ? w.craft_price.toLocaleString('fr-FR') + '$' : 'Gratuit';
         const saleStr = w.sale_price > 0 ? `<span class="craft-weapon-saleprice">Vente : ${w.sale_price.toLocaleString('fr-FR')}$</span>` : '';
+        const maxSaleStr = w.max_sale_price > 0 ? `<span class="craft-weapon-maxprice">Max : ${w.max_sale_price.toLocaleString('fr-FR')}$</span>` : '';
         const maxCraftable = Number(w.maxCraftable) || 0;
         const stockBadge = maxCraftable > 0
             ? `<span class="craft-stock-badge ok">Craftable x${maxCraftable}</span>`
@@ -2798,6 +2800,7 @@ function renderCraftCatalog() {
                         <span class="craft-weapon-time">&#9201; ${timeStr}</span>
                         <span class="craft-weapon-price">Craft : ${priceStr}</span>
                         ${saleStr}
+                        ${maxSaleStr}
                     </div>
                     ${ingredientsHTML ? `<div class="craft-ingredients-grid">${ingredientsHTML}</div>` : ''}
                 </div>
@@ -2818,6 +2821,7 @@ function openCraftWeaponDetails(id) {
     const timeStr = weapon.craft_time > 0 ? formatCraftTime(weapon.craft_time) : 'N/A';
     const craftPrice = weapon.craft_price > 0 ? weapon.craft_price.toLocaleString('fr-FR') + '$' : 'Gratuit';
     const salePrice = weapon.sale_price > 0 ? weapon.sale_price.toLocaleString('fr-FR') + '$' : 'N/A';
+    const maxSalePrice = weapon.max_sale_price > 0 ? weapon.max_sale_price.toLocaleString('fr-FR') + '$' : '';
     const ingredients = weapon.ingredients || [];
 
     title.textContent = weapon.name || 'Arme';
@@ -2839,6 +2843,12 @@ function openCraftWeaponDetails(id) {
                     <span>Prix vente</span>
                     <strong>${escapeHtml(salePrice)}</strong>
                 </div>
+                ${maxSalePrice ? `
+                <div class="craft-detail-stat craft-detail-max-price">
+                    <span>Prix maximal</span>
+                    <strong>${escapeHtml(maxSalePrice)}</strong>
+                </div>
+                ` : ''}
             </div>
         </div>
         <h4 class="craft-detail-section-title">Plan</h4>
