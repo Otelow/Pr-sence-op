@@ -31,7 +31,9 @@ function startServer(client, getState) {
     app.use(express.static(path.join(__dirname, 'public'), {
         maxAge: config.isProduction || config.isRailway ? '1h' : 0,
         setHeaders: (res, filePath) => {
-            if (/\.(png|jpe?g|webp|gif|svg|ico)$/i.test(filePath)) {
+            if (/\.(html|js|css)$/i.test(filePath)) {
+                res.setHeader('Cache-Control', 'no-cache');
+            } else if (/\.(png|jpe?g|webp|gif|svg|ico)$/i.test(filePath)) {
                 res.setHeader('Cache-Control', 'public, max-age=604800');
             }
         },
