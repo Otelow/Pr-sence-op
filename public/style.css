@@ -8417,6 +8417,13 @@ body {
     line-height: 1.45;
 }
 
+.mw-price-limit-hint {
+    margin: 8px 0 0;
+    color: #fca5a5;
+    font-size: 12px;
+    font-weight: 700;
+}
+
 .mw-form-actions {
     display: flex;
     justify-content: flex-end;

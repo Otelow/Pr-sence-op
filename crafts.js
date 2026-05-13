@@ -516,6 +516,13 @@ function getWeapon(id) {
     return jsonData.weapons.find(w => w.id === id);
 }
 
+function getWeaponByName(name) {
+    const clean = String(name || '').trim().toLowerCase();
+    if (!clean) return null;
+    if (useSQLite) return db.prepare('SELECT * FROM weapons WHERE LOWER(name) = ? LIMIT 1').get(clean) || null;
+    return (jsonData.weapons || []).find(w => String(w.name || '').trim().toLowerCase() === clean) || null;
+}
+
 function insertWeapon(name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) {
     if (useSQLite) {
         const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -998,6 +1005,17 @@ function getCraftableWeapons(options = {}) {
 function getAllMyWeaponNames() {
     if (useSQLite) return db.prepare('SELECT * FROM my_weapon_names ORDER BY name ASC').all();
     return [...(jsonData.my_weapon_names || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+}
+
+function getAllMyWeaponNamesWithPriceLimits() {
+    return getAllMyWeaponNames().map(item => {
+        const adminWeapon = getWeaponByName(item.name);
+        return {
+            ...item,
+            max_sale_price: Number(adminWeapon?.max_sale_price) || 0,
+            sale_price: Number(adminWeapon?.sale_price) || 0,
+        };
+    });
 }
 
 function insertMyWeaponName(name) {
@@ -1888,7 +1906,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     });
 
     app.get('/api/crafts/myweapon-names', requireAuth, (req, res) => {
-        try { res.json({ names: getAllMyWeaponNames() }); }
+        try { res.json({ names: getAllMyWeaponNamesWithPriceLimits() }); }
         catch (e) { res.json({ names: [], error: e.message }); }
     });
 
@@ -2575,6 +2593,17 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         { id: 'le-h', name: 'Le H' },
     ];
 
+    const maxSalePriceError = (max) => `Le prix ne peut pas dépasser le prix maximal autorisé pour cette arme : ${Number(max).toLocaleString('fr-FR')}$.`;
+
+    function validateMyWeaponPriceLimit({ isCrafted21BS, weaponName, weaponId, askingPrice, minPrice }) {
+        if (!isCrafted21BS) return null;
+        const adminWeapon = weaponId ? getWeapon(weaponId) : getWeaponByName(weaponName);
+        const maxSalePrice = Number(adminWeapon?.max_sale_price) || 0;
+        if (maxSalePrice <= 0) return null;
+        const prices = [askingPrice, minPrice].filter(value => value !== null && typeof value !== 'undefined');
+        return prices.some(value => Number(value) > maxSalePrice) ? maxSalePriceError(maxSalePrice) : null;
+    }
+
     function resolveAuthorizedCrafter(craftedById, craftedByName) {
         const rawId = String(craftedById || '').trim().toLowerCase();
         const rawName = String(craftedByName || '').trim().toLowerCase();
@@ -2860,7 +2889,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             let rows;
             if (useSQLite) {
                 rows = db.prepare(`
-                    SELECT r.*, w.name as weapon_name
+                    SELECT r.*, w.name as weapon_name, w.max_sale_price as max_sale_price
                     FROM craft_requests r
                     JOIN weapons w ON r.weapon_id = w.id
                     WHERE r.user_id = ?
@@ -2873,7 +2902,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     .filter(r => r.user_id === userId && r.status === 'crafted' && String(r.serial_number || '').trim())
                     .map(r => {
                         const w = (jsonData.weapons || []).find(weapon => Number(weapon.id) === Number(r.weapon_id));
-                        return { ...r, weapon_name: w ? w.name : 'Arme inconnue' };
+                        return { ...r, weapon_name: w ? w.name : 'Arme inconnue', max_sale_price: Number(w?.max_sale_price) || 0 };
                     })
                     .sort((a, b) => (b.craft_date || b.created_at || 0) - (a.craft_date || a.created_at || 0));
             }
@@ -2884,6 +2913,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     user_id: r.user_id,
                     user_name: r.user_name,
                     weapon_name: r.weapon_name,
+                    max_sale_price: Number(r.max_sale_price) || 0,
                     serial_number: r.serial_number,
                     craft_date: r.craft_date,
                     crafted_by_id: r.crafted_by_id,
@@ -2979,6 +3009,14 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             const askingPrice = parseInt(asking_price) || null;
             const minPrice = parseInt(min_price) || null;
+            const priceLimitError = validateMyWeaponPriceLimit({
+                isCrafted21BS,
+                weaponName,
+                weaponId: linkedCraftRequest?.weapon_id || null,
+                askingPrice,
+                minPrice,
+            });
+            if (priceLimitError) return res.status(400).json({ error: priceLimitError });
             const craftedById = linkedCraftRequest?.crafted_by_id || (isCrafted21BS ? authorizedCrafter.id : null);
             const craftedByName = linkedCraftRequest?.crafted_by_name || (isCrafted21BS ? authorizedCrafter.name : null);
             const batchId = `mw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -3084,6 +3122,14 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             };
             const askingPrice = parseOptionalAmount(req.body.asking_price);
             const minPrice = parseOptionalAmount(req.body.min_price);
+            const priceLimitError = validateMyWeaponPriceLimit({
+                isCrafted21BS: isCrafted,
+                weaponName,
+                weaponId: existing.craft_request_id ? getRequest(existing.craft_request_id)?.weapon_id : null,
+                askingPrice,
+                minPrice,
+            });
+            if (priceLimitError) return res.status(400).json({ error: priceLimitError });
             const nextIsSold = req.body.is_sold === true || req.body.is_sold === 1 || req.body.is_sold === '1' || req.body.is_sold === 'true';
             if (nextIsSold && !canManageAny) {
                 return res.status(403).json({ error: 'Utilise le bouton Marquer vendu pour declarer une vente' });

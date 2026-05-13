@@ -3608,6 +3608,7 @@ async function openCraftListingFromBoard(requestId) {
     updateMwSerialFields();
     const serialInput = document.querySelector('.mw-serial-input');
     if (serialInput) serialInput.value = request.serial_number || '';
+    updateMwMaxSalePriceHint();
     document.querySelector('.myweapons-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     document.getElementById('mwAskingPrice')?.focus();
 }
@@ -4121,6 +4122,7 @@ let myWeaponsSubmitInFlight = false;
 let myWeaponsMarkSoldInFlight = false;
 let myWeaponsEditInFlight = false;
 let myWeaponsSearchQuery = '';
+let myWeaponsActiveMaxSalePrice = 0;
 const myWeaponsAuthorizedCrafters = [
     { id: 'otelow', name: 'Otelow' },
     { id: 'ney', name: 'Ney' },
@@ -4129,6 +4131,7 @@ const myWeaponsAuthorizedCrafters = [
 
 async function initMyWeaponsTab() {
     bindMyWeaponsSearch();
+    bindMyWeaponsPriceLimit();
     if (!organizationsCache || organizationsCache.length === 0) {
         await loadOrganizations();
     }
@@ -4145,6 +4148,15 @@ async function initMyWeaponsTab() {
     }
     await loadMyWeapons();
     renderMyWeapons();
+}
+
+function bindMyWeaponsPriceLimit() {
+    ['mwAskingPrice', 'mwMinPrice'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input || input.dataset.priceLimitBound === '1') return;
+        input.addEventListener('input', () => updateMwMaxSalePriceHint());
+        input.dataset.priceLimitBound = '1';
+    });
 }
 
 function bindMyWeaponsSearch() {
@@ -4224,12 +4236,61 @@ function populateMyWeaponNameSelect() {
     }
     select.innerHTML = '<option value="">— Choisir une arme —</option>' +
         myWeaponNamesCache
-            .map(w => `<option value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`)
+            .map(w => `<option value="${escapeHtml(w.name)}" data-max-sale-price="${Number(w.max_sale_price) || 0}">${escapeHtml(w.name)}</option>`)
             .join('');
     if (previousValue && myWeaponNamesCache.some(w => String(w.name) === previousValue)) {
         select.value = previousValue;
     }
-    select.onchange = () => updateMwSerialFields();
+    select.onchange = () => {
+        updateMwSerialFields();
+        updateMwMaxSalePriceHint();
+    };
+}
+
+function formatMwMoney(amount) {
+    return `${Number(amount || 0).toLocaleString('fr-FR')}$`;
+}
+
+function getSelectedMyWeaponMaxSalePrice() {
+    const linkedCraft = myWeaponsAvailableCraftsCache.find(c => String(c.id) === String(myWeaponsSelectedCraftRequestId || ''));
+    if (linkedCraft) return Number(linkedCraft.max_sale_price) || 0;
+    const select = document.getElementById('mwName');
+    const optionMax = Number(select?.selectedOptions?.[0]?.dataset?.maxSalePrice) || 0;
+    if (optionMax > 0) return optionMax;
+    const selectedName = String(select?.value || '').toLowerCase();
+    const weapon = myWeaponNamesCache.find(w => String(w.name || '').toLowerCase() === selectedName);
+    return Number(weapon?.max_sale_price) || 0;
+}
+
+function updateMwMaxSalePriceHint() {
+    const hint = document.getElementById('mwMaxSalePriceHint');
+    const isCrafted = document.querySelector('input[name="mwOrigin"]:checked')?.value === 'crafted';
+    const maxSalePrice = isCrafted ? getSelectedMyWeaponMaxSalePrice() : 0;
+    myWeaponsActiveMaxSalePrice = maxSalePrice;
+    if (!hint) return;
+    if (maxSalePrice > 0) {
+        hint.textContent = `Prix maximal autorisé : ${formatMwMoney(maxSalePrice)}`;
+        hint.style.display = 'block';
+    } else {
+        hint.textContent = '';
+        hint.style.display = 'none';
+    }
+}
+
+function validateMwMaxSalePrice(askingPrice, minPrice) {
+    const isCrafted = document.querySelector('input[name="mwOrigin"]:checked')?.value === 'crafted';
+    if (!isCrafted) return true;
+    const maxSalePrice = getSelectedMyWeaponMaxSalePrice();
+    if (!maxSalePrice) return true;
+    const prices = [askingPrice, minPrice]
+        .map(value => parseInt(value, 10))
+        .filter(value => Number.isFinite(value));
+    if (prices.some(value => value > maxSalePrice)) {
+        toast(`Le prix ne peut pas dépasser le prix maximal autorisé pour cette arme : ${formatMwMoney(maxSalePrice)}.`, 'error');
+        updateMwMaxSalePriceHint();
+        return false;
+    }
+    return true;
 }
 
 function populateMyWeaponsAvailableCraftsSelect(preferredValue = null) {
@@ -4257,6 +4318,7 @@ function resetMwLinkedCraftFields(clearPrefill = false) {
     const qty = document.getElementById('mwQuantity');
     if (qty) qty.value = '1';
     updateMwSerialFields();
+    updateMwMaxSalePriceHint();
     document.querySelectorAll('.mw-serial-input').forEach(input => { input.value = ''; });
 }
 
@@ -4295,6 +4357,7 @@ function selectMwLinkedCraft() {
     updateMwSerialFields();
     const serialInput = document.querySelector('.mw-serial-input');
     if (serialInput) serialInput.value = craft.serial_number || '';
+    updateMwMaxSalePriceHint();
 }
 
 function getMwQuantity() {
@@ -4357,6 +4420,7 @@ function toggleMwCrafted() {
     }
     if (serialLabel) serialLabel.textContent = crafted ? 'N° de série *' : 'N° de série (optionnel)';
     updateMwSerialFields();
+    updateMwMaxSalePriceHint();
 }
 
 function populateMyWeaponsMemberSelects() {
@@ -4421,6 +4485,8 @@ async function submitMyWeapon() {
         toast(`❌ Renseigne ${quantity} N° de série distinct${quantity > 1 ? 's' : ''}`, 'error');
         return;
     }
+
+    if (!validateMwMaxSalePrice(asking_price, min_price)) return;
 
     myWeaponsSubmitInFlight = true;
     const submitBtn = document.getElementById('mwSubmitBtn');
