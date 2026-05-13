@@ -56,6 +56,7 @@ const CONFIG = {
         // Rôles protégés : pas de kick, pas de relance accueil, pas d'exclusion
         PROTECTED_ROLES: [
             '1489336767097208922',
+            '1485278988598509759',
             '1495448653945634987',
             '1495464200443662366',
             '1497005826114846741',
@@ -165,6 +166,29 @@ const botStartTime = Date.now(); // Pour le fallback welcome : ne traiter que le
 
 // Persistance du welcomeState pour survivre aux redéploiements
 const WELCOME_STATE_FILE = dataFile('welcome_state.json');
+
+function hasProtectedRole(member) {
+    return CONFIG.ROLES.PROTECTED_ROLES.some(roleId => member.roles.cache.has(roleId));
+}
+
+function hasRealRole(member) {
+    return member.roles.cache.some(role => role.id !== member.guild.id);
+}
+
+async function excludeMemberWithoutUsefulRole(member, reason = 'Aucun rôle utile') {
+    if (!member || member.user.bot) return false;
+    if (hasProtectedRole(member) || hasRealRole(member)) return false;
+
+    try {
+        await member.send(`Salut, tu viens d'être exclu du serveur **21 Block Savage** ${CONFIG.EMOJIS.BS21} car tu n'as aucun rôle actif.`).catch(() => {});
+        await member.kick(reason);
+        console.log(`🚪 ${member.user.tag} exclu : aucun rôle réel`);
+        return true;
+    } catch (e) {
+        console.error(`❌ Exclusion impossible pour ${member.user.tag}:`, e.message);
+        return false;
+    }
+}
 
 function saveWelcomeState() {
     try {
@@ -806,6 +830,8 @@ client.once('ready', async () => {
 // NOUVEAU MEMBRE
 // ==========================================
 client.on('guildMemberAdd', async (member) => {
+    if (member.user.bot) return;
+
     // Auto-attribution de rôles spécifiques (pour des utilisateurs précis listés dans AUTO_ROLE_USERS)
     const autoRoleId = CONFIG.AUTO_ROLE_USERS[member.id];
     if (autoRoleId) {
@@ -830,8 +856,13 @@ client.on('guildMemberAdd', async (member) => {
         return;
     }
 
-    // Pour tous les autres : ne rien faire (procédure d'accueil désactivée)
-    console.log(`👋 ${member.user.tag} a rejoint — aucune action automatique`);
+    if (hasProtectedRole(member)) {
+        console.log(`ROLE PROTEGE: ${member.user.tag} a rejoint - accueil ignore`);
+        return;
+    }
+
+    console.log(`WELCOME: ${member.user.tag} a rejoint - lancement de la procedure d'accueil`);
+    await startWelcomeFlow(member);
 });
 
 // ==========================================
@@ -861,6 +892,10 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     }
 
     if (roleRemovalProcessing.has(newMember.id) || welcomeState.has(newMember.id)) return;
+
+    if (await excludeMemberWithoutUsefulRole(newMember, 'Aucun role reel')) {
+        return;
+    }
 
     // ─── Détecter le retrait d'un des 3 rôles d'accueil ────
     const ACCUEIL_ROLES = [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_2, CONFIG.ROLES.MEMBRE_3];
@@ -987,7 +1022,7 @@ async function runWelcomeStep(channel, guild, member, step) {
 
         if (step < 4) return runWelcomeStep(channel, guild, member, step + 1);
 
-        const welcomeMsg = await channel.send(`${member} Très bien, bienvenu à toi jeune **21 Block Savage** ! ${CONFIG.EMOJIS.BS21}`);
+        const welcomeMsg = await channel.send(`${member} Très bien, bienvenu à toi jeune **21 Block Savage** ! Pense à te renommer dans les 10 minutes ! ${CONFIG.EMOJIS.BS21}`);
 
         try {
             const fm = await guild.members.fetch(userId);
@@ -1153,7 +1188,7 @@ async function handleWelcomeReactionFallback(reaction, user, state) {
     }
 
     // Étape 4 validée → donner les rôles
-    const welcomeMsg = await channel.send(`${member} Très bien, bienvenu à toi jeune **21 Block Savage** ! ${CONFIG.EMOJIS.BS21}`);
+    const welcomeMsg = await channel.send(`${member} Très bien, bienvenu à toi jeune **21 Block Savage** ! Pense à te renommer dans les 10 minutes ! ${CONFIG.EMOJIS.BS21}`);
 
     try {
         for (const rId of [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_2, CONFIG.ROLES.MEMBRE_3]) {
