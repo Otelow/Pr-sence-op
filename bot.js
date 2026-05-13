@@ -180,7 +180,6 @@ async function excludeMemberWithoutUsefulRole(member, reason = 'Aucun rôle util
     if (hasProtectedRole(member) || hasRealRole(member)) return false;
 
     try {
-        await member.send(`Salut, tu viens d'être exclu du serveur **21 Block Savage** ${CONFIG.EMOJIS.BS21} car tu n'as aucun rôle actif.`).catch(() => {});
         await member.kick(reason);
         console.log(`🚪 ${member.user.tag} exclu : aucun rôle réel`);
         return true;
