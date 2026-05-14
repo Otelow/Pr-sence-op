@@ -9852,3 +9852,80 @@ body:has(#impersonateBanner[style*="flex"]) {
     55% { left: 130%; }
     100% { left: 130%; }
 }
+
+/* Effet texte ondulé visible sur l'avertissement et les badges EN VENTE */
+.wave-text-effect {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0;
+}
+
+.wave-text-effect .wave-letter {
+    display: inline-block;
+    animation: waveTextBounce 1.35s ease-in-out infinite;
+    animation-delay: calc(var(--wave-index, 0) * 0.045s);
+    will-change: transform, color, text-shadow;
+}
+
+.wave-text-effect .wave-space {
+    width: 0.32em;
+}
+
+.warning-wave-text {
+    color: var(--text);
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.warning-wave-text .wave-letter {
+    text-shadow: 0 0 10px rgba(255, 184, 77, 0.28);
+}
+
+.sale-badge-wave {
+    color: inherit;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+}
+
+.sale-badge-wave .wave-letter {
+    text-shadow: 0 0 10px rgba(74, 222, 128, 0.45);
+}
+
+@keyframes waveTextBounce {
+    0%, 100% {
+        transform: translateY(0);
+        text-shadow: inherit;
+    }
+
+    35% {
+        transform: translateY(-4px);
+        color: #ffd166;
+        text-shadow: 0 0 16px rgba(255, 184, 77, 0.75);
+    }
+
+    70% {
+        transform: translateY(2px);
+    }
+}
+
+.sale-badge-wave .wave-letter {
+    animation-name: saleWaveTextBounce;
+}
+
+@keyframes saleWaveTextBounce {
+    0%, 100% {
+        transform: translateY(0);
+        text-shadow: 0 0 8px rgba(74, 222, 128, 0.35);
+    }
+
+    35% {
+        transform: translateY(-4px);
+        color: #bbf7d0;
+        text-shadow: 0 0 18px rgba(74, 222, 128, 0.9);
+    }
+
+    70% {
+        transform: translateY(2px);
+    }
+}

@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.body.appendChild(modal);
         }
     });
+    applyWaveTextEffects();
 
     await loadUser();
     setupIdleLogoutTimer();
@@ -42,6 +43,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshAll();
     refreshTimer = setInterval(refreshAll, 15_000);
 });
+
+function renderWaveTextSpans(text) {
+    return Array.from(String(text || '')).map((char, index) => {
+        if (char === ' ') return '<span class="wave-letter wave-space">&nbsp;</span>';
+        return `<span class="wave-letter" style="--wave-index:${index}">${escapeHtml(char)}</span>`;
+    }).join('');
+}
+
+function applyWaveTextEffects(root = document) {
+    root.querySelectorAll('.js-wave-text').forEach(el => {
+        if (el.dataset.waveReady === '1') return;
+        const text = el.dataset.waveText || el.textContent || '';
+        el.innerHTML = renderWaveTextSpans(text);
+        el.dataset.waveReady = '1';
+    });
+}
 
 async function loadPermissions() {
     try {
@@ -4749,7 +4766,7 @@ function renderMyWeapons() {
                 <div class="myweapons-item-body">
                     <div class="myweapons-item-name">
                         ${escapeHtml(w.weapon_name)}
-                        <span class="myweapons-tag-status ${isSold ? 'sold' : 'available'}">${isSold ? 'VENDUE' : 'EN VENTE'}</span>
+                        <span class="myweapons-tag-status ${isSold ? 'sold' : 'available'}">${isSold ? 'VENDUE' : `<span class="wave-text-effect sale-badge-wave">${renderWaveTextSpans('EN VENTE')}</span>`}</span>
                         ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
                         <span class="myweapons-tag-stock">${availableQty}/${totalQty}</span>
                     </div>
