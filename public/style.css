@@ -9780,6 +9780,13 @@ body:has(#impersonateBanner[style*="flex"]) {
     z-index: 2 !important;
 }
 
+.dynamic-warning-effect .warning-content,
+.dynamic-warning-effect .warning-content *,
+.dynamic-warning-effect .banner-icon {
+    animation: none !important;
+    transform: none !important;
+}
+
 @keyframes dynamicWarningPulse {
     0%, 100% {
         box-shadow:
