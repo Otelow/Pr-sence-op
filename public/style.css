@@ -405,12 +405,19 @@ html, body {
 }
 
 .topbar {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     margin-bottom: 32px;
     padding-bottom: 24px;
     border-bottom: 1px solid var(--border);
+}
+
+.topbar-left {
+    grid-column: 2;
+    justify-self: center;
+    text-align: center;
+    min-width: 0;
 }
 
 .page-title {
@@ -430,6 +437,8 @@ html, body {
 }
 
 .topbar-right {
+    grid-column: 3;
+    justify-self: end;
     display: flex;
     align-items: center;
     gap: 16px;
@@ -5798,6 +5807,15 @@ body {
     max-width: 500px;
 }
 
+#adminTab-saleNames .admin-org-form {
+    max-width: none;
+    flex-wrap: wrap;
+}
+
+#adminTab-saleNames .admin-org-form .comm-input {
+    flex: 1 1 180px;
+}
+
 .admin-orgs-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -5830,6 +5848,7 @@ body {
     background: rgba(20, 20, 24, 0.55);
     border: 0.5px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
+    flex-wrap: wrap;
 }
 
 .admin-myweapon-name-row strong {
@@ -5837,6 +5856,28 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.admin-myweapon-name-input {
+    flex: 1 1 220px;
+    min-width: 180px;
+}
+
+.admin-myweapon-price-input {
+    flex: 0 1 170px;
+    min-width: 145px;
+}
+
+.admin-myweapon-price-source {
+    flex: 1 1 180px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.admin-myweapon-name-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 /* ============================================================
@@ -8697,9 +8738,9 @@ body:has(#impersonateBanner[style*="flex"]) {
     padding: 18px 24px;
     border-radius: 16px;
     background:
-        linear-gradient(120deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 140, 0, 0.08) 50%, rgba(255, 255, 255, 0.04) 100%),
-        rgba(20, 20, 24, 0.7);
-    border: 0.5px solid rgba(255, 140, 0, 0.3);
+        linear-gradient(120deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 140, 0, 0.15) 50%, rgba(255, 255, 255, 0.055) 100%),
+        rgba(24, 18, 14, 0.84);
+    border: 1px solid rgba(255, 170, 54, 0.52);
     backdrop-filter: blur(20px) saturate(160%);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
     color: var(--text);
@@ -8710,7 +8751,8 @@ body:has(#impersonateBanner[style*="flex"]) {
     box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 0 24px rgba(255, 140, 0, 0.15);
+        0 0 34px rgba(255, 140, 0, 0.24),
+        inset 4px 0 0 rgba(255, 184, 77, 0.75);
     animation: bannerPulse 4s ease-in-out infinite;
 }
 
@@ -8724,9 +8766,9 @@ body:has(#impersonateBanner[style*="flex"]) {
     background: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(255, 255, 255, 0.08) 30%,
-        rgba(255, 255, 255, 0.18) 50%,
-        rgba(255, 255, 255, 0.08) 70%,
+        rgba(255, 184, 77, 0.12) 30%,
+        rgba(255, 214, 128, 0.28) 50%,
+        rgba(255, 184, 77, 0.12) 70%,
         transparent 100%
     );
     animation: shimmerWave 3.5s ease-in-out infinite;
@@ -8743,20 +8785,22 @@ body:has(#impersonateBanner[style*="flex"]) {
         box-shadow:
             0 8px 32px rgba(0, 0, 0, 0.4),
             inset 0 1px 0 rgba(255, 255, 255, 0.08),
-            0 0 24px rgba(255, 140, 0, 0.15);
+            0 0 34px rgba(255, 140, 0, 0.24),
+            inset 4px 0 0 rgba(255, 184, 77, 0.75);
     }
     50% {
         box-shadow:
             0 8px 32px rgba(0, 0, 0, 0.4),
             inset 0 1px 0 rgba(255, 255, 255, 0.12),
-            0 0 36px rgba(255, 140, 0, 0.3);
+            0 0 52px rgba(255, 140, 0, 0.42),
+            inset 4px 0 0 rgba(255, 214, 128, 0.95);
     }
 }
 
 .myweapons-banner-shimmer .banner-icon {
-    font-size: 32px;
+    font-size: 36px;
     flex-shrink: 0;
-    filter: drop-shadow(0 0 8px rgba(255, 140, 0, 0.4));
+    filter: drop-shadow(0 0 12px rgba(255, 184, 77, 0.68));
     animation: iconBob 2s ease-in-out infinite;
 }
 
@@ -8847,8 +8891,14 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+    .myweapons-banner-shimmer,
+    .myweapons-banner-shimmer::before,
+    .myweapons-banner-shimmer .banner-icon,
     .myweapons-item.mw-available-row::after {
         animation: none;
+    }
+
+    .myweapons-item.mw-available-row::after {
         opacity: 0;
     }
 }
@@ -9502,6 +9552,21 @@ body:has(#impersonateBanner[style*="flex"]) {
         left: 0 !important;
         padding-left: 12px !important;
         padding-right: 12px !important;
+    }
+
+    .topbar {
+        grid-template-columns: 1fr;
+        row-gap: 14px;
+        justify-items: center;
+    }
+
+    .topbar-left,
+    .topbar-right {
+        grid-column: 1;
+    }
+
+    .topbar-right {
+        justify-self: center;
     }
 
     .craft-catalog-toolbar,

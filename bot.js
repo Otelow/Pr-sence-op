@@ -638,6 +638,7 @@ async function registerCommands() {
         new SlashCommandBuilder().setName('traitement-weed').setDescription('🚨 Traitement de la weed'),
         new SlashCommandBuilder().setName('yellowjack').setDescription('🚨 Rassemblement Yellow Jack'),
         new SlashCommandBuilder().setName('megamall').setDescription('🚨 Rassemblement parking Mega Mall'),
+        new SlashCommandBuilder().setName('parking5').setDescription('🚨 Rassemblement Parking 5 Madrazo'),
         new SlashCommandBuilder().setName('ile').setDescription('🚨 Rassemblement près de l\'Ile'),
         new SlashCommandBuilder().setName('trash').setDescription('🚨 Avertissement trash'),
         new SlashCommandBuilder().setName('radio').setDescription('📻 Nouvelle fréquence radio'),
@@ -1270,6 +1271,7 @@ client.on('interactionCreate', async (interaction) => {
         case 'traitement-weed': return handleSimpleAlert(interaction, `🚨 On va aller sur le traitement de la weed ! Branchez-vous sur la radio ! ${CONFIG.EMOJIS.BS21}`);
         case 'yellowjack': return handleSimpleAlert(interaction, `<@&${CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir à côté du Yellow Jack ${CONFIG.EMOJIS.BS21}`, true);
         case 'megamall': return handleSimpleAlert(interaction, `<@&${CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir au parking Mega Mall ${CONFIG.EMOJIS.BS21}`, true);
+        case 'parking5': return handleSimpleAlert(interaction, `<@&${CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de vous rendre au Parking 5 (Madrazo) le plus rapidement possible.`, true);
         case 'ile': return handleSimpleAlert(interaction, `<@&${CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir à côté de l'Ile ${CONFIG.EMOJIS.BS21}`, true);
         case 'trash': return handleSimpleAlert(interaction, `🚨 Celui qui trash sera ban sans sommation ! ${CONFIG.EMOJIS.BS21}`);
         case 'radio': return handleRadio(interaction);

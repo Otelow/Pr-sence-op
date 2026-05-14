@@ -544,8 +544,14 @@ function renderAdminMyWeaponNames() {
     }
     list.innerHTML = adminMyWeaponNames.map(item => `
         <div class="admin-myweapon-name-row">
-            <strong>${escapeHtml(item.name)}</strong>
-            <button class="btn-danger btn-small" onclick="deleteMyWeaponNameFromAdmin(${item.id})">Supprimer</button>
+            <input type="text" class="comm-input admin-myweapon-name-input" id="myWeaponName-${item.id}" value="${escapeHtml(item.name)}">
+            <input type="number" class="comm-input admin-myweapon-price-input" id="myWeaponSalePrice-${item.id}" min="0" value="${Number(item.sale_price) || 0}" placeholder="Prix vente">
+            <input type="number" class="comm-input admin-myweapon-price-input" id="myWeaponMaxSalePrice-${item.id}" min="0" value="${Number(item.max_sale_price) || 0}" placeholder="Prix maximal">
+            <span class="admin-myweapon-price-source">${item.price_source === 'craft_catalog' ? 'Prix catalogue craftable prioritaires si renseignés' : 'Prix Vos Armes'}</span>
+            <div class="admin-myweapon-name-actions">
+                <button class="btn-secondary btn-small" onclick="saveMyWeaponNameFromAdmin(${item.id})">Enregistrer</button>
+                <button class="btn-danger btn-small" onclick="deleteMyWeaponNameFromAdmin(${item.id})">Supprimer</button>
+            </div>
         </div>
     `).join('');
 }
@@ -553,23 +559,54 @@ function renderAdminMyWeaponNames() {
 async function addMyWeaponNameFromAdmin() {
     const input = document.getElementById('newMyWeaponName');
     const name = input?.value?.trim();
+    const saleInput = document.getElementById('newMyWeaponSalePrice');
+    const maxSaleInput = document.getElementById('newMyWeaponMaxSalePrice');
     if (!name) { toast('❌ Nom requis', 'error'); return; }
     try {
         const res = await fetch('/api/crafts/myweapon-names', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
+            body: JSON.stringify({
+                name,
+                sale_price: saleInput?.value || 0,
+                max_sale_price: maxSaleInput?.value || 0
+            })
         });
         const data = await res.json();
         if (res.ok) {
             toast('✅ Nom ajouté');
             input.value = '';
+            if (saleInput) saleInput.value = '';
+            if (maxSaleInput) maxSaleInput.value = '';
             await loadAdminMyWeaponNames();
         } else {
             toast(`❌ ${data.error}`, 'error');
         }
     } catch (e) {
         toast(`❌ ${e.message}`, 'error');
+    }
+}
+
+async function saveMyWeaponNameFromAdmin(id) {
+    const name = document.getElementById(`myWeaponName-${id}`)?.value?.trim();
+    const salePrice = document.getElementById(`myWeaponSalePrice-${id}`)?.value || 0;
+    const maxSalePrice = document.getElementById(`myWeaponMaxSalePrice-${id}`)?.value || 0;
+    if (!name) { toast('Nom requis', 'error'); return; }
+    try {
+        const res = await fetch(`/api/crafts/myweapon-names/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, sale_price: salePrice, max_sale_price: maxSalePrice })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            toast('Nom/prix enregistrés');
+            await loadAdminMyWeaponNames();
+        } else {
+            toast(`Erreur : ${data.error}`, 'error');
+        }
+    } catch (e) {
+        toast(`Erreur : ${e.message}`, 'error');
     }
 }
 
@@ -587,6 +624,7 @@ async function deleteMyWeaponNameFromAdmin(id) {
 }
 
 window.addMyWeaponNameFromAdmin = addMyWeaponNameFromAdmin;
+window.saveMyWeaponNameFromAdmin = saveMyWeaponNameFromAdmin;
 window.deleteMyWeaponNameFromAdmin = deleteMyWeaponNameFromAdmin;
 
 // ─── INGRÉDIENTS ─────────────────────

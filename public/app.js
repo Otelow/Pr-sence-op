@@ -4314,7 +4314,7 @@ function populateMyWeaponNameSelect() {
     }
     select.innerHTML = '<option value="">— Choisir une arme —</option>' +
         myWeaponNamesCache
-            .map(w => `<option value="${escapeHtml(w.name)}" data-max-sale-price="${Number(w.max_sale_price) || 0}">${escapeHtml(w.name)}</option>`)
+            .map(w => `<option value="${escapeHtml(w.name)}" data-sale-price="${Number(w.sale_price) || 0}" data-max-sale-price="${Number(w.max_sale_price) || 0}">${escapeHtml(w.name)}</option>`)
             .join('');
     if (previousValue && myWeaponNamesCache.some(w => String(w.name) === previousValue)) {
         select.value = previousValue;
@@ -4340,14 +4340,30 @@ function getSelectedMyWeaponMaxSalePrice() {
     return Number(weapon?.max_sale_price) || 0;
 }
 
+function getSelectedMyWeaponSalePrice() {
+    const select = document.getElementById('mwName');
+    const optionSale = Number(select?.selectedOptions?.[0]?.dataset?.salePrice) || 0;
+    if (optionSale > 0) return optionSale;
+    const selectedName = String(select?.value || '').toLowerCase();
+    const weapon = myWeaponNamesCache.find(w => String(w.name || '').toLowerCase() === selectedName);
+    return Number(weapon?.sale_price) || 0;
+}
+
 function updateMwMaxSalePriceHint() {
     const hint = document.getElementById('mwMaxSalePriceHint');
-    const isCrafted = document.querySelector('input[name="mwOrigin"]:checked')?.value === 'crafted';
-    const maxSalePrice = isCrafted ? getSelectedMyWeaponMaxSalePrice() : 0;
+    const salePrice = getSelectedMyWeaponSalePrice();
+    const maxSalePrice = getSelectedMyWeaponMaxSalePrice();
     myWeaponsActiveMaxSalePrice = maxSalePrice;
+    const askingInput = document.getElementById('mwAskingPrice');
+    if (salePrice > 0 && askingInput && !String(askingInput.value || '').trim()) {
+        askingInput.value = salePrice;
+    }
     if (!hint) return;
     if (maxSalePrice > 0) {
-        hint.textContent = `Prix maximal autorisé : ${formatMwMoney(maxSalePrice)}`;
+        hint.textContent = `${salePrice > 0 ? `Prix conseillé : ${formatMwMoney(salePrice)} • ` : ''}Prix maximal autorisé : ${formatMwMoney(maxSalePrice)}`;
+        hint.style.display = 'block';
+    } else if (salePrice > 0) {
+        hint.textContent = `Prix conseillé : ${formatMwMoney(salePrice)}`;
         hint.style.display = 'block';
     } else {
         hint.textContent = '';
@@ -4356,8 +4372,6 @@ function updateMwMaxSalePriceHint() {
 }
 
 function validateMwMaxSalePrice(askingPrice, minPrice) {
-    const isCrafted = document.querySelector('input[name="mwOrigin"]:checked')?.value === 'crafted';
-    if (!isCrafted) return true;
     const maxSalePrice = getSelectedMyWeaponMaxSalePrice();
     if (!maxSalePrice) return true;
     const prices = [askingPrice, minPrice]

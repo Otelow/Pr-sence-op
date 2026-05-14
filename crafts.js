@@ -202,6 +202,8 @@ function initDB() {
                 CREATE TABLE IF NOT EXISTS my_weapon_names (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL UNIQUE,
+                    sale_price INTEGER DEFAULT 0,
+                    max_sale_price INTEGER DEFAULT 0,
                     created_at INTEGER DEFAULT (strftime('%s','now'))
                 );
                 CREATE TABLE IF NOT EXISTS organizations (
@@ -313,6 +315,8 @@ function initDB() {
             try { db.exec(`ALTER TABLE weapons ADD COLUMN requires_plan INTEGER DEFAULT 0`); } catch {}
             try { db.exec(`ALTER TABLE weapons ADD COLUMN sale_price INTEGER DEFAULT 0`); } catch {}
             try { db.exec(`ALTER TABLE weapons ADD COLUMN max_sale_price INTEGER DEFAULT 0`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapon_names ADD COLUMN sale_price INTEGER DEFAULT 0`); } catch {}
+            try { db.exec(`ALTER TABLE my_weapon_names ADD COLUMN max_sale_price INTEGER DEFAULT 0`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN user_avatar TEXT`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN asking_price INTEGER`); } catch {}
             try { db.exec(`ALTER TABLE my_weapons ADD COLUMN min_price INTEGER`); } catch {}
@@ -497,6 +501,8 @@ function seedMyWeaponNamesFromWeapons() {
             jsonData.my_weapon_names.push({
                 id: jsonData.counters.my_weapon_names,
                 name,
+                sale_price: 0,
+                max_sale_price: 0,
                 created_at: Math.floor(Date.now() / 1000),
             });
         }
@@ -1007,31 +1013,69 @@ function getAllMyWeaponNames() {
     return [...(jsonData.my_weapon_names || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
+function getMyWeaponNameByName(name) {
+    const clean = String(name || '').trim().toLowerCase();
+    if (!clean) return null;
+    if (useSQLite) return db.prepare('SELECT * FROM my_weapon_names WHERE LOWER(name) = ? LIMIT 1').get(clean) || null;
+    return (jsonData.my_weapon_names || []).find(w => String(w.name || '').trim().toLowerCase() === clean) || null;
+}
+
 function getAllMyWeaponNamesWithPriceLimits() {
     return getAllMyWeaponNames().map(item => {
         const adminWeapon = getWeaponByName(item.name);
+        const weaponSalePrice = Number(adminWeapon?.sale_price) || 0;
+        const weaponMaxSalePrice = Number(adminWeapon?.max_sale_price) || 0;
         return {
             ...item,
-            max_sale_price: Number(adminWeapon?.max_sale_price) || 0,
-            sale_price: Number(adminWeapon?.sale_price) || 0,
+            max_sale_price: weaponMaxSalePrice > 0 ? weaponMaxSalePrice : (Number(item.max_sale_price) || 0),
+            sale_price: weaponSalePrice > 0 ? weaponSalePrice : (Number(item.sale_price) || 0),
+            price_source: adminWeapon ? 'craft_catalog' : 'my_weapon_names',
         };
     });
 }
 
-function insertMyWeaponName(name) {
+function insertMyWeaponName(name, sale_price = 0, max_sale_price = 0) {
     const clean = String(name || '').trim();
     if (!clean) return null;
+    const salePrice = Math.max(0, parseInt(sale_price, 10) || 0);
+    const maxSalePrice = Math.max(0, parseInt(max_sale_price, 10) || 0);
     if (useSQLite) {
-        const r = db.prepare('INSERT OR IGNORE INTO my_weapon_names (name) VALUES (?)').run(clean);
+        const r = db.prepare('INSERT OR IGNORE INTO my_weapon_names (name, sale_price, max_sale_price) VALUES (?, ?, ?)').run(clean, salePrice, maxSalePrice);
+        if (!r.changes) {
+            db.prepare('UPDATE my_weapon_names SET sale_price = ?, max_sale_price = ? WHERE LOWER(name) = ?').run(salePrice, maxSalePrice, clean.toLowerCase());
+        }
         return r.lastInsertRowid;
     }
     jsonData.my_weapon_names = jsonData.my_weapon_names || [];
     jsonData.counters.my_weapon_names = jsonData.counters.my_weapon_names || 0;
-    if (jsonData.my_weapon_names.some(w => String(w.name || '').toLowerCase() === clean.toLowerCase())) return null;
+    const existing = jsonData.my_weapon_names.find(w => String(w.name || '').toLowerCase() === clean.toLowerCase());
+    if (existing) {
+        existing.sale_price = salePrice;
+        existing.max_sale_price = maxSalePrice;
+        saveJSON();
+        return existing.id;
+    }
     const id = nextId('my_weapon_names');
-    jsonData.my_weapon_names.push({ id, name: clean, created_at: Math.floor(Date.now() / 1000) });
+    jsonData.my_weapon_names.push({ id, name: clean, sale_price: salePrice, max_sale_price: maxSalePrice, created_at: Math.floor(Date.now() / 1000) });
     saveJSON();
     return id;
+}
+
+function updateMyWeaponName(id, name, sale_price = 0, max_sale_price = 0) {
+    const clean = String(name || '').trim();
+    if (!clean) throw new Error('Nom requis');
+    const salePrice = Math.max(0, parseInt(sale_price, 10) || 0);
+    const maxSalePrice = Math.max(0, parseInt(max_sale_price, 10) || 0);
+    if (useSQLite) {
+        db.prepare('UPDATE my_weapon_names SET name = ?, sale_price = ?, max_sale_price = ? WHERE id = ?').run(clean, salePrice, maxSalePrice, id);
+        return;
+    }
+    const item = (jsonData.my_weapon_names || []).find(w => Number(w.id) === Number(id));
+    if (!item) throw new Error('Nom introuvable');
+    item.name = clean;
+    item.sale_price = salePrice;
+    item.max_sale_price = maxSalePrice;
+    saveJSON();
 }
 
 function deleteMyWeaponName(id) {
@@ -1912,10 +1956,18 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.post('/api/crafts/myweapon-names', requireAdmin, (req, res) => {
         try {
-            const { name } = req.body;
+            const { name, sale_price, max_sale_price } = req.body;
             if (!name || !String(name).trim()) return res.status(400).json({ error: 'Nom requis' });
-            const id = insertMyWeaponName(name);
+            const id = insertMyWeaponName(name, sale_price, max_sale_price);
             res.json({ success: true, id });
+        } catch (e) { res.status(500).json({ error: e.message }); }
+    });
+
+    app.put('/api/crafts/myweapon-names/:id', requireAdmin, (req, res) => {
+        try {
+            const { name, sale_price, max_sale_price } = req.body;
+            updateMyWeaponName(parseInt(req.params.id), name, sale_price, max_sale_price);
+            res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
@@ -2595,10 +2647,11 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     const maxSalePriceError = (max) => `Le prix ne peut pas dépasser le prix maximal autorisé pour cette arme : ${Number(max).toLocaleString('fr-FR')}$.`;
 
-    function validateMyWeaponPriceLimit({ isCrafted21BS, weaponName, weaponId, askingPrice, minPrice }) {
-        if (!isCrafted21BS) return null;
+    function validateMyWeaponPriceLimit({ weaponName, weaponId, askingPrice, minPrice }) {
         const adminWeapon = weaponId ? getWeapon(weaponId) : getWeaponByName(weaponName);
-        const maxSalePrice = Number(adminWeapon?.max_sale_price) || 0;
+        const myWeaponName = getMyWeaponNameByName(weaponName);
+        const adminMaxSalePrice = Number(adminWeapon?.max_sale_price) || 0;
+        const maxSalePrice = adminMaxSalePrice > 0 ? adminMaxSalePrice : (Number(myWeaponName?.max_sale_price) || 0);
         if (maxSalePrice <= 0) return null;
         const prices = [askingPrice, minPrice].filter(value => value !== null && typeof value !== 'undefined');
         return prices.some(value => Number(value) > maxSalePrice) ? maxSalePriceError(maxSalePrice) : null;
