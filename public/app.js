@@ -104,6 +104,7 @@ function setupRealtimeSocket() {
         'craft:status': ['crafts', 'myweapons'],
         'sanction:added': ['sanctions'],
         'reminder:changed': ['commands'],
+        'channel:message': ['channels'],
     };
 
     Object.entries(tabEvents).forEach(([eventName, tabs]) => {

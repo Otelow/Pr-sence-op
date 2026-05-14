@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections sécurité et persistance
 // ==========================================
 // MODULE CRAFTS — DB SQLite
 // MODIFIÉ CHANTIER 3 — 14/05/2026 — images craft protégées par session
@@ -9,7 +10,7 @@
 const path = require('path');
 const fs = require('fs');
 const config = require('./src/shared/config');
-const { ensureDataDirs } = require('./src/shared/database');
+const { ensureDataDirs, createConnection } = require('./src/shared/database');
 const {
     ADMIN_USER_ID,
     ADMIN_ROLE_ID,
@@ -31,7 +32,6 @@ const { registerMyWeaponsRoutes } = require('./src/web/routes/crafts/myWeapons')
 const DATA_DIR = config.paths.data;
 const DB_PATH = config.paths.database;
 const UPLOADS_DIR = config.paths.craftsUploads;
-const Database = require('better-sqlite3');
 let db = null;
 const upload = createCraftUploadMiddleware(UPLOADS_DIR);
 
@@ -72,12 +72,14 @@ function isStockMaterialName(name) {
 const CRAFT_PRODUCTION_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
 const CRAFT_STOCK_RESERVED_STATUSES = ['materials', 'waiting_materials', 'in_progress'];
 
+function parseId(v, max = 2_000_000) {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
+}
+
 function initDB() {
             try {
-            db = new Database(DB_PATH);
-            db.pragma('journal_mode = WAL');
-            db.pragma('foreign_keys = ON');
-            db.pragma('busy_timeout = 5000');
+            db = createConnection(DB_PATH);
             db.exec(`
                 CREATE TABLE IF NOT EXISTS weapons (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1,4 +1,10 @@
+// STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes Vos Armes extraites
+function parseId(v, max = 2_000_000) {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
+}
+
 function registerMyWeaponsRoutes(app, deps) {
     const {
         requireAuth,
@@ -371,7 +377,8 @@ function registerMyWeaponsRoutes(app, deps) {
             const weaponName = matchedWeaponName ? matchedWeaponName.name : requestedWeaponName;
             if (typeof is_crafted === 'undefined') return res.status(400).json({ error: "Origine de l'arme obligatoire" });
             const isCrafted21BS = is_crafted === true || is_crafted === 1 || is_crafted === '1' || is_crafted === 'true';
-            const linkedCraftRequestId = parseInt(craft_request_id, 10) || null;
+            const linkedCraftRequestId = craft_request_id ? parseId(craft_request_id) : null;
+            if (craft_request_id && linkedCraftRequestId === null) return res.status(400).json({ error: 'Demande craft invalide' });
             let linkedCraftRequest = null;
             if (linkedCraftRequestId) {
                 if (!isCrafted21BS) {
@@ -401,7 +408,7 @@ function registerMyWeaponsRoutes(app, deps) {
             if (linkedCraftRequest) {
                 serials = [String(linkedCraftRequest.serial_number).trim()];
             }
-            const requestedQuantity = Math.min(50, Math.max(1, parseInt(quantity, 10) || serials.length || 1));
+            const requestedQuantity = parseId(quantity, 50) || serials.length || 1;
             if (isCrafted21BS && serials.length !== requestedQuantity) {
                 return res.status(400).json({ error: `Renseigne ${requestedQuantity} N° de série distinct${requestedQuantity > 1 ? 's' : ''}` });
             }
@@ -455,7 +462,8 @@ function registerMyWeaponsRoutes(app, deps) {
 
     app.get('/api/crafts/myweapons/:id', requireAuth, (req, res) => {
         try {
-            const id = parseInt(req.params.id, 10);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const existing = getMyWeaponById(id);
             if (!existing) return res.status(404).json({ error: 'Annonce introuvable' });
             const canManageAny = canValidateCraft(req.session.user) || canDeleteMyWeapons(req.session.user);
@@ -473,7 +481,8 @@ function registerMyWeaponsRoutes(app, deps) {
 
     app.put('/api/crafts/myweapons/:id', requireAuth, async (req, res) => {
         try {
-            const id = parseInt(req.params.id, 10);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const existing = getMyWeaponById(id);
             if (!existing) return res.status(404).json({ error: 'Annonce introuvable' });
 
@@ -563,7 +572,8 @@ function registerMyWeaponsRoutes(app, deps) {
     // Marquer comme vendu
     app.patch('/api/crafts/myweapons/:id/sold', requireAuth, async (req, res) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const { sold_to, sold_price, sold_by_id, sold_by_name } = req.body;
             const userId = req.session.user.id;
 
@@ -682,7 +692,8 @@ function registerMyWeaponsRoutes(app, deps) {
 
     app.delete('/api/crafts/myweapons/:id', requireAuth, async (req, res) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const userId = req.session.user.id;
             let existing;
                             existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);

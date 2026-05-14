@@ -1,4 +1,10 @@
+// STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes catalogue/stock craft extraites
+
+function parseId(v, max = 2_000_000) {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
+}
 
 function registerCraftCatalogRoutes(app, deps) {
     const {
@@ -114,7 +120,8 @@ function registerCraftCatalogRoutes(app, deps) {
 
     app.put('/api/crafts/weapons/:id', requireAdmin, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'plan_image', maxCount: 1 }]), (req, res) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const { name, craft_time, craft_price, sale_price, max_sale_price, ingredients, requires_plan } = req.body;
             const existing = getWeapon(id);
             if (!existing) return res.status(404).json({ error: 'Arme introuvable' });
@@ -146,7 +153,8 @@ function registerCraftCatalogRoutes(app, deps) {
 
     app.delete('/api/crafts/weapons/:id', requireAdmin, (req, res) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const existing = getWeapon(id);
             if (existing && existing.image_path) {
                 const p = path.join(uploadsDir, existing.image_path);
@@ -184,7 +192,8 @@ function registerCraftCatalogRoutes(app, deps) {
 
     app.put('/api/crafts/ingredients/:id', requireAdmin, upload.single('image'), (req, res) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const { name } = req.body;
             const existing = getIngredient(id);
             if (!existing) return res.status(404).json({ error: 'Ingrédient introuvable' });
@@ -199,7 +208,8 @@ function registerCraftCatalogRoutes(app, deps) {
 
     app.delete('/api/crafts/ingredients/:id', requireAdmin, (req, res) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const existing = getIngredient(id);
             if (existing && existing.image_path) {
                 const p = path.join(uploadsDir, existing.image_path);
@@ -227,14 +237,18 @@ function registerCraftCatalogRoutes(app, deps) {
     app.put('/api/crafts/myweapon-names/:id', requireAdmin, (req, res) => {
         try {
             const { name, sale_price, max_sale_price } = req.body;
-            updateMyWeaponName(parseInt(req.params.id), name, sale_price, max_sale_price);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
+            updateMyWeaponName(id, name, sale_price, max_sale_price);
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
     app.delete('/api/crafts/myweapon-names/:id', requireAdmin, (req, res) => {
         try {
-            deleteMyWeaponName(parseInt(req.params.id));
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
+            deleteMyWeaponName(id);
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -257,7 +271,12 @@ function registerCraftCatalogRoutes(app, deps) {
     });
 
     app.delete('/api/crafts/organizations/:id', requireAdmin, (req, res) => {
-        try { deleteOrg(parseInt(req.params.id)); res.json({ success: true }); }
+        try {
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
+            deleteOrg(id);
+            res.json({ success: true });
+        }
         catch (e) { res.status(500).json({ error: e.message }); }
     });
 

@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections sécurité et persistance
 const fs = require('fs');
 const path = require('path');
 const config = require('./config');
@@ -29,6 +30,7 @@ function createConnection(databasePath = config.paths.database) {
     const db = new SQLite(resolvedPath);
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
+    db.pragma('busy_timeout = 5000');
     return db;
 }
 

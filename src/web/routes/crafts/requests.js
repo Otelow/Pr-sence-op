@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes demandes craft extraites
 const {
     ADMIN_USER_ID,
@@ -12,6 +13,11 @@ const MYWEAPONS_AUTHORIZED_CRAFTERS = [
     { id: 'ney', name: 'Ney' },
     { id: 'le-h', name: 'Le H' },
 ];
+
+function parseId(v, max = 2_000_000) {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
+}
 
 function resolveAuthorizedCrafter(craftedById, craftedByName) {
     const rawId = String(craftedById || '').trim().toLowerCase();
@@ -370,7 +376,9 @@ function registerCraftRequestRoutes(app, deps) {
                 sold_by_name,
                 free_sale,
             } = req.body;
-            const weapon = getWeapon(parseInt(weapon_id));
+            const weaponId = parseId(weapon_id);
+            if (weaponId === null) return res.status(400).json({ error: 'Arme invalide' });
+            const weapon = getWeapon(weaponId);
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
             if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N° de série obligatoire' });
             if (!craft_date) return res.status(400).json({ error: 'Date craft obligatoire' });
@@ -441,7 +449,8 @@ function registerCraftRequestRoutes(app, deps) {
             if (!canValidateCraft(req.session.user)) {
                 return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const { crafted, serial_number } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
@@ -488,7 +497,8 @@ function registerCraftRequestRoutes(app, deps) {
             if (!canValidateCraft(req.session.user)) {
                 return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const { status } = req.body;
             const allowed = ['pending', 'waiting_materials', 'in_progress', 'rejected'];
             if (!allowed.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
@@ -520,7 +530,8 @@ function registerCraftRequestRoutes(app, deps) {
     // Annuler/supprimer sa propre demande (pour le demandeur uniquement, ou super admin)
     app.delete('/api/crafts/requests/:id/cancel', requireAuth, (req, res) => {
         try {
-            const id = parseInt(req.params.id);
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const userId = req.session.user.id;
             const existing = getRequest(id);
             if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
@@ -553,8 +564,10 @@ function registerCraftRequestRoutes(app, deps) {
             if (!isCraftManager(req.session.user)) {
                 return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
-            deleteCraftRequestCleanly(parseInt(req.params.id));
-            emitRealtime('craft:status', { requestId: parseInt(req.params.id), status: 'deleted', action: 'deleted' });
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
+            deleteCraftRequestCleanly(id);
+            emitRealtime('craft:status', { requestId: id, status: 'deleted', action: 'deleted' });
             res.json({ success: true });
         } catch (e) { res.status(e.statusCode || 500).json({ error: e.message }); }
     });

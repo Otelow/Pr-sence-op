@@ -1,31 +1,10 @@
+// STABILISATION 15/05/2026 — carte persistée en SQLite
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes carte isolées
-const fs = require('fs');
-const path = require('path');
-const config = require('../../shared/config');
 const {
     FULL_ACCESS_ROLES,
     LAB_VISIBLE_USERS,
 } = require('../../shared/permissions');
-
-fs.mkdirSync(config.paths.data, { recursive: true });
-const MAP_POINTS_FILE = path.join(config.paths.data, 'map_points.json');
-
-function loadMapPoints() {
-    try {
-        if (fs.existsSync(MAP_POINTS_FILE)) {
-            return JSON.parse(fs.readFileSync(MAP_POINTS_FILE, 'utf8'));
-        }
-    } catch {}
-    return [];
-}
-
-function saveMapPoints(points) {
-    try {
-        fs.writeFileSync(MAP_POINTS_FILE, JSON.stringify(points, null, 2));
-    } catch (e) {
-        console.error('❌ Erreur sauvegarde map points:', e.message);
-    }
-}
+const mapPoints = require('../services/mapPoints');
 
 function registerMapRoutes(app, deps) {
     const {
@@ -56,8 +35,7 @@ function registerMapRoutes(app, deps) {
                 FULL_ACCESS_ROLES.some(r => userRoles.includes(r))
             );
 
-        const allPoints = loadMapPoints();
-        const visiblePoints = allPoints.filter(p => {
+        const visiblePoints = mapPoints.listAll().filter(p => {
             if (p.type === 'weapon-lab') return canSeeLab;
 
             if ((!p.allowedRoles || p.allowedRoles.length === 0) &&
@@ -87,8 +65,7 @@ function registerMapRoutes(app, deps) {
             return res.status(400).json({ error: 'Coordonnées invalides' });
         }
 
-        const points = loadMapPoints();
-        const point = {
+        const point = mapPoints.insert({
             id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
             x,
             y,
@@ -100,27 +77,21 @@ function registerMapRoutes(app, deps) {
             createdBy: req.session.user.username,
             createdById: req.session.user.id,
             createdAt: Date.now(),
-        };
-        points.push(point);
-        saveMapPoints(points);
+        });
         res.json({ success: true, point });
     });
 
     app.delete('/api/map/points/:id', requireAuth, (req, res) => {
         if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes' });
 
-        const points = loadMapPoints();
-        const filtered = points.filter(p => p.id !== req.params.id);
-        if (filtered.length === points.length) return res.status(404).json({ error: 'Point introuvable' });
-        saveMapPoints(filtered);
+        if (!mapPoints.deleteById(req.params.id)) return res.status(404).json({ error: 'Point introuvable' });
         res.json({ success: true });
     });
 
     app.put('/api/map/points/:id', requireAuth, (req, res) => {
         if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes' });
 
-        const points = loadMapPoints();
-        const point = points.find(p => p.id === req.params.id);
+        const point = mapPoints.listAll().find(p => p.id === req.params.id);
         if (!point) return res.status(404).json({ error: 'Point introuvable' });
 
         const { x, y, label, type, color, code, allowedRoles } = req.body;
@@ -133,16 +104,12 @@ function registerMapRoutes(app, deps) {
             point.code = (code || '').trim().slice(0, 50);
         }
         if (Array.isArray(allowedRoles)) point.allowedRoles = allowedRoles;
-        point.updatedAt = Date.now();
         point.updatedBy = req.session.user.username;
 
-        saveMapPoints(points);
-        res.json({ success: true, point });
+        res.json({ success: true, point: mapPoints.update(req.params.id, point) });
     });
 }
 
 module.exports = {
     registerMapRoutes,
-    loadMapPoints,
-    saveMapPoints,
 };

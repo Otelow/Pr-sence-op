@@ -19,6 +19,7 @@
 const express = require('express');
 const http = require('http');
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const SQLiteStoreFactory = require('connect-sqlite3');
@@ -129,6 +130,7 @@ function startServer(client, getState) {
             },
         },
     }));
+    app.use(compression());
     app.use(express.json());
     app.use(express.static(path.join(__dirname, 'public'), {
         maxAge: config.isProduction || config.isRailway ? '1h' : 0,
@@ -162,6 +164,15 @@ function startServer(client, getState) {
         const state = botState?.();
         const guildId = state?.CONFIG?.GUILD_ID;
         return guildId ? botClient?.guilds?.cache?.get(guildId) : null;
+    }
+
+    function requireBotReady(req, res, next) {
+        if (!botClient?.isReady?.()) {
+            return res.status(503).json({
+                error: 'Bot Discord indisponible, réessaie dans quelques secondes',
+            });
+        }
+        next();
     }
 
     async function refreshSessionRoles(req, res, next) {
@@ -267,6 +278,19 @@ function startServer(client, getState) {
         canAccessMyWeapons,
         canEditMapUser,
     });
+
+    app.use([
+        '/api/presence',
+        '/api/weekly',
+        '/api/command',
+        '/api/channels',
+        '/api/channel',
+        '/api/sanctions',
+        '/api/stats',
+        '/api/members',
+        '/api/roles',
+        '/api/emojis',
+    ], requireBotReady);
 
     // ==========================================
     // API - Presence et statistiques

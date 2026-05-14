@@ -1,4 +1,7 @@
-// MODIFIÉ CHANTIER 6 — 14/05/2026 — events message lifecycle isolés
+// STABILISATION 15/05/2026 — realtime salons sur nouveaux messages
+// MODIFIE CHANTIER 6 - 14/05/2026 - events message lifecycle isoles
+const { emitRealtime } = require('../../shared/realtime');
+
 function registerMessageLifecycleEvents(client, context) {
     const {
         handleAbsenceSalonCacheEvent,
@@ -8,6 +11,9 @@ function registerMessageLifecycleEvents(client, context) {
 
     client.on('messageCreate', message => {
         handleAbsenceSalonCacheEvent(message, 'messageCreate');
+        if (!message.author?.bot) {
+            emitRealtime('channel:message', { channelId: message.channelId });
+        }
     });
 
     client.on('messageDelete', message => {
@@ -20,10 +26,10 @@ function registerMessageLifecycleEvents(client, context) {
 
     client.on('messageDelete', async message => {
         if (presence2Data.messageId === message.id) {
-            console.log('🗑️ Message 2ème OP supprimé sur Discord, mais panel site conservé jusqu\'à 2h');
+            console.log('🗑️ Message 2eme OP supprime sur Discord, mais panel site conserve jusqu a 2h');
         }
         if (presenceData.messageId === message.id) {
-            console.log('🗑️ Message 1ère OP supprimé sur Discord, mais panel site conservé jusqu\'à 2h');
+            console.log('🗑️ Message 1ere OP supprime sur Discord, mais panel site conserve jusqu a 2h');
         }
     });
 }
