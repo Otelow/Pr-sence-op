@@ -8790,12 +8790,25 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 .myweapons-item.mw-available-row {
+    position: relative;
+    overflow: hidden;
     border-color: rgba(0, 255, 136, 0.22);
     border-left: 3px solid var(--green);
     background:
         linear-gradient(90deg, rgba(0, 255, 136, 0.08), transparent 44%),
         rgba(20, 20, 24, 0.68);
     box-shadow: 0 0 18px rgba(0, 255, 136, 0.04);
+}
+
+.myweapons-item.mw-available-row::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(112deg, transparent 0%, transparent 40%, rgba(74, 222, 128, 0.1) 50%, transparent 60%, transparent 100%);
+    background-size: 240% 100%;
+    animation: mwAvailableWave 6.5s ease-in-out infinite;
+    opacity: 0.75;
 }
 
 .myweapons-item.mw-available-row:hover {
@@ -8815,6 +8828,20 @@ body:has(#impersonateBanner[style*="flex"]) {
 
 .myweapons-item.mw-sold-row .mw-avatar {
     filter: grayscale(0.55) blur(0.35px);
+}
+
+@keyframes mwAvailableWave {
+    0% { background-position: 220% 0; opacity: 0; }
+    22% { opacity: 0.72; }
+    58% { opacity: 0.42; }
+    100% { background-position: -120% 0; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .myweapons-item.mw-available-row::after {
+        animation: none;
+        opacity: 0;
+    }
 }
 
 .mw-avatar {

@@ -4638,6 +4638,11 @@ function renderMyWeapons() {
         const aSold = getAvailableQty(a) <= 0;
         const bSold = getAvailableQty(b) <= 0;
         if (aSold !== bSold) return aSold ? 1 : -1;
+        if (!aSold && !bSold) {
+            const aPrice = Number(a.asking_price) || 0;
+            const bPrice = Number(b.asking_price) || 0;
+            if (aPrice !== bPrice) return bPrice - aPrice;
+        }
         return (Number(b.created_at) || 0) - (Number(a.created_at) || 0);
     });
     const availableUnits = sortedWeapons.reduce((sum, w) => sum + Math.max(0, getAvailableQty(w)), 0);
