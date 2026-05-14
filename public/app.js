@@ -3113,6 +3113,54 @@ function changeCraftRequestsPage(delta) {
     renderCraftRequestsList();
 }
 
+function getCraftWeaponForRequest(request) {
+    const requestWeaponId = Number(request?.weapon_id);
+    if (requestWeaponId) {
+        const byId = weaponsCache.find(w => Number(w.id) === requestWeaponId);
+        if (byId) return byId;
+    }
+    const requestName = String(request?.weapon_name || '').trim().toLowerCase();
+    return weaponsCache.find(w => String(w.name || w.weapon_name || '').trim().toLowerCase() === requestName) || null;
+}
+
+function renderCraftRequestDetails(request) {
+    const weapon = getCraftWeaponForRequest(request);
+    const weaponName = request?.weapon_name || weapon?.name || weapon?.weapon_name || 'Non renseigné';
+    const amount = Number(weapon?.craft_price ?? request?.craft_price ?? 0) || 0;
+    const amountLabel = amount > 0 ? `${amount.toLocaleString('fr-FR')}$` : 'Non renseigné';
+    const planLabel = weaponName && weaponName !== 'Non renseigné' ? `Plan ${escapeHtml(weaponName)}` : 'Non renseigné';
+    const ingredients = Array.isArray(weapon?.ingredients) ? weapon.ingredients : [];
+    const ingredientsHtml = ingredients.length
+        ? `<ul>${ingredients.map(ing => {
+            const required = Number(ing.required ?? ing.amount ?? 0) || 0;
+            const name = escapeHtml(ing.name || 'Non renseigné');
+            return `<li>${required > 0 ? `${required} ` : ''}${name}</li>`;
+        }).join('')}</ul>`
+        : '<span>Non renseigné</span>';
+
+    return `
+        <div class="craft-request-details-panel" id="craftRequestDetails-${request.id}" hidden>
+            <div class="craft-request-details-title">Arme demandée : ${escapeHtml(weaponName)}</div>
+            <div class="craft-request-details-grid">
+                <div><strong>💰 Montant</strong><span>${amountLabel}</span></div>
+                <div><strong>📄 Plan</strong><span>${planLabel}</span></div>
+                <div class="craft-request-details-ingredients"><strong>🧱 Ingrédients</strong>${ingredientsHtml}</div>
+            </div>
+        </div>
+    `;
+}
+
+function toggleCraftRequestDetails(id, button) {
+    const panel = document.getElementById(`craftRequestDetails-${id}`);
+    if (!panel) return;
+    const willOpen = panel.hidden;
+    panel.hidden = !willOpen;
+    if (button) {
+        button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        button.textContent = willOpen ? 'Masquer' : 'Détails';
+    }
+}
+
 function normalizeCraftRequestsToolbarLabels() {
     const title = document.querySelector('.craft-recent-requests h4');
     if (title) title.textContent = 'Demandes récentes';
@@ -3183,24 +3231,24 @@ function renderCraftRequestsList() {
 
         // Hauts gradés : peuvent changer statut + supprimer
         // User normal : peut juste annuler/supprimer SA demande tant que pas craftée
-        let statusActions = '';
+        let actionButtons = `
+            <button class="btn-status-details" onclick="toggleCraftRequestDetails(${r.id}, this)" aria-expanded="false" aria-controls="craftRequestDetails-${r.id}">Détails</button>
+        `;
         if (canChangeStatus) {
-            statusActions = `
-                <div class="craft-status-actions">
+            actionButtons += `
                     ${r.status !== 'waiting_materials' && r.status !== 'crafted' ? `<button class="btn-status-materials" onclick="updateRequestStatus(${r.id}, 'waiting_materials')">📦 Matières</button>` : ''}
                     ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
                     ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
                     ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
                     <button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">🗑</button>
-                </div>
             `;
         } else if (isMine && r.status !== 'crafted' && r.status !== 'completed') {
-            statusActions = `
-                <div class="craft-status-actions">
+            actionButtons += `
                     <button class="btn-status-delete" onclick="cancelMyCraftRequest(${r.id})">🗑 Annuler ma demande</button>
-                </div>
             `;
         }
+        const statusActions = `<div class="craft-status-actions">${actionButtons}</div>`;
+        const requestDetails = renderCraftRequestDetails(r);
 
         return `
             <div class="craft-request-item${rejectedClass}${statusRowClass}">
@@ -3218,6 +3266,7 @@ function renderCraftRequestsList() {
                         ${r.has_money ? '<span class="craft-tag">💰 Argent</span>' : ''}
                     </div>
                     ${statusActions}
+                    ${requestDetails}
                 </div>
                 <div class="craft-request-status">${status}</div>
             </div>
@@ -3343,6 +3392,7 @@ window.updateRequestStatus = updateRequestStatus;
 window.deleteCraftRequest = deleteCraftRequest;
 window.changeCraftRequestsPage = changeCraftRequestsPage;
 window.changeCraftHistoryPage = changeCraftHistoryPage;
+window.toggleCraftRequestDetails = toggleCraftRequestDetails;
 
 function getCraftStatusBadge(r) {
     if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">✓ Finalisé</span>';

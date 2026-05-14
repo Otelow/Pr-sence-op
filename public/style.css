@@ -6978,6 +6978,61 @@ body {
     font-size: 11px;
 }
 
+.craft-request-details-panel {
+    margin-top: 10px;
+    padding: 12px;
+    border: 1px solid rgba(255, 140, 0, 0.22);
+    border-radius: 8px;
+    background: rgba(255, 140, 0, 0.065);
+    color: var(--text);
+}
+
+.craft-request-details-panel[hidden] {
+    display: none;
+}
+
+.craft-request-details-title {
+    font-size: 13px;
+    font-weight: 800;
+    margin-bottom: 10px;
+    color: var(--accent);
+}
+
+.craft-request-details-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.craft-request-details-grid > div {
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 7px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.craft-request-details-grid strong,
+.craft-request-details-grid span {
+    display: block;
+}
+
+.craft-request-details-grid strong {
+    margin-bottom: 6px;
+    color: var(--text);
+    font-size: 12px;
+}
+
+.craft-request-details-grid span,
+.craft-request-details-grid li {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.craft-request-details-ingredients ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
 .craft-status-badge {
     padding: 6px 12px;
     border-radius: 6px;
@@ -7133,6 +7188,10 @@ body {
 }
 
 @media (max-width: 900px) {
+    .craft-request-details-grid {
+        grid-template-columns: 1fr;
+    }
+
     .craft-board-toolbar {
         align-items: stretch;
         flex-direction: column;
@@ -8130,6 +8189,7 @@ body {
 .btn-status-materials,
 .btn-status-reject,
 .btn-status-pending,
+.btn-status-details,
 .btn-status-delete {
     padding: 4px 10px;
     border-radius: 6px;
@@ -8169,6 +8229,13 @@ body {
     color: var(--gold);
 }
 .btn-status-pending:hover { background: rgba(255, 184, 77, 0.25); }
+
+.btn-status-details {
+    background: rgba(255, 140, 0, 0.1);
+    border-color: rgba(255, 140, 0, 0.3);
+    color: var(--accent);
+}
+.btn-status-details:hover { background: rgba(255, 140, 0, 0.22); }
 
 .btn-status-delete {
     background: rgba(239, 68, 68, 0.08);
