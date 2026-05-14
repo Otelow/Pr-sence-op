@@ -8803,12 +8803,21 @@ body:has(#impersonateBanner[style*="flex"]) {
 .myweapons-item.mw-available-row::after {
     content: "";
     position: absolute;
-    inset: 0;
+    top: -18%;
+    bottom: -18%;
+    left: -45%;
+    width: 42%;
     pointer-events: none;
-    background: linear-gradient(112deg, transparent 0%, transparent 40%, rgba(74, 222, 128, 0.1) 50%, transparent 60%, transparent 100%);
-    background-size: 240% 100%;
-    animation: mwAvailableWave 6.5s ease-in-out infinite;
-    opacity: 0.75;
+    z-index: 1;
+    transform: skewX(-18deg) translateX(-120%);
+    background: linear-gradient(115deg, transparent 0%, rgba(74, 222, 128, 0.08) 28%, rgba(74, 222, 128, 0.24) 50%, rgba(74, 222, 128, 0.08) 72%, transparent 100%);
+    animation: mwAvailableWave 3.8s ease-in-out infinite;
+    opacity: 0;
+}
+
+.myweapons-item.mw-available-row > * {
+    position: relative;
+    z-index: 2;
 }
 
 .myweapons-item.mw-available-row:hover {
@@ -8831,10 +8840,10 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 @keyframes mwAvailableWave {
-    0% { background-position: 220% 0; opacity: 0; }
-    22% { opacity: 0.72; }
-    58% { opacity: 0.42; }
-    100% { background-position: -120% 0; opacity: 0; }
+    0% { transform: skewX(-18deg) translateX(-120%); opacity: 0; }
+    18% { opacity: 0.82; }
+    58% { transform: skewX(-18deg) translateX(390%); opacity: 0.48; }
+    100% { transform: skewX(-18deg) translateX(390%); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
