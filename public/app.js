@@ -3144,7 +3144,7 @@ function renderCraftRequestDetails(request) {
             <div class="craft-request-details-grid">
                 <div><strong>💰 Montant</strong><span>${amountLabel}</span></div>
                 <div><strong>📄 Plan</strong><span>${planLabel}</span></div>
-                <div class="craft-request-details-ingredients"><strong>🧱 Ingrédients</strong>${ingredientsHtml}</div>
+                <div class="craft-request-details-ingredients"><strong>🧪 Ingrédients</strong>${ingredientsHtml}</div>
             </div>
         </div>
     `;
