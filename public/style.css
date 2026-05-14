@@ -1,3 +1,4 @@
+/* COSMÉTIQUE 15/05/2026 — effet vague bandeau craft warning */
 /* ==========================================
    21 BLOCK SAVAGE — Dashboard
    Design : Urban / Brutalist / Dark
@@ -9934,5 +9935,65 @@ body:has(#impersonateBanner[style*="flex"]) {
 
     70% {
         transform: translateY(2px);
+    }
+}
+
+/* ==========================================
+   Bandeau craft warning — effet vague orange
+   ========================================== */
+.craft-warning-banner {
+    position: relative;
+    overflow: hidden;
+}
+
+.craft-warning-banner .shimmer-overlay,
+.craft-warning-banner .shimmer-overlay-2 {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+    animation: craftWarningShimmer 2.8s linear infinite;
+}
+
+.craft-warning-banner .shimmer-overlay {
+    width: 40%;
+    background: linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(255, 170, 50, 0.55) 50%,
+        transparent 100%
+    );
+    filter: blur(2px);
+}
+
+.craft-warning-banner .shimmer-overlay-2 {
+    width: 25%;
+    background: linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(255, 220, 150, 0.4) 50%,
+        transparent 100%
+    );
+    animation-delay: -1.4s;
+}
+
+/* Le texte et l'icône passent au-dessus des vagues */
+.craft-warning-banner > *:not(.shimmer-overlay):not(.shimmer-overlay-2) {
+    position: relative;
+    z-index: 2;
+}
+
+@keyframes craftWarningShimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .craft-warning-banner .shimmer-overlay,
+    .craft-warning-banner .shimmer-overlay-2 {
+        animation: none;
+        display: none;
     }
 }
