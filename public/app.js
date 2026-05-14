@@ -2449,9 +2449,13 @@ let craftCatalogFilters = {
 };
 let craftBoardState = {
     page: 1,
-    pageSize: 28,
+    pageSize: 10,
     sortBy: 'created',
     sortDir: 'asc',
+};
+let craftHistoryState = {
+    page: 1,
+    pageSize: 10,
 };
 let craftRequestsListState = {
     page: 1,
@@ -3118,7 +3122,7 @@ function normalizeCraftRequestsToolbarLabels() {
         in_progress: 'En cours',
         waiting_materials: 'En attente des matières premières',
         rejected: 'Refusé',
-        pending: 'En attente',
+        pending: 'Commande reçu',
     };
     const statusSelect = document.getElementById('craftRequestsStatusFilter');
     if (statusSelect) {
@@ -3222,7 +3226,7 @@ function renderCraftRequestsList() {
     list.querySelectorAll('.btn-status-materials').forEach(btn => { btn.textContent = 'Matières'; });
     list.querySelectorAll('.btn-status-progress').forEach(btn => { btn.textContent = 'En cours'; });
     list.querySelectorAll('.btn-status-reject').forEach(btn => { btn.textContent = 'Refuser'; });
-    list.querySelectorAll('.btn-status-pending').forEach(btn => { btn.textContent = 'En attente'; });
+    list.querySelectorAll('.btn-status-pending').forEach(btn => { btn.textContent = 'Commande reçu'; });
 }
 
 async function cancelMyCraftRequest(id) {
@@ -3280,7 +3284,7 @@ async function updateRequestStatus(requestId, status) {
         waiting_materials: 'En attente des matières premières',
         in_progress: 'En cours',
         rejected: 'Refusé',
-        pending: 'En attente'
+        pending: 'Commande reçu'
     };
     if (!await confirmAction({ title: 'Changer le statut', message: `Passer cette demande en "${labels[status]}" ?`, confirmText: 'Changer le statut', danger: status === 'rejected' })) return;
     craftStatusActionLocks.add(lockKey);
@@ -3338,6 +3342,7 @@ async function deleteCraftRequest(requestId) {
 window.updateRequestStatus = updateRequestStatus;
 window.deleteCraftRequest = deleteCraftRequest;
 window.changeCraftRequestsPage = changeCraftRequestsPage;
+window.changeCraftHistoryPage = changeCraftHistoryPage;
 
 function getCraftStatusBadge(r) {
     if (r.status === 'completed') return '<span class="craft-status-badge craft-status-done">✓ Finalisé</span>';
@@ -3345,7 +3350,7 @@ function getCraftStatusBadge(r) {
     if (r.crafted) return '<span class="craft-status-badge craft-status-crafted">⚒ Crafté</span>';
     if (r.status === 'materials' || r.status === 'waiting_materials') return '<span class="craft-status-badge craft-status-materials">📦 En attente des matières premières</span>';
     if (r.status === 'in_progress') return '<span class="craft-status-badge craft-status-progress">⏳ En cours</span>';
-    return '<span class="craft-status-badge craft-status-pending">📋 En attente</span>';
+    return '<span class="craft-status-badge craft-status-pending">📋 Commande reçu</span>';
 }
 
 function getCraftStatusTone(r) {
@@ -3692,6 +3697,11 @@ function updateCraftSalePrice(requestId, value) {
     if (tr) tr.dataset.salePrice = value;
 }
 
+function changeCraftHistoryPage(delta) {
+    craftHistoryState.page += Number(delta) || 0;
+    renderCraftHistory();
+}
+
 function renderCraftHistory() {
     const list = document.getElementById('craftHistoryList');
     if (!list) return;
@@ -3705,7 +3715,23 @@ function renderCraftHistory() {
         return;
     }
 
-    list.innerHTML = completed.map(r => {
+    const total = completed.length;
+    const pageSize = craftHistoryState.pageSize;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    craftHistoryState.page = Math.min(Math.max(1, craftHistoryState.page), totalPages);
+    const start = (craftHistoryState.page - 1) * pageSize;
+    const end = Math.min(start + pageSize, total);
+    const pageItems = completed.slice(start, end);
+    const pagination = `
+        <div class="craft-history-pagination">
+            <span>${start + 1}-${end} / ${total} crafts</span>
+            <button type="button" class="craft-board-page-btn" onclick="changeCraftHistoryPage(-1)" ${craftHistoryState.page <= 1 ? 'disabled' : ''}>Précédent</button>
+            <span>Page ${craftHistoryState.page} / ${totalPages}</span>
+            <button type="button" class="craft-board-page-btn" onclick="changeCraftHistoryPage(1)" ${craftHistoryState.page >= totalPages ? 'disabled' : ''}>Suivant</button>
+        </div>
+    `;
+
+    const items = pageItems.map(r => {
         const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
         const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
         const deleteBtn = isSuperAdmin
@@ -3730,6 +3756,8 @@ function renderCraftHistory() {
             </div>
         `;
     }).join('');
+
+    list.innerHTML = pagination + items + pagination;
 }
 
 function renderManualCraftForm() {
@@ -4584,12 +4612,30 @@ function renderMyWeapons() {
         const availableQty = typeof w.quantity_available === 'number' ? w.quantity_available : (w.is_sold ? 0 : 1);
         const serials = Array.isArray(w.serials) ? w.serials : [];
         const isSold = availableQty <= 0;
-        const serialPreview = serials.length
+        let serialPreview = serials.length
             ? serials.slice(0, 6).map(s => `${s.is_sold ? 'Vendu' : 'Dispo'}: ${escapeHtml(s.serial_number || 'Non renseigne')}${s.sold_by_name ? ` par ${escapeHtml(s.sold_by_name)}` : ''}`).join(' • ')
             : (w.serial_number ? escapeHtml(w.serial_number) : '');
-        const moreSerials = serials.length > 6 ? ` +${serials.length - 6}` : '';
+        let moreSerials = serials.length > 6 ? ` +${serials.length - 6}` : '';
+        const availableSerials = serials
+            .filter(s => !s.is_sold && String(s.serial_number || '').trim())
+            .map(s => escapeHtml(s.serial_number));
+        const soldSerials = serials
+            .filter(s => s.is_sold && String(s.serial_number || '').trim())
+            .map(s => escapeHtml(s.serial_number));
+        const serialValues = availableSerials.length
+            ? availableSerials
+            : (soldSerials.length ? soldSerials : (w.serial_number ? [escapeHtml(w.serial_number)] : []));
+        const serialLabel = availableSerials.length ? 'N° Dispo' : (soldSerials.length ? 'N° vendu' : 'N°');
+        serialPreview = serialValues.length
+            ? `${serialLabel} : ${serialValues.slice(0, 4).join(' • ')}`
+            : '';
+        moreSerials = serialValues.length > 4 ? ` +${serialValues.length - 4}` : '';
         const craftedByLine = w.is_crafted && w.crafted_by_name
-            ? `<span>⚒ ${escapeHtml(w.crafted_by_name)}</span>`
+            ? `<span>Craft : ${escapeHtml(w.crafted_by_name)}</span>`
+            : '';
+
+        const craftDateLine = w.is_crafted && w.craft_date
+            ? `<span>Date craft : ${new Date(w.craft_date * 1000).toLocaleDateString('fr-FR')}</span>`
             : '';
 
         const priceBlock = isSold
@@ -4635,7 +4681,8 @@ function renderMyWeapons() {
                     <div class="myweapons-item-meta">
                         <span class="mw-username">👤 ${escapeHtml(w.user_name)}</span>
                         ${craftedByLine}
-                        ${serialPreview ? `<span>N°: ${serialPreview}${moreSerials}</span>` : ''}
+                        ${serialPreview ? `<span>${serialPreview}${moreSerials}</span>` : ''}
+                        ${craftDateLine}
                         ${priceBlock}
                         <span>📅 ${date}</span>
                     </div>

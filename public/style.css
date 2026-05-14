@@ -7047,6 +7047,18 @@ body {
     font-size: 12px;
 }
 
+.craft-history-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin: 10px 0;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+
 .craft-requests-pagination {
     display: flex;
     align-items: center;
@@ -7136,6 +7148,7 @@ body {
     }
 
     .craft-board-pagination,
+    .craft-history-pagination,
     .craft-requests-pagination {
         justify-content: space-between;
         margin-left: 0;
@@ -8789,11 +8802,15 @@ body:has(#impersonateBanner[style*="flex"]) {
 
 .mw-asking-price {
     color: var(--gold);
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.01em;
 }
 
 .mw-min-price {
     color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 800;
 }
 
 .mw-sold-price {
