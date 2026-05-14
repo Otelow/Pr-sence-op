@@ -439,6 +439,25 @@ const { restoreReactionsFromMessage } = createReactionRestoreService({
     buildAbsencePanelPlaceholderEmbed,
 }));
 
+({
+    loadReminders,
+    restorePanelState,
+    startReminderLoop,
+    stopReminderLoop,
+    refreshPanel,
+    handlePanel,
+    handlePanelInteraction,
+    hasEnabledReminders,
+} = createPanelService({
+    client,
+    CONFIG,
+    remindersFile: dataFile('reminders.json'),
+    loadState,
+    saveState,
+    deleteState,
+    emitRealtime,
+}));
+
 // ==========================================
 // ENREGISTREMENT COMMANDES
 // ==========================================
