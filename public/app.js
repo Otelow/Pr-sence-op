@@ -4637,6 +4637,12 @@ function renderMyWeapons() {
         const craftDateLine = w.is_crafted && w.craft_date
             ? `<span>Date craft : ${new Date(w.craft_date * 1000).toLocaleDateString('fr-FR')}</span>`
             : '';
+        const craftDetails = [craftedByLine, serialPreview ? `<span>${serialPreview}${moreSerials}</span>` : '', craftDateLine].filter(Boolean).join('');
+        const craftDetailsId = `mwCraftDetails-${w.id}`;
+        const craftDetailsBlock = craftDetails ? `
+            <button type="button" class="mw-details-toggle" onclick="toggleMyWeaponDetails('${craftDetailsId}', this)" aria-expanded="false" aria-controls="${craftDetailsId}">Détails</button>
+            <div class="mw-hidden-details" id="${craftDetailsId}" hidden>${craftDetails}</div>
+        ` : '';
 
         const priceBlock = isSold
             ? `<span class="mw-sold-price">Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '→ ' + escapeHtml(w.sold_to) : ''}</span>`
@@ -4680,11 +4686,9 @@ function renderMyWeapons() {
                     </div>
                     <div class="myweapons-item-meta">
                         <span class="mw-username">👤 ${escapeHtml(w.user_name)}</span>
-                        ${craftedByLine}
-                        ${serialPreview ? `<span>${serialPreview}${moreSerials}</span>` : ''}
-                        ${craftDateLine}
                         ${priceBlock}
                         <span>📅 ${date}</span>
+                        ${craftDetailsBlock}
                     </div>
                 </div>
                 ${actions}
@@ -4693,6 +4697,17 @@ function renderMyWeapons() {
     }).join('');
 
     list.innerHTML = summary + rows;
+}
+
+function toggleMyWeaponDetails(id, button) {
+    const panel = document.getElementById(id);
+    if (!panel) return;
+    const willOpen = panel.hidden;
+    panel.hidden = !willOpen;
+    if (button) {
+        button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        button.textContent = willOpen ? 'Masquer' : 'Détails';
+    }
 }
 
 function formatDateInputFromTimestamp(timestamp) {
@@ -4942,6 +4957,7 @@ window.openEditMyWeaponModal = openEditMyWeaponModal;
 window.closeEditMyWeaponModal = closeEditMyWeaponModal;
 window.toggleEditMyWeaponSoldFields = toggleEditMyWeaponSoldFields;
 window.submitEditMyWeapon = submitEditMyWeapon;
+window.toggleMyWeaponDetails = toggleMyWeaponDetails;
 window.toggleMarkSoldBuyerDropdown = toggleMarkSoldBuyerDropdown;
 window.selectMarkSoldBuyer = selectMarkSoldBuyer;
 window.confirmMarkSold = confirmMarkSold;
