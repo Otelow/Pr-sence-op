@@ -10,6 +10,7 @@
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes carte isolées
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes référentiels Discord isolées
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes salons Discord isolées
+// MODIFIE HOTFIX UI — 14/05/2026 — autorise les handlers inline du dashboard existant
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes présence/statistiques isolées
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes actions dashboard isolées
 // ==========================================
@@ -115,7 +116,9 @@ function startServer(client, getState) {
             directives: {
                 defaultSrc: ["'self'"],
                 scriptSrc: ["'self'", "'unsafe-inline'"],
+                scriptSrcAttr: ["'unsafe-inline'"],
                 styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+                styleSrcAttr: ["'unsafe-inline'"],
                 fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
                 imgSrc: ["'self'", 'data:', 'https://cdn.discordapp.com', 'https://media.discordapp.net'],
                 mediaSrc: ["'self'", 'https://cdn.discordapp.com', 'https://media.discordapp.net'],
