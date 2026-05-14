@@ -8747,9 +8747,10 @@ body:has(#impersonateBanner[style*="flex"]) {
     padding: 18px 24px;
     border-radius: 16px;
     background:
-        linear-gradient(120deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 140, 0, 0.15) 50%, rgba(255, 255, 255, 0.055) 100%),
-        rgba(24, 18, 14, 0.84);
-    border: 1px solid rgba(255, 170, 54, 0.52);
+        radial-gradient(circle at 12% 50%, rgba(255, 184, 77, 0.16), transparent 34%),
+        linear-gradient(120deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 140, 0, 0.22) 50%, rgba(255, 255, 255, 0.07) 100%),
+        rgba(28, 18, 10, 0.92);
+    border: 1px solid rgba(255, 184, 77, 0.72);
     backdrop-filter: blur(20px) saturate(160%);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
     color: var(--text);
@@ -8760,33 +8761,33 @@ body:has(#impersonateBanner[style*="flex"]) {
     box-shadow:
         0 8px 32px rgba(0, 0, 0, 0.4),
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 0 34px rgba(255, 140, 0, 0.24),
-        inset 4px 0 0 rgba(255, 184, 77, 0.75);
-    animation: bannerPulse 4s ease-in-out infinite;
+        0 0 42px rgba(255, 140, 0, 0.34),
+        inset 4px 0 0 rgba(255, 184, 77, 0.95);
+    animation: bannerPulse 2.4s ease-in-out infinite;
 }
 
 .myweapons-banner-shimmer::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 50%;
-    height: 100%;
+    inset: 0;
     background: linear-gradient(
-        90deg,
+        115deg,
         transparent 0%,
-        rgba(255, 184, 77, 0.12) 30%,
-        rgba(255, 214, 128, 0.28) 50%,
-        rgba(255, 184, 77, 0.12) 70%,
+        rgba(255, 184, 77, 0.08) 34%,
+        rgba(255, 224, 148, 0.34) 50%,
+        rgba(255, 184, 77, 0.08) 66%,
         transparent 100%
     );
-    animation: shimmerWave 3.5s ease-in-out infinite;
+    transform: translateX(-120%);
+    animation: shimmerWave 3s ease-in-out infinite;
     pointer-events: none;
+    z-index: 1;
 }
 
 @keyframes shimmerWave {
-    0% { left: -100%; }
-    100% { left: 200%; }
+    0% { transform: translateX(-120%); }
+    55% { transform: translateX(120%); }
+    100% { transform: translateX(120%); }
 }
 
 @keyframes bannerPulse {
@@ -8794,16 +8795,21 @@ body:has(#impersonateBanner[style*="flex"]) {
         box-shadow:
             0 8px 32px rgba(0, 0, 0, 0.4),
             inset 0 1px 0 rgba(255, 255, 255, 0.08),
-            0 0 34px rgba(255, 140, 0, 0.24),
-            inset 4px 0 0 rgba(255, 184, 77, 0.75);
+            0 0 42px rgba(255, 140, 0, 0.34),
+            inset 4px 0 0 rgba(255, 184, 77, 0.95);
     }
     50% {
         box-shadow:
             0 8px 32px rgba(0, 0, 0, 0.4),
             inset 0 1px 0 rgba(255, 255, 255, 0.12),
-            0 0 52px rgba(255, 140, 0, 0.42),
-            inset 4px 0 0 rgba(255, 214, 128, 0.95);
+            0 0 70px rgba(255, 140, 0, 0.58),
+            inset 4px 0 0 rgba(255, 230, 165, 1);
     }
+}
+
+.myweapons-banner-shimmer > * {
+    position: relative;
+    z-index: 2;
 }
 
 .myweapons-banner-shimmer .banner-icon {
@@ -8842,40 +8848,46 @@ body:has(#impersonateBanner[style*="flex"]) {
     background: rgba(255, 140, 0, 0.04);
 }
 
-.myweapons-item.mw-available-row {
+.myweapons-item.mw-available-row,
+.myweapons-item.mw-sale-active {
     position: relative;
     overflow: hidden;
-    border-color: rgba(0, 255, 136, 0.22);
+    border-color: rgba(74, 222, 128, 0.7);
     border-left: 3px solid var(--green);
     background:
-        linear-gradient(90deg, rgba(0, 255, 136, 0.08), transparent 44%),
-        rgba(20, 20, 24, 0.68);
-    box-shadow: 0 0 18px rgba(0, 255, 136, 0.04);
+        radial-gradient(circle at 10% 50%, rgba(74, 222, 128, 0.14), transparent 32%),
+        linear-gradient(90deg, rgba(0, 255, 136, 0.11), transparent 46%),
+        rgba(20, 20, 24, 0.74);
+    box-shadow:
+        0 0 24px rgba(74, 222, 128, 0.14),
+        inset 0 0 18px rgba(74, 222, 128, 0.06);
+    animation: mwAvailablePulse 2.8s ease-in-out infinite;
 }
 
-.myweapons-item.mw-available-row::after {
+.myweapons-item.mw-available-row::before,
+.myweapons-item.mw-sale-active::before {
     content: "";
     position: absolute;
-    top: -18%;
-    bottom: -18%;
-    left: -45%;
-    width: 42%;
+    inset: 0;
     pointer-events: none;
     z-index: 1;
-    transform: skewX(-18deg) translateX(-120%);
-    background: linear-gradient(115deg, transparent 0%, rgba(74, 222, 128, 0.08) 28%, rgba(74, 222, 128, 0.24) 50%, rgba(74, 222, 128, 0.08) 72%, transparent 100%);
-    animation: mwAvailableWave 3.8s ease-in-out infinite;
-    opacity: 0;
+    transform: translateX(-120%);
+    background: linear-gradient(115deg, transparent 0%, rgba(74, 222, 128, 0.06) 35%, rgba(74, 222, 128, 0.34) 50%, rgba(74, 222, 128, 0.06) 65%, transparent 100%);
+    animation: mwAvailableWave 3.2s ease-in-out infinite;
 }
 
-.myweapons-item.mw-available-row > * {
+.myweapons-item.mw-available-row > *,
+.myweapons-item.mw-sale-active > * {
     position: relative;
     z-index: 2;
 }
 
-.myweapons-item.mw-available-row:hover {
-    border-color: rgba(0, 255, 136, 0.42);
-    box-shadow: 0 0 24px rgba(0, 255, 136, 0.08);
+.myweapons-item.mw-available-row:hover,
+.myweapons-item.mw-sale-active:hover {
+    border-color: rgba(74, 222, 128, 0.95);
+    box-shadow:
+        0 0 34px rgba(74, 222, 128, 0.26),
+        inset 0 0 22px rgba(74, 222, 128, 0.08);
 }
 
 .myweapons-item.mw-sold-row {
@@ -8893,22 +8905,35 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 @keyframes mwAvailableWave {
-    0% { transform: skewX(-18deg) translateX(-120%); opacity: 0; }
-    18% { opacity: 0.82; }
-    58% { transform: skewX(-18deg) translateX(390%); opacity: 0.48; }
-    100% { transform: skewX(-18deg) translateX(390%); opacity: 0; }
+    0% { transform: translateX(-120%); }
+    55% { transform: translateX(120%); }
+    100% { transform: translateX(120%); }
+}
+
+@keyframes mwAvailablePulse {
+    0%, 100% {
+        border-color: rgba(74, 222, 128, 0.58);
+        box-shadow:
+            0 0 18px rgba(74, 222, 128, 0.12),
+            inset 0 0 16px rgba(74, 222, 128, 0.05);
+    }
+    50% {
+        border-color: rgba(74, 222, 128, 1);
+        box-shadow:
+            0 0 34px rgba(74, 222, 128, 0.32),
+            inset 0 0 26px rgba(74, 222, 128, 0.12);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .myweapons-banner-shimmer,
     .myweapons-banner-shimmer::before,
     .myweapons-banner-shimmer .banner-icon,
-    .myweapons-item.mw-available-row::after {
+    .myweapons-item.mw-available-row,
+    .myweapons-item.mw-sale-active,
+    .myweapons-item.mw-available-row::before,
+    .myweapons-item.mw-sale-active::before {
         animation: none;
-    }
-
-    .myweapons-item.mw-available-row::after {
-        opacity: 0;
     }
 }
 
