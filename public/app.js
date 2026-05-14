@@ -3,6 +3,7 @@
 // MODIFIÉ CHANTIER 3 — 14/05/2026 — rendu messages sécurisé
 // MODIFIÉ CHANTIER 4 — 14/05/2026 — permissions UI chargées depuis le serveur
 // MODIFIÉ CHANTIER 12 — 14/05/2026 — Socket.IO avec fallback polling
+// MODIFIE HOTFIX UI - 14/05/2026 - initialisation isolee pour garder les interactions
 // ==========================================
 
 const PAGE_TITLES = {
@@ -29,28 +30,43 @@ let presenceStatsCache = null;
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
-    // Déplacer uniquement les modals racine (avec ID) au body
-    document.querySelectorAll('.modal-backdrop[id]').forEach(modal => {
-        if (modal.parentNode !== document.body) {
-            document.body.appendChild(modal);
-        }
+    await runInitStep('moveRootModals', () => {
+        // Deplacer uniquement les modals racine (avec ID) au body
+        document.querySelectorAll('.modal-backdrop[id]').forEach(modal => {
+            if (modal.parentNode !== document.body) {
+                document.body.appendChild(modal);
+            }
+        });
     });
-    applyWaveTextEffects();
+    await runInitStep('applyWaveTextEffects', () => applyWaveTextEffects());
 
-    await loadPublicConfig();
-    await loadUser();
-    setupIdleLogoutTimer();
-    await loadPermissions();
-    setupNav();
-    setupChannelSearch();
-    setupMap();
-    updateImpersonateBanner();
-    applyPermissionsUI();
-    restoreLastTab();
-    setupRealtimeSocket();
-    refreshAll();
+    // La navigation doit rester cliquable meme si une API d'init tombe.
+    await runInitStep('setupNav', () => setupNav());
+    await runInitStep('setupIdleLogoutTimer', () => setupIdleLogoutTimer());
+    await runInitStep('setupChannelSearch', () => setupChannelSearch());
+    await runInitStep('setupMap', () => setupMap());
+
+    await runInitStep('loadPublicConfig', () => loadPublicConfig());
+    const userLoaded = await runInitStep('loadUser', () => loadUser());
+    if (!userLoaded) return;
+
+    await runInitStep('loadPermissions', () => loadPermissions());
+    await runInitStep('updateImpersonateBanner', () => updateImpersonateBanner());
+    await runInitStep('applyPermissionsUI', () => applyPermissionsUI());
+    await runInitStep('restoreLastTab', () => restoreLastTab());
+    await runInitStep('setupRealtimeSocket', () => setupRealtimeSocket());
+    await runInitStep('refreshAll', () => refreshAll());
     refreshTimer = setInterval(refreshAll, 60_000);
 });
+
+async function runInitStep(name, fn) {
+    try {
+        return await fn();
+    } catch (e) {
+        console.error(`[init] ${name} a echoue:`, e);
+        return null;
+    }
+}
 
 function scheduleRealtimeRefresh(reason = 'realtime') {
     clearTimeout(realtimeRefreshTimer);
@@ -121,14 +137,16 @@ async function loadPermissions() {
 async function loadUser() {
     try {
         const res = await fetch('/api/me');
-        if (!res.ok) { window.location = '/'; return; }
+        if (!res.ok) { window.location = '/'; return false; }
         const user = await res.json();
         window.currentUser = user;
         window.currentUserId = user.id;
         document.getElementById('userName').textContent = user.username;
         if (user.avatar) document.getElementById('userAvatar').src = user.avatar;
+        return true;
     } catch {
         window.location = '/';
+        return false;
     }
 }
 
