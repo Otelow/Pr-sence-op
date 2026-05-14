@@ -1,3 +1,4 @@
+/* NETTOYAGE 15/05/2026 — virer ancien shimmer myweapons */
 /* COSMÉTIQUE 15/05/2026 — effet vague bandeau craft warning */
 /* ==========================================
    21 BLOCK SAVAGE — Dashboard
@@ -8764,48 +8765,6 @@ body:has(#impersonateBanner[style*="flex"]) {
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
         0 0 42px rgba(255, 140, 0, 0.34),
         inset 4px 0 0 rgba(255, 184, 77, 0.95);
-    animation: bannerPulse 2.4s ease-in-out infinite;
-}
-
-.myweapons-banner-shimmer::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-        115deg,
-        transparent 0%,
-        rgba(255, 184, 77, 0.08) 34%,
-        rgba(255, 224, 148, 0.34) 50%,
-        rgba(255, 184, 77, 0.08) 66%,
-        transparent 100%
-    );
-    transform: translateX(-120%);
-    animation: shimmerWave 3s ease-in-out infinite;
-    pointer-events: none;
-    z-index: 1;
-}
-
-@keyframes shimmerWave {
-    0% { transform: translateX(-120%); }
-    55% { transform: translateX(120%); }
-    100% { transform: translateX(120%); }
-}
-
-@keyframes bannerPulse {
-    0%, 100% {
-        box-shadow:
-            0 8px 32px rgba(0, 0, 0, 0.4),
-            inset 0 1px 0 rgba(255, 255, 255, 0.08),
-            0 0 42px rgba(255, 140, 0, 0.34),
-            inset 4px 0 0 rgba(255, 184, 77, 0.95);
-    }
-    50% {
-        box-shadow:
-            0 8px 32px rgba(0, 0, 0, 0.4),
-            inset 0 1px 0 rgba(255, 255, 255, 0.12),
-            0 0 70px rgba(255, 140, 0, 0.58),
-            inset 4px 0 0 rgba(255, 230, 165, 1);
-    }
 }
 
 .myweapons-banner-shimmer > * {
@@ -8817,12 +8776,6 @@ body:has(#impersonateBanner[style*="flex"]) {
     font-size: 36px;
     flex-shrink: 0;
     filter: drop-shadow(0 0 12px rgba(255, 184, 77, 0.68));
-    animation: iconBob 2s ease-in-out infinite;
-}
-
-@keyframes iconBob {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-3px); }
 }
 
 .myweapons-banner-shimmer strong {
@@ -8927,9 +8880,6 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .myweapons-banner-shimmer,
-    .myweapons-banner-shimmer::before,
-    .myweapons-banner-shimmer .banner-icon,
     .myweapons-item.mw-available-row,
     .myweapons-item.mw-sale-active,
     .myweapons-item.mw-available-row::before,
@@ -9755,25 +9705,6 @@ body:has(#impersonateBanner[style*="flex"]) {
     box-shadow:
         0 0 18px rgba(238, 138, 1, 0.35),
         inset 0 0 18px rgba(238, 138, 1, 0.12) !important;
-    animation: dynamicWarningPulse 1.8s ease-in-out infinite !important;
-}
-
-.dynamic-warning-effect::after {
-    content: "" !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: -120% !important;
-    width: 70% !important;
-    height: 100% !important;
-    background: linear-gradient(
-        120deg,
-        transparent,
-        rgba(238, 138, 1, 0.45),
-        transparent
-    ) !important;
-    animation: dynamicWarningWave 2.4s ease-in-out infinite !important;
-    pointer-events: none !important;
-    z-index: 1 !important;
 }
 
 .dynamic-warning-effect > * {
@@ -9786,26 +9717,6 @@ body:has(#impersonateBanner[style*="flex"]) {
 .dynamic-warning-effect .banner-icon {
     animation: none !important;
     transform: none !important;
-}
-
-@keyframes dynamicWarningPulse {
-    0%, 100% {
-        box-shadow:
-            0 0 12px rgba(238, 138, 1, 0.25),
-            inset 0 0 12px rgba(238, 138, 1, 0.08);
-    }
-
-    50% {
-        box-shadow:
-            0 0 34px rgba(238, 138, 1, 0.65),
-            inset 0 0 24px rgba(238, 138, 1, 0.18);
-    }
-}
-
-@keyframes dynamicWarningWave {
-    0% { left: -120%; }
-    55% { left: 130%; }
-    100% { left: 130%; }
 }
 
 .dynamic-sale-effect {
