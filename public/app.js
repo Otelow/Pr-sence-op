@@ -4744,7 +4744,7 @@ function renderMyWeapons() {
         }
 
         return `
-            <div class="myweapons-item ${isSold ? 'mw-sold-row' : 'mw-available-row mw-sale-active'} ${isMine ? 'mw-mine' : ''}">
+            <div class="myweapons-item weapon-sale-card ${isSold ? 'mw-sold-row' : 'mw-available-row mw-sale-active dynamic-sale-effect'} ${isMine ? 'mw-mine' : ''}">
                 ${avatar}
                 <div class="myweapons-item-body">
                     <div class="myweapons-item-name">

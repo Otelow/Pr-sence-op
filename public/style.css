@@ -9743,3 +9743,112 @@ body:has(#impersonateBanner[style*="flex"]) {
         letter-spacing: 0.12em;
     }
 }
+
+/* ============================================================
+   DYNAMIC EFFECTS — animations visibles Vos Armes
+   ============================================================ */
+.dynamic-warning-effect {
+    position: relative !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(238, 138, 1, 0.95) !important;
+    box-shadow:
+        0 0 18px rgba(238, 138, 1, 0.35),
+        inset 0 0 18px rgba(238, 138, 1, 0.12) !important;
+    animation: dynamicWarningPulse 1.8s ease-in-out infinite !important;
+}
+
+.dynamic-warning-effect::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -120% !important;
+    width: 70% !important;
+    height: 100% !important;
+    background: linear-gradient(
+        120deg,
+        transparent,
+        rgba(238, 138, 1, 0.45),
+        transparent
+    ) !important;
+    animation: dynamicWarningWave 2.4s ease-in-out infinite !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+}
+
+.dynamic-warning-effect > * {
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+@keyframes dynamicWarningPulse {
+    0%, 100% {
+        box-shadow:
+            0 0 12px rgba(238, 138, 1, 0.25),
+            inset 0 0 12px rgba(238, 138, 1, 0.08);
+    }
+
+    50% {
+        box-shadow:
+            0 0 34px rgba(238, 138, 1, 0.65),
+            inset 0 0 24px rgba(238, 138, 1, 0.18);
+    }
+}
+
+@keyframes dynamicWarningWave {
+    0% { left: -120%; }
+    55% { left: 130%; }
+    100% { left: 130%; }
+}
+
+.dynamic-sale-effect {
+    position: relative !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(34, 197, 94, 1) !important;
+    box-shadow:
+        0 0 20px rgba(34, 197, 94, 0.35),
+        inset 0 0 18px rgba(34, 197, 94, 0.10) !important;
+    animation: dynamicSalePulse 2s ease-in-out infinite !important;
+}
+
+.dynamic-sale-effect::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -120% !important;
+    width: 75% !important;
+    height: 100% !important;
+    background: linear-gradient(
+        120deg,
+        transparent,
+        rgba(34, 197, 94, 0.38),
+        transparent
+    ) !important;
+    animation: dynamicSaleWave 2.6s ease-in-out infinite !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+}
+
+.dynamic-sale-effect > * {
+    position: relative !important;
+    z-index: 2 !important;
+}
+
+@keyframes dynamicSalePulse {
+    0%, 100% {
+        box-shadow:
+            0 0 14px rgba(34, 197, 94, 0.22),
+            inset 0 0 12px rgba(34, 197, 94, 0.06);
+    }
+
+    50% {
+        box-shadow:
+            0 0 38px rgba(34, 197, 94, 0.65),
+            inset 0 0 26px rgba(34, 197, 94, 0.16);
+    }
+}
+
+@keyframes dynamicSaleWave {
+    0% { left: -120%; }
+    55% { left: 130%; }
+    100% { left: 130%; }
+}
