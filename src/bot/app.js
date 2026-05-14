@@ -23,6 +23,7 @@
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — service panel/rappels externalisé
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — service panneau absence externalisé
 // MODIFIE CHANTIER 6 - 14/05/2026 - cache/embeds panneau presence externalises
+// MODIFIE HOTFIX RAILWAY - 14/05/2026 - mapping reactions presence restaure
 // ==========================================
 // Nécessite: npm install discord.js node-cron
 // Lancer: node bot.js
@@ -111,6 +112,14 @@ const CONFIG = {
         LSPD: 'lspd:1495451609084334220',
     },
 };
+
+function emojiToType(name, id) {
+    const key = id ? `${name}:${id}` : String(name || '');
+    if (key === CONFIG.REACT_EMOJIS.CHECK || name === '✅') return 'check';
+    if (key === CONFIG.REACT_EMOJIS.RETARD || name === '⏰') return 'retard';
+    if (key === CONFIG.REACT_EMOJIS.NO || name === '❌') return 'no';
+    return null;
+}
 
 // ==========================================
 // MODE TEST
@@ -289,6 +298,21 @@ let presence2Data = {
     messageId: null,
     active: false,
 };
+
+const reactionsOP1 = new Map();
+const reactionsOP2 = new Map();
+
+function getReactionMap(messageId) {
+    if (presenceData.messageId === messageId) return reactionsOP1;
+    if (presence2Data.messageId === messageId) return reactionsOP2;
+    return null;
+}
+
+function getPresenceOpForMessageId(messageId) {
+    if (presenceData.messageId === messageId) return 'op1';
+    if (presence2Data.messageId === messageId) return 'op2';
+    return null;
+}
 
 // ==========================================
 // PERSISTANCE ÉTAT PRÉSENCE (survie redéploiement)
