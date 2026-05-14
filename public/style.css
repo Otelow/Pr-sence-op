@@ -409,8 +409,10 @@ html, body {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     margin-bottom: 32px;
-    padding-bottom: 24px;
+    min-height: 104px;
+    padding: 24px 0;
     border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
 }
 
 .topbar-left {
@@ -418,6 +420,11 @@ html, body {
     justify-self: center;
     text-align: center;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
 }
 
 .page-title {
@@ -425,6 +432,7 @@ html, body {
     font-size: 36px;
     letter-spacing: 0.05em;
     line-height: 1;
+    margin: 0;
 }
 
 .page-sub {
@@ -433,7 +441,8 @@ html, body {
     letter-spacing: 0.2em;
     text-transform: uppercase;
     display: block;
-    margin-top: 4px;
+    margin: 0;
+    line-height: 1.2;
 }
 
 .topbar-right {
