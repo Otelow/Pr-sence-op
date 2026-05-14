@@ -1,21 +1,54 @@
 // ==========================================
 // Serveur web — Dashboard 21 Block Savage
+// MODIFIÉ CHANTIER 2 — 14/05/2026 — sessions persistantes SQLite Railway
+// MODIFIÉ CHANTIER 3 — 14/05/2026 — helmet, rate-limit et rafraîchissement rôles
+// MODIFIÉ CHANTIER 4 — 14/05/2026 — permissions partagées et config publique
+// MODIFIÉ CHANTIER 10 — 14/05/2026 — healthcheck Railway
+// MODIFIÉ CHANTIER 12 — 14/05/2026 — Socket.IO dashboard avec fallback polling
+// MODIFIÉ CHANTIER 6 — 14/05/2026 — middlewares web externalisés
 // ==========================================
 
 const express = require('express');
+const http = require('http');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const session = require('express-session');
+const SQLiteStoreFactory = require('connect-sqlite3');
+const { Server: SocketIOServer } = require('socket.io');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const config = require('./src/shared/config');
+const {
+    ADMIN_USER_ID,
+    ADMIN_ROLE_ID,
+    FULL_ACCESS_ROLES,
+    LIMITED_CRAFT_ACCESS_ROLES,
+    LAB_VISIBLE_USERS,
+    MY_WEAPONS_DELETE_ROLE,
+} = require('./src/shared/permissions');
+const {
+    requireAuth,
+    requireAdmin,
+    requireFullSiteAccess,
+    isUserAdmin,
+    hasFullSiteAccess,
+    hasLimitedCraftAccess,
+    canAccessCrafts,
+    canAccessMyWeapons,
+    canEditMapUser,
+} = require('./src/web/middlewares/auth');
 const { initDB, registerCraftEndpoints } = require('./crafts');
 const { backfillClipForum, getBackfillStatus, getRecentClipBackups, retryFailedClipBackups } = require('./src/shared/clipBackup');
+const { realtimeEvents, emitRealtime } = require('./src/shared/realtime');
 
 const PORT = process.env.PORT || 3000;
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `http://localhost:${PORT}/auth/callback`;
 const SESSION_SECRET = process.env.SESSION_SECRET;
+const SQLiteStore = SQLiteStoreFactory(session);
+const ROLE_SESSION_CACHE_TTL_MS = 120 * 1000;
 
 let botClient;
 let botState;
@@ -25,8 +58,79 @@ function startServer(client, getState) {
     botState = getState;
 
     const app = express();
+    const httpServer = http.createServer(app);
+    fs.mkdirSync(config.paths.data, { recursive: true });
+    const sessionStore = new SQLiteStore({
+        dir: config.paths.data,
+        db: 'sessions.db',
+        table: 'sessions',
+        ttl: 7 * 24 * 60 * 60,
+    });
+    const roleSessionCache = new Map();
+    const authLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        limit: 10,
+        standardHeaders: true,
+        legacyHeaders: false,
+    });
+    const commandLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        limit: 30,
+        standardHeaders: true,
+        legacyHeaders: false,
+    });
+    const craftsWriteLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        limit: 60,
+        standardHeaders: true,
+        legacyHeaders: false,
+        skip: req => !['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method),
+    });
+    const sessionMiddleware = session({
+        store: sessionStore,
+        secret: SESSION_SECRET || config.web.sessionSecret,
+        resave: false,
+        saveUninitialized: false,
+        rolling: true,
+        cookie: {
+            maxAge: config.web.sessionMaxAgeMs,
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: config.isProduction || config.isRailway,
+        },
+    });
+    const io = new SocketIOServer(httpServer, {
+        path: '/socket.io',
+        serveClient: true,
+    });
+    io.engine.use(sessionMiddleware);
+    io.use((socket, next) => {
+        if (socket.request.session?.user) return next();
+        next(new Error('Non connecté'));
+    });
+    io.on('connection', socket => {
+        socket.emit('dashboard:ready', { ts: Date.now() });
+    });
+    realtimeEvents.on('event', ({ type, payload }) => {
+        io.emit(type, payload);
+    });
 
     app.set('trust proxy', 1);
+    app.use(helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'"],
+                styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+                fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+                imgSrc: ["'self'", 'data:', 'https://cdn.discordapp.com', 'https://media.discordapp.net'],
+                mediaSrc: ["'self'", 'https://cdn.discordapp.com', 'https://media.discordapp.net'],
+                connectSrc: ["'self'", 'ws:', 'wss:'],
+                frameSrc: ["'none'"],
+                objectSrc: ["'none'"],
+            },
+        },
+    }));
     app.use(express.json());
     app.use(express.static(path.join(__dirname, 'public'), {
         maxAge: config.isProduction || config.isRailway ? '1h' : 0,
@@ -38,18 +142,7 @@ function startServer(client, getState) {
             }
         },
     }));
-    app.use(session({
-        secret: SESSION_SECRET,
-        resave: false,
-        saveUninitialized: false,
-        rolling: true,
-        cookie: {
-            maxAge: config.web.sessionMaxAgeMs,
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: config.isProduction || config.isRailway,
-        },
-    }));
+    app.use(sessionMiddleware);
     app.use((req, res, next) => {
         const startedAt = process.hrtime.bigint();
         res.on('finish', () => {
@@ -63,9 +156,21 @@ function startServer(client, getState) {
         next();
     });
 
+    app.get('/healthz', (req, res) => {
+        const ready = botClient?.isReady?.() ?? false;
+        res.status(ready ? 200 : 503).json({
+            ready,
+            uptime: Math.round(process.uptime()),
+            memMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+            ts: Date.now(),
+        });
+    });
+
     // ==========================================
     // OAuth2 Discord
     // ==========================================
+    app.use('/auth', authLimiter);
+
     app.get('/auth/login', (req, res) => {
         const url = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
         res.redirect(url);
@@ -228,68 +333,41 @@ body.login-body { overflow: hidden; }
         });
     });
 
-    // ==========================================
-    // Middleware d'auth
-    // ==========================================
-    const ADMIN_USER_ID = '952986899667103804';
-    const ADMIN_ROLE_ID = '1485279148246175764';
-    const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
-    const LIMITED_CRAFT_ACCESS_ROLES = [
-        '1495448653945634987',
-        '1485636099853516982',
-        '1485270431291277383',
-    ];
-
-    function requireAuth(req, res, next) {
-        if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
-        next();
-    }
-
-    function isUserAdmin(user) {
-        if (!user) return false;
-        if (user.id === ADMIN_USER_ID) return true;
-        if (user.roles && FULL_ACCESS_ROLES.some(roleId => user.roles.includes(roleId))) return true;
-        return false;
-    }
-
-    function hasFullSiteAccess(user) {
-        if (!user) return false;
-        if (user.id === ADMIN_USER_ID) return true;
-        return FULL_ACCESS_ROLES.some(roleId => (user.roles || []).includes(roleId));
-    }
-
-    function hasLimitedCraftAccess(user) {
-        if (!user) return false;
-        return LIMITED_CRAFT_ACCESS_ROLES.some(roleId => (user.roles || []).includes(roleId));
-    }
-
-    function canAccessCrafts(user) {
-        return hasFullSiteAccess(user) || hasLimitedCraftAccess(user);
-    }
-
-    function canAccessMyWeapons(user) {
-        return hasFullSiteAccess(user) || hasLimitedCraftAccess(user);
-    }
-
-    function requireFullSiteAccess(req, res, next) {
-        if (!hasFullSiteAccess(req.session.user)) {
-            return res.status(403).json({ error: 'Accès confidentiel réservé aux hauts gradés' });
-        }
-        next();
-    }
-
-    function requireAdmin(req, res, next) {
-        if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
-        if (!isUserAdmin(req.session.user)) return res.status(403).json({ error: 'Accès admin requis' });
-        // Marquer pour usage downstream
-        req.session.user.isAdmin = true;
-        next();
-    }
-
     function getGuild() {
         const state = botState?.();
         const guildId = state?.CONFIG?.GUILD_ID;
         return guildId ? botClient?.guilds?.cache?.get(guildId) : null;
+    }
+
+    async function refreshSessionRoles(req, res, next) {
+        const user = req.session?.user;
+        if (!user?.id) return next();
+
+        const cached = roleSessionCache.get(user.id);
+        if (cached && Date.now() - cached.fetchedAt < ROLE_SESSION_CACHE_TTL_MS) {
+            user.roles = cached.roles;
+            return next();
+        }
+
+        const guild = getGuild();
+        if (!guild?.members?.fetch) return next();
+
+        try {
+            const member = await guild.members.fetch(user.id).catch(() => null);
+            if (!member) return next();
+
+            const roles = [...member.roles.cache.keys()];
+            roleSessionCache.set(user.id, { roles, fetchedAt: Date.now() });
+            user.roles = roles;
+            user.username = member.nickname || member.user.username || user.username;
+            user.avatar = member.user.avatar
+                ? `https://cdn.discordapp.com/avatars/${member.id}/${member.user.avatar}.png?size=128`
+                : user.avatar;
+        } catch (e) {
+            console.warn(`⚠️ Refresh rôles session impossible pour ${user.id}:`, e.message);
+        }
+
+        next();
     }
 
     function canRoleViewChannel(channel, role) {
@@ -325,6 +403,8 @@ body.login-body { overflow: hidden; }
         return botClient?.channels?.cache?.get(channelId)
             || await botClient?.channels?.fetch(channelId).catch(() => null);
     }
+
+    app.use(refreshSessionRoles);
 
     // Initialiser la DB crafts
     try {
@@ -362,6 +442,7 @@ body.login-body { overflow: hidden; }
     });
 
     // Enregistrer les endpoints crafts
+    app.use('/api/crafts', craftsWriteLimiter);
     try {
         registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botState);
         console.log('🔫 Endpoints crafts enregistrés');
@@ -422,6 +503,17 @@ body.login-body { overflow: hidden; }
             canAccessMyWeapons: canAccessMyWeapons(req.session.user),
         };
         res.json(user);
+    });
+
+    app.get('/api/config/public', requireAuth, (req, res) => {
+        res.json({
+            adminUserId: ADMIN_USER_ID,
+            adminRoleId: ADMIN_ROLE_ID,
+            fullAccessRoles: FULL_ACCESS_ROLES,
+            limitedCraftAccessRoles: LIMITED_CRAFT_ACCESS_ROLES,
+            labVisibleUsers: LAB_VISIBLE_USERS,
+            myWeaponsDeleteRole: MY_WEAPONS_DELETE_ROLE,
+        });
     });
 
     // Données présence en temps réel
@@ -502,7 +594,7 @@ body.login-body { overflow: hidden; }
     });
 
     // Lancer une commande / alerte
-    app.post('/api/command', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.post('/api/command', commandLimiter, requireAuth, requireFullSiteAccess, async (req, res) => {
         const { command, params } = req.body;
         const state = botState();
 
@@ -643,6 +735,7 @@ body.login-body { overflow: hidden; }
                     const bs21Emoji = state.CONFIG.EMOJIS?.BS21 || '';
 
                     await sanctionChannel.send(`${mention} Vous avez reçu un **avertissement** pour la raison suivante : ${raison} ${attentionEmoji} ${bs21Emoji}`);
+                    emitRealtime('sanction:added', { userId: cleanId, raison });
                     return res.json({ success: true });
                 }
 
@@ -737,6 +830,7 @@ body.login-body { overflow: hidden; }
         if (state.absenceTracking.has(userId)) {
             state.absenceTracking.delete(userId);
             state.saveAbsenceTracking();
+            emitRealtime('absence:posted', { userId, action: 'reset' });
             return res.json({ success: true });
         }
         res.status(404).json({ error: 'User not in tracking' });
@@ -1332,9 +1426,7 @@ body.login-body { overflow: hidden; }
         const effectiveUserId = isImpersonating ? '__impersonate__' : userId;
         const effectiveRoles = isImpersonating ? [impersonateRole] : userRoles;
 
-        // Laboratoire d'armes : visible pour les 3 user IDs OU les 3 rôles hauts gradés
-        const LAB_VISIBLE_USERS = ['952986899667103804', '780164840798552066', '769670622380294265'];
-        const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
+        // Laboratoire d'armes : visible pour les user IDs autorisés OU les rôles hauts gradés
         const canSeeLab = isImpersonating
             ? FULL_ACCESS_ROLES.includes(impersonateRole)
             : (
@@ -1374,11 +1466,7 @@ body.login-body { overflow: hidden; }
 
     // Vérifier permissions de placer des points (mêmes que COMMAND_ROLES par défaut)
     function canEditMap(req) {
-        const userId = req.session.user?.id;
-        if (userId === '952986899667103804') return true;
-        const userRoles = req.session.user?.roles || [];
-        const FULL_ACCESS = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
-        return FULL_ACCESS.some(r => userRoles.includes(r));
+        return canEditMapUser(req.session.user);
     }
 
     app.post('/api/map/points', requireAuth, (req, res) => {
@@ -1458,7 +1546,7 @@ body.login-body { overflow: hidden; }
         res.json({ isAdmin: isUserAdmin(req.session.user) });
     });
 
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
         console.log(`🌐 Dashboard web démarré sur le port ${PORT}`);
     });
 }

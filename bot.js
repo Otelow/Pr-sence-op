@@ -1,15 +1,31 @@
 // ==========================================
 // 21 Block Savage - Discord Bot
+// MODIFIÉ CHANTIER 1 — 14/05/2026 — stabilisation /absence, lock panneau et cache salon
+// MODIFIÉ CHANTIER 4 — 14/05/2026 — salons et rôles Discord centralisés
+// MODIFIÉ CHANTIER 7 — 14/05/2026 — persistance SQLite panel/absence
+// MODIFIÉ CHANTIER 8 — 14/05/2026 — rappels panel sans drift modulo
+// MODIFIÉ CHANTIER 9 — 14/05/2026 — réactions et interactions longues optimisées
+// MODIFIÉ CHANTIER 10 — 14/05/2026 — crash fatal relancé par Railway
+// MODIFIÉ CHANTIER 11 — 14/05/2026 — backups journaliers programmés
+// MODIFIÉ CHANTIER 12 — 14/05/2026 — events temps réel dashboard
+// MODIFIÉ CHANTIER 6 — 14/05/2026 — client Discord et slash commands externalisés
+// MODIFIÉ CHANTIER 7 — 14/05/2026 — suivi absences/rappels migrés dans bot_state
 // ==========================================
 // Nécessite: npm install discord.js node-cron
 // Lancer: node bot.js
 // ==========================================
 
-const { Client, GatewayIntentBits, Partials, REST, Routes, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require('discord.js');
+const { REST, Routes, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, StringSelectMenuBuilder } = require('discord.js');
 const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
 const config = require('./src/shared/config');
+const { GUILD_ID, CHANNELS, ROLES } = require('./src/shared/channels');
+const { createDiscordClient } = require('./src/bot/client');
+const { buildSlashCommands } = require('./src/bot/commands/definitions');
+const { scheduleDailyBackups } = require('./src/bot/services/backup');
+const { loadState, saveState, deleteState } = require('./src/bot/services/state');
+const { emitRealtime } = require('./src/shared/realtime');
 const { processClipMessage, backfillClipForum, getBackfillStatus, extractClipLinks, isClipAttachment } = require('./src/shared/clipBackup');
 
 fs.mkdirSync(config.paths.data, { recursive: true });
@@ -26,56 +42,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // ==========================================
 const CONFIG = {
     TOKEN: process.env.DISCORD_TOKEN,
-    GUILD_ID: process.env.GUILD_ID || '1485254310894895282',
-
-    CHANNELS: {
-        REGLEMENT: '1485288718225903676',
-        COMMANDES: '1485624499234934857',
-        QG: '1485651067860680915',
-        RADIO: '1488490323398099014',
-        PRESENCE: '1485270858980135004',
-        ABSENCE: '1485623724622217316',
-        SANCTION: '1488548984955080735',
-        AVERTISSEMENT: '1490345122678837419',
-        BM_ANNONCES: '1485636616683913346',
-        BM_NOTIF: '1485636555480502404',
-        RAPPELS_PANEL: '1485669809956982984',
-        CLIPS: '1485624000569933905',
-        ROLE_ALERT: '1489688278503264428',
-        WEAPONS_LOG: '1497021044953845791',
-    },
-
-    ROLES: {
-        MEMBRE_1: '1485270431291277383',
-        MEMBRE_2: '1485636099853516982',
-        MEMBRE_3: '1485279821658456306',
-        EXCLUDED_ROLE: '1485279148246175764',
-        EXCLUDED_RENAME: '1489336767097208922',
-        VIP_ROLE: '1489336767097208922',
-        ALERT_ROLE: '1490361524408291459',
-        // Rôles protégés : pas de kick, pas de relance accueil, pas d'exclusion
-        PROTECTED_ROLES: [
-            '1489336767097208922',
-            '1485278988598509759',
-            '1495448653945634987',
-            '1495464200443662366',
-            '1497005826114846741',
-            '1497228404834045972',
-        ],
-        // Rôles supérieurs : si MEMBRE_3 retiré et remplacé par un de ceux-là dans les 5 min → promotion (pas de relance accueil)
-        PROMOTION_ROLES: [
-            '1485279789253132288',
-            '1485279738212651279',
-            '1485279571531137204',
-            '1485279534650494976',
-        ],
-        COMMAND_ROLES: [
-            '1485279148246175764',
-            '1486744891848654988',
-            '1485279534650494976',
-            '1485279571531137204',
-        ],
-    },
+    GUILD_ID,
+    CHANNELS,
+    ROLES,
 
     VIP_USERS: [
         '293050500482465793',
@@ -136,20 +105,7 @@ if (TURBO_MODE) {
 // ==========================================
 // CLIENT DISCORD
 // ==========================================
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.MessageContent,
-    ],
-    partials: [
-        Partials.Message,
-        Partials.Reaction,
-        Partials.User,
-    ],
-});
+const client = createDiscordClient();
 
 // ==========================================
 // STOCKAGE EN MÉMOIRE
@@ -202,6 +158,7 @@ function saveWelcomeState() {
             };
         }
         fs.writeFileSync(WELCOME_STATE_FILE, JSON.stringify(data, null, 2));
+        saveState('welcome', data);
     } catch (e) {
         console.error('❌ Erreur sauvegarde welcome:', e.message);
     }
@@ -209,8 +166,12 @@ function saveWelcomeState() {
 
 function loadWelcomeStateData() {
     try {
+        const persisted = loadState('welcome', null);
+        if (persisted && typeof persisted === 'object') return persisted;
         if (fs.existsSync(WELCOME_STATE_FILE)) {
-            return JSON.parse(fs.readFileSync(WELCOME_STATE_FILE, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(WELCOME_STATE_FILE, 'utf8'));
+            saveState('welcome', data);
+            return data;
         }
     } catch (e) {
         console.error('❌ Erreur chargement welcome:', e.message);
@@ -238,8 +199,11 @@ const TRACKING_FILE = dataFile('absence_tracking.json');
 
 function loadAbsenceTracking() {
     try {
+        const persisted = loadState('absence_tracking', null);
+        if (persisted && typeof persisted === 'object') return new Map(Object.entries(persisted));
         if (fs.existsSync(TRACKING_FILE)) {
             const data = JSON.parse(fs.readFileSync(TRACKING_FILE, 'utf8'));
+            saveState('absence_tracking', data);
             return new Map(Object.entries(data));
         }
     } catch (e) {
@@ -255,6 +219,8 @@ function saveAbsenceTracking() {
             data[key] = value;
         }
         fs.writeFileSync(TRACKING_FILE, JSON.stringify(data, null, 2));
+        saveState('absence_tracking', data);
+        emitRealtime('absence:posted', { total: absenceTracking.size });
     } catch (e) {
         console.error('❌ Erreur sauvegarde suivi absences:', e);
     }
@@ -279,11 +245,32 @@ let presence2Data = {
 
 // Panneau /absence
 let absencePanelData = {
-    messageId: null,
-    messageIds: [],
+    ids: [],
     channelId: null,
+    busy: false,
     refreshInterval: null,
+    createdAt: 0,
 };
+let absencePanelBusyTimeout = null;
+let absencePanelRefreshFailures = 0;
+
+function saveAbsencePanelState() {
+    saveState('absence_panel', {
+        ids: absencePanelData.ids || [],
+        channelId: absencePanelData.channelId,
+        createdAt: absencePanelData.createdAt || 0,
+    });
+}
+
+function restoreAbsencePanelState() {
+    const saved = loadState('absence_panel', null);
+    if (!saved?.channelId || !Array.isArray(saved.ids) || saved.ids.length === 0) return;
+    absencePanelData.ids = saved.ids;
+    absencePanelData.channelId = saved.channelId;
+    absencePanelData.createdAt = saved.createdAt || Date.now();
+    startAbsencePanelRefresh();
+    console.log(`📋 Panneau absence restauré (${saved.ids.length} message(s))`);
+}
 
 // ==========================================
 // PERSISTANCE ÉTAT PRÉSENCE (survie redéploiement)
@@ -363,6 +350,12 @@ function getReactionMap(messageId) {
     return null;
 }
 
+function getPresenceOpForMessageId(messageId) {
+    if (presenceData.messageId === messageId) return 'op1';
+    if (presence2Data.messageId === messageId) return 'op2';
+    return null;
+}
+
 function emojiToType(emojiName, emojiId) {
     if (emojiName === 'check' || emojiId === '1486393925219647519') return 'check';
     if (emojiName === 'retard1' || emojiId === '1486400147654049924') return 'retard';
@@ -373,15 +366,35 @@ function emojiToType(emojiName, emojiId) {
 // Cache pour les absences du salon (mis à jour toutes les 60s)
 let absenceSalonCache = { validAbsences: new Set(), invalidAbsences: new Set(), validAbsenceNames: [], invalidAbsenceNames: [] };
 let absenceCacheUpdating = false;
+let absenceCacheRefreshTimeout = null;
 
-async function updateAbsenceSalonCache() {
-    if (absenceCacheUpdating) return;
+async function updateAbsenceSalonCache({ force = false } = {}) {
+    if (absenceCacheUpdating && !force) return;
     absenceCacheUpdating = true;
     try {
         absenceSalonCache = await getAbsentUsersToday();
-    } catch {} finally {
+    } catch (e) {
+        console.warn('⚠️ Cache absences salon non mis à jour:', e.message);
+    } finally {
         absenceCacheUpdating = false;
     }
+}
+
+function scheduleAbsenceSalonCacheUpdate(reason = 'event') {
+    if (absenceCacheRefreshTimeout) clearTimeout(absenceCacheRefreshTimeout);
+    absenceCacheRefreshTimeout = setTimeout(() => {
+        absenceCacheRefreshTimeout = null;
+        updateAbsenceSalonCache({ force: true })
+            .then(() => refreshAbsencePanel())
+            .catch(e => console.warn(`⚠️ Refresh cache absences (${reason}) échoué:`, e.message));
+    }, 500);
+}
+
+function handleAbsenceSalonCacheEvent(message, reason) {
+    const channelId = message?.channelId || message?.channel?.id;
+    if (channelId !== CONFIG.CHANNELS.ABSENCE) return;
+    console.log(`📋 Salon absences modifié (${reason}) → cache à recalculer`);
+    scheduleAbsenceSalonCacheUpdate(reason);
 }
 
 // Construction du panneau — utilise des embeds Discord (visuel propre)
@@ -416,6 +429,14 @@ function buildAbsencePanelEmbeds() {
     embeds.push(buildWeeklySummaryEmbed());
 
     return embeds;
+}
+
+function buildAbsencePanelPlaceholderEmbed(index = 1, total = 5) {
+    return new EmbedBuilder()
+        .setColor(0x2B2D31)
+        .setTitle(`📋 Suivi Présence OP — chargement ${index}/${total}`)
+        .setDescription('⏳ Construction du panneau absence en cours...')
+        .setFooter({ text: 'Le panneau se remplit automatiquement dans quelques secondes.' });
 }
 
 function buildPresenceEmbed(title, data, reactionMap, role, absData, color) {
@@ -584,7 +605,7 @@ function getConsecutiveDays(data) {
 // PANNEAU — Rafraîchissement
 // ==========================================
 async function refreshAbsencePanel() {
-    if (!absencePanelData.channelId || !absencePanelData.messageIds || absencePanelData.messageIds.length === 0) return;
+    if (!absencePanelData.channelId || !absencePanelData.ids || absencePanelData.ids.length === 0) return;
 
     try {
         // Timeout de sécurité — 10s max pour le cache absences
@@ -597,22 +618,29 @@ async function refreshAbsencePanel() {
         const embeds = buildAbsencePanelEmbeds();
 
         // Mettre à jour chaque message avec son embed correspondant
-        for (let i = 0; i < absencePanelData.messageIds.length; i++) {
+        for (let i = 0; i < absencePanelData.ids.length; i++) {
             try {
-                const msg = await channel.messages.fetch(absencePanelData.messageIds[i]).catch(() => null);
+                const msg = await channel.messages.fetch(absencePanelData.ids[i]).catch(() => null);
                 if (!msg) continue;
                 if (i < embeds.length) {
                     await msg.edit({ embeds: [embeds[i]] }).catch(() => {});
                 }
             } catch {}
         }
+        absencePanelRefreshFailures = 0;
     } catch (e) {
+        absencePanelRefreshFailures += 1;
         console.error('⚠️ Refresh panneau erreur (non bloquant):', e.message);
+        if (absencePanelRefreshFailures >= 3) {
+            console.warn('⚠️ Refresh panneau absence stoppé après 3 échecs consécutifs');
+            stopAbsencePanelRefresh();
+        }
     }
 }
 
 function startAbsencePanelRefresh() {
     stopAbsencePanelRefresh();
+    absencePanelRefreshFailures = 0;
     absencePanelData.refreshInterval = setInterval(() => refreshAbsencePanel(), 30_000);
 }
 
@@ -627,47 +655,7 @@ function stopAbsencePanelRefresh() {
 // ENREGISTREMENT COMMANDES
 // ==========================================
 async function registerCommands() {
-    const commands = [
-        new SlashCommandBuilder().setName('qg').setDescription('🚨 Appel au QG'),
-        new SlashCommandBuilder().setName('garage').setDescription('🚨 Appel au Garage Hood'),
-        new SlashCommandBuilder().setName('alignement').setDescription('🚨 Demande d\'alignement'),
-        new SlashCommandBuilder().setName('tir').setDescription('🚨 Arrêter de tirer'),
-        new SlashCommandBuilder().setName('position').setDescription('🚨 Prendre des positions'),
-        new SlashCommandBuilder().setName('defense').setDescription('🚨 Défense du laboratoire'),
-        new SlashCommandBuilder().setName('weed').setDescription('🚨 Alerte weed'),
-        new SlashCommandBuilder().setName('traitement-weed').setDescription('🚨 Traitement de la weed'),
-        new SlashCommandBuilder().setName('yellowjack').setDescription('🚨 Rassemblement Yellow Jack'),
-        new SlashCommandBuilder().setName('megamall').setDescription('🚨 Rassemblement parking Mega Mall'),
-        new SlashCommandBuilder().setName('parking5').setDescription('🚨 Rassemblement Parking 5 Madrazo'),
-        new SlashCommandBuilder().setName('ile').setDescription('🚨 Rassemblement près de l\'Ile'),
-        new SlashCommandBuilder().setName('trash').setDescription('🚨 Avertissement trash'),
-        new SlashCommandBuilder().setName('radio').setDescription('📻 Nouvelle fréquence radio'),
-        new SlashCommandBuilder().setName('presence-test').setDescription('🧪 Test 1ère présence OP'),
-        new SlashCommandBuilder().setName('presence-test2').setDescription('🧪 Test 2ème présence OP'),
-        new SlashCommandBuilder().setName('presence2').setDescription('📋 Envoie la 2ème présence OP (sans relances)'),
-        new SlashCommandBuilder().setName('absence').setDescription('📋 Panneau suivi présences/absences'),
-        new SlashCommandBuilder()
-            .setName('presence-edit')
-            .setDescription('✏️ Modifier la liste du message de présence')
-            .addStringOption(o => o.setName('liste').setDescription('Sépare par / — Ex: Armes / Eau / Pochons').setRequired(false)),
-        new SlashCommandBuilder()
-            .setName('clear')
-            .setDescription('🧹 Supprime les messages du bot')
-            .addIntegerOption(o => o.setName('nombre').setDescription('Nombre (défaut 100)').setRequired(false)),
-        new SlashCommandBuilder()
-            .setName('clearmessage')
-            .setDescription('🧹 Supprime X messages')
-            .addIntegerOption(o => o.setName('nombre').setDescription('Nombre').setRequired(true)),
-        new SlashCommandBuilder()
-            .setName('annonce')
-            .setDescription('📢 Annonce avec mention')
-            .addRoleOption(o => o.setName('role').setDescription('Rôle').setRequired(true))
-            .addStringOption(o => o.setName('message').setDescription('Message').setRequired(true)),
-        new SlashCommandBuilder().setName('presence-force').setDescription('🔄 Force le démarrage de la présence OP (si redéployé en cours)'),
-        new SlashCommandBuilder().setName('panel').setDescription('🎮 Ouvrir le panneau de contrôle (rappels programmés)'),
-        new SlashCommandBuilder().setName('clips-backfill').setDescription('Lancer le scan historique des clips du forum'),
-        new SlashCommandBuilder().setName('clips-backfill-status').setDescription('Voir l etat du scan historique des clips'),
-    ];
+    const commands = buildSlashCommands();
 
     const rest = new REST().setToken(CONFIG.TOKEN);
     try {
@@ -685,9 +673,12 @@ client.once('ready', async () => {
     console.log(`🤖 ${client.user.tag} connecté | ${client.guilds.cache.size} serveur(s)`);
     await registerCommands();
     setupPresenceCron();
+    scheduleDailyBackups();
+    restoreAbsencePanelState();
 
     // Charger les rappels du panel
     loadReminders();
+    restorePanelState();
     if (reminders.some(r => r.enabled)) {
         startReminderLoop();
         console.log('⏰ Boucle de rappels démarrée');
@@ -1118,13 +1109,25 @@ client.on('messageCreate', async (message) => {
 // Debounce pour le refresh du panneau
 let panelRefreshTimeout = null;
 function scheduleAbsencePanelRefresh() {
-    if (!absencePanelData.messageId) return;
+    if (!absencePanelData.ids || absencePanelData.ids.length === 0) return;
     if (panelRefreshTimeout) clearTimeout(panelRefreshTimeout);
     panelRefreshTimeout = setTimeout(() => {
         refreshAbsencePanel();
         panelRefreshTimeout = null;
     }, 2_000);
 }
+
+client.on('messageCreate', (message) => {
+    handleAbsenceSalonCacheEvent(message, 'messageCreate');
+});
+
+client.on('messageDelete', (message) => {
+    handleAbsenceSalonCacheEvent(message, 'messageDelete');
+});
+
+client.on('messageUpdate', (oldMessage, newMessage) => {
+    handleAbsenceSalonCacheEvent(newMessage || oldMessage, 'messageUpdate');
+});
 
 client.on('messageDelete', async (message) => {
     // On NE stoppe PAS la présence si le message Discord est supprimé manuellement
@@ -1148,6 +1151,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
     const type = emojiToType(reaction.emoji.name, reaction.emoji.id);
     if (type) {
         map.set(user.id, type);
+        emitRealtime('presence:reaction', { op: getPresenceOpForMessageId(msgId), userId: user.id, type });
         scheduleAbsencePanelRefresh();
     }
 });
@@ -1231,6 +1235,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
     const type = emojiToType(reaction.emoji.name, reaction.emoji.id);
     if (type && map.get(user.id) === type) {
         map.delete(user.id);
+        emitRealtime('presence:reaction', { op: getPresenceOpForMessageId(msgId), userId: user.id, type: null });
         scheduleAbsencePanelRefresh();
     }
 });
@@ -1291,10 +1296,8 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 async function handleClipsBackfill(interaction) {
-    await interaction.reply({
-        content: 'Scan historique des clips lance. Utilise `/clips-backfill-status` pour suivre l avancement.',
-        ephemeral: true,
-    });
+    await interaction.deferReply({ ephemeral: true });
+    await interaction.editReply('Scan historique des clips lance. Utilise `/clips-backfill-status` pour suivre l avancement.');
 
     backfillClipForum(client)
         .then(summary => {
@@ -1306,6 +1309,7 @@ async function handleClipsBackfill(interaction) {
 }
 
 async function handleClipsBackfillStatus(interaction) {
+    await interaction.deferReply({ ephemeral: true });
     const status = getBackfillStatus();
     const lines = [
         '**Backfill clips**',
@@ -1320,66 +1324,96 @@ async function handleClipsBackfillStatus(interaction) {
     if (status.startedAt) lines.push(`Demarre : ${status.startedAt}`);
     if (status.completedAt) lines.push(`Termine : ${status.completedAt}`);
     if (status.error) lines.push(`Derniere erreur : ${status.error}`);
-    return interaction.reply({ content: lines.join('\n'), ephemeral: true });
+    return interaction.editReply(lines.join('\n'));
 }
 
 // ==========================================
 // /absence
 // ==========================================
 async function handleAbsencePanel(interaction) {
-    // Supprimer l'ancien panneau en background
-    try {
-        if (absencePanelData.messageIds && absencePanelData.channelId) {
-            const ch = client.channels.cache.get(absencePanelData.channelId);
-            if (ch) {
-                for (const id of absencePanelData.messageIds) {
-                    ch.messages.fetch(id).then(m => m.delete()).catch(() => {});
-                }
-            }
-        }
-    } catch {}
+    if (absencePanelData.busy) {
+        return interaction.reply({ content: '⏳ Le panneau /absence est déjà en cours de création. Réessaie dans quelques secondes.', ephemeral: true });
+    }
 
-    // Construire les embeds (5 max)
-    const embeds = buildAbsencePanelEmbeds();
+    absencePanelData.busy = true;
+    if (absencePanelBusyTimeout) clearTimeout(absencePanelBusyTimeout);
+    absencePanelBusyTimeout = setTimeout(() => {
+        absencePanelData.busy = false;
+        console.warn('⚠️ Lock /absence libéré automatiquement après 30s');
+    }, 30_000);
 
-    // Envoyer le premier embed comme reply (instantané)
     try {
-        await interaction.reply({ embeds: [embeds[0]] });
+        await interaction.deferReply();
     } catch (e) {
-        console.error('❌ /absence reply erreur:', e.message);
+        absencePanelData.busy = false;
+        if (absencePanelBusyTimeout) clearTimeout(absencePanelBusyTimeout);
+        console.error('❌ /absence defer erreur:', e.message);
         return;
     }
 
-    // Envoyer les autres embeds dans des messages séparés en background
-    (async () => {
-        try {
-            const channel = interaction.channel;
-            const messageIds = [];
+    const channel = interaction.channel;
+    const oldIds = [...(absencePanelData.ids || [])];
+    const oldChannelId = absencePanelData.channelId;
+    stopAbsencePanelRefresh();
+    absencePanelData.ids = [];
+    absencePanelData.channelId = channel.id;
+    absencePanelData.createdAt = Date.now();
+    saveAbsencePanelState();
 
-            const reply = await interaction.fetchReply().catch(() => null);
-            if (reply) messageIds.push(reply.id);
-
-            // 1 embed par message (évite la limite 6000 chars)
-            for (let i = 1; i < embeds.length; i++) {
-                try {
-                    const msg = await channel.send({ embeds: [embeds[i]] });
-                    messageIds.push(msg.id);
-                    await sleep(200);
-                } catch (e) {
-                    console.error(`⚠️ Erreur envoi embed ${i}:`, e.message);
-                }
+    // Supprimer l'ancien panneau en background, sans bloquer l'interaction Discord.
+    if (oldIds.length && oldChannelId) {
+        const oldChannel = client.channels.cache.get(oldChannelId);
+        if (oldChannel) {
+            for (const id of oldIds) {
+                oldChannel.messages.fetch(id).then(m => m.delete()).catch(() => {});
             }
+        }
+    }
 
-            absencePanelData.messageIds = messageIds;
-            absencePanelData.channelId = channel.id;
-            absencePanelData.messageId = messageIds[0] || null;
-            startAbsencePanelRefresh();
-        } catch (e) {
-            console.error('❌ Erreur background /absence:', e.message);
+    try {
+        const placeholderTotal = 5;
+        await interaction.editReply({ embeds: [buildAbsencePanelPlaceholderEmbed(1, placeholderTotal)] });
+        const firstMsg = await interaction.fetchReply().catch(() => null);
+        if (firstMsg) {
+            absencePanelData.ids.push(firstMsg.id);
+            saveAbsencePanelState();
         }
 
-        updateAbsenceSalonCache().catch(() => {});
-    })();
+        const placeholderMessages = firstMsg ? [firstMsg] : [];
+        for (let i = 1; i < placeholderTotal; i++) {
+            const msg = await channel.send({ embeds: [buildAbsencePanelPlaceholderEmbed(i + 1, placeholderTotal)] });
+            placeholderMessages.push(msg);
+            absencePanelData.ids.push(msg.id);
+            saveAbsencePanelState();
+            await sleep(200);
+        }
+
+        await updateAbsenceSalonCache({ force: true });
+        const embeds = buildAbsencePanelEmbeds();
+        for (let i = 0; i < placeholderMessages.length; i++) {
+            if (!placeholderMessages[i]) continue;
+            if (embeds[i]) {
+                await placeholderMessages[i].edit({ embeds: [embeds[i]] }).catch(() => {});
+            } else {
+                await placeholderMessages[i].delete().catch(() => {});
+                absencePanelData.ids = absencePanelData.ids.filter(id => id !== placeholderMessages[i].id);
+                saveAbsencePanelState();
+            }
+        }
+
+        startAbsencePanelRefresh();
+        await interaction.followUp({ content: '✅ Panneau absence prêt.', ephemeral: true }).catch(() => {});
+    } catch (e) {
+        console.error('❌ Erreur /absence:', e.message);
+        await interaction.editReply({ content: '❌ Impossible de créer le panneau absence. Réessaie dans quelques secondes.', embeds: [] }).catch(() => {});
+    } finally {
+        absencePanelData.busy = false;
+        if (absencePanelBusyTimeout) {
+            clearTimeout(absencePanelBusyTimeout);
+            absencePanelBusyTimeout = null;
+        }
+        updateAbsenceSalonCache({ force: true }).catch(() => {});
+    }
 }
 
 // ==========================================
@@ -1391,10 +1425,12 @@ async function handlePresenceForce(interaction) {
         return interaction.reply({ content: '⚠️ Une présence OP est déjà active. Utilise `/presence-test` pour relancer.', ephemeral: true });
     }
 
-    await interaction.reply({ content: '🔄 Lancement forcé de la présence OP...', ephemeral: true });
+    await interaction.deferReply({ ephemeral: true });
+    await interaction.editReply('🔄 Lancement forcé de la présence OP...');
 
     // Lancer la présence normalement (avec relances et crons)
     await sendPresenceMessage();
+    await interaction.editReply('✅ Présence OP lancée.');
 
     console.log('🔄 /presence-force: Présence OP lancée manuellement');
 }
@@ -1427,9 +1463,7 @@ async function sendPresence2Message(channelOverride) {
 
     try {
         const msg = await channel.send({ content: text });
-        await safeReact(msg, CONFIG.REACT_EMOJIS.CHECK);
-        await safeReact(msg, CONFIG.REACT_EMOJIS.RETARD);
-        await safeReact(msg, CONFIG.REACT_EMOJIS.NO);
+        await addPresenceReactions(msg);
 
         presence2Data.messageId = msg.id;
         presence2Data.active = true;
@@ -1724,9 +1758,7 @@ async function sendPresenceMessage(channelOverride) {
 
     try {
         const msg = await channel.send({ content: text, allowedMentions: { parse: ['roles'] } });
-        await safeReact(msg, CONFIG.REACT_EMOJIS.CHECK);
-        await safeReact(msg, CONFIG.REACT_EMOJIS.RETARD);
-        await safeReact(msg, CONFIG.REACT_EMOJIS.NO);
+        await addPresenceReactions(msg);
 
         presenceData.messageId = msg.id;
         presenceData.reminderIds = [];
@@ -1812,6 +1844,10 @@ async function startPresenceReminders(channel, presenceMsg) {
             cron.schedule('0 2 * * *', async () => {
                 console.log('🌃 2h — Reset complet présence (site + état)');
                 stopAbsencePanelRefresh();
+                absencePanelData.ids = [];
+                absencePanelData.channelId = null;
+                absencePanelData.createdAt = 0;
+                deleteState('absence_panel');
                 if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
                 presenceData = { messageId: null, reminderIds: [], reminderInterval: null, active: false };
                 reactionsOP1.clear();
@@ -1878,7 +1914,14 @@ async function getAbsentUsersToday() {
     if (!ch) return { validAbsences, invalidAbsences, validAbsenceNames, invalidAbsenceNames };
 
     try {
-        const msgs = await ch.messages.fetch({ limit: 100 });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10_000);
+        const msgs = await Promise.race([
+            ch.messages.fetch({ limit: 100, signal: controller.signal }),
+            new Promise((_, reject) => {
+                controller.signal.addEventListener('abort', () => reject(new Error('timeout fetch salon absences')), { once: true });
+            }),
+        ]).finally(() => clearTimeout(timeout));
         const today = new Date(), td = today.getDate(), tm = today.getMonth() + 1;
 
         for (const [, m] of msgs) {
@@ -1915,7 +1958,9 @@ async function getAbsentUsersToday() {
                 validAbsenceNames.push(displayName);
             }
         }
-    } catch {}
+    } catch (e) {
+        console.warn('⚠️ Lecture salon absences interrompue:', e.message);
+    }
     return { validAbsences, invalidAbsences, validAbsenceNames, invalidAbsenceNames };
 }
 
@@ -2143,13 +2188,46 @@ let reminderLoopTimer = null;
 let panelMessageId = null;
 let panelChannelId = null;
 
+function savePanelState() {
+    if (!panelMessageId || !panelChannelId) return deleteState('panel');
+    saveState('panel', { messageId: panelMessageId, channelId: panelChannelId });
+}
+
+function restorePanelState() {
+    const saved = loadState('panel', null);
+    if (!saved?.messageId || !saved?.channelId) return;
+    panelMessageId = saved.messageId;
+    panelChannelId = saved.channelId;
+    console.log(`🎮 Panel restauré depuis SQLite: ${panelMessageId}`);
+}
+
 // Persistance des rappels
 function loadReminders() {
     try {
-        if (fs.existsSync(REMINDERS_FILE)) {
+        const persisted = loadState('reminders', null);
+        if (persisted && Array.isArray(persisted.reminders)) {
+            reminders = persisted.reminders;
+            nextReminderId = persisted.nextId || 1;
+        } else if (fs.existsSync(REMINDERS_FILE)) {
             const data = JSON.parse(fs.readFileSync(REMINDERS_FILE, 'utf8'));
             reminders = data.reminders || [];
             nextReminderId = data.nextId || 1;
+            saveState('reminders', { reminders, nextId: nextReminderId });
+        }
+
+        if (reminders.length) {
+            const minutes = getParisMinutes();
+            const elapsed = getElapsedMinutes(minutes);
+            let migrated = false;
+            for (const reminder of reminders) {
+                if (typeof reminder.lastSentMinute !== 'number') {
+                    reminder.lastSentMinute = elapsed >= 0
+                        ? Math.max(0, elapsed - (Number(reminder.interval) || 60))
+                        : null;
+                    migrated = true;
+                }
+            }
+            if (migrated) saveReminders();
             console.log(`📋 ${reminders.length} rappel(s) restauré(s)`);
         }
     } catch (e) {
@@ -2160,6 +2238,8 @@ function loadReminders() {
 function saveReminders() {
     try {
         fs.writeFileSync(REMINDERS_FILE, JSON.stringify({ reminders, nextId: nextReminderId }, null, 2));
+        saveState('reminders', { reminders, nextId: nextReminderId });
+        emitRealtime('reminder:changed', { total: reminders.length });
     } catch (e) {
         console.error('❌ Erreur sauvegarde rappels:', e.message);
     }
@@ -2255,6 +2335,7 @@ async function refreshPanel() {
     } catch {
         panelMessageId = null;
         panelChannelId = null;
+        savePanelState();
     }
 }
 
@@ -2278,6 +2359,8 @@ async function sendReminderMessage(reminder) {
         });
 
         reminder.lastMessageId = sent.id;
+        const elapsed = getElapsedMinutes(getParisMinutes());
+        if (elapsed >= 0) reminder.lastSentMinute = elapsed;
         saveReminders();
     } catch (err) {
         console.error(`❌ Erreur envoi rappel #${reminder.id}:`, err.message);
@@ -2293,7 +2376,14 @@ function startReminderLoop() {
         const elapsed = getElapsedMinutes(minutes);
         if (elapsed < 0) return;
 
-        const toSend = reminders.filter(r => r.enabled && elapsed % r.interval === 0);
+        const toSend = reminders.filter(r => {
+            if (!r.enabled) return false;
+            const interval = Number(r.interval) || 60;
+            if (typeof r.lastSentMinute !== 'number') {
+                r.lastSentMinute = Math.max(0, elapsed - interval);
+            }
+            return elapsed - r.lastSentMinute >= interval;
+        });
         if (toSend.length === 0) return;
 
         for (let i = 0; i < toSend.length; i++) {
@@ -2340,6 +2430,7 @@ async function handlePanel(interaction) {
 
     panelMessageId = reply.id;
     panelChannelId = reply.channelId;
+    savePanelState();
 
     if (reminders.some(r => r.enabled)) startReminderLoop();
 }
@@ -2432,6 +2523,7 @@ async function handlePanelInteraction(interaction) {
             try {
                 const channel = await client.channels.fetch(CONFIG.CHANNELS.SANCTION);
                 await channel.send(`${mention} Vous avez reçu un **avertissement** pour la raison suivante : ${raison} ${CONFIG.EMOJIS.ATTENTION} ${CONFIG.EMOJIS.BS21}`);
+                emitRealtime('sanction:added', { userId: cleanId, raison });
                 await interaction.reply({ content: '⚠️ Sanction envoyée', ephemeral: true });
             } catch (err) {
                 await interaction.reply({ content: `❌ Erreur : ${err.message}`, ephemeral: true });
@@ -2450,6 +2542,7 @@ async function handlePanelInteraction(interaction) {
                 interval,
                 enabled: true,
                 lastMessageId: null,
+                lastSentMinute: getElapsedMinutes(getParisMinutes()),
             };
 
             reminders.push(reminder);
@@ -2720,11 +2813,28 @@ async function safeReact(msg, emoji, retries = 2) {
     return false;
 }
 
+async function addPresenceReactions(msg) {
+    const emojis = [
+        CONFIG.REACT_EMOJIS.CHECK,
+        CONFIG.REACT_EMOJIS.RETARD,
+        CONFIG.REACT_EMOJIS.NO,
+    ];
+    await Promise.all(emojis.map((emoji, index) => (
+        sleep(index * 250).then(() => safeReact(msg, emoji))
+    )));
+}
+
 // ==========================================
 // ERREURS
 // ==========================================
-process.on('unhandledRejection', e => console.error('❌ Unhandled:', e));
-process.on('uncaughtException', e => console.error('❌ Uncaught:', e));
+process.on('unhandledRejection', e => {
+    console.error('❌ Unhandled:', e);
+    process.exit(1);
+});
+process.on('uncaughtException', e => {
+    console.error('❌ Uncaught:', e);
+    process.exit(1);
+});
 
 // ==========================================
 // LANCEMENT

@@ -1,112 +1,29 @@
 // ==========================================
-// MODULE CRAFTS — DB SQLite avec fallback JSON
+// MODULE CRAFTS — DB SQLite
+// MODIFIÉ CHANTIER 3 — 14/05/2026 — images craft protégées par session
+// MODIFIÉ CHANTIER 4 — 14/05/2026 — rôles craft centralisés
+// MODIFIÉ CHANTIER 5 — 14/05/2026 — suppression du fallback JSON
+// MODIFIÉ CHANTIER 12 — 14/05/2026 — events temps réel craft/dashboard
 // ==========================================
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const config = require('./src/shared/config');
 const { ensureDataDirs } = require('./src/shared/database');
+const {
+    ADMIN_USER_ID,
+    ADMIN_ROLE_ID,
+    CRAFT_VALIDATION_ROLES,
+    LIMITED_CRAFT_ACCESS_ROLES,
+    MY_WEAPONS_DELETE_ROLE,
+} = require('./src/shared/permissions');
+const { emitRealtime } = require('./src/shared/realtime');
 
 const DATA_DIR = config.paths.data;
 const DB_PATH = config.paths.database;
 const UPLOADS_DIR = config.paths.craftsUploads;
-const FALLBACK_PATH = path.join(DATA_DIR, 'crafts.json');
-
-// Assurer l'existence des dossiers
-try {
-    ensureDataDirs();
-    console.log(`[storage] data=${DATA_DIR}`);
-    console.log(`[storage] crafts uploads=${UPLOADS_DIR}`);
-    console.log(`[database] crafts db=${DB_PATH}`);
-} catch (e) {
-    console.error('❌ Erreur création dossiers data:', e.message);
-}
-
-// Tenter de charger better-sqlite3, sinon fallback JSON
-let useSQLite = false;
+const Database = require('better-sqlite3');
 let db = null;
-let Database = null;
-
-try {
-    Database = require('better-sqlite3');
-    useSQLite = true;
-    console.log('✅ better-sqlite3 chargé');
-} catch (e) {
-    console.warn('⚠️ better-sqlite3 indisponible, fallback JSON activé');
-    if (config.isProduction || config.isRailway) {
-        console.error('❌ Production sans SQLite: vérifie better-sqlite3 et le volume Railway /data.');
-        process.exit(1);
-    }
-    useSQLite = false;
-}
-
-let jsonData = {
-    weapons: [],
-    ingredients: [],
-    stock_materials: [],
-    my_weapon_names: [],
-    organizations: [],
-    craft_requests: [],
-    my_weapons: [],
-    order_advances: [],
-    order_advance_participants: [],
-    order_advance_repayments: [],
-    counters: {
-        weapons: 0,
-        ingredients: 0,
-        my_weapon_names: 0,
-        organizations: 0,
-        requests: 0,
-        myweapons: 0,
-        order_advances: 0,
-        order_advance_participants: 0,
-        order_advance_repayments: 0,
-    },
-};
-
-function loadJSON() {
-    try {
-        if (fs.existsSync(FALLBACK_PATH)) {
-            jsonData = JSON.parse(fs.readFileSync(FALLBACK_PATH, 'utf8'));
-            jsonData.weapons = jsonData.weapons || [];
-            jsonData.stock_materials = jsonData.stock_materials || [];
-            jsonData.my_weapon_names = jsonData.my_weapon_names || [];
-            jsonData.organizations = jsonData.organizations || [];
-            jsonData.craft_requests = jsonData.craft_requests || [];
-            jsonData.my_weapons = jsonData.my_weapons || [];
-            jsonData.order_advances = jsonData.order_advances || [];
-            jsonData.order_advance_participants = jsonData.order_advance_participants || [];
-            jsonData.order_advance_repayments = jsonData.order_advance_repayments || [];
-            jsonData.counters = {
-                weapons: 0,
-                ingredients: 0,
-                my_weapon_names: 0,
-                organizations: 0,
-                requests: 0,
-                myweapons: 0,
-                order_advances: 0,
-                order_advance_participants: 0,
-                order_advance_repayments: 0,
-                ...(jsonData.counters || {}),
-            };
-        }
-    } catch (e) {
-        console.error('Erreur chargement crafts.json:', e.message);
-    }
-}
-
-function saveJSON() {
-    try {
-        fs.writeFileSync(FALLBACK_PATH, JSON.stringify(jsonData, null, 2));
-    } catch (e) {
-        console.error('Erreur sauvegarde crafts.json:', e.message);
-    }
-}
-
-function nextId(type) {
-    jsonData.counters[type] = (jsonData.counters[type] || 0) + 1;
-    return jsonData.counters[type];
-}
 
 const STOCK_MATERIAL_NAMES = [
     'Bloc de chrome',
@@ -117,26 +34,14 @@ const STOCK_MATERIAL_NAMES = [
     'Tungstène',
 ];
 
-const CRAFT_PRODUCTION_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
-const CRAFT_STOCK_RESERVED_STATUSES = ['materials', 'waiting_materials', 'in_progress'];
-const CRAFTABLE_CACHE_TTL_MS = 10_000;
-
-let craftableWeaponsCache = null;
-let craftableWeaponsCacheExpiresAt = 0;
-
-function invalidateCraftCaches() {
-    craftableWeaponsCache = null;
-    craftableWeaponsCacheExpiresAt = 0;
-}
-
 function normalizeStockName(value) {
     return String(value || '')
-        .replace(/Ã¨/g, 'e')
-        .replace(/Ã©/g, 'e')
-        .replace(/Ãª/g, 'e')
-        .replace(/Ã«/g, 'e')
-        .replace(/Ã /g, 'a')
-        .replace(/Ã¢/g, 'a')
+        .replace(/è/g, 'e')
+        .replace(/é/g, 'e')
+        .replace(/ê/g, 'e')
+        .replace(/ë/g, 'e')
+        .replace(/à/g, 'a')
+        .replace(/â/g, 'a')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/^stock\s+/i, '')
@@ -154,20 +59,20 @@ function isStockMaterialName(name) {
     return Boolean(getCanonicalStockMaterialName(name));
 }
 
-function parseWeaponIngredients(value) {
-    if (!value) return [];
-    if (Array.isArray(value)) return value;
-    try {
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
+const CRAFT_PRODUCTION_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
+const CRAFT_STOCK_RESERVED_STATUSES = ['materials', 'waiting_materials', 'in_progress'];
+const CRAFTABLE_CACHE_TTL_MS = 10_000;
+
+let craftableWeaponsCache = null;
+let craftableWeaponsCacheExpiresAt = 0;
+
+function invalidateCraftCaches() {
+    craftableWeaponsCache = null;
+    craftableWeaponsCacheExpiresAt = 0;
 }
 
 function initDB() {
-    if (useSQLite) {
-        try {
+            try {
             db = new Database(DB_PATH);
             db.pragma('journal_mode = WAL');
             db.pragma('foreign_keys = ON');
@@ -351,48 +256,14 @@ function initDB() {
 
             console.log('💾 DB Crafts initialisée (SQLite)');
         } catch (e) {
-            console.error('❌ SQLite init error, fallback JSON:', e.message);
-            if (config.isProduction || config.isRailway) {
-                console.error('SQLite init error en production, fallback JSON desactive:', e.message);
-                throw e;
-            }
-            useSQLite = false;
-            loadJSON();
-            seedDefaultIngredientsJSON();
-            seedStockMaterials();
-            seedMyWeaponNamesFromWeapons();
-            console.log('💾 DB Crafts initialisée (JSON fallback)');
+            console.error('❌ SQLite init error, arrêt du module crafts:', e.message);
+            throw e;
         }
-    } else {
-        loadJSON();
-        seedDefaultIngredientsJSON();
-        seedStockMaterials();
-        seedMyWeaponNamesFromWeapons();
-        console.log('💾 DB Crafts initialisée (JSON)');
-    }
-}
 
-function seedDefaultIngredientsJSON() {
-    const defaults = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
-    if (!jsonData.ingredients) jsonData.ingredients = [];
-    if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
-    for (const name of defaults) {
-        if (!jsonData.ingredients.find(i => i.name === name)) {
-            jsonData.counters.ingredients++;
-            jsonData.ingredients.push({
-                id: jsonData.counters.ingredients,
-                name,
-                image_path: null,
-                created_at: Math.floor(Date.now() / 1000),
-            });
-        }
-    }
-    saveJSON();
 }
 
 function seedStockMaterials() {
-    if (useSQLite) {
-        const insertIngredient = db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)');
+            const insertIngredient = db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)');
         const upsertStock = db.prepare(`
             INSERT INTO stock_materials (ingredient_id, quantity, updated_at)
             VALUES (?, ?, strftime('%s','now'))
@@ -431,210 +302,76 @@ function seedStockMaterials() {
             }
         }
         invalidateCraftCaches();
-        return;
-    }
-
-    if (!jsonData.ingredients) jsonData.ingredients = [];
-    if (!jsonData.stock_materials) jsonData.stock_materials = [];
-    if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
-
-    for (const name of STOCK_MATERIAL_NAMES) {
-        const matches = jsonData.ingredients.filter(item => normalizeStockName(item.name) === normalizeStockName(name));
-        let ingredient = matches.find(item => item.image_path)
-            || matches.find(item => item.name === name)
-            || matches[0];
-        if (!ingredient) {
-            jsonData.counters.ingredients++;
-            ingredient = {
-                id: jsonData.counters.ingredients,
-                name,
-                image_path: null,
-                created_at: Math.floor(Date.now() / 1000),
-            };
-            jsonData.ingredients.push(ingredient);
-        } else if (ingredient.name !== name) {
-            ingredient.name = name;
-        }
-
-        const duplicateIds = new Set(matches.map(item => Number(item.id)).filter(id => id !== Number(ingredient.id)));
-        const duplicateRows = jsonData.stock_materials.filter(row => duplicateIds.has(Number(row.ingredient_id)));
-        const existing = jsonData.stock_materials.find(row => Number(row.ingredient_id) === Number(ingredient.id));
-        const quantity = Math.max(
-            Number(existing?.quantity) || 0,
-            ...duplicateRows.map(row => Number(row.quantity) || 0)
-        );
-
-        if (existing) {
-            existing.quantity = quantity;
-            existing.updated_at = Math.floor(Date.now() / 1000);
-        } else {
-            jsonData.stock_materials.push({
-                id: jsonData.stock_materials.length + 1,
-                ingredient_id: ingredient.id,
-                quantity,
-                updated_at: Math.floor(Date.now() / 1000),
-            });
-        }
-        jsonData.stock_materials = jsonData.stock_materials.filter(row => !duplicateIds.has(Number(row.ingredient_id)));
-    }
-    saveJSON();
-    invalidateCraftCaches();
 }
 
 function seedMyWeaponNamesFromWeapons() {
     try {
-        if (useSQLite) {
-            const existing = db.prepare('SELECT COUNT(*) as count FROM my_weapon_names').get();
+                    const existing = db.prepare('SELECT COUNT(*) as count FROM my_weapon_names').get();
             if (existing && existing.count > 0) return;
-            const names = db.prepare('SELECT DISTINCT name FROM weapons WHERE name IS NOT NULL AND TRIM(name) != "" ORDER BY name ASC').all();
+            const names = db.prepare("SELECT DISTINCT name FROM weapons WHERE name IS NOT NULL AND TRIM(name) != '' ORDER BY name ASC").all();
             const stmt = db.prepare('INSERT OR IGNORE INTO my_weapon_names (name) VALUES (?)');
             for (const row of names) stmt.run(String(row.name || '').trim());
-            return;
-        }
-        jsonData.my_weapon_names = jsonData.my_weapon_names || [];
-        if (jsonData.my_weapon_names.length > 0) return;
-        jsonData.counters.my_weapon_names = jsonData.counters.my_weapon_names || 0;
-        for (const weapon of (jsonData.weapons || [])) {
-            const name = String(weapon.name || '').trim();
-            if (!name || jsonData.my_weapon_names.some(w => String(w.name || '').toLowerCase() === name.toLowerCase())) continue;
-            jsonData.counters.my_weapon_names++;
-            jsonData.my_weapon_names.push({
-                id: jsonData.counters.my_weapon_names,
-                name,
-                sale_price: 0,
-                max_sale_price: 0,
-                created_at: Math.floor(Date.now() / 1000),
-            });
-        }
-        saveJSON();
     } catch (e) {
         console.error('Erreur seed noms armes vente:', e.message);
     }
 }
 
 function getAllWeapons() {
-    if (useSQLite) return db.prepare('SELECT * FROM weapons ORDER BY name ASC').all();
-    return [...jsonData.weapons].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-}
+    return db.prepare('SELECT * FROM weapons ORDER BY name ASC').all();}
 
 function getWeapon(id) {
-    if (useSQLite) return db.prepare('SELECT * FROM weapons WHERE id = ?').get(id);
-    return jsonData.weapons.find(w => w.id === id);
-}
+    return db.prepare('SELECT * FROM weapons WHERE id = ?').get(id);}
 
 function getWeaponByName(name) {
     const clean = String(name || '').trim().toLowerCase();
     if (!clean) return null;
-    if (useSQLite) return db.prepare('SELECT * FROM weapons WHERE LOWER(name) = ? LIMIT 1').get(clean) || null;
-    return (jsonData.weapons || []).find(w => String(w.name || '').trim().toLowerCase() === clean) || null;
-}
+    return db.prepare('SELECT * FROM weapons WHERE LOWER(name) = ? LIMIT 1').get(clean) || null;}
 
 function insertWeapon(name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) {
-    if (useSQLite) {
-        const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            const r = db.prepare(`INSERT INTO weapons (name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(name, image_path, plan_image_path, requires_plan ? 1 : 0, craft_time, craft_price, sale_price, max_sale_price, ingredients);
         invalidateCraftCaches();
         return r.lastInsertRowid;
-    }
-    const id = nextId('weapons');
-    jsonData.weapons.push({ id, name, image_path, plan_image_path, requires_plan: requires_plan ? 1 : 0, craft_time, craft_price, sale_price, max_sale_price, ingredients, created_at: Math.floor(Date.now() / 1000) });
-    saveJSON();
-    invalidateCraftCaches();
-    return id;
 }
 
 function updateWeapon(id, name, image_path, plan_image_path, requires_plan, craft_time, craft_price, sale_price, max_sale_price, ingredients) {
-    if (useSQLite) {
-        db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, sale_price = ?, max_sale_price = ?, ingredients = ?, requires_plan = ?, image_path = COALESCE(?, image_path), plan_image_path = COALESCE(?, plan_image_path) WHERE id = ?`)
+            db.prepare(`UPDATE weapons SET name = ?, craft_time = ?, craft_price = ?, sale_price = ?, max_sale_price = ?, ingredients = ?, requires_plan = ?, image_path = COALESCE(?, image_path), plan_image_path = COALESCE(?, plan_image_path) WHERE id = ?`)
             .run(name, craft_time, craft_price, sale_price, max_sale_price, ingredients, requires_plan ? 1 : 0, image_path, plan_image_path, id);
         invalidateCraftCaches();
         return;
-    }
-    const w = jsonData.weapons.find(w => w.id === id);
-    if (w) {
-        w.name = name;
-        w.craft_time = craft_time;
-        w.craft_price = craft_price;
-        w.sale_price = sale_price;
-        w.max_sale_price = max_sale_price;
-        w.ingredients = ingredients;
-        w.requires_plan = requires_plan ? 1 : 0;
-        if (image_path) w.image_path = image_path;
-        if (plan_image_path) w.plan_image_path = plan_image_path;
-        saveJSON();
-        invalidateCraftCaches();
-    }
 }
 
 function deleteWeapon(id) {
-    if (useSQLite) { db.prepare('DELETE FROM weapons WHERE id = ?').run(id); invalidateCraftCaches(); return; }
-    jsonData.weapons = jsonData.weapons.filter(w => w.id !== id);
-    saveJSON();
-    invalidateCraftCaches();
+     db.prepare('DELETE FROM weapons WHERE id = ?').run(id); invalidateCraftCaches(); return;
 }
 
 // ─── INGREDIENTS ───────────────
 function getAllIngredients() {
-    if (useSQLite) return db.prepare('SELECT * FROM ingredients ORDER BY name ASC').all();
-    return [...(jsonData.ingredients || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-}
+    return db.prepare('SELECT * FROM ingredients ORDER BY name ASC').all();}
 
 function getIngredient(id) {
-    if (useSQLite) return db.prepare('SELECT * FROM ingredients WHERE id = ?').get(id);
-    return (jsonData.ingredients || []).find(i => i.id === id);
-}
+    return db.prepare('SELECT * FROM ingredients WHERE id = ?').get(id);}
 
 function insertIngredient(name, image_path) {
-    if (useSQLite) {
-        const r = db.prepare('INSERT OR IGNORE INTO ingredients (name, image_path) VALUES (?, ?)').run(name, image_path);
+            const r = db.prepare('INSERT OR IGNORE INTO ingredients (name, image_path) VALUES (?, ?)').run(name, image_path);
         if (isStockMaterialName(name)) seedStockMaterials();
         else invalidateCraftCaches();
         return r.lastInsertRowid;
-    }
-    if (!jsonData.ingredients) jsonData.ingredients = [];
-    if (!jsonData.counters.ingredients) jsonData.counters.ingredients = 0;
-    if (jsonData.ingredients.find(i => i.name === name)) return null;
-    jsonData.counters.ingredients++;
-    jsonData.ingredients.push({
-        id: jsonData.counters.ingredients,
-        name, image_path,
-        created_at: Math.floor(Date.now() / 1000),
-    });
-    saveJSON();
-    if (isStockMaterialName(name)) seedStockMaterials();
-    else invalidateCraftCaches();
-    return jsonData.counters.ingredients;
 }
 
 function updateIngredient(id, name, image_path) {
-    if (useSQLite) {
-        db.prepare(`UPDATE ingredients SET name = ?, image_path = COALESCE(?, image_path) WHERE id = ?`).run(name, image_path, id);
+            db.prepare(`UPDATE ingredients SET name = ?, image_path = COALESCE(?, image_path) WHERE id = ?`).run(name, image_path, id);
         if (isStockMaterialName(name)) seedStockMaterials();
         else invalidateCraftCaches();
         return;
-    }
-    const ing = (jsonData.ingredients || []).find(i => i.id === id);
-    if (ing) {
-        if (name) ing.name = name;
-        if (image_path) ing.image_path = image_path;
-        saveJSON();
-        if (isStockMaterialName(ing.name)) seedStockMaterials();
-        else invalidateCraftCaches();
-    }
 }
 
 function deleteIngredient(id) {
     const existing = getIngredient(id);
-    if (useSQLite) {
-        db.prepare('DELETE FROM ingredients WHERE id = ?').run(id);
+            db.prepare('DELETE FROM ingredients WHERE id = ?').run(id);
         if (existing && isStockMaterialName(existing.name)) seedStockMaterials();
         else invalidateCraftCaches();
         return;
-    }
-    jsonData.ingredients = (jsonData.ingredients || []).filter(i => i.id !== id);
-    saveJSON();
-    if (existing && isStockMaterialName(existing.name)) seedStockMaterials();
-    else invalidateCraftCaches();
 }
 
 function toCraftImageUrl(imagePath) {
@@ -684,8 +421,7 @@ function dedupeStockRows(rows, ingredients = []) {
 }
 
 function getStockMaterials() {
-    if (useSQLite) {
-        const ingredients = db.prepare('SELECT * FROM ingredients').all();
+            const ingredients = db.prepare('SELECT * FROM ingredients').all();
         const rows = db.prepare(`
             SELECT sm.id, sm.ingredient_id, sm.quantity, sm.updated_at, i.name, i.image_path
             FROM stock_materials sm
@@ -693,23 +429,6 @@ function getStockMaterials() {
             ORDER BY i.name ASC
         `).all();
         return dedupeStockRows(rows, ingredients);
-    }
-
-    const ingredients = jsonData.ingredients || [];
-    const rows = (jsonData.stock_materials || [])
-        .map(row => {
-            const ingredient = ingredients.find(item => Number(item.id) === Number(row.ingredient_id));
-            if (!ingredient || !isStockMaterialName(ingredient.name)) return null;
-            return {
-                ...row,
-                name: ingredient.name,
-                image_path: ingredient.image_path,
-                quantity: Number(row.quantity) || 0,
-                image_url: toCraftImageUrl(ingredient.image_path),
-            };
-        })
-        .filter(Boolean);
-    return dedupeStockRows(rows, ingredients);
 }
 
 function getReservedStockByActiveRequests() {
@@ -803,35 +522,13 @@ function getStockRequirementsForWeapon(weapon) {
 function applyStockDelta(requirements, delta, now) {
     if (!requirements.length) return;
 
-    if (useSQLite) {
-        const selectStock = db.prepare('SELECT quantity FROM stock_materials WHERE ingredient_id = ?');
-        const updateStock = db.prepare('UPDATE stock_materials SET quantity = ?, updated_at = ? WHERE ingredient_id = ?');
+    const selectStock = db.prepare('SELECT quantity FROM stock_materials WHERE ingredient_id = ?');
+    const updateStock = db.prepare('UPDATE stock_materials SET quantity = ?, updated_at = ? WHERE ingredient_id = ?');
 
-        if (delta < 0) {
-            for (const requirement of requirements) {
-                const current = selectStock.get(requirement.ingredient_id);
-                const currentQuantity = Number(current?.quantity) || 0;
-                if (currentQuantity < requirement.quantity) {
-                    throw createStockError(`Stock insuffisant pour ${requirement.name} (${currentQuantity}/${requirement.quantity})`);
-                }
-            }
-        }
-
+    if (delta < 0) {
         for (const requirement of requirements) {
             const current = selectStock.get(requirement.ingredient_id);
             const currentQuantity = Number(current?.quantity) || 0;
-            const nextQuantity = currentQuantity + delta * requirement.quantity;
-            updateStock.run(nextQuantity, now, requirement.ingredient_id);
-        }
-        invalidateCraftCaches();
-        return;
-    }
-
-    jsonData.stock_materials = jsonData.stock_materials || [];
-    if (delta < 0) {
-        for (const requirement of requirements) {
-            const row = jsonData.stock_materials.find(item => Number(item.ingredient_id) === Number(requirement.ingredient_id));
-            const currentQuantity = Number(row?.quantity) || 0;
             if (currentQuantity < requirement.quantity) {
                 throw createStockError(`Stock insuffisant pour ${requirement.name} (${currentQuantity}/${requirement.quantity})`);
             }
@@ -839,13 +536,10 @@ function applyStockDelta(requirements, delta, now) {
     }
 
     for (const requirement of requirements) {
-        const row = jsonData.stock_materials.find(item => Number(item.ingredient_id) === Number(requirement.ingredient_id));
-        const currentQuantity = Number(row?.quantity) || 0;
+        const current = selectStock.get(requirement.ingredient_id);
+        const currentQuantity = Number(current?.quantity) || 0;
         const nextQuantity = currentQuantity + delta * requirement.quantity;
-        if (row) {
-            row.quantity = nextQuantity;
-            row.updated_at = now;
-        }
+        updateStock.run(nextQuantity, now, requirement.ingredient_id);
     }
     invalidateCraftCaches();
 }
@@ -855,11 +549,8 @@ function consumeStockForCraftRequest(request, now) {
     const requirements = getStockRequirementsForWeapon(weapon);
     applyStockDelta(requirements, -1, now);
 
-    if (useSQLite) {
-        db.prepare('UPDATE craft_requests SET stock_consumed_at = ? WHERE id = ?').run(now, request.id);
-    } else {
-        request.stock_consumed_at = now;
-    }
+            db.prepare('UPDATE craft_requests SET stock_consumed_at = ? WHERE id = ?').run(now, request.id);
+
 }
 
 function restoreStockForCraftRequest(request, now) {
@@ -867,11 +558,8 @@ function restoreStockForCraftRequest(request, now) {
     const requirements = getStockRequirementsForWeapon(weapon);
     applyStockDelta(requirements, 1, now);
 
-    if (useSQLite) {
-        db.prepare('UPDATE craft_requests SET stock_consumed_at = NULL WHERE id = ?').run(request.id);
-    } else {
-        request.stock_consumed_at = null;
-    }
+            db.prepare('UPDATE craft_requests SET stock_consumed_at = NULL WHERE id = ?').run(request.id);
+
 }
 
 function getAvailableStock() {
@@ -902,8 +590,7 @@ function updateStockMaterial(ingredientId, quantity) {
         throw new Error('Matiere premiere introuvable');
     }
 
-    if (useSQLite) {
-        db.prepare(`
+            db.prepare(`
             INSERT INTO stock_materials (ingredient_id, quantity, updated_at)
             VALUES (?, ?, strftime('%s','now'))
             ON CONFLICT(ingredient_id) DO UPDATE SET
@@ -912,24 +599,6 @@ function updateStockMaterial(ingredientId, quantity) {
         `).run(cleanIngredientId, cleanQuantity);
         invalidateCraftCaches();
         return getStockMaterials();
-    }
-
-    jsonData.stock_materials = jsonData.stock_materials || [];
-    const existing = jsonData.stock_materials.find(row => Number(row.ingredient_id) === cleanIngredientId);
-    if (existing) {
-        existing.quantity = cleanQuantity;
-        existing.updated_at = Math.floor(Date.now() / 1000);
-    } else {
-        jsonData.stock_materials.push({
-            id: jsonData.stock_materials.length + 1,
-            ingredient_id: cleanIngredientId,
-            quantity: cleanQuantity,
-            updated_at: Math.floor(Date.now() / 1000),
-        });
-    }
-    saveJSON();
-    invalidateCraftCaches();
-    return getStockMaterials();
 }
 
 function getCraftableWeapons(options = {}) {
@@ -1009,16 +678,12 @@ function getCraftableWeapons(options = {}) {
 }
 
 function getAllMyWeaponNames() {
-    if (useSQLite) return db.prepare('SELECT * FROM my_weapon_names ORDER BY name ASC').all();
-    return [...(jsonData.my_weapon_names || [])].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-}
+    return db.prepare('SELECT * FROM my_weapon_names ORDER BY name ASC').all();}
 
 function getMyWeaponNameByName(name) {
     const clean = String(name || '').trim().toLowerCase();
     if (!clean) return null;
-    if (useSQLite) return db.prepare('SELECT * FROM my_weapon_names WHERE LOWER(name) = ? LIMIT 1').get(clean) || null;
-    return (jsonData.my_weapon_names || []).find(w => String(w.name || '').trim().toLowerCase() === clean) || null;
-}
+    return db.prepare('SELECT * FROM my_weapon_names WHERE LOWER(name) = ? LIMIT 1').get(clean) || null;}
 
 function getAllMyWeaponNamesWithPriceLimits() {
     return getAllMyWeaponNames().map(item => {
@@ -1039,26 +704,11 @@ function insertMyWeaponName(name, sale_price = 0, max_sale_price = 0) {
     if (!clean) return null;
     const salePrice = Math.max(0, parseInt(sale_price, 10) || 0);
     const maxSalePrice = Math.max(0, parseInt(max_sale_price, 10) || 0);
-    if (useSQLite) {
-        const r = db.prepare('INSERT OR IGNORE INTO my_weapon_names (name, sale_price, max_sale_price) VALUES (?, ?, ?)').run(clean, salePrice, maxSalePrice);
+            const r = db.prepare('INSERT OR IGNORE INTO my_weapon_names (name, sale_price, max_sale_price) VALUES (?, ?, ?)').run(clean, salePrice, maxSalePrice);
         if (!r.changes) {
             db.prepare('UPDATE my_weapon_names SET sale_price = ?, max_sale_price = ? WHERE LOWER(name) = ?').run(salePrice, maxSalePrice, clean.toLowerCase());
         }
         return r.lastInsertRowid;
-    }
-    jsonData.my_weapon_names = jsonData.my_weapon_names || [];
-    jsonData.counters.my_weapon_names = jsonData.counters.my_weapon_names || 0;
-    const existing = jsonData.my_weapon_names.find(w => String(w.name || '').toLowerCase() === clean.toLowerCase());
-    if (existing) {
-        existing.sale_price = salePrice;
-        existing.max_sale_price = maxSalePrice;
-        saveJSON();
-        return existing.id;
-    }
-    const id = nextId('my_weapon_names');
-    jsonData.my_weapon_names.push({ id, name: clean, sale_price: salePrice, max_sale_price: maxSalePrice, created_at: Math.floor(Date.now() / 1000) });
-    saveJSON();
-    return id;
 }
 
 function updateMyWeaponName(id, name, sale_price = 0, max_sale_price = 0) {
@@ -1066,45 +716,24 @@ function updateMyWeaponName(id, name, sale_price = 0, max_sale_price = 0) {
     if (!clean) throw new Error('Nom requis');
     const salePrice = Math.max(0, parseInt(sale_price, 10) || 0);
     const maxSalePrice = Math.max(0, parseInt(max_sale_price, 10) || 0);
-    if (useSQLite) {
-        db.prepare('UPDATE my_weapon_names SET name = ?, sale_price = ?, max_sale_price = ? WHERE id = ?').run(clean, salePrice, maxSalePrice, id);
+            db.prepare('UPDATE my_weapon_names SET name = ?, sale_price = ?, max_sale_price = ? WHERE id = ?').run(clean, salePrice, maxSalePrice, id);
         return;
-    }
-    const item = (jsonData.my_weapon_names || []).find(w => Number(w.id) === Number(id));
-    if (!item) throw new Error('Nom introuvable');
-    item.name = clean;
-    item.sale_price = salePrice;
-    item.max_sale_price = maxSalePrice;
-    saveJSON();
 }
 
 function deleteMyWeaponName(id) {
-    if (useSQLite) { db.prepare('DELETE FROM my_weapon_names WHERE id = ?').run(id); return; }
-    jsonData.my_weapon_names = (jsonData.my_weapon_names || []).filter(w => w.id !== id);
-    saveJSON();
+    db.prepare('DELETE FROM my_weapon_names WHERE id = ?').run(id); return;
 }
 
 function getAllOrgs() {
-    if (useSQLite) return db.prepare('SELECT * FROM organizations ORDER BY name ASC').all();
-    return [...jsonData.organizations].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-}
+    return db.prepare('SELECT * FROM organizations ORDER BY name ASC').all();}
 
 function insertOrg(name) {
-    if (useSQLite) {
-        const r = db.prepare('INSERT OR IGNORE INTO organizations (name) VALUES (?)').run(name);
-        return r.lastInsertRowid;
-    }
-    if (jsonData.organizations.find(o => o.name === name)) return null;
-    const id = nextId('organizations');
-    jsonData.organizations.push({ id, name, created_at: Math.floor(Date.now() / 1000) });
-    saveJSON();
-    return id;
+    const r = db.prepare('INSERT OR IGNORE INTO organizations (name) VALUES (?)').run(name);
+    return r.lastInsertRowid || null;
 }
 
 function deleteOrg(id) {
-    if (useSQLite) { db.prepare('DELETE FROM organizations WHERE id = ?').run(id); return; }
-    jsonData.organizations = jsonData.organizations.filter(o => o.id !== id);
-    saveJSON();
+    db.prepare('DELETE FROM organizations WHERE id = ?').run(id);
 }
 
 function cleanMoney(value) {
@@ -1227,30 +856,17 @@ function hydrateOrderAdvance(order, participants = [], repayments = []) {
 }
 
 function getOrderAdvances() {
-    if (useSQLite) {
-        const orders = db.prepare('SELECT * FROM order_advances ORDER BY status ASC, order_date DESC, id DESC').all();
+            const orders = db.prepare('SELECT * FROM order_advances ORDER BY status ASC, order_date DESC, id DESC').all();
         const getParticipants = db.prepare('SELECT * FROM order_advance_participants WHERE order_id = ? ORDER BY id ASC');
         const getRepayments = db.prepare('SELECT * FROM order_advance_repayments WHERE order_id = ? ORDER BY repayment_date DESC, id DESC');
         return orders.map(order => hydrateOrderAdvance(order, getParticipants.all(order.id), getRepayments.all(order.id)));
-    }
-    const participants = jsonData.order_advance_participants || [];
-    const repayments = jsonData.order_advance_repayments || [];
-    return [...(jsonData.order_advances || [])]
-        .sort((a, b) => String(a.status || '').localeCompare(String(b.status || '')) || String(b.order_date || '').localeCompare(String(a.order_date || '')) || (b.id || 0) - (a.id || 0))
-        .map(order => hydrateOrderAdvance(
-            order,
-            participants.filter(p => Number(p.order_id) === Number(order.id)),
-            repayments.filter(r => Number(r.order_id) === Number(order.id)),
-        ));
 }
 
 function upsertOrderAdvance(payload, id = null) {
     const orderIdForUpdate = Number(id);
     let existingOrder = null;
     if (orderIdForUpdate) {
-        existingOrder = useSQLite
-            ? db.prepare('SELECT * FROM order_advances WHERE id = ?').get(orderIdForUpdate)
-            : (jsonData.order_advances || []).find(o => Number(o.id) === orderIdForUpdate);
+        existingOrder = db.prepare('SELECT * FROM order_advances WHERE id = ?').get(orderIdForUpdate);
         if (!existingOrder) throw new Error('Commande introuvable');
     }
     const participants = normalizeAdvanceParticipants(payload.participants);
@@ -1269,84 +885,40 @@ function upsertOrderAdvance(payload, id = null) {
     const requestedStatus = String(payload.status || 'open').trim();
     const status = requestedStatus === 'settled' ? 'settled' : (totals.remaining_amount <= 0 ? 'settled' : 'open');
 
-    if (useSQLite) {
-        const tx = db.transaction(() => {
-            let orderId = orderIdForUpdate;
-            if (orderId) {
-                db.prepare(`UPDATE order_advances SET title = ?, order_date = ?, total_amount = ?, recovered_amount = ?, remaining_amount = ?, note = ?, status = ?, updated_at = ? WHERE id = ?`)
-                    .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, orderId);
-                db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(orderId);
-            } else {
-                const r = db.prepare(`INSERT INTO order_advances (title, order_date, total_amount, recovered_amount, remaining_amount, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-                    .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, now);
-                orderId = r.lastInsertRowid;
-            }
-            const stmt = db.prepare(`INSERT INTO order_advance_participants (order_id, user_id, user_name, amount_contributed, amount_recovered, amount_remaining, amount_to_compensate_next_order, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-            for (const p of participants) {
-                stmt.run(orderId, p.user_id, p.user_name, p.amount_contributed, p.amount_recovered, p.amount_remaining, p.amount_to_compensate_next_order, p.note, now, now);
-            }
-            return orderId;
-        });
-        return tx();
-    }
-
-    let orderId = orderIdForUpdate;
-    if (orderId) {
-        Object.assign(existingOrder, { title, order_date: orderDate, ...totals, note, status, updated_at: now });
-        jsonData.order_advance_participants = (jsonData.order_advance_participants || []).filter(p => Number(p.order_id) !== orderId);
-    } else {
-        orderId = nextId('order_advances');
-        jsonData.order_advances.push({ id: orderId, title, order_date: orderDate, ...totals, note, status, created_at: now, updated_at: now });
-    }
-    for (const p of participants) {
-        jsonData.order_advance_participants.push({
-            id: nextId('order_advance_participants'),
-            order_id: orderId,
-            ...p,
-            created_at: now,
-            updated_at: now,
-        });
-    }
-    saveJSON();
-    return orderId;
+    const tx = db.transaction(() => {
+        let orderId = orderIdForUpdate;
+        if (orderId) {
+            db.prepare(`UPDATE order_advances SET title = ?, order_date = ?, total_amount = ?, recovered_amount = ?, remaining_amount = ?, note = ?, status = ?, updated_at = ? WHERE id = ?`)
+                .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, orderId);
+            db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(orderId);
+        } else {
+            const r = db.prepare(`INSERT INTO order_advances (title, order_date, total_amount, recovered_amount, remaining_amount, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+                .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, now);
+            orderId = r.lastInsertRowid;
+        }
+        const stmt = db.prepare(`INSERT INTO order_advance_participants (order_id, user_id, user_name, amount_contributed, amount_recovered, amount_remaining, amount_to_compensate_next_order, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        for (const p of participants) {
+            stmt.run(orderId, p.user_id, p.user_name, p.amount_contributed, p.amount_recovered, p.amount_remaining, p.amount_to_compensate_next_order, p.note, now, now);
+        }
+        return orderId;
+    });
+    return tx();
 }
 
 function deleteOrderAdvance(id) {
-    if (useSQLite) {
-        db.prepare('DELETE FROM order_advance_repayments WHERE order_id = ?').run(id);
+            db.prepare('DELETE FROM order_advance_repayments WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advances WHERE id = ?').run(id);
         return;
-    }
-    jsonData.order_advance_repayments = (jsonData.order_advance_repayments || []).filter(r => Number(r.order_id) !== Number(id));
-    jsonData.order_advance_participants = (jsonData.order_advance_participants || []).filter(p => Number(p.order_id) !== Number(id));
-    jsonData.order_advances = (jsonData.order_advances || []).filter(o => Number(o.id) !== Number(id));
-    saveJSON();
 }
 
 function settleOrderAdvance(id) {
     const now = Math.floor(Date.now() / 1000);
-    if (useSQLite) {
-        const order = db.prepare('SELECT * FROM order_advances WHERE id = ?').get(id);
+            const order = db.prepare('SELECT * FROM order_advances WHERE id = ?').get(id);
         if (!order) throw new Error('Commande introuvable');
         db.prepare(`UPDATE order_advances SET recovered_amount = total_amount, remaining_amount = 0, status = 'settled', updated_at = ? WHERE id = ?`).run(now, id);
         db.prepare(`UPDATE order_advance_participants SET amount_recovered = amount_contributed, amount_remaining = 0, updated_at = ? WHERE order_id = ?`).run(now, id);
         return;
-    }
-    const order = (jsonData.order_advances || []).find(o => Number(o.id) === Number(id));
-    if (!order) throw new Error('Commande introuvable');
-    order.recovered_amount = order.total_amount;
-    order.remaining_amount = 0;
-    order.status = 'settled';
-    order.updated_at = now;
-    (jsonData.order_advance_participants || []).forEach(p => {
-        if (Number(p.order_id) === Number(id)) {
-            p.amount_recovered = p.amount_contributed;
-            p.amount_remaining = 0;
-            p.updated_at = now;
-        }
-    });
-    saveJSON();
 }
 
 function normalizeOrderAdvanceRepayment(orderId, payload) {
@@ -1359,11 +931,8 @@ function normalizeOrderAdvanceRepayment(orderId, payload) {
     if (!repaymentDate) throw new Error('Date de remboursement obligatoire');
 
     let participant;
-    if (useSQLite) {
-        participant = db.prepare('SELECT * FROM order_advance_participants WHERE id = ? AND order_id = ?').get(participantId, orderId);
-    } else {
-        participant = (jsonData.order_advance_participants || []).find(p => Number(p.id) === participantId && Number(p.order_id) === orderId);
-    }
+            participant = db.prepare('SELECT * FROM order_advance_participants WHERE id = ? AND order_id = ?').get(participantId, orderId);
+
     if (!participant) throw new Error('Participant introuvable pour cette commande');
 
     return {
@@ -1381,8 +950,7 @@ function normalizeOrderAdvanceRepayment(orderId, payload) {
 function saveOrderAdvanceRepayment(orderId, payload, repaymentId = null) {
     const normalized = normalizeOrderAdvanceRepayment(orderId, payload);
     const now = Math.floor(Date.now() / 1000);
-    if (useSQLite) {
-        if (repaymentId) {
+            if (repaymentId) {
             const existing = db.prepare('SELECT * FROM order_advance_repayments WHERE id = ? AND order_id = ?').get(repaymentId, orderId);
             if (!existing) throw new Error('Remboursement introuvable');
             db.prepare(`UPDATE order_advance_repayments SET participant_id = ?, user_id = ?, user_name = ?, amount = ?, reason = ?, weapon_name = ?, repayment_date = ?, updated_at = ? WHERE id = ? AND order_id = ?`)
@@ -1392,71 +960,35 @@ function saveOrderAdvanceRepayment(orderId, payload, repaymentId = null) {
         const result = db.prepare(`INSERT INTO order_advance_repayments (order_id, participant_id, user_id, user_name, amount, reason, weapon_name, repayment_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(orderId, normalized.participant_id, normalized.user_id, normalized.user_name, normalized.amount, normalized.reason, normalized.weapon_name, normalized.repayment_date, now, now);
         return result.lastInsertRowid;
-    }
-
-    if (!jsonData.order_advance_repayments) jsonData.order_advance_repayments = [];
-    if (repaymentId) {
-        const existing = jsonData.order_advance_repayments.find(r => Number(r.id) === Number(repaymentId) && Number(r.order_id) === orderId);
-        if (!existing) throw new Error('Remboursement introuvable');
-        Object.assign(existing, normalized, { updated_at: now });
-        saveJSON();
-        return Number(repaymentId);
-    }
-    const id = nextId('order_advance_repayments');
-    jsonData.order_advance_repayments.push({ id, ...normalized, created_at: now, updated_at: now });
-    saveJSON();
-    return id;
 }
 
 function deleteOrderAdvanceRepayment(orderId, repaymentId) {
-    if (useSQLite) {
-        const result = db.prepare('DELETE FROM order_advance_repayments WHERE id = ? AND order_id = ?').run(repaymentId, orderId);
+            const result = db.prepare('DELETE FROM order_advance_repayments WHERE id = ? AND order_id = ?').run(repaymentId, orderId);
         if (!result.changes) throw new Error('Remboursement introuvable');
         return;
-    }
-    const before = (jsonData.order_advance_repayments || []).length;
-    jsonData.order_advance_repayments = (jsonData.order_advance_repayments || []).filter(r => !(Number(r.id) === Number(repaymentId) && Number(r.order_id) === Number(orderId)));
-    if (jsonData.order_advance_repayments.length === before) throw new Error('Remboursement introuvable');
-    saveJSON();
 }
 
 function getRequests(status, options = {}) {
-    if (useSQLite) {
-        let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image, w.craft_price as weapon_craft_price FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
-        const params = [];
-        const where = [];
-        if (options.productionOnly) {
-            where.push(`r.status IN (${CRAFT_PRODUCTION_STATUSES.map(() => '?').join(',')})`);
-            params.push(...CRAFT_PRODUCTION_STATUSES);
-        } else if (status && status !== 'all') {
-            where.push('r.status = ?');
-            params.push(status);
-        }
-        if (options.hideTests) {
-            where.push('COALESCE(r.is_test, 0) = 0');
-        }
-        if (where.length) query += ` WHERE ${where.join(' AND ')}`;
-        query += ' ORDER BY r.created_at DESC';
-        return db.prepare(query).all(...params);
+    let query = `SELECT r.*, w.name as weapon_name, w.image_path as weapon_image, w.craft_price as weapon_craft_price FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id`;
+    const params = [];
+    const where = [];
+    if (options.productionOnly) {
+        where.push(`r.status IN (${CRAFT_PRODUCTION_STATUSES.map(() => '?').join(',')})`);
+        params.push(...CRAFT_PRODUCTION_STATUSES);
+    } else if (status && status !== 'all') {
+        where.push('r.status = ?');
+        params.push(status);
     }
-    let arr = jsonData.craft_requests;
-    if (options.productionOnly) arr = arr.filter(r => CRAFT_PRODUCTION_STATUSES.includes(r.status));
-    else if (status && status !== 'all') arr = arr.filter(r => r.status === status);
-    if (options.hideTests) arr = arr.filter(r => !r.is_test);
-    return [...arr].sort((a, b) => (b.created_at || 0) - (a.created_at || 0)).map(r => {
-        const w = jsonData.weapons.find(w => w.id === r.weapon_id);
-        return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null, weapon_craft_price: w ? w.craft_price : 0 };
-    });
+    if (options.hideTests) {
+        where.push('COALESCE(r.is_test, 0) = 0');
+    }
+    if (where.length) query += ` WHERE ${where.join(' AND ')}`;
+    query += ' ORDER BY r.created_at DESC';
+    return db.prepare(query).all(...params);
 }
 
 function getRequest(id) {
-    if (useSQLite) {
-        return db.prepare(`SELECT r.*, w.name as weapon_name, w.image_path as weapon_image FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id WHERE r.id = ?`).get(id);
-    }
-    const r = jsonData.craft_requests.find(r => r.id === id);
-    if (!r) return null;
-    const w = jsonData.weapons.find(w => w.id === r.weapon_id);
-    return { ...r, weapon_name: w ? w.name : '?', weapon_image: w ? w.image_path : null };
+    return db.prepare(`SELECT r.*, w.name as weapon_name, w.image_path as weapon_image FROM craft_requests r JOIN weapons w ON r.weapon_id = w.id WHERE r.id = ?`).get(id);
 }
 
 function normalizeCraftRequestType(value) {
@@ -1466,84 +998,37 @@ function normalizeCraftRequestType(value) {
 
 function insertRequest(user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test = false) {
     const normalizedType = normalizeCraftRequestType(request_type);
-    if (useSQLite) {
-        const r = db.prepare(`INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            const r = db.prepare(`INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test) VALUES (?, ?, ?, ?, ?, ?, ?)`)
             .run(user_id, user_name, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0, normalizedType, is_test ? 1 : 0);
         return r.lastInsertRowid;
-    }
-    const id = nextId('requests');
-    jsonData.craft_requests.push({
-        id, user_id, user_name, weapon_id,
-        has_plan: has_plan ? 1 : 0, has_money: has_money ? 1 : 0,
-        request_type: normalizedType,
-        is_test: is_test ? 1 : 0,
-        status: 'pending', crafted: 0,
-        created_at: Math.floor(Date.now() / 1000),
-    });
-    saveJSON();
-    return id;
 }
 
 function updateRequestCraft(id, crafted, serial, userId, userName) {
     const now = Math.floor(Date.now() / 1000);
-    if (useSQLite) {
-        const tx = db.transaction(() => {
-            const current = getRequest(id);
-            if (!current) throw createStockError('Demande introuvable');
+    const tx = db.transaction(() => {
+        const current = getRequest(id);
+        if (!current) throw createStockError('Demande introuvable');
 
-            if (!current.is_test && crafted && !current.stock_consumed_at) {
-                consumeStockForCraftRequest(current, now);
-            } else if (!crafted && current.stock_consumed_at) {
-                restoreStockForCraftRequest(current, now);
-            }
-
-            db.prepare(`UPDATE craft_requests SET crafted = ?, serial_number = ?, craft_date = ?, crafted_by_id = ?, crafted_by_name = ?, status = CASE WHEN ? = 1 THEN 'crafted' ELSE 'in_progress' END WHERE id = ?`)
-                .run(crafted ? 1 : 0, serial || null, crafted ? now : null, userId, userName, crafted ? 1 : 0, id);
-        });
-        tx();
-        return;
-    }
-    const r = jsonData.craft_requests.find(r => r.id === id);
-    if (r) {
-        if (!r.is_test && crafted && !r.stock_consumed_at) {
-            consumeStockForCraftRequest(r, now);
-        } else if (!crafted && r.stock_consumed_at) {
-            restoreStockForCraftRequest(r, now);
+        if (!current.is_test && crafted && !current.stock_consumed_at) {
+            consumeStockForCraftRequest(current, now);
+        } else if (!crafted && current.stock_consumed_at) {
+            restoreStockForCraftRequest(current, now);
         }
-        r.crafted = crafted ? 1 : 0;
-        r.serial_number = serial || null;
-        r.craft_date = crafted ? now : null;
-        r.crafted_by_id = userId;
-        r.crafted_by_name = userName;
-        r.status = crafted ? 'crafted' : 'in_progress';
-        saveJSON();
-    }
+
+        db.prepare(`UPDATE craft_requests SET crafted = ?, serial_number = ?, craft_date = ?, crafted_by_id = ?, crafted_by_name = ?, status = CASE WHEN ? = 1 THEN 'crafted' ELSE 'in_progress' END WHERE id = ?`)
+            .run(crafted ? 1 : 0, serial || null, crafted ? now : null, userId, userName, crafted ? 1 : 0, id);
+    });
+    tx();
 }
 
 function updateRequestSale(id, buyer_org, sale_price, sale_date, userId, userName) {
-    if (useSQLite) {
-        db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
-            .run(buyer_org || null, sale_price ?? null, sale_date, userId, userName, id);
-        invalidateCraftCaches();
-        return;
-    }
-    const r = jsonData.craft_requests.find(r => r.id === id);
-    if (r) {
-        r.buyer_org = buyer_org;
-        r.sale_price = sale_price;
-        r.sale_date = sale_date;
-        r.completed_by_id = userId;
-        r.completed_by_name = userName;
-        r.status = 'completed';
-        saveJSON();
-        invalidateCraftCaches();
-    }
+    db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
+        .run(buyer_org || null, sale_price ?? null, sale_date, userId, userName, id);
+    invalidateCraftCaches();
 }
 
 function markRequestPosted(id) {
-    if (useSQLite) { db.prepare('UPDATE craft_requests SET posted_to_channel = 1 WHERE id = ?').run(id); return; }
-    const r = jsonData.craft_requests.find(r => r.id === id);
-    if (r) { r.posted_to_channel = 1; saveJSON(); }
+    db.prepare('UPDATE craft_requests SET posted_to_channel = 1 WHERE id = ?').run(id);
 }
 
 function getWeaponSaleStateForCraftRequest(request) {
@@ -1551,19 +1036,13 @@ function getWeaponSaleStateForCraftRequest(request) {
     const requestId = Number(request.id);
     const serial = String(request.serial_number || '').trim();
     let rows = [];
-    if (useSQLite) {
-        if (requestId) {
+            if (requestId) {
             rows = db.prepare('SELECT * FROM my_weapons WHERE craft_request_id = ? ORDER BY id ASC').all(requestId);
         }
         if (!rows.length && serial) {
             rows = db.prepare('SELECT * FROM my_weapons WHERE serial_number = ? ORDER BY id ASC').all(serial);
         }
-    } else {
-        rows = (jsonData.my_weapons || []).filter(w =>
-            (requestId && Number(w.craft_request_id) === requestId) ||
-            (serial && String(w.serial_number || '').trim() === serial)
-        );
-    }
+
     if (!rows.length) return { state: 'not_listed' };
     const sold = rows.every(w => w.is_sold === true || w.is_sold === 1 || w.is_sold === '1');
     return {
@@ -1577,49 +1056,32 @@ function getLinkedMyWeaponsForRequest(request) {
     if (!request) return [];
     const requestId = Number(request.id);
     const serial = String(request.serial_number || '').trim();
-    if (useSQLite) {
-        const rowsByRequest = requestId
-            ? db.prepare('SELECT * FROM my_weapons WHERE craft_request_id = ? ORDER BY id ASC').all(requestId)
-            : [];
-        const rowsBySerial = serial
-            ? db.prepare('SELECT * FROM my_weapons WHERE serial_number = ? ORDER BY id ASC').all(serial)
-            : [];
-        return [...new Map([...rowsByRequest, ...rowsBySerial].map(row => [Number(row.id), row])).values()];
-    }
-    return (jsonData.my_weapons || []).filter(w =>
-        (requestId && Number(w.craft_request_id) === requestId) ||
-        (serial && String(w.serial_number || '').trim() === serial)
-    );
+    const rowsByRequest = requestId
+        ? db.prepare('SELECT * FROM my_weapons WHERE craft_request_id = ? ORDER BY id ASC').all(requestId)
+        : [];
+    const rowsBySerial = serial
+        ? db.prepare('SELECT * FROM my_weapons WHERE serial_number = ? ORDER BY id ASC').all(serial)
+        : [];
+    return [...new Map([...rowsByRequest, ...rowsBySerial].map(row => [Number(row.id), row])).values()];
 }
 
 function serialAlreadyListed(serial, excludeId = null) {
     const clean = String(serial || '').trim();
     if (!clean) return false;
-    if (useSQLite) {
-        const row = excludeId
-            ? db.prepare('SELECT id FROM my_weapons WHERE serial_number = ? AND id != ? LIMIT 1').get(clean, excludeId)
-            : db.prepare('SELECT id FROM my_weapons WHERE serial_number = ? LIMIT 1').get(clean);
-        return !!row;
-    }
-    return (jsonData.my_weapons || []).some(w =>
-        String(w.serial_number || '').trim() === clean &&
-        (!excludeId || Number(w.id) !== Number(excludeId))
-    );
+    const row = excludeId
+        ? db.prepare('SELECT id FROM my_weapons WHERE serial_number = ? AND id != ? LIMIT 1').get(clean, excludeId)
+        : db.prepare('SELECT id FROM my_weapons WHERE serial_number = ? LIMIT 1').get(clean);
+    return !!row;
 }
 
 function getMyWeaponById(id) {
     const weaponId = Number(id);
     if (!weaponId) return null;
-    if (useSQLite) {
-        return db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(weaponId) || null;
-    }
-    return (jsonData.my_weapons || []).find(w => Number(w.id) === weaponId) || null;
+    return db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(weaponId) || null;
 }
 
 function deleteRequest(id) {
-    if (useSQLite) { db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id); return; }
-    jsonData.craft_requests = jsonData.craft_requests.filter(r => r.id !== id);
-    saveJSON();
+    db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id);
 }
 
 function deleteCraftRequestCleanly(id) {
@@ -1642,23 +1104,16 @@ function deleteCraftRequestCleanly(id) {
             restoreStockForCraftRequest(request, Math.floor(Date.now() / 1000));
         }
 
-        if (useSQLite) {
-            if (linkedWeapons.length) {
+                    if (linkedWeapons.length) {
                 const deleteWeapon = db.prepare('DELETE FROM my_weapons WHERE id = ?');
                 linkedWeapons.forEach(w => deleteWeapon.run(w.id));
             }
             db.prepare('DELETE FROM craft_requests WHERE id = ?').run(id);
-        } else {
-            const linkedIds = new Set(linkedWeapons.map(w => Number(w.id)));
-            jsonData.my_weapons = (jsonData.my_weapons || []).filter(w => !linkedIds.has(Number(w.id)));
-            jsonData.craft_requests = jsonData.craft_requests.filter(r => Number(r.id) !== Number(id));
-            saveJSON();
-        }
+
         invalidateCraftCaches();
     };
 
-    if (useSQLite) db.transaction(runDelete)();
-    else runDelete();
+    db.transaction(runDelete)();
 }
 
 const storage = multer.diskStorage({
@@ -1682,7 +1137,18 @@ const upload = multer({
 
 function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botState) {
     const express = require('express');
-    app.use('/crafts/images', express.static(UPLOADS_DIR));
+    function canAccessCraftImages(user) {
+        if (canValidateCraft(user)) return true;
+        const roles = user?.roles || [];
+        return LIMITED_CRAFT_ACCESS_ROLES.some(roleId => roles.includes(roleId));
+    }
+
+    app.use('/crafts/images', requireAuth, (req, res, next) => {
+        if (!canAccessCraftImages(req.session.user)) {
+            return res.status(403).json({ error: 'Accès craft requis' });
+        }
+        next();
+    }, express.static(UPLOADS_DIR));
 
     const memberPresenceCache = new Map();
     let lastMissingMemberSweep = 0;
@@ -1736,19 +1202,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     function markRequestsRejectedForAbsentMember(userId) {
         const now = Math.floor(Date.now() / 1000);
         const reason = 'Membre plus présent sur le Discord';
-        if (useSQLite) {
-            db.prepare(`UPDATE craft_requests SET status = 'rejected', refusal_reason = ? WHERE user_id = ? AND status IN (${ABSENT_MEMBER_CHECK_STATUSES.map(() => '?').join(',')})`)
-                .run(reason, userId, ...ABSENT_MEMBER_CHECK_STATUSES);
-        } else {
-            for (const request of (jsonData.craft_requests || [])) {
-                if (String(request.user_id) === String(userId) && ABSENT_MEMBER_CHECK_STATUSES.includes(request.status)) {
-                    request.status = 'rejected';
-                    request.refusal_reason = reason;
-                    request.updated_at = now;
-                }
-            }
-            saveJSON();
-        }
+        db.prepare(`UPDATE craft_requests SET status = 'rejected', refusal_reason = ? WHERE user_id = ? AND status IN (${ABSENT_MEMBER_CHECK_STATUSES.map(() => '?').join(',')})`)
+            .run(reason, userId, ...ABSENT_MEMBER_CHECK_STATUSES);
         invalidateCraftCaches();
     }
 
@@ -2223,12 +1678,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             const msg = await channel.send({ content, embeds: [embed], allowedMentions });
 
-            if (useSQLite) {
-                db.prepare('UPDATE craft_requests SET discord_message_id = ? WHERE id = ?').run(msg.id, requestId);
-            } else {
-                const r = jsonData.craft_requests.find(r => r.id === requestId);
-                if (r) { r.discord_message_id = msg.id; saveJSON(); }
-            }
+                            db.prepare('UPDATE craft_requests SET discord_message_id = ? WHERE id = ?').run(msg.id, requestId);
+
         } catch (e) {
             console.error('Erreur postOrUpdateCraftRequestMessage:', e.message);
         }
@@ -2312,32 +1763,27 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
             }
 
+            emitRealtime('craft:status', { requestId: id, status: 'pending', action: 'created' });
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
 
-    // CRAFT_VALIDATION_ROLES : seuls ces rôles peuvent valider/cocher crafté
-    const CRAFT_VALIDATION_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
-    const SUPER_ADMIN_ROLE = '1485279148246175764';
-    const SUPER_ADMIN_USER = '952986899667103804';
-    const MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
-
     function canValidateCraft(user) {
         if (!user) return false;
-        if (user.id === SUPER_ADMIN_USER) return true;
+        if (user.id === ADMIN_USER_ID) return true;
         const userRoles = user.roles || [];
         return CRAFT_VALIDATION_ROLES.some(r => userRoles.includes(r));
     }
 
     function canDeleteRequests(user) {
         if (!user) return false;
-        if (user.id === SUPER_ADMIN_USER) return true;
-        return (user.roles || []).includes(SUPER_ADMIN_ROLE);
+        if (user.id === ADMIN_USER_ID) return true;
+        return (user.roles || []).includes(ADMIN_ROLE_ID);
     }
 
     function canDeleteMyWeapons(user) {
         if (!user) return false;
-        if (user.id === SUPER_ADMIN_USER) return true;
+        if (user.id === ADMIN_USER_ID) return true;
         const roles = user.roles || [];
         return roles.includes(MY_WEAPONS_DELETE_ROLE) || canDeleteRequests(user);
     }
@@ -2423,8 +1869,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             let requestId;
             let myWeaponId;
 
-            if (useSQLite) {
-                const r = db.prepare(`
+                            const r = db.prepare(`
                     INSERT INTO craft_requests (
                         user_id, user_name, weapon_id, has_plan, has_money, status, crafted,
                         serial_number, craft_date, crafted_by_id, crafted_by_name,
@@ -2449,59 +1894,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     authorizedCrafter.id, authorizedCrafter.name, sold ? soldById : null, sold ? soldByName : null
                 );
                 myWeaponId = mw.lastInsertRowid;
-            } else {
-                if (!jsonData.craft_requests) jsonData.craft_requests = [];
-                if (!jsonData.counters.requests) jsonData.counters.requests = 0;
-                jsonData.counters.requests++;
-                requestId = jsonData.counters.requests;
-                jsonData.craft_requests.push({
-                    id: requestId,
-                    user_id: userId,
-                    user_name: userName,
-                    weapon_id: weapon.id,
-                    has_plan: 1,
-                    has_money: 1,
-                    status,
-                    crafted: 1,
-                    serial_number: serial,
-                    craft_date: craftTimestamp,
-                    crafted_by_id: authorizedCrafter.id,
-                    crafted_by_name: authorizedCrafter.name,
-                    buyer_org: sold ? buyer_org : null,
-                    sale_price: soldPrice,
-                    sale_date: sold ? saleTimestamp : null,
-                    completed_by_id: sold ? soldById : null,
-                    completed_by_name: sold ? soldByName : null,
-                    posted_to_channel: 0,
-                    created_at: now,
-                });
 
-                if (!jsonData.my_weapons) jsonData.my_weapons = [];
-                if (!jsonData.counters.myweapons) jsonData.counters.myweapons = 0;
-                jsonData.counters.myweapons++;
-                myWeaponId = jsonData.counters.myweapons;
-                jsonData.my_weapons.push({
-                    id: myWeaponId,
-                    user_id: userId,
-                    user_name: userName,
-                    user_avatar: userAvatar,
-                    weapon_name: weapon.name,
-                    is_crafted: 1,
-                    serial_number: serial,
-                    asking_price: soldPrice,
-                    min_price: null,
-                    is_sold: sold ? 1 : 0,
-                    sold_to: sold ? buyer_org : null,
-                    sold_price: soldPrice,
-                    sold_at: sold ? saleTimestamp : null,
-                    crafted_by_id: authorizedCrafter.id,
-                    crafted_by_name: authorizedCrafter.name,
-                    sold_by_id: sold ? soldById : null,
-                    sold_by_name: sold ? soldByName : null,
-                    created_at: now,
-                });
-                saveJSON();
-            }
 
             if (sold) {
                 try {
@@ -2556,6 +1949,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     }).catch(e => console.error('Erreur notification craft terminé:', e.message));
                 }
             }
+            emitRealtime('craft:status', { requestId: id, status: crafted ? 'crafted' : 'in_progress', action: 'crafted' });
             res.json({ success: true });
         } catch (e) { res.status(e.statusCode || 500).json({ error: e.message }); }
     });
@@ -2571,12 +1965,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const allowed = ['pending', 'waiting_materials', 'in_progress', 'rejected'];
             if (!allowed.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
 
-            if (useSQLite) {
-                db.prepare('UPDATE craft_requests SET status = ? WHERE id = ?').run(status, id);
-            } else {
-                const r = jsonData.craft_requests.find(r => r.id === id);
-                if (r) { r.status = status; saveJSON(); }
-            }
+                            db.prepare('UPDATE craft_requests SET status = ? WHERE id = ?').run(status, id);
+
             invalidateCraftCaches();
 
             const updatedForDiscord = getRequest(id);
@@ -2588,6 +1978,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 postCraftStatusUpdate(id, status).catch(e => console.error('post craft status async:', e.message));
             }
 
+            emitRealtime('craft:status', { requestId: id, status, action: 'status' });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -2616,6 +2007,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             if (isSuperAdmin) {
                 deleteCraftRequestCleanly(id);
+                emitRealtime('craft:status', { requestId: id, status: 'deleted', action: 'deleted' });
                 return res.json({ success: true });
             }
             if (existing.status !== 'pending') {
@@ -2623,6 +2015,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
 
             deleteRequest(id);
+            emitRealtime('craft:status', { requestId: id, status: 'deleted', action: 'cancelled' });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -2633,6 +2026,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 return res.status(403).json({ error: 'Action réservée aux hauts gradés' });
             }
             deleteCraftRequestCleanly(parseInt(req.params.id));
+            emitRealtime('craft:status', { requestId: parseInt(req.params.id), status: 'deleted', action: 'deleted' });
             res.json({ success: true });
         } catch (e) { res.status(e.statusCode || 500).json({ error: e.message }); }
     });
@@ -2747,13 +2141,10 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     }
     async function updateMyWeaponsDiscordBatch(existing) {
         let rows;
-        if (useSQLite) {
-            rows = existing.batch_id
+                    rows = existing.batch_id
                 ? db.prepare('SELECT * FROM my_weapons WHERE batch_id = ? ORDER BY id ASC').all(existing.batch_id)
                 : [db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(existing.id)];
-        } else {
-            rows = (jsonData.my_weapons || []).filter(w => existing.batch_id ? w.batch_id === existing.batch_id : w.id === existing.id);
-        }
+
         rows = rows.filter(Boolean);
         if (!rows.length) return;
 
@@ -2774,13 +2165,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             } catch {}
         }
         const msg = await channel.send({ content, embeds: [embed], allowedMentions: { parse: [] } });
-        if (useSQLite) {
-            if (base.batch_id) db.prepare('UPDATE my_weapons SET discord_message_id = ? WHERE batch_id = ?').run(msg.id, base.batch_id);
+                    if (base.batch_id) db.prepare('UPDATE my_weapons SET discord_message_id = ? WHERE batch_id = ?').run(msg.id, base.batch_id);
             else db.prepare('UPDATE my_weapons SET discord_message_id = ? WHERE id = ?').run(msg.id, base.id);
-        } else {
-            for (const w of rows) w.discord_message_id = msg.id;
-            saveJSON();
-        }
+
     }
 
     async function fetchDiscordChannel(channelId, label) {
@@ -2805,13 +2192,10 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     function getSaleLogReadyRows(existing) {
         let rows;
-        if (useSQLite) {
-            rows = existing.batch_id
+                    rows = existing.batch_id
                 ? db.prepare('SELECT * FROM my_weapons WHERE batch_id = ? ORDER BY id ASC').all(existing.batch_id)
                 : [db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(existing.id)];
-        } else {
-            rows = (jsonData.my_weapons || []).filter(w => existing.batch_id ? w.batch_id === existing.batch_id : w.id === existing.id);
-        }
+
 
         return rows
             .filter(Boolean)
@@ -2898,13 +2282,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 embeds: [embed],
                 allowedMentions: { parse: [] },
             });
-            if (useSQLite) {
-                const stmt = db.prepare('UPDATE my_weapons SET sale_discord_message_id = ? WHERE id = ?');
+                            const stmt = db.prepare('UPDATE my_weapons SET sale_discord_message_id = ? WHERE id = ?');
                 for (const row of rows) stmt.run(msg.id, row.id);
-            } else {
-                for (const row of rows) row.sale_discord_message_id = msg.id;
-                saveJSON();
-            }
+
             return true;
         } catch (e) {
             console.error(`[discord] WEAPONS_LOG: log vente impossible pour ${base.weapon_name}: ${e.message}`);
@@ -2917,15 +2297,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const userId = req.session.user.id;
             // Tout le monde voit toutes les armes en vente, mais on note l'auteur
             let list;
-            if (useSQLite) {
-                list = db.prepare('SELECT * FROM my_weapons ORDER BY is_sold ASC, created_at DESC').all();
-            } else {
-                const arr = jsonData.my_weapons || [];
-                list = [...arr].sort((a, b) => {
-                    if ((a.is_sold || 0) !== (b.is_sold || 0)) return (a.is_sold || 0) - (b.is_sold || 0);
-                    return (b.created_at || 0) - (a.created_at || 0);
-                });
-            }
+                            list = db.prepare('SELECT * FROM my_weapons ORDER BY is_sold ASC, created_at DESC').all();
+
             res.json({ myweapons: aggregateMyWeapons(list, userId) });
         } catch (e) { res.json({ myweapons: [], error: e.message }); }
     });
@@ -2940,8 +2313,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
             const userId = viewingOtherUser ? requestedUserId : requesterId;
             let rows;
-            if (useSQLite) {
-                rows = db.prepare(`
+                            rows = db.prepare(`
                     SELECT r.*, w.name as weapon_name, w.max_sale_price as max_sale_price
                     FROM craft_requests r
                     JOIN weapons w ON r.weapon_id = w.id
@@ -2950,15 +2322,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                       AND TRIM(COALESCE(r.serial_number, '')) != ''
                     ORDER BY r.craft_date DESC, r.created_at DESC
                 `).all(userId);
-            } else {
-                rows = (jsonData.craft_requests || [])
-                    .filter(r => r.user_id === userId && r.status === 'crafted' && String(r.serial_number || '').trim())
-                    .map(r => {
-                        const w = (jsonData.weapons || []).find(weapon => Number(weapon.id) === Number(r.weapon_id));
-                        return { ...r, weapon_name: w ? w.name : 'Arme inconnue', max_sale_price: Number(w?.max_sale_price) || 0 };
-                    })
-                    .sort((a, b) => (b.craft_date || b.created_at || 0) - (a.craft_date || a.created_at || 0));
-            }
+
             const crafts = rows
                 .filter(r => getWeaponSaleStateForCraftRequest(r).state === 'not_listed')
                 .map(r => ({
@@ -3075,50 +2439,21 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const batchId = `mw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             let id;
 
-            if (useSQLite) {
-                const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, craft_request_id, is_crafted, serial_number, asking_price, min_price, batch_id, crafted_by_id, crafted_by_name, created_by_id, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+                            const stmt = db.prepare(`INSERT INTO my_weapons (user_id, user_name, user_avatar, weapon_name, craft_request_id, is_crafted, serial_number, asking_price, min_price, batch_id, crafted_by_id, crafted_by_name, created_by_id, created_by_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
                 for (const serial of serials) {
                     const r = stmt.run(ownerId, ownerName, ownerAvatar, weaponName, linkedCraftRequestId, isCrafted21BS ? 1 : 0, serial, askingPrice, minPrice, batchId, craftedById, craftedByName, createdById, createdByName);
                     if (!id) id = r.lastInsertRowid;
                 }
-            } else {
-                if (!jsonData.my_weapons) jsonData.my_weapons = [];
-                if (!jsonData.counters.myweapons) jsonData.counters.myweapons = 0;
-                const createdAt = Math.floor(Date.now() / 1000);
-                for (const serial of serials) {
-                    jsonData.counters.myweapons++;
-                    const rowId = jsonData.counters.myweapons;
-                    if (!id) id = rowId;
-                    jsonData.my_weapons.push({
-                        id: rowId,
-                        user_id: ownerId,
-                        user_name: ownerName,
-                        user_avatar: ownerAvatar,
-                        weapon_name: weaponName,
-                        craft_request_id: linkedCraftRequestId,
-                        is_crafted: isCrafted21BS ? 1 : 0,
-                        serial_number: serial,
-                        asking_price: askingPrice,
-                        min_price: minPrice,
-                        is_sold: 0,
-                        batch_id: batchId,
-                        crafted_by_id: craftedById,
-                        crafted_by_name: craftedByName,
-                        created_by_id: createdById,
-                        created_by_name: createdByName,
-                        created_at: createdAt,
-                    });
-                }
-                saveJSON();
-            }
+
 
             try {
-                const first = useSQLite ? db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id) : (jsonData.my_weapons || []).find(w => w.id === id);
+                const first = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
                 if (first) {
                     await updateMyWeaponsDiscordBatch(first);
                 }
             } catch (e) { console.error('Erreur post Discord myweapons:', e.message); }
 
+            emitRealtime('craft:status', { requestId: linkedCraftRequestId || null, myWeaponId: id, status: 'listed', action: 'myweapon-listed' });
             return res.json({ success: true, id, quantity: serials.length });
         } catch (e) {
             return res.status(500).json({ error: e.message });
@@ -3211,8 +2546,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
 
             const batchId = existing.batch_id || null;
-            if (useSQLite) {
-                if (batchId) {
+                            if (batchId) {
                     db.prepare(`
                         UPDATE my_weapons
                         SET user_id = ?, user_name = ?, user_avatar = ?, weapon_name = ?, is_crafted = ?,
@@ -3227,29 +2561,11 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                         sold_to = ?, sold_price = ?, sold_at = ?
                     WHERE id = ?
                 `).run(ownerId, ownerName, ownerAvatar, weaponName, isCrafted ? 1 : 0, serial || null, askingPrice, minPrice, nextIsSold ? 1 : 0, soldTo, soldPrice, soldAt, id);
-            } else {
-                const rows = (jsonData.my_weapons || []).filter(w => batchId ? w.batch_id === batchId : Number(w.id) === id);
-                for (const row of rows) {
-                    row.user_id = ownerId;
-                    row.user_name = ownerName;
-                    row.user_avatar = ownerAvatar;
-                    row.weapon_name = weaponName;
-                    row.is_crafted = isCrafted ? 1 : 0;
-                    row.asking_price = askingPrice;
-                    row.min_price = minPrice;
-                }
-                const row = rows.find(w => Number(w.id) === id);
-                if (row) {
-                    row.serial_number = serial || null;
-                    row.is_sold = nextIsSold ? 1 : 0;
-                    row.sold_to = soldTo;
-                    row.sold_price = soldPrice;
-                    row.sold_at = soldAt;
-                }
-                saveJSON();
-            }
 
-            res.json({ success: true, weapon: getMyWeaponById(id) });
+
+            const updatedWeapon = getMyWeaponById(id);
+            emitRealtime('craft:status', { requestId: updatedWeapon?.craft_request_id || null, myWeaponId: id, status: updatedWeapon?.is_sold ? 'sold' : 'listed', action: 'myweapon-updated' });
+            res.json({ success: true, weapon: updatedWeapon });
         } catch (e) {
             res.status(500).json({ error: e.message });
         }
@@ -3264,11 +2580,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
             // Récupérer
             let existing;
-            if (useSQLite) {
-                existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
-            } else {
-                existing = (jsonData.my_weapons || []).find(w => w.id === id);
-            }
+                            existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
+
             if (!existing) return res.status(404).json({ error: 'Introuvable' });
             if (existing.user_id !== userId && !canDeleteRequests(req.session.user)) {
                 return res.status(403).json({ error: 'Action non autorisée — seul le vendeur peut marquer comme vendu' });
@@ -3287,21 +2600,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const soldByName = String(sold_by_name || '').trim();
             if (!soldById) return res.status(400).json({ error: 'Vendeur obligatoire' });
 
-            if (useSQLite) {
-                db.prepare(`UPDATE my_weapons SET is_sold = 1, sold_to = ?, sold_price = ?, sold_at = ?, sold_by_id = ?, sold_by_name = ? WHERE id = ?`)
+                            db.prepare(`UPDATE my_weapons SET is_sold = 1, sold_to = ?, sold_price = ?, sold_at = ?, sold_by_id = ?, sold_by_name = ? WHERE id = ?`)
                     .run(soldTo, soldPrice, now, soldById, soldByName, id);
-            } else {
-                const w = jsonData.my_weapons.find(w => w.id === id);
-                if (w) {
-                    w.is_sold = 1;
-                    w.sold_to = soldTo;
-                    w.sold_price = soldPrice;
-                    w.sold_at = now;
-                    w.sold_by_id = soldById;
-                    w.sold_by_name = soldByName;
-                    saveJSON();
-                }
-            }
+
 
             // Mettre à jour le message Discord (édit ou nouveau message)
             try {
@@ -3354,44 +2655,21 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             if (existing.is_crafted && existing.serial_number) {
                 try {
                     let matchedRequest;
-                    if (useSQLite) {
-                        // Chercher demande par : user_id + N°Série + status (crafted/in_progress/pending)
+                                            // Chercher demande par : user_id + N°Série + status (crafted/in_progress/pending)
                         matchedRequest = db.prepare(`
                             SELECT r.*, w.name as weapon_name FROM craft_requests r
                             JOIN weapons w ON r.weapon_id = w.id
                             WHERE r.user_id = ? AND r.serial_number = ? AND r.status != 'completed'
                             ORDER BY r.created_at DESC LIMIT 1
                         `).get(existing.user_id, existing.serial_number);
-                    } else {
-                        const req = (jsonData.craft_requests || []).find(r =>
-                            r.user_id === existing.user_id &&
-                            r.serial_number === existing.serial_number &&
-                            r.status !== 'completed'
-                        );
-                        if (req) {
-                            const w = jsonData.weapons.find(w => w.id === req.weapon_id);
-                            matchedRequest = { ...req, weapon_name: w ? w.name : '?' };
-                        }
-                    }
+
 
                     if (matchedRequest) {
                         matchedRequestForLog = matchedRequest;
                         // Compléter la demande craft avec les infos de vente
-                        if (useSQLite) {
-                            db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
+                                                    db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
                                 .run(soldTo, soldPrice, now, userId, existing.user_name, matchedRequest.id);
-                        } else {
-                            const r = jsonData.craft_requests.find(r => r.id === matchedRequest.id);
-                            if (r) {
-                                r.buyer_org = soldTo;
-                                r.sale_price = soldPrice;
-                                r.sale_date = now;
-                                r.completed_by_id = userId;
-                                r.completed_by_name = existing.user_name;
-                                r.status = 'completed';
-                                saveJSON();
-                            }
-                        }
+
                         autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
 
                     }
@@ -3399,9 +2677,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             }
 
             try {
-                const soldWeaponForLog = useSQLite
-                    ? db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id)
-                    : (jsonData.my_weapons || []).find(w => Number(w.id) === Number(id));
+                const soldWeaponForLog = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
                 const saleLogged = soldWeaponForLog ? await postMyWeaponsSaleLog(soldWeaponForLog) : false;
                 if (saleLogged && matchedRequestForLog && !matchedRequestForLog.posted_to_channel) {
                     markRequestPosted(matchedRequestForLog.id);
@@ -3410,6 +2686,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                 console.error('Erreur log vente WEAPONS_LOG:', e.message);
             }
 
+            emitRealtime('craft:status', { requestId: matchedRequestForLog?.id || existing.craft_request_id || null, myWeaponId: id, status: 'sold', action: 'myweapon-sold' });
             res.json({ success: true, autoFilledCraft });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -3419,11 +2696,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const id = parseInt(req.params.id);
             const userId = req.session.user.id;
             let existing;
-            if (useSQLite) {
-                existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
-            } else {
-                existing = (jsonData.my_weapons || []).find(w => w.id === id);
-            }
+                            existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
+
             if (!existing) return res.status(404).json({ error: 'Introuvable' });
             // Le vendeur peut supprimer sa propre annonce, OU super admin
             if (existing.user_id !== userId && !canDeleteMyWeapons(req.session.user)) {
@@ -3436,13 +2710,10 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     if (msg) await msg.delete();
                 } catch {}
             }
-            if (useSQLite) {
-                if (existing.batch_id) db.prepare('DELETE FROM my_weapons WHERE batch_id = ?').run(existing.batch_id);
+                            if (existing.batch_id) db.prepare('DELETE FROM my_weapons WHERE batch_id = ?').run(existing.batch_id);
                 else db.prepare('DELETE FROM my_weapons WHERE id = ?').run(id);
-            } else {
-                jsonData.my_weapons = (jsonData.my_weapons || []).filter(w => existing.batch_id ? w.batch_id !== existing.batch_id : w.id !== id);
-                saveJSON();
-            }
+
+            emitRealtime('craft:status', { requestId: existing.craft_request_id || null, myWeaponId: id, status: 'deleted', action: 'myweapon-deleted' });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });

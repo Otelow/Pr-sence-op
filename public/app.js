@@ -1,5 +1,8 @@
 // ==========================================
 // 21 BLOCK SAVAGE — Dashboard JS
+// MODIFIÉ CHANTIER 3 — 14/05/2026 — rendu messages sécurisé
+// MODIFIÉ CHANTIER 4 — 14/05/2026 — permissions UI chargées depuis le serveur
+// MODIFIÉ CHANTIER 12 — 14/05/2026 — Socket.IO avec fallback polling
 // ==========================================
 
 const PAGE_TITLES = {
@@ -16,6 +19,9 @@ const PAGE_TITLES = {
 let currentTab = 'presence';
 let refreshTimer = null;
 let refreshAllInFlight = false;
+let realtimeSocket = null;
+let realtimeRefreshTimer = null;
+let realtimeConnected = false;
 const SITE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 let idleLogoutTimer = null;
 let userPermissions = { canEditMap: false };
@@ -31,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     applyWaveTextEffects();
 
+    await loadPublicConfig();
     await loadUser();
     setupIdleLogoutTimer();
     await loadPermissions();
@@ -40,9 +47,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateImpersonateBanner();
     applyPermissionsUI();
     restoreLastTab();
+    setupRealtimeSocket();
     refreshAll();
-    refreshTimer = setInterval(refreshAll, 15_000);
+    refreshTimer = setInterval(refreshAll, 60_000);
 });
+
+function scheduleRealtimeRefresh(reason = 'realtime') {
+    clearTimeout(realtimeRefreshTimer);
+    realtimeRefreshTimer = setTimeout(() => {
+        console.debug(`[realtime] refresh ${reason}`);
+        refreshAll();
+    }, 350);
+}
+
+function setupRealtimeSocket() {
+    if (typeof io !== 'function') {
+        console.warn('[realtime] socket.io client absent, fallback polling actif');
+        return;
+    }
+
+    realtimeSocket = io({ path: '/socket.io', transports: ['websocket', 'polling'] });
+    realtimeSocket.on('connect', () => {
+        realtimeConnected = true;
+        console.info('[realtime] connecté');
+    });
+    realtimeSocket.on('disconnect', () => {
+        realtimeConnected = false;
+        console.warn('[realtime] déconnecté, fallback polling actif');
+    });
+    realtimeSocket.on('connect_error', err => {
+        realtimeConnected = false;
+        console.warn('[realtime] connexion impossible:', err?.message || err);
+    });
+
+    const tabEvents = {
+        'presence:reaction': ['presence', 'stats'],
+        'absence:posted': ['presence', 'stats'],
+        'craft:status': ['crafts', 'myweapons'],
+        'sanction:added': ['sanctions'],
+        'reminder:changed': ['commands'],
+    };
+
+    Object.entries(tabEvents).forEach(([eventName, tabs]) => {
+        realtimeSocket.on(eventName, () => {
+            if (tabs.includes(currentTab)) scheduleRealtimeRefresh(eventName);
+        });
+    });
+}
 
 function renderWaveTextSpans(text) {
     return Array.from(String(text || '')).map((char, index) => {
@@ -122,19 +173,36 @@ function setupNav() {
 }
 
 // Permissions UI
-const FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
-const LIMITED_CRAFT_ACCESS_ROLES = [
+let ADMIN_USER_ID = '952986899667103804';
+let ADMIN_ROLE_ID = '1485279148246175764';
+let FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
+let LIMITED_CRAFT_ACCESS_ROLES = [
     '1495448653945634987',
     '1485636099853516982',
     '1485270431291277383',
 ];
 let userHasFullAccess = false;
 
+async function loadPublicConfig() {
+    try {
+        const res = await fetch('/api/config/public');
+        if (!res.ok) return;
+        const data = await res.json();
+        ADMIN_USER_ID = data.adminUserId || ADMIN_USER_ID;
+        ADMIN_ROLE_ID = data.adminRoleId || ADMIN_ROLE_ID;
+        FULL_ACCESS_ROLES = Array.isArray(data.fullAccessRoles) ? data.fullAccessRoles : FULL_ACCESS_ROLES;
+        LIMITED_CRAFT_ACCESS_ROLES = Array.isArray(data.limitedCraftAccessRoles) ? data.limitedCraftAccessRoles : LIMITED_CRAFT_ACCESS_ROLES;
+        if (data.myWeaponsDeleteRole) MY_WEAPONS_DELETE_ROLE = data.myWeaponsDeleteRole;
+    } catch (e) {
+        console.warn('Config publique indisponible, fallback local utilisé:', e.message);
+    }
+}
+
 function checkUserAccess() {
     if (!window.currentUser) return false;
     const impersonateRole = localStorage.getItem('impersonate_role');
     if (impersonateRole) return FULL_ACCESS_ROLES.includes(impersonateRole);
-    if (window.currentUser.id === '952986899667103804') return true;
+    if (window.currentUser.id === ADMIN_USER_ID) return true;
     const roles = window.currentUser.roles || [];
     return FULL_ACCESS_ROLES.some(r => roles.includes(r));
 }
@@ -1055,18 +1123,20 @@ function renderMessage(m) {
     const date = new Date(m.createdTimestamp);
     const dateStr = date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 
-    const avatar = m.authorAvatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
+    const avatar = safeImageUrl(m.authorAvatar) || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
+    const authorColor = safeColor(m.authorColor);
 
     let content = escapeHtml(m.content)
         .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')
         .replace(/<@!?(\d+)>/g, (_, id) => {
             const u = m.mentions.users.find(u => u.id === id);
-            const color = u?.color ? `style="color:${u.color};background:${u.color}22;"` : '';
+            const userColor = safeColor(u?.color);
+            const color = userColor ? `style="color:${userColor};background:${userColor}22;"` : '';
             return `<span class="mention mention-user" ${color}>@${escapeHtml(u?.name || 'inconnu')}</span>`;
         })
         .replace(/<@&(\d+)>/g, (_, id) => {
             const r = m.mentions.roles.find(r => r.id === id);
-            const color = r?.color ? `#${r.color.toString(16).padStart(6, '0')}` : null;
+            const color = safeColor(r?.color ? `#${r.color.toString(16).padStart(6, '0')}` : '');
             const style = color ? `style="color:${color};background:${color}22;"` : '';
             return `<span class="mention mention-role" ${style}>@${escapeHtml(r?.name || 'rôle')}</span>`;
         })
@@ -1082,38 +1152,45 @@ function renderMessage(m) {
         .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
 
     let attachmentsHtml = '';
-    for (const a of m.attachments) {
+    for (const a of (m.attachments || [])) {
+        const attachmentUrl = safeImageUrl(a.url);
+        if (!attachmentUrl) continue;
+        const escapedUrl = escapeHtml(attachmentUrl);
+        const jsUrl = escapeJsArg(attachmentUrl);
         if (a.isImage) {
-            attachmentsHtml += `<img class="message-attachment-img" src="${a.url}" alt="${escapeHtml(a.name)}" onclick="window.open('${a.url}', '_blank')">`;
+            attachmentsHtml += `<img class="message-attachment-img" src="${escapedUrl}" alt="${escapeHtml(a.name)}" onclick="window.open('${jsUrl}', '_blank')">`;
         } else if (a.isVideo) {
-            attachmentsHtml += `<video class="message-attachment-video" src="${a.url}" controls></video>`;
+            attachmentsHtml += `<video class="message-attachment-video" src="${escapedUrl}" controls></video>`;
         } else {
-            attachmentsHtml += `<a href="${a.url}" target="_blank" class="message-attachment-file">📎 ${escapeHtml(a.name)}</a>`;
+            attachmentsHtml += `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer" class="message-attachment-file">📎 ${escapeHtml(a.name)}</a>`;
         }
     }
 
     let embedsHtml = '';
-    for (const e of m.embeds) {
+    for (const e of (m.embeds || [])) {
+        const embedColor = safeColor(typeof e.color === 'number' ? `#${e.color.toString(16).padStart(6, '0')}` : e.color);
+        const embedImage = safeImageUrl(e.image);
         embedsHtml += `
-            <div class="message-embed" style="${e.color ? `border-left-color:#${e.color.toString(16).padStart(6,'0')};` : ''}">
+            <div class="message-embed" style="${embedColor ? `border-left-color:${embedColor};` : ''}">
                 ${e.title ? `<div class="message-embed-title">${escapeHtml(e.title)}</div>` : ''}
                 ${e.description ? `<div class="message-embed-desc">${escapeHtml(e.description).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>')}</div>` : ''}
-                ${e.image ? `<img class="message-embed-image" src="${e.image}" alt="">` : ''}
+                ${embedImage ? `<img class="message-embed-image" src="${escapeHtml(embedImage)}" alt="">` : ''}
                 ${(e.fields || []).map(f => `<div style="margin-top:8px;"><strong style="font-size:12px;">${escapeHtml(f.name)}</strong><div style="font-size:12px;color:var(--text-dim);white-space:pre-wrap;">${escapeHtml(f.value)}</div></div>`).join('')}
             </div>
         `;
     }
 
     let reactionsHtml = '';
-    for (const r of m.reactions) {
-        reactionsHtml += `<span class="message-reaction">${r.emojiUrl ? `<img src="${r.emojiUrl}" alt=":${r.emojiName}:">` : r.emoji} ${r.count}</span>`;
+    for (const r of (m.reactions || [])) {
+        const emojiUrl = safeImageUrl(r.emojiUrl);
+        reactionsHtml += `<span class="message-reaction">${emojiUrl ? `<img src="${escapeHtml(emojiUrl)}" alt=":${escapeHtml(r.emojiName)}:">` : escapeHtml(r.emoji)} ${r.count}</span>`;
     }
 
     div.innerHTML = `
         <img class="message-avatar" src="${avatar}" alt="">
         <div class="message-body">
             <div class="message-header">
-                <span class="message-author ${m.authorBot ? 'bot' : ''}" ${m.authorColor ? `style="color:${m.authorColor};"` : ''}>${escapeHtml(m.authorName)}</span>
+                <span class="message-author ${m.authorBot ? 'bot' : ''}" ${authorColor ? `style="color:${authorColor};"` : ''}>${escapeHtml(m.authorName)}</span>
                 ${m.authorBot ? '<span class="message-bot-tag">BOT</span>' : ''}
                 ${m.pinned ? '<span class="message-pinned-tag">📌 ÉPINGLÉ</span>' : ''}
                 <span class="message-time">${dateStr}</span>
@@ -2483,7 +2560,7 @@ let craftRequestsListState = {
     statusFilter: 'all',
 };
 const CRAFT_BOARD_ACTIVE_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
-const MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
+let MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
 
 function compareWeaponsBySalePrice(a, b) {
     const saleDiff = (Number(b.sale_price) || 0) - (Number(a.sale_price) || 0);
@@ -3316,20 +3393,20 @@ window.updateCraftRequestsStatusFilter = updateCraftRequestsStatusFilter;
 
 function canValidateCraftClient() {
     const u = window.currentUser || {};
-    if (u.id === '952986899667103804') return true;
+    if (u.id === ADMIN_USER_ID) return true;
     const userRoles = u.roles || [];
-    return ['1485279148246175764', '1486744891848654988', '1485279534650494976'].some(r => userRoles.includes(r));
+    return FULL_ACCESS_ROLES.some(r => userRoles.includes(r));
 }
 
 function canDeleteRequestsClient() {
     const u = window.currentUser || {};
-    if (u.id === '952986899667103804') return true;
-    return (u.roles || []).includes('1485279148246175764');
+    if (u.id === ADMIN_USER_ID) return true;
+    return (u.roles || []).includes(ADMIN_ROLE_ID);
 }
 
 function canDeleteMyWeaponsClient() {
     const u = window.currentUser || {};
-    if (u.id === '952986899667103804') return true;
+    if (u.id === ADMIN_USER_ID) return true;
     const roles = u.roles || [];
     return roles.includes(MY_WEAPONS_DELETE_ROLE) || canDeleteRequestsClient();
 }
@@ -4143,8 +4220,8 @@ window.toggleEmbedMode = toggleEmbedMode;
                 window.currentUserId = me.id;
                 window.currentUserRoles = me.roles || [];
 
-                if (me.id === '952986899667103804' ||
-                    (me.roles && me.roles.includes('1485279148246175764')) ||
+                if (me.id === ADMIN_USER_ID ||
+                    (me.roles && me.roles.includes(ADMIN_ROLE_ID)) ||
                     me.isAdmin) {
                     const wrapper = document.getElementById('adminSlideWrapper');
                     if (wrapper) {
