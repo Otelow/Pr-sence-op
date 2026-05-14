@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — middlewares auth/permissions web isolés
 const {
     ADMIN_USER_ID,
@@ -49,7 +50,6 @@ function requireFullSiteAccess(req, res, next) {
 function requireAdmin(req, res, next) {
     if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
     if (!isUserAdmin(req.session.user)) return res.status(403).json({ error: 'Accès admin requis' });
-    req.session.user.isAdmin = true;
     next();
 }
 

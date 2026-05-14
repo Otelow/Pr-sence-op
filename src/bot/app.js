@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 // ==========================================
 // 21 Block Savage - Discord Bot
 // MODIFIÉ CHANTIER 1 — 14/05/2026 — stabilisation /absence, lock panneau et cache salon
@@ -149,6 +150,7 @@ if (TURBO_MODE) {
 const client = createDiscordClient();
 
 let startWelcomeFlow;
+let restoreRenameChecks;
 let handleClipsBackfill;
 let handleClipsBackfillStatus;
 let handleSimpleAlert;
@@ -200,6 +202,27 @@ let lastRadioMessageId = null;
 // Persistance du welcomeState pour survivre aux redéploiements
 const WELCOME_STATE_FILE = dataFile('welcome_state.json');
 
+const savedRenameChecks = loadState('rename_check', {});
+if (savedRenameChecks && typeof savedRenameChecks === 'object') {
+    for (const [userId, renameState] of Object.entries(savedRenameChecks)) {
+        if (renameState && typeof renameState === 'object') {
+            renameCheckState.set(userId, renameState);
+        }
+    }
+}
+
+function saveRenameCheckState(userId, renameState) {
+    const all = loadState('rename_check', {}) || {};
+    all[userId] = renameState;
+    saveState('rename_check', all);
+}
+
+function deleteRenameCheckState(userId) {
+    const all = loadState('rename_check', {}) || {};
+    delete all[userId];
+    saveState('rename_check', all);
+}
+
 function hasProtectedRole(member) {
     return CONFIG.ROLES.PROTECTED_ROLES.some(roleId => member.roles.cache.has(roleId));
 }
@@ -219,6 +242,7 @@ const {
 
 ({
     startWelcomeFlow,
+    restoreRenameChecks,
 } = createWelcomeService({
     CONFIG,
     client,
@@ -230,6 +254,8 @@ const {
     sleep,
     saveWelcomeState,
     deleteWelcomeState,
+    saveRenameCheckState,
+    deleteRenameCheckState,
 }));
 
 ({
@@ -479,6 +505,7 @@ registerReadyEvent({
     setupPresenceCron,
     scheduleDailyBackups,
     restoreAbsencePanelState,
+    restoreRenameChecks,
     loadReminders,
     restorePanelState,
     hasEnabledReminders,
@@ -547,11 +574,10 @@ registerAbsenceValidatorEvent(client, { CONFIG });
 // ERREURS
 // ==========================================
 process.on('unhandledRejection', e => {
-    console.error('❌ Unhandled:', e);
-    process.exit(1);
+    console.warn('⚠️ Unhandled Rejection:', e?.stack || e);
 });
 process.on('uncaughtException', e => {
-    console.error('❌ Uncaught:', e);
+    console.error('❌ Uncaught Exception (fatal):', e);
     process.exit(1);
 });
 

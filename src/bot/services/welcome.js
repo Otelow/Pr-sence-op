@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — service accueil Discord externalisé
 
 function createWelcomeService(deps) {
@@ -12,7 +13,14 @@ function createWelcomeService(deps) {
         sleep,
         saveWelcomeState,
         deleteWelcomeState,
+        saveRenameCheckState,
+        deleteRenameCheckState,
     } = deps;
+
+    function clearRenameCheck(userId) {
+        renameCheckState.delete(userId);
+        deleteRenameCheckState?.(userId);
+    }
 
     async function startWelcomeFlow(member) {
         const channel = member.guild.channels.cache.get(CONFIG.CHANNELS.REGLEMENT);
@@ -40,6 +48,10 @@ function createWelcomeService(deps) {
     }
 
     async function scheduleRenameCheck(userId) {
+        const initialState = renameCheckState.get(userId);
+        const remainingDelay = initialState?.createdAt
+            ? Math.max(0, renameKickDelay - (Date.now() - initialState.createdAt))
+            : renameKickDelay;
         setTimeout(async () => {
             const renameState = renameCheckState.get(userId);
             if (!renameState) return;
@@ -48,18 +60,18 @@ function createWelcomeService(deps) {
                 const guild = client.guilds.cache.get(renameState.guildId);
                 const member = await guild.members.fetch(userId).catch(() => null);
                 if (!member) {
-                    renameCheckState.delete(userId);
+                    clearRenameCheck(userId);
                     return;
                 }
 
                 if (member.roles.cache.has(CONFIG.ROLES.EXCLUDED_RENAME)) {
-                    renameCheckState.delete(userId);
+                    clearRenameCheck(userId);
                     return;
                 }
 
                 const hasProtected = CONFIG.ROLES.PROTECTED_ROLES.some(roleId => member.roles.cache.has(roleId));
                 if (hasProtected) {
-                    renameCheckState.delete(userId);
+                    clearRenameCheck(userId);
                     return;
                 }
 
@@ -67,11 +79,17 @@ function createWelcomeService(deps) {
                     await member.send(`Salut, tu viens d'être Kick du Serveur **21 Block Savage** ${CONFIG.EMOJIS.BS21} car tu ne t'es pas renommé.\nA bientôt ! ${CONFIG.EMOJIS.BS21}`).catch(() => {});
                     await member.kick('Pas renommé').catch(() => {});
                 }
-                renameCheckState.delete(userId);
+                clearRenameCheck(userId);
             } catch {
-                renameCheckState.delete(userId);
+                clearRenameCheck(userId);
             }
-        }, renameKickDelay);
+        }, remainingDelay);
+    }
+
+    function restoreRenameChecks() {
+        for (const userId of renameCheckState.keys()) {
+            scheduleRenameCheck(userId);
+        }
     }
 
     async function finalizeWelcome(guild, member, userId, channel) {
@@ -85,7 +103,9 @@ function createWelcomeService(deps) {
             }
 
             const originalName = freshMember.nickname || freshMember.user.username;
-            renameCheckState.set(userId, { originalName, guildId: guild.id });
+            const renameState = { originalName, guildId: guild.id, createdAt: Date.now() };
+            renameCheckState.set(userId, renameState);
+            saveRenameCheckState?.(userId, renameState);
             await scheduleRenameCheck(userId);
         } catch {}
 
@@ -194,6 +214,7 @@ function createWelcomeService(deps) {
 
     return {
         startWelcomeFlow,
+        restoreRenameChecks,
         runWelcomeStep,
         handleWelcomeReactionFallback,
     };

@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 // ==========================================
 // 21 BLOCK SAVAGE — Dashboard JS
 // MODIFIÉ CHANTIER 3 — 14/05/2026 — rendu messages sécurisé
@@ -990,6 +991,7 @@ async function loadMessages(channelId, before = null) {
 function startChannelPolling() {
     stopChannelPolling();
     channelPollTimer = setInterval(async () => {
+        if (realtimeConnected) return;
         if (!currentChannelId) return;
         // Skip si l'onglet n'est pas Salons
         if (currentTab !== 'channels') return;

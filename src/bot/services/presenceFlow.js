@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - flux presence OP externalise
 
 function createStateProxy(getter) {
@@ -150,7 +151,17 @@ async function sendPresenceMessage(channelOverride) {
 }
 
 // Variable globale pour empêcher les doublons de crons de présence
-let presenceCronsScheduled = false;
+const presenceCronJobs = new Map();
+
+function replacePresenceCron(key, expression, handler) {
+    const existing = presenceCronJobs.get(key);
+    if (existing && typeof existing.stop === 'function') {
+        existing.stop();
+    }
+    const job = cron.schedule(expression, handler, { timezone: 'Europe/Paris' });
+    presenceCronJobs.set(key, job);
+    return job;
+}
 
 async function startPresenceReminders(channel, presenceMsg) {
     let stopped = false;
@@ -166,37 +177,38 @@ async function startPresenceReminders(channel, presenceMsg) {
     };
 
     if (TEST_MODE || TURBO_MODE) {
+        if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
         presenceData.reminderInterval = setInterval(() => doReminder(false), TIMERS.PRESENCE_RAPPEL_INTERVAL);
     } else {
         // Empêcher les doublons : si les crons sont déjà programmés, on ne les recrée pas
-        if (!presenceCronsScheduled) {
+        {
             ['0 18', '30 18', '0 19', '30 19', '0 20', '45 20'].forEach((t, i, a) => {
-                cron.schedule(`${t} * * *`, () => {
+                replacePresenceCron(`reminder:${t}`, `${t} * * *`, () => {
                     if (presenceData.active && presenceData.messageId) doReminder(i === a.length - 1);
-                }, { timezone: 'Europe/Paris' });
+                });
             });
 
             // 21h05 — Avertissements
-            cron.schedule('5 21 * * *', async () => {
+            replacePresenceCron('warnings:21h05', '5 21 * * *', async () => {
                 stopped = true;
                 if (presenceData.reminderInterval) { clearInterval(presenceData.reminderInterval); presenceData.reminderInterval = null; }
                 if (!presenceData.active || !presenceData.messageId) return;
                 await sendPresenceWarnings(channel);
                 await refreshAbsencePanel();
-            }, { timezone: 'Europe/Paris' });
+            });
 
             // 21h20 — Suppression message 1ère OP
-            cron.schedule('20 21 * * *', async () => {
+            replacePresenceCron('delete-op1:21h20', '20 21 * * *', async () => {
                 if (!presenceData.messageId) return;
                 console.log('🗑️ 21h20 : Suppression 1ère présence OP');
                 try {
                     const msg = await channel.messages.fetch(presenceData.messageId);
                     await msg.delete();
                 } catch {}
-            }, { timezone: 'Europe/Paris' });
+            });
 
             // 22h00 — Nettoyage des messages Discord (présence reste visible sur le site)
-            cron.schedule('0 22 * * *', async () => {
+            replacePresenceCron('cleanup:22h00', '0 22 * * *', async () => {
                 if (!presenceData.active && !presence2Data.active) return;
                 console.log('🌙 22h — Nettoyage messages Discord (le panel site reste actif jusqu\'à 2h)');
                 stopAbsencePanelRefresh();
@@ -213,10 +225,10 @@ async function startPresenceReminders(channel, presenceMsg) {
                 }
                 // L'état reste 'active' avec les données de réactions pour que le site continue à les montrer
                 savePresenceState();
-            }, { timezone: 'Europe/Paris' });
+            });
 
             // 2h00 du matin — Reset complet (présence disparaît du site)
-            cron.schedule('0 2 * * *', async () => {
+            replacePresenceCron('reset:02h00', '0 2 * * *', async () => {
                 console.log('🌃 2h — Reset complet présence (site + état)');
                 clearAbsencePanelState();
                 if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
@@ -226,21 +238,19 @@ async function startPresenceReminders(channel, presenceMsg) {
                 reactionsOP2.clear();
                 savePresenceState();
                 try { await refreshAbsencePanel(); } catch {}
-            }, { timezone: 'Europe/Paris' });
-
-            presenceCronsScheduled = true;
-            console.log('🔔 Crons présence programmés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, reset complet 2h');
+            });
+            console.log('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, reset complet 2h');
         }
 
         // Mode TEST/TURBO : on lance des crons * * * * * temporaires
         if (TEST_MODE || TURBO_MODE) {
-            cron.schedule('* * * * *', async () => {
+            replacePresenceCron('test:warnings', '* * * * *', async () => {
                 stopped = true;
                 if (presenceData.reminderInterval) { clearInterval(presenceData.reminderInterval); presenceData.reminderInterval = null; }
                 if (!presenceData.active || !presenceData.messageId) return;
                 await sendPresenceWarnings(channel);
                 await refreshAbsencePanel();
-            }, { timezone: 'Europe/Paris' });
+            });
         }
     }
 }

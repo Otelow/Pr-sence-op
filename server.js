@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 // ==========================================
 // Serveur web — Dashboard 21 Block Savage
 // MODIFIÉ CHANTIER 2 — 14/05/2026 — sessions persistantes SQLite Railway
@@ -241,14 +242,6 @@ function startServer(client, getState) {
     registerPageRoutes(app, {
         publicDir: path.join(__dirname, 'public'),
         isUserAdmin,
-    });
-
-    // Marquer isAdmin dans la session user
-    app.use((req, res, next) => {
-        if (req.session.user) {
-            req.session.user.isAdmin = isUserAdmin(req.session.user);
-        }
-        next();
     });
 
     // Enregistrer les endpoints crafts

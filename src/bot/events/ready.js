@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - event ready externalise
 
 function registerReadyEvent(deps) {
@@ -10,6 +11,7 @@ function registerReadyEvent(deps) {
         setupPresenceCron,
         scheduleDailyBackups,
         restoreAbsencePanelState,
+        restoreRenameChecks,
         loadReminders,
         restorePanelState,
         hasEnabledReminders,
@@ -65,6 +67,7 @@ client.once('ready', async () => {
             }
         }
         await updateAbsenceSalonCache();
+        restoreRenameChecks?.();
         console.log('📋 Cache absences salon initialisé');
     } catch (e) {
         console.error('⚠️ Erreur prefetch:', e.message);

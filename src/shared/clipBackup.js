@@ -1,8 +1,8 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 const config = require('./config');
-const { ensureDataDirs } = require('./database');
+const { createConnection } = require('./database');
 const supabase = require('./supabase');
 
-let Database;
 let db;
 let backfillRunning = false;
 let lastBackfillSummary = null;
@@ -16,10 +16,7 @@ const URL_RE = /https?:\/\/[^\s<>"')]+/gi;
 
 function getDb() {
     if (db) return db;
-    ensureDataDirs();
-    Database = Database || require('better-sqlite3');
-    db = new Database(config.paths.database);
-    db.pragma('journal_mode = WAL');
+    db = createConnection(config.paths.database);
     initClipBackupTables();
     return db;
 }

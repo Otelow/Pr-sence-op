@@ -1,3 +1,4 @@
+// STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - cache salon absence et embeds panneau presence externalises
 
 const { EmbedBuilder } = require('discord.js');
@@ -21,18 +22,31 @@ function createPresencePanelService(deps) {
         validAbsenceNames: [],
         invalidAbsenceNames: [],
     };
-    let absenceCacheUpdating = false;
+    let absenceCacheUpdating = null;
+    let absenceCacheUpdateSeq = 0;
     let absenceCacheRefreshTimeout = null;
 
     async function updateAbsenceSalonCache({ force = false } = {}) {
-        if (absenceCacheUpdating && !force) return absenceSalonCache;
-        absenceCacheUpdating = true;
+        if (absenceCacheUpdating && !force) {
+            await absenceCacheUpdating;
+            return absenceSalonCache;
+        }
+        const seq = ++absenceCacheUpdateSeq;
+        const work = (async () => {
+            try {
+                const nextCache = await getAbsentUsersToday();
+                if (seq === absenceCacheUpdateSeq) {
+                    absenceSalonCache = nextCache;
+                }
+            } catch (e) {
+                console.warn('⚠️ Cache absences salon non mis à jour:', e.message);
+            }
+        })();
+        absenceCacheUpdating = work;
         try {
-            absenceSalonCache = await getAbsentUsersToday();
-        } catch (e) {
-            console.warn('⚠️ Cache absences salon non mis à jour:', e.message);
+            await work;
         } finally {
-            absenceCacheUpdating = false;
+            if (absenceCacheUpdating === work) absenceCacheUpdating = null;
         }
         return absenceSalonCache;
     }
