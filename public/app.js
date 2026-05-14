@@ -6,6 +6,7 @@
 // MODIFIE HOTFIX UI - 14/05/2026 - initialisation isolee pour garder les interactions
 // ==========================================
 
+// MODIFIE HOTFIX UI - 14/05/2026 - Vendue par garde l'utilisateur courant
 const PAGE_TITLES = {
     presence: { title: 'Présence', sub: 'Suivi Présence/Absence' },
     commands: { title: 'Commandes', sub: 'Centre de contrôle' },
@@ -4628,7 +4629,7 @@ function toggleMwCrafted() {
 }
 
 function populateMyWeaponsMemberSelects() {
-    const members = allMembersCache || [];
+    const members = ensureCurrentUserMemberOption(allMembersCache || []);
     const currentId = window.currentUser?.id || window.currentUserId || '';
     const options = '<option value="">— Choisir un membre —</option>' + members.map(m => (
         `<option value="${escapeHtml(m.id)}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`
@@ -4658,6 +4659,45 @@ function populateMyWeaponsMemberSelects() {
         )).join('');
         if (previousValue && members.some(m => m.id === previousValue)) sellForSelect.value = previousValue;
     }
+}
+
+function getCurrentUserMemberOption() {
+    const user = window.currentUser || {};
+    const id = String(user.id || window.currentUserId || '').trim();
+    if (!id) return null;
+    const name = String(
+        user.name ||
+        user.username ||
+        user.global_name ||
+        user.displayName ||
+        user.user_name ||
+        id
+    ).trim() || id;
+    return { id, name };
+}
+
+function ensureCurrentUserMemberOption(members) {
+    const list = Array.isArray(members) ? [...members] : [];
+    const current = getCurrentUserMemberOption();
+    if (!current) return list;
+    const exists = list.some(m => String(m.id) === current.id);
+    return exists ? list : [current, ...list];
+}
+
+function ensureCurrentUserInMemberSelect(select) {
+    if (!select) return '';
+    const current = getCurrentUserMemberOption();
+    if (!current) return '';
+    const exists = Array.from(select.options).some(opt => String(opt.value) === current.id);
+    if (!exists) {
+        const option = document.createElement('option');
+        option.value = current.id;
+        option.dataset.name = current.name;
+        option.textContent = current.name;
+        const firstRealOption = Array.from(select.options).find(opt => opt.value);
+        select.insertBefore(option, firstRealOption || null);
+    }
+    return current.id;
 }
 
 function getSelectedMember(selectId) {
@@ -5024,7 +5064,7 @@ function openMarkSoldModal(id) {
     document.getElementById('markSoldModal').style.display = 'flex';
     const soldBySelect = document.getElementById('markSoldBy');
     if (soldBySelect) {
-        const currentId = window.currentUser?.id || window.currentUserId || '';
+        const currentId = ensureCurrentUserInMemberSelect(soldBySelect);
         soldBySelect.value = currentId || '';
     }
 }
