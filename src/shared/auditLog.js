@@ -1,3 +1,4 @@
+// ONGLET HISTORIQUE 16/05/2026 — pagination et filtres audit log
 // STABILISATION FINALE v2 16/05/2026 — utilitaire audit log admin SQLite
 const { createConnection } = require('./database');
 const config = require('./config');
@@ -30,13 +31,13 @@ function audit(user, action, opts = {}) {
     }
 }
 
-function listAuditLogs({ limit = 100, offset = 0, action, user_id, since } = {}) {
+function buildAuditWhere({ action, user_id, since } = {}) {
     const clauses = [];
     const params = [];
 
     if (action) {
-        clauses.push('action = ?');
-        params.push(String(action));
+        clauses.push('action LIKE ?');
+        params.push(`${String(action)}%`);
     }
     if (user_id) {
         clauses.push('user_id = ?');
@@ -48,6 +49,23 @@ function listAuditLogs({ limit = 100, offset = 0, action, user_id, since } = {})
     }
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    return { where, params };
+}
+
+function normalizeAuditDetails(row) {
+    let details = null;
+    if (row.details) {
+        try {
+            details = JSON.parse(row.details);
+        } catch {
+            details = row.details;
+        }
+    }
+    return { ...row, details };
+}
+
+function listAuditLogs({ limit = 100, offset = 0, action, user_id, since } = {}) {
+    const { where, params } = buildAuditWhere({ action, user_id, since });
     const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 200);
     const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
 
@@ -59,17 +77,24 @@ function listAuditLogs({ limit = 100, offset = 0, action, user_id, since } = {})
         LIMIT ? OFFSET ?
     `).all(...params, safeLimit, safeOffset);
 
-    return rows.map(row => {
-        let details = null;
-        if (row.details) {
-            try {
-                details = JSON.parse(row.details);
-            } catch {
-                details = row.details;
-            }
-        }
-        return { ...row, details };
-    });
+    return rows.map(normalizeAuditDetails);
 }
 
-module.exports = { audit, listAuditLogs };
+function countAuditLogs({ action, user_id, since } = {}) {
+    const { where, params } = buildAuditWhere({ action, user_id, since });
+    const row = getDb().prepare(`
+        SELECT COUNT(*) as total
+        FROM audit_log
+        ${where}
+    `).get(...params);
+    return Number(row?.total) || 0;
+}
+
+function queryAuditLogs(filters = {}) {
+    return {
+        total: countAuditLogs(filters),
+        logs: listAuditLogs(filters),
+    };
+}
+
+module.exports = { audit, listAuditLogs, countAuditLogs, queryAuditLogs };

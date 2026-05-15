@@ -1,3 +1,4 @@
+// ONGLET HISTORIQUE 16/05/2026 — consultation visuelle audit log admin
 // CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune
 // CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier
 // CHANTIER COMMANDES 15/05/2026 — UI commandes ingrédients et publication Discord
@@ -13,6 +14,12 @@ let adminRoles = [];
 let adminMembers = [];
 let adminOrderAdvances = [];
 let orderIngredientsCatalog = [];
+let adminAuditLogs = [];
+let adminAuditTotal = 0;
+let adminAuditOffset = 0;
+let adminAuditLoaded = false;
+const ADMIN_AUDIT_PAGE_SIZE = 50;
+let adminAuditFilters = {};
 let adminMembersLoadedAt = 0;
 let editingIngredients = []; // [{ ingredient_id, name, amount }]
 let adminWeaponQuery = '';
@@ -173,8 +180,131 @@ function switchAdminTab(name) {
         loadAdminMembers();
         loadAdminOrderAdvances();
     }
+    if (name === 'audit') {
+        if (!adminAuditLoaded) initAdminAuditTab();
+        else renderAdminAuditTable();
+    }
 }
 window.switchAdminTab = switchAdminTab;
+
+// ─── HISTORIQUE AUDIT ─────────────────────────────────────
+async function initAdminAuditTab() {
+    adminAuditOffset = 0;
+    adminAuditLogs = [];
+    adminAuditLoaded = true;
+    await loadAdminAuditLogs();
+}
+
+async function loadAdminAuditLogs() {
+    const params = new URLSearchParams();
+    params.set('limit', ADMIN_AUDIT_PAGE_SIZE);
+    params.set('offset', adminAuditOffset);
+    if (adminAuditFilters.action) params.set('action', adminAuditFilters.action);
+    if (adminAuditFilters.user_id) params.set('user_id', adminAuditFilters.user_id);
+    if (adminAuditFilters.since) params.set('since', adminAuditFilters.since);
+
+    try {
+        const res = await fetch(`/api/admin/audit-log?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const newLogs = data.logs || [];
+        if (adminAuditOffset === 0) adminAuditLogs = newLogs;
+        else adminAuditLogs = adminAuditLogs.concat(newLogs);
+        adminAuditTotal = Number.isFinite(Number(data.total))
+            ? Number(data.total)
+            : adminAuditLogs.length + (newLogs.length === ADMIN_AUDIT_PAGE_SIZE ? ADMIN_AUDIT_PAGE_SIZE : 0);
+        renderAdminAuditTable();
+    } catch (e) {
+        console.error('Erreur chargement audit log:', e);
+        toast('❌ Erreur chargement historique', 'error');
+    }
+}
+
+async function loadMoreAuditLogs() {
+    adminAuditOffset += ADMIN_AUDIT_PAGE_SIZE;
+    await loadAdminAuditLogs();
+}
+
+function applyAuditFilters() {
+    adminAuditFilters = {
+        action: document.getElementById('auditFilterAction')?.value.trim() || '',
+        user_id: document.getElementById('auditFilterUserId')?.value.trim() || '',
+    };
+    const sinceDate = document.getElementById('auditFilterSince')?.value;
+    if (sinceDate) {
+        adminAuditFilters.since = Math.floor(new Date(`${sinceDate}T00:00:00+02:00`).getTime() / 1000);
+    }
+    adminAuditOffset = 0;
+    loadAdminAuditLogs();
+}
+
+function resetAuditFilters() {
+    const actionInput = document.getElementById('auditFilterAction');
+    const userInput = document.getElementById('auditFilterUserId');
+    const sinceInput = document.getElementById('auditFilterSince');
+    if (actionInput) actionInput.value = '';
+    if (userInput) userInput.value = '';
+    if (sinceInput) sinceInput.value = '';
+    adminAuditFilters = {};
+    adminAuditOffset = 0;
+    loadAdminAuditLogs();
+}
+
+function auditActionClass(action) {
+    const category = String(action || '').split('.')[0] || 'default';
+    return category.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
+function renderAdminAuditTable() {
+    const tbody = document.getElementById('auditTableBody');
+    const totalEl = document.getElementById('auditTotal');
+    const loadedEl = document.getElementById('auditLoaded');
+    const moreBtn = document.getElementById('auditLoadMoreBtn');
+    if (!tbody || !totalEl || !loadedEl || !moreBtn) return;
+
+    totalEl.textContent = adminAuditTotal.toLocaleString('fr-FR');
+    loadedEl.textContent = adminAuditLogs.length.toLocaleString('fr-FR');
+    moreBtn.style.display = adminAuditLogs.length < adminAuditTotal ? '' : 'none';
+
+    if (!adminAuditLogs.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">Aucune action trouvée.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = adminAuditLogs.map(log => {
+        const timestamp = Number(log.created_at) || 0;
+        const date = new Date(timestamp * 1000);
+        const dateStr = date.toLocaleString('fr-FR', {
+            dateStyle: 'short',
+            timeStyle: 'medium',
+            timeZone: 'Europe/Paris',
+        });
+        const userCell = log.user_name
+            ? `${escapeHtml(log.user_name)} <small class="audit-user-id">${escapeHtml((log.user_id || '').slice(-6))}</small>`
+            : '<em>—</em>';
+        const actionName = String(log.action || 'unknown');
+        const actionCell = `<span class="audit-action audit-action-${escapeHtml(auditActionClass(actionName))}">${escapeHtml(actionName)}</span>`;
+        const targetCell = log.target_type
+            ? `${escapeHtml(log.target_type)} <small>#${escapeHtml(log.target_id || '?')}</small>`
+            : '<em>—</em>';
+        const detailsCell = log.details
+            ? `<details class="audit-details"><summary>Voir</summary><pre>${escapeHtml(JSON.stringify(log.details, null, 2))}</pre></details>`
+            : '<em>—</em>';
+        return `
+            <tr>
+                <td class="audit-date">${escapeHtml(dateStr)}</td>
+                <td>${userCell}</td>
+                <td>${actionCell}</td>
+                <td>${targetCell}</td>
+                <td>${detailsCell}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.applyAuditFilters = applyAuditFilters;
+window.resetAuditFilters = resetAuditFilters;
+window.loadMoreAuditLogs = loadMoreAuditLogs;
 
 // ─── ROLES (impersonate) ────────────────────────
 async function loadAdminRoles() {

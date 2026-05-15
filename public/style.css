@@ -1,3 +1,4 @@
+/* ONGLET HISTORIQUE 16/05/2026 — styles audit log admin */
 /* CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune */
 /* CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier */
 /* CHANTIER COMMANDES 15/05/2026 — styles commandes ingrédients admin */
@@ -10074,4 +10075,187 @@ body:has(#impersonateBanner[style*="flex"]) {
 
 .order-advance-items-display .item-line-tungstene .item-total {
     color: #d4a574; /* ocre chaud */
+}
+
+/* ==========================================
+   ONGLET HISTORIQUE 16/05/2026 — Audit log
+   ========================================== */
+.audit-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 14px;
+    margin-bottom: 20px;
+    align-items: end;
+}
+
+.audit-filters-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.audit-stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.audit-stats strong {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.audit-table-wrap {
+    overflow-x: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.audit-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.audit-table th {
+    text-align: left;
+    padding: 12px 14px;
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--border);
+}
+
+.audit-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text-dim);
+}
+
+.audit-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.audit-date {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+.audit-user-id {
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: 4px;
+    font-size: 11px;
+}
+
+.audit-action {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+}
+
+.audit-action-sanction {
+    background: rgba(255, 100, 100, 0.18);
+    color: #ff8888;
+}
+
+.audit-action-craft {
+    background: rgba(100, 200, 255, 0.18);
+    color: #88ccff;
+}
+
+.audit-action-weapon {
+    background: rgba(255, 170, 50, 0.18);
+    color: #ffb84d;
+}
+
+.audit-action-catalog {
+    background: rgba(180, 130, 255, 0.18);
+    color: #c8a8ff;
+}
+
+.audit-action-mapPoint {
+    background: rgba(100, 255, 150, 0.18);
+    color: #88ffaa;
+}
+
+.audit-action-order {
+    background: rgba(212, 175, 55, 0.18);
+    color: #d4af37;
+}
+
+.audit-action-repayment {
+    background: rgba(212, 175, 55, 0.12);
+    color: #d4af37;
+}
+
+.audit-action-clips {
+    background: rgba(255, 100, 200, 0.18);
+    color: #ff88cc;
+}
+
+.audit-action-config {
+    background: rgba(150, 150, 150, 0.18);
+    color: #aaaaaa;
+}
+
+.audit-action-admin {
+    background: rgba(255, 51, 51, 0.18);
+    color: #ff3333;
+}
+
+.audit-details summary {
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 12px;
+}
+
+.audit-details[open] summary {
+    margin-bottom: 6px;
+}
+
+.audit-details pre {
+    background: var(--bg-deep);
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    max-width: 500px;
+    max-height: 300px;
+    overflow: auto;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.audit-pagination {
+    margin-top: 16px;
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    .audit-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .audit-filters-actions {
+        justify-content: stretch;
+    }
+
+    .audit-filters-actions .btn-primary,
+    .audit-filters-actions .btn-secondary {
+        flex: 1;
+    }
 }

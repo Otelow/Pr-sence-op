@@ -1,3 +1,4 @@
+// ONGLET HISTORIQUE 16/05/2026 — endpoint audit log paginé
 // CHANTIER COMMANDES 15/05/2026 — catalogue commandes admin et publication Discord
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // ==========================================
@@ -14,7 +15,7 @@ const fs = require('fs');
 const config = require('./src/shared/config');
 const { ensureDataDirs, createConnection, runMigration } = require('./src/shared/database');
 const log = require('./src/shared/logger');
-const { audit, listAuditLogs } = require('./src/shared/auditLog');
+const { audit, queryAuditLogs } = require('./src/shared/auditLog');
 const {
     ADMIN_USER_ID,
     ADMIN_ROLE_ID,
@@ -712,7 +713,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
 
     app.get('/api/admin/audit-log', requireAdmin, (req, res) => {
         try {
-            const logs = listAuditLogs({
+            const result = queryAuditLogs({
                 limit: req.query.limit,
                 offset: req.query.offset,
                 action: req.query.action,
@@ -729,7 +730,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
                     since: req.query.since || null,
                 },
             });
-            res.json({ logs });
+            res.json(result);
         } catch (e) {
             log.warn({ err: e.message }, 'audit log lecture échouée');
             res.status(500).json({ error: 'Impossible de lire l’historique admin' });
