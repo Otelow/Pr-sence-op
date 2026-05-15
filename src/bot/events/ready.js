@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - event ready externalise
 
@@ -31,7 +33,7 @@ function registerReadyEvent(deps) {
     } = deps;
 
 client.once('ready', async () => {
-    console.log(`🤖 ${client.user.tag} connecté | ${client.guilds.cache.size} serveur(s)`);
+    log.info(`🤖 ${client.user.tag} connecté | ${client.guilds.cache.size} serveur(s)`);
     await registerCommands();
     setupPresenceCron();
     scheduleDailyBackups();
@@ -42,7 +44,7 @@ client.once('ready', async () => {
     restorePanelState();
     if (hasEnabledReminders()) {
         startReminderLoop();
-        console.log('⏰ Boucle de rappels démarrée');
+        log.info('⏰ Boucle de rappels démarrée');
     }
 
     // Prefetch membres + absences au boot
@@ -50,7 +52,7 @@ client.once('ready', async () => {
         const guild = client.guilds.cache.get(CONFIG.GUILD_ID);
         if (guild) {
             await guild.members.fetch();
-            console.log(`👥 ${guild.members.cache.size} membres mis en cache`);
+            log.info(`👥 ${guild.members.cache.size} membres mis en cache`);
 
             // Vérifier les auto-rôles
             for (const [userId, roleId] of Object.entries(CONFIG.AUTO_ROLE_USERS)) {
@@ -60,7 +62,7 @@ client.once('ready', async () => {
                         const role = guild.roles.cache.get(roleId);
                         if (role) {
                             await member.roles.add(role);
-                            console.log(`🎯 Auto-rôle restauré pour ${member.user.tag}`);
+                            log.info(`🎯 Auto-rôle restauré pour ${member.user.tag}`);
                         }
                     }
                 } catch {}
@@ -68,9 +70,9 @@ client.once('ready', async () => {
         }
         await updateAbsenceSalonCache();
         restoreRenameChecks?.();
-        console.log('📋 Cache absences salon initialisé');
+        log.info('📋 Cache absences salon initialisé');
     } catch (e) {
-        console.error('⚠️ Erreur prefetch:', e.message);
+        log.error('⚠️ Erreur prefetch:', e.message);
     }
 
     // Restaurer l'état de présence si le bot a été redéployé en cours d'OP
@@ -80,13 +82,13 @@ client.once('ready', async () => {
 
     if (savedState) {
         if (savedState.op1 && savedState.op1.active && savedState.op1.messageId) {
-            console.log('🔄 Restauration 1ère Présence OP depuis fichier...');
+            log.info('🔄 Restauration 1ère Présence OP depuis fichier...');
             const restored = await restoreReactionsFromMessage(savedState.op1.messageId, reactionsOP1);
             if (restored) {
                 presenceData.messageId = savedState.op1.messageId;
                 presenceData.active = true;
                 op1Restored = true;
-                console.log('✅ 1ère Présence OP restaurée');
+                log.info('✅ 1ère Présence OP restaurée');
 
                 // Relancer les rappels et crons
                 const channel = client.channels.cache.get(CONFIG.CHANNELS.PRESENCE);
@@ -95,20 +97,20 @@ client.once('ready', async () => {
                     if (msg) startPresenceReminders(channel, msg);
                 }
             } else {
-                console.log('⚠️ Message 1ère OP introuvable dans le fichier');
+                log.info('⚠️ Message 1ère OP introuvable dans le fichier');
             }
         }
 
         if (savedState.op2 && savedState.op2.active && savedState.op2.messageId) {
-            console.log('🔄 Restauration 2ème Présence OP depuis fichier...');
+            log.info('🔄 Restauration 2ème Présence OP depuis fichier...');
             const restored = await restoreReactionsFromMessage(savedState.op2.messageId, reactionsOP2);
             if (restored) {
                 presence2Data.messageId = savedState.op2.messageId;
                 presence2Data.active = true;
                 op2Restored = true;
-                console.log('✅ 2ème Présence OP restaurée');
+                log.info('✅ 2ème Présence OP restaurée');
             } else {
-                console.log('⚠️ Message 2ème OP introuvable');
+                log.info('⚠️ Message 2ème OP introuvable');
             }
         }
     }
@@ -119,7 +121,7 @@ client.once('ready', async () => {
         try {
             const presenceChannel = client.guilds.cache.get(CONFIG.GUILD_ID)?.channels.cache.get(CONFIG.CHANNELS.PRESENCE);
             if (presenceChannel) {
-                console.log('🔍 Scan du salon présence pour récupérer une OP en cours...');
+                log.info('🔍 Scan du salon présence pour récupérer une OP en cours...');
                 const messages = await presenceChannel.messages.fetch({ limit: 30 }).catch(() => null);
                 if (messages) {
                     // Chercher les messages bot non périmés (< 24h)
@@ -134,7 +136,7 @@ client.once('ready', async () => {
 
                         // Détection 1ère présence OP (contient "Présence OP" + role mention)
                         if (!op1Restored && /Présence OP/i.test(content) && content.includes(`<@&${CONFIG.ROLES.MEMBRE_1}>`) && /20H45|21H00/i.test(content)) {
-                            console.log(`🔄 OP1 détectée dans le salon (msg ${msg.id})`);
+                            log.info(`🔄 OP1 détectée dans le salon (msg ${msg.id})`);
                             const restored = await restoreReactionsFromMessage(msg.id, reactionsOP1);
                             if (restored) {
                                 presenceData.messageId = msg.id;
@@ -142,36 +144,36 @@ client.once('ready', async () => {
                                 op1Restored = true;
                                 savePresenceState();
                                 startPresenceReminders(presenceChannel, msg);
-                                console.log('✅ 1ère Présence OP récupérée depuis le salon');
+                                log.info('✅ 1ère Présence OP récupérée depuis le salon');
                             }
                         }
 
                         // Détection 2ème présence OP (contient "Merci de réagir si vous êtes présent")
                         if (!op2Restored && /Merci de réagir si vous êtes présent/i.test(content)) {
-                            console.log(`🔄 OP2 détectée dans le salon (msg ${msg.id})`);
+                            log.info(`🔄 OP2 détectée dans le salon (msg ${msg.id})`);
                             const restored = await restoreReactionsFromMessage(msg.id, reactionsOP2);
                             if (restored) {
                                 presence2Data.messageId = msg.id;
                                 presence2Data.active = true;
                                 op2Restored = true;
                                 savePresenceState();
-                                console.log('✅ 2ème Présence OP récupérée depuis le salon');
+                                log.info('✅ 2ème Présence OP récupérée depuis le salon');
                             }
                         }
                     }
 
                     if (!op1Restored && !op2Restored) {
-                        console.log('ℹ️ Aucune OP active détectée dans le salon');
+                        log.info('ℹ️ Aucune OP active détectée dans le salon');
                     }
                 }
             }
         } catch (e) {
-            console.error('❌ Erreur scan salon présence:', e.message);
+            log.error('❌ Erreur scan salon présence:', e.message);
         }
     }
 
     cron.schedule('0 22 * * 0', () => {
-        console.log('📊 RESET HEBDO ABSENCES');
+        log.info('📊 RESET HEBDO ABSENCES');
         absenceTracking.clear();
         saveAbsenceTracking();
     }, { timezone: 'Europe/Paris' });

@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIE CHANTIER 6 - 14/05/2026 - events membres Discord externalises
 
 function registerGuildMemberEvents(client, deps) {
@@ -17,10 +19,10 @@ function registerGuildMemberEvents(client, deps) {
                 const role = member.guild.roles.cache.get(autoRoleId);
                 if (role) {
                     await member.roles.add(role);
-                    console.log(`🎯 Auto-rôle attribué à ${member.user.tag} : ${role.name}`);
+                    log.info(`🎯 Auto-rôle attribué à ${member.user.tag} : ${role.name}`);
                 }
             } catch (e) {
-                console.error(`❌ Erreur auto-rôle ${member.user.tag}:`, e.message);
+                log.error(`❌ Erreur auto-rôle ${member.user.tag}:`, e.message);
             }
             return;
         }
@@ -35,11 +37,11 @@ function registerGuildMemberEvents(client, deps) {
         }
 
         if (hasProtectedRole(member)) {
-            console.log(`ROLE PROTEGE: ${member.user.tag} a rejoint - accueil ignore`);
+            log.info(`ROLE PROTEGE: ${member.user.tag} a rejoint - accueil ignore`);
             return;
         }
 
-        console.log(`WELCOME: ${member.user.tag} a rejoint - lancement de la procedure d'accueil`);
+        log.info(`WELCOME: ${member.user.tag} a rejoint - lancement de la procedure d'accueil`);
         await startWelcomeFlow(member);
     });
 }

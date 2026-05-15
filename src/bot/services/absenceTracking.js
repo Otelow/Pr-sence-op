@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIE CHANTIER 6 - 14/05/2026 - persistance suivi absences externalisee
 
 function createAbsenceTrackingPersistence(deps) {
@@ -20,7 +22,7 @@ function createAbsenceTrackingPersistence(deps) {
                 return new Map(Object.entries(data));
             }
         } catch (e) {
-            console.error('❌ Erreur chargement suivi absences:', e);
+            log.error('❌ Erreur chargement suivi absences:', e);
         }
         return new Map();
     }
@@ -36,7 +38,7 @@ function createAbsenceTrackingPersistence(deps) {
             saveState('absence_tracking', data);
             emitRealtime('absence:posted', { total: absenceTracking.size });
         } catch (e) {
-            console.error('❌ Erreur sauvegarde suivi absences:', e);
+            log.error('❌ Erreur sauvegarde suivi absences:', e);
         }
     }
 

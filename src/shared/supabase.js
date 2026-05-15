@@ -1,3 +1,4 @@
+// FINAL D4 16/05/2026 — listage et suppression distants Supabase
 const config = require('./config');
 
 function assertSupabaseConfigured() {
@@ -76,6 +77,34 @@ async function deleteFile(bucket, objectPath) {
     return true;
 }
 
+async function listFiles(bucket, prefix = '') {
+    assertSupabaseConfigured();
+    const targetBucket = bucket || config.supabase.bucket;
+    const base = config.supabase.url.replace(/\/$/, '');
+    const normalizedPrefix = String(prefix || '').replace(/^\/+/, '');
+    const response = await fetch(`${base}/storage/v1/object/list/${targetBucket}`, {
+        method: 'POST',
+        headers: {
+            Authorization: `Bearer ${config.supabase.key}`,
+            apikey: config.supabase.key,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            prefix: normalizedPrefix,
+            limit: 100,
+            offset: 0,
+            sortBy: { column: 'created_at', order: 'desc' }
+        })
+    });
+
+    if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Supabase list failed (${response.status}): ${text}`);
+    }
+
+    return response.json();
+}
+
 function getPublicUrl(bucket, objectPath) {
     const targetBucket = bucket || config.supabase.bucket;
     const base = config.supabase.url.replace(/\/$/, '');
@@ -85,6 +114,7 @@ function getPublicUrl(bucket, objectPath) {
 module.exports = {
     isSupabaseConfigured,
     uploadFile,
+    listFiles,
     deleteFile,
     getPublicUrl,
     validateFile

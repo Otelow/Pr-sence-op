@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIE CHANTIER 6 - 14/05/2026 - restauration reactions presence externalisee
 
 function createReactionRestoreService(deps) {
@@ -24,10 +26,10 @@ function createReactionRestoreService(deps) {
                     if (type) reactionMap.set(userId, type);
                 }
             }
-            console.log(`   ↳ ${reactionMap.size} réaction(s) restaurées`);
+            log.info(`   ↳ ${reactionMap.size} réaction(s) restaurées`);
             return true;
         } catch (e) {
-            console.error('❌ Erreur restauration réactions:', e.message);
+            log.error('❌ Erreur restauration réactions:', e.message);
             return false;
         }
     }

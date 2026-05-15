@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIE CHANTIER 6 - 14/05/2026 - persistance presence OP externalisee
 
 function createPresenceStatePersistence(deps) {
@@ -19,7 +21,7 @@ function createPresenceStatePersistence(deps) {
             };
             fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
         } catch (e) {
-            console.error('❌ Erreur sauvegarde état présence:', e.message);
+            log.error('❌ Erreur sauvegarde état présence:', e.message);
         }
     }
 
@@ -27,11 +29,11 @@ function createPresenceStatePersistence(deps) {
         try {
             if (fs.existsSync(stateFile)) {
                 const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-                console.log(`📋 État présence chargé (sauvé à ${state.savedAt})`);
+                log.info(`📋 État présence chargé (sauvé à ${state.savedAt})`);
                 return state;
             }
         } catch (e) {
-            console.error('❌ Erreur chargement état présence:', e.message);
+            log.error('❌ Erreur chargement état présence:', e.message);
         }
         return null;
     }

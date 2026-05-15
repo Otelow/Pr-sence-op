@@ -2,6 +2,7 @@
 // CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune
 // CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier
 // CHANTIER COMMANDES 15/05/2026 — UI commandes ingrédients et publication Discord
+// FINAL D3 16/05/2026 — monitoring runtime admin
 // ============================================================
 // ADMIN PANEL — JS
 // ============================================================
@@ -20,6 +21,7 @@ let adminAuditOffset = 0;
 let adminAuditLoaded = false;
 const ADMIN_AUDIT_PAGE_SIZE = 50;
 let adminAuditFilters = {};
+let monitoringTimer = null;
 let adminMembersLoadedAt = 0;
 let editingIngredients = []; // [{ ingredient_id, name, amount }]
 let adminWeaponQuery = '';
@@ -184,8 +186,100 @@ function switchAdminTab(name) {
         if (!adminAuditLoaded) initAdminAuditTab();
         else renderAdminAuditTable();
     }
+    if (name === 'monitoring') {
+        startMonitoringPolling();
+    } else {
+        stopMonitoringPolling();
+    }
 }
 window.switchAdminTab = switchAdminTab;
+
+// ─── MONITORING ─────────────────────────────────────
+async function loadAdminMonitoring() {
+    const grid = document.getElementById('monitoringGrid');
+    try {
+        const res = await fetch('/api/admin/health-detailed');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        renderMonitoringGrid(data);
+    } catch (e) {
+        if (grid) {
+            grid.innerHTML = `<div class="monitoring-card monitoring-error">❌ ${escapeHtml(e.message)}</div>`;
+        }
+    }
+}
+
+function formatUptime(seconds) {
+    const value = Number(seconds) || 0;
+    const days = Math.floor(value / 86400);
+    const hours = Math.floor((value % 86400) / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
+    if (days) return `${days}j ${hours}h ${minutes}m`;
+    if (hours) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+}
+
+function renderMonitoringGrid(data) {
+    const grid = document.getElementById('monitoringGrid');
+    if (!grid) return;
+
+    const cards = [
+        { label: 'Uptime', value: formatUptime(data.uptime_seconds), color: 'green' },
+        { label: 'Mémoire heap', value: `${data.memory_heap_mb} MB`, color: data.memory_heap_mb > 500 ? 'orange' : 'normal' },
+        { label: 'Mémoire RSS', value: `${data.memory_rss_mb} MB`, color: data.memory_rss_mb > 800 ? 'orange' : 'normal' },
+        { label: 'Bot Discord', value: data.bot_ready ? '✅ Ready' : '❌ Down', color: data.bot_ready ? 'green' : 'red' },
+        { label: 'Ping Discord', value: data.bot_ping_ms != null ? `${data.bot_ping_ms} ms` : '—', color: data.bot_ping_ms > 300 ? 'orange' : 'normal' },
+        { label: 'Clients WS', value: data.ws_clients ?? 0, color: 'normal' },
+        {
+            label: 'Taille DB',
+            value: data.db_size_kb < 1024 ? `${data.db_size_kb} KB` : `${(data.db_size_kb / 1024).toFixed(1)} MB`,
+            color: 'normal',
+        },
+        {
+            label: 'Backups',
+            value: `${data.backups_count || 0} (${data.backups_last ? new Date(data.backups_last).toLocaleDateString('fr-FR') : '—'})`,
+            color: data.backups_count ? 'normal' : 'orange',
+        },
+        { label: 'Version', value: `v${data.version} (Node ${data.node_version})`, color: 'normal' },
+    ];
+
+    const cardsHtml = cards.map(card => `
+        <div class="monitoring-card monitoring-card-${card.color}">
+            <div class="monitoring-label">${escapeHtml(card.label)}</div>
+            <div class="monitoring-value">${escapeHtml(String(card.value))}</div>
+        </div>
+    `).join('');
+
+    const tableHtml = `
+        <div class="monitoring-card monitoring-card-wide">
+            <div class="monitoring-label">Tables SQLite</div>
+            <table class="monitoring-table">
+                ${(data.db_tables || []).map(table => `
+                    <tr>
+                        <td>${escapeHtml(table.name)}</td>
+                        <td>${Number(table.rows || 0).toLocaleString('fr-FR')}</td>
+                    </tr>
+                `).join('')}
+            </table>
+        </div>
+    `;
+
+    grid.innerHTML = cardsHtml + tableHtml;
+}
+
+function startMonitoringPolling() {
+    loadAdminMonitoring();
+    if (monitoringTimer) clearInterval(monitoringTimer);
+    monitoringTimer = setInterval(loadAdminMonitoring, 10000);
+}
+
+function stopMonitoringPolling() {
+    if (!monitoringTimer) return;
+    clearInterval(monitoringTimer);
+    monitoringTimer = null;
+}
+
+window.loadAdminMonitoring = loadAdminMonitoring;
 
 // ─── HISTORIQUE AUDIT ─────────────────────────────────────
 async function initAdminAuditTab() {

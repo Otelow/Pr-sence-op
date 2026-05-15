@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - flux presence OP externalise
 
@@ -79,7 +81,7 @@ async function sendPresence2Message(channelOverride) {
         presence2Data.active = true;
         reactionsOP2.clear();
         savePresenceState();
-        console.log(`📋 2ème Présence OP envoyée (${dateStr} ${timeStr})`);
+        log.info(`📋 2ème Présence OP envoyée (${dateStr} ${timeStr})`);
         await refreshAbsencePanel();
 
         // Suppression auto après 30 minutes
@@ -87,13 +89,13 @@ async function sendPresence2Message(channelOverride) {
             try {
                 const oldMsg = await channel.messages.fetch(msg.id);
                 await oldMsg.delete();
-                console.log('🗑️ 2ème Présence OP supprimée (30min)');
+                log.info('🗑️ 2ème Présence OP supprimée (30min)');
             } catch {}
             setPresence2Data({ messageId: null, active: false }); reactionsOP2.clear(); savePresenceState();
             await refreshAbsencePanel();
         }, 30 * 60 * 1000);
     } catch (error) {
-        console.error('❌ Erreur 2ème OP:', error);
+        log.error('❌ Erreur 2ème OP:', error);
     }
 }
 
@@ -103,7 +105,7 @@ async function sendPresence2Message(channelOverride) {
 function setupPresenceCron() {
     if (!PRESENCE_ENABLED) return;
     cron.schedule(PRESENCE_CRON, () => sendPresenceMessage(), { timezone: 'Europe/Paris' });
-    console.log(`⏰ Cron présence: ${PRESENCE_CRON}`);
+    log.info(`⏰ Cron présence: ${PRESENCE_CRON}`);
 }
 
 async function sendPresenceMessage(channelOverride) {
@@ -140,12 +142,12 @@ async function sendPresenceMessage(channelOverride) {
         presenceData.reminderIds = [];
         reactionsOP1.clear();
         savePresenceState();
-        console.log(`📋 1ère Présence OP envoyée (${dateStr})`);
+        log.info(`📋 1ère Présence OP envoyée (${dateStr})`);
 
         startPresenceReminders(channel, msg);
         await refreshAbsencePanel();
     } catch (error) {
-        console.error('❌ Erreur présence:', error);
+        log.error('❌ Erreur présence:', error);
         presenceData.active = false;
     }
 }
@@ -200,7 +202,7 @@ async function startPresenceReminders(channel, presenceMsg) {
             // 21h20 — Suppression message 1ère OP
             replacePresenceCron('delete-op1:21h20', '20 21 * * *', async () => {
                 if (!presenceData.messageId) return;
-                console.log('🗑️ 21h20 : Suppression 1ère présence OP');
+                log.info('🗑️ 21h20 : Suppression 1ère présence OP');
                 try {
                     const msg = await channel.messages.fetch(presenceData.messageId);
                     await msg.delete();
@@ -210,7 +212,7 @@ async function startPresenceReminders(channel, presenceMsg) {
             // 22h00 — Nettoyage des messages Discord (présence reste visible sur le site)
             replacePresenceCron('cleanup:22h00', '0 22 * * *', async () => {
                 if (!presenceData.active && !presence2Data.active) return;
-                console.log('🌙 22h — Nettoyage messages Discord (le panel site reste actif jusqu\'à 2h)');
+                log.info('🌙 22h — Nettoyage messages Discord (le panel site reste actif jusqu\'à 2h)');
                 stopAbsencePanelRefresh();
 
                 // Supprimer les messages Discord mais garder l'état actif
@@ -229,7 +231,7 @@ async function startPresenceReminders(channel, presenceMsg) {
 
             // 2h00 du matin — Reset complet (présence disparaît du site)
             replacePresenceCron('reset:02h00', '0 2 * * *', async () => {
-                console.log('🌃 2h — Reset complet présence (site + état)');
+                log.info('🌃 2h — Reset complet présence (site + état)');
                 clearAbsencePanelState();
                 if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
                 setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false });
@@ -239,7 +241,7 @@ async function startPresenceReminders(channel, presenceMsg) {
                 savePresenceState();
                 try { await refreshAbsencePanel(); } catch {}
             });
-            console.log('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, reset complet 2h');
+            log.info('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, reset complet 2h');
         }
 
         // Mode TEST/TURBO : on lance des crons * * * * * temporaires
@@ -281,7 +283,7 @@ async function mentionNonReactors(channel, presenceMsg) {
             mentionMsgs.push(await channel.send(`${member} Tu n'as pas encore réagi à la **Présence OP**, merci de le faire ou pose une absence dans <#${CONFIG.CHANNELS.ABSENCE}>`));
             await sleep(500);
         }
-    } catch (error) { console.error('❌ Erreur mentions:', error.message); }
+    } catch (error) { log.error('❌ Erreur mentions:', error.message); }
     return mentionMsgs;
 }
 
@@ -340,7 +342,7 @@ async function getAbsentUsersToday() {
             }
         }
     } catch (e) {
-        console.warn('⚠️ Lecture salon absences interrompue:', e.message);
+        log.warn('⚠️ Lecture salon absences interrompue:', e.message);
     }
     return { validAbsences, invalidAbsences, validAbsenceNames, invalidAbsenceNames };
 }
@@ -359,7 +361,7 @@ async function cleanupPresence(channel) {
 // AVERTISSEMENTS
 // ==========================================
 async function sendPresenceWarnings(presenceChannel) {
-    console.log('⚠️ VÉRIFICATION AVERTISSEMENTS');
+    log.info('⚠️ VÉRIFICATION AVERTISSEMENTS');
     try {
         const guild = presenceChannel.guild;
         if (guild.members.cache.size < 5) await guild.members.fetch();
@@ -536,7 +538,7 @@ async function sendPresenceWarnings(presenceChannel) {
         saveAbsenceTracking();
 
     } catch (error) {
-        console.error('❌ Erreur avertissements:', error);
+        log.error('❌ Erreur avertissements:', error);
     }
 }
 

@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // STABILISATION FINALE 15/05/2026 - mentions salons explicites dans les rappels
 // MODIFI? CHANTIER 6 ? 14/05/2026 ? service panel/rappels externalis?
 
@@ -54,7 +56,7 @@ function restorePanelState() {
     if (!saved?.messageId || !saved?.channelId) return;
     panelMessageId = saved.messageId;
     panelChannelId = saved.channelId;
-    console.log(`🎮 Panel restauré depuis SQLite: ${panelMessageId}`);
+    log.info(`🎮 Panel restauré depuis SQLite: ${panelMessageId}`);
 }
 
 // Persistance des rappels
@@ -84,10 +86,10 @@ function loadReminders() {
                 }
             }
             if (migrated) saveReminders();
-            console.log(`📋 ${reminders.length} rappel(s) restauré(s)`);
+            log.info(`📋 ${reminders.length} rappel(s) restauré(s)`);
         }
     } catch (e) {
-        console.error('❌ Erreur chargement rappels:', e.message);
+        log.error('❌ Erreur chargement rappels:', e.message);
     }
 }
 
@@ -97,7 +99,7 @@ function saveReminders() {
         saveState('reminders', { reminders, nextId: nextReminderId });
         emitRealtime('reminder:changed', { total: reminders.length });
     } catch (e) {
-        console.error('❌ Erreur sauvegarde rappels:', e.message);
+        log.error('❌ Erreur sauvegarde rappels:', e.message);
     }
 }
 
@@ -219,7 +221,7 @@ async function sendReminderMessage(reminder) {
         if (elapsed >= 0) reminder.lastSentMinute = elapsed;
         saveReminders();
     } catch (err) {
-        console.error(`❌ Erreur envoi rappel #${reminder.id}:`, err.message);
+        log.error(`❌ Erreur envoi rappel #${reminder.id}:`, err.message);
     }
 }
 

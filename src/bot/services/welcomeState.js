@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIE CHANTIER 6 - 14/05/2026 - persistance welcome externalisee
 
 function createWelcomeStatePersistence(deps) {
@@ -23,7 +25,7 @@ function createWelcomeStatePersistence(deps) {
             fs.writeFileSync(welcomeStateFile, JSON.stringify(data, null, 2));
             saveState('welcome', data);
         } catch (e) {
-            console.error('❌ Erreur sauvegarde welcome:', e.message);
+            log.error('❌ Erreur sauvegarde welcome:', e.message);
         }
     }
 
@@ -37,7 +39,7 @@ function createWelcomeStatePersistence(deps) {
                 return data;
             }
         } catch (e) {
-            console.error('❌ Erreur chargement welcome:', e.message);
+            log.error('❌ Erreur chargement welcome:', e.message);
         }
         return {};
     }

@@ -1,3 +1,4 @@
+// FINAL D1 16/05/2026 — fallback picture WebP blackmarket
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes OAuth Discord externalisees
 
 function registerAuthRoutes(app, deps) {
@@ -109,7 +110,9 @@ body.login-body { overflow: hidden; }
 <div class="grain"></div>
 <div class="darknet-denial">
     <div class="denial-scan">ACCÈS BLOQUÉ</div>
-    ${image ? `<img class="denial-art" src="${image}" alt="">` : '<div class="error-icon">⚠</div>'}
+    ${image === '/blackmarket-denied.png'
+        ? '<picture><source srcset="/blackmarket-denied.webp" type="image/webp"><img class="denial-art" src="/blackmarket-denied.png" alt=""></picture>'
+        : (image ? `<img class="denial-art" src="${image}" alt="">` : '<div class="error-icon">⚠</div>')}
     <h1 class="denial-title">${title}</h1>
     <p class="denial-subtitle">${subtitle}</p>
     <p class="denial-message">${msg}</p>

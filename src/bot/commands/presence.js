@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — handlers slash présence isolés
 
 function createPresenceCommandHandlers(deps) {
@@ -27,7 +29,7 @@ function createPresenceCommandHandlers(deps) {
         await sendPresenceMessage();
         await interaction.editReply('✅ Présence OP lancée.');
 
-        console.log('🔄 /presence-force: Présence OP lancée manuellement');
+        log.info('🔄 /presence-force: Présence OP lancée manuellement');
     }
 
     async function handlePresence2(interaction) {

@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../shared/logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // ==========================================
 // 21 Block Savage - Discord Bot
@@ -139,9 +141,9 @@ const TIMERS = {
 const PRESENCE_CRON = (TEST_MODE || TURBO_MODE) ? '* * * * *' : '30 17 * * *';
 
 if (TURBO_MODE) {
-    console.log('🚀 MODE TURBO ACTIVÉ');
+    log.info('🚀 MODE TURBO ACTIVÉ');
 } else if (TEST_MODE) {
-    console.log('🧪 MODE TEST ACTIVÉ');
+    log.info('🧪 MODE TEST ACTIVÉ');
 }
 
 // ==========================================
@@ -309,7 +311,7 @@ const {
 });
 
 const absenceTracking = loadAbsenceTracking();
-console.log(`📊 Suivi absences chargé: ${absenceTracking.size} utilisateur(s)`);
+log.info(`📊 Suivi absences chargé: ${absenceTracking.size} utilisateur(s)`);
 
 // 1ère Présence OP
 let presenceData = {
@@ -574,10 +576,10 @@ registerAbsenceValidatorEvent(client, { CONFIG });
 // ERREURS
 // ==========================================
 process.on('unhandledRejection', e => {
-    console.warn('⚠️ Unhandled Rejection:', e?.stack || e);
+    log.warn('⚠️ Unhandled Rejection:', e?.stack || e);
 });
 process.on('uncaughtException', e => {
-    console.error('❌ Uncaught Exception (fatal):', e);
+    log.error('❌ Uncaught Exception (fatal):', e);
     process.exit(1);
 });
 

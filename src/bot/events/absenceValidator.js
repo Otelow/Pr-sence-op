@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — validateur messages absence isolé
 function registerAbsenceValidatorEvent(client, { CONFIG }) {
     client.on('messageCreate', async message => {
@@ -33,7 +35,7 @@ function registerAbsenceValidatorEvent(client, { CONFIG }) {
                 );
                 setTimeout(() => warn.delete().catch(() => {}), 60_000);
             } catch (e) {
-                console.error('❌ Erreur warn absence:', e.message);
+                log.error('❌ Erreur warn absence:', e.message);
             }
             return;
         }

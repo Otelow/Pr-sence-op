@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — events clips forum isolés
 const config = require('../../shared/config');
 const { processClipMessage, extractClipLinks, isClipAttachment } = require('../../shared/clipBackup');
@@ -34,19 +36,19 @@ async function maybeRemindClipForum(message) {
                 allowedMentions: { repliedUser: true, parse: [] },
             });
         } catch (e) {
-            console.error(`[clips] rappel salon clips echoue: ${e.message}`);
+            log.error(`[clips] rappel salon clips echoue: ${e.message}`);
         }
     }
 
     try {
         if (!message.deletable) {
-            console.warn('[clips] suppression message clip hors forum impossible: permission Manage Messages manquante ou message non supprimable');
+            log.warn('[clips] suppression message clip hors forum impossible: permission Manage Messages manquante ou message non supprimable');
             return;
         }
 
         await message.delete();
     } catch (e) {
-        console.warn(`[clips] suppression message clip hors forum impossible: ${e.message}`);
+        log.warn(`[clips] suppression message clip hors forum impossible: ${e.message}`);
     }
 }
 
@@ -59,7 +61,7 @@ function registerClipEvents(client) {
                 await maybeRemindClipForum(message);
             }
         } catch (e) {
-            console.error(`[clips] traitement temps reel echoue: ${e.message}`);
+            log.error(`[clips] traitement temps reel echoue: ${e.message}`);
         }
     });
 }

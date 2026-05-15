@@ -3,13 +3,14 @@
 <!-- CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune -->
 <!-- CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier -->
 <!-- CHANTIER COMMANDES 15/05/2026 — formulaire commandes par ingrédients -->
+<!-- FINAL D3 16/05/2026 — onglet monitoring runtime admin -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Admin · 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260516-audit">
+<link rel="stylesheet" href="/style.css?v=20260516-final">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -36,6 +37,7 @@
         <button class="admin-tab" data-admin-tab="impersonate" onclick="switchAdminTab('impersonate')">👁 Vue impersonate</button>
         <button class="admin-tab" data-admin-tab="advances" onclick="switchAdminTab('advances')">Avances commandes</button>
         <button class="admin-tab" data-admin-tab="audit" onclick="switchAdminTab('audit')">Historique</button>
+        <button class="admin-tab" data-admin-tab="monitoring" onclick="switchAdminTab('monitoring')">Monitoring</button>
     </nav>
 
     <!-- ARMES -->
@@ -230,6 +232,21 @@
         </div>
     </section>
 
+    <!-- MONITORING -->
+    <section class="admin-tab-content" id="adminTab-monitoring" style="display:none;">
+        <div class="admin-section">
+            <div class="admin-section-head">
+                <div>
+                    <h2 class="section-title">📊 Monitoring</h2>
+                    <p class="page-sub">État runtime du bot et du serveur web.</p>
+                </div>
+            </div>
+            <div class="monitoring-grid" id="monitoringGrid">
+                <div class="monitoring-card">Chargement…</div>
+            </div>
+        </div>
+    </section>
+
     <!-- IMPERSONATE -->
     <section class="admin-tab-content" id="adminTab-impersonate" style="display:none;">
         <div class="admin-section">
@@ -357,6 +374,6 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="/admin.js?v=20260516-audit"></script>
+<script src="/admin.js?v=20260516-final"></script>
 </body>
 </html>

@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — helpers réactions Discord isolés
 const { sleep } = require('./sleep');
 
@@ -12,11 +14,11 @@ async function safeReact(msg, emoji, retries = 2) {
             await sleep(500);
             return true;
         } catch (err) {
-            console.warn(`⚠️ safeReact échec (${emoji}, tentative ${i + 1}/${retries + 1}):`, err.message);
+            log.warn(`⚠️ safeReact échec (${emoji}, tentative ${i + 1}/${retries + 1}):`, err.message);
             if (i < retries) await sleep(1000);
         }
     }
-    console.error(`❌ safeReact ABANDONNÉ pour emoji: ${emoji}`);
+    log.error(`❌ safeReact ABANDONNÉ pour emoji: ${emoji}`);
     return false;
 }
 

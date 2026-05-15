@@ -1,3 +1,4 @@
+/* FINAL D1/D3 16/05/2026 ? WebP/gold + monitoring admin */
 /* ONGLET HISTORIQUE 16/05/2026 — styles audit log admin */
 /* CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune */
 /* CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier */
@@ -4092,7 +4093,7 @@ html, body {
     --accent-soft: rgba(255, 140, 0, 0.12);
 
     /* Couleurs secondaires */
-    --gold: #ffb84d;
+    --gold-light: #ffb84d;
     --green: #4ade80;
     --orange: #ff8c00;
     --red: #ef4444;
@@ -4136,7 +4137,7 @@ body::before {
 }
 
 .badge-mini {
-    background: linear-gradient(135deg, var(--accent), var(--gold)) !important;
+    background: linear-gradient(135deg, var(--accent), var(--gold-light)) !important;
     color: #0a0a0a !important;
     font-weight: 800 !important;
     box-shadow: 0 4px 12px rgba(255, 140, 0, 0.3);
@@ -4250,7 +4251,7 @@ body::before {
 }
 
 .stat-card::before {
-    background: linear-gradient(180deg, var(--accent), var(--gold)) !important;
+    background: linear-gradient(180deg, var(--accent), var(--gold-light)) !important;
     width: 3px !important;
     box-shadow: 0 0 8px var(--accent-glow);
 }
@@ -10241,8 +10242,75 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 .audit-pagination {
-    margin-top: 16px;
-    text-align: center;
+      margin-top: 16px;
+      text-align: center;
+  }
+
+/* FINAL D3 16/05/2026 — Monitoring admin runtime */
+.monitoring-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.monitoring-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.monitoring-card-wide {
+    grid-column: 1 / -1;
+}
+
+.monitoring-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+}
+
+.monitoring-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.monitoring-card-green .monitoring-value { color: #00ff88; }
+.monitoring-card-orange .monitoring-value { color: #ffaa44; }
+.monitoring-card-red .monitoring-value { color: #ff4444; }
+.monitoring-error { color: #ff8888; }
+
+.monitoring-table {
+    width: 100%;
+    font-size: 13px;
+}
+
+.monitoring-table td {
+    padding: 4px 8px;
+    color: var(--text-dim);
+}
+
+.monitoring-table td:last-child {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* FINAL D1 16/05/2026 — wrappers picture WebP sans casser les layouts images */
+.map-canvas picture {
+    display: block;
+    width: max-content;
+    height: max-content;
+}
+
+.login-card picture,
+.darknet-denial picture {
+    display: contents;
 }
 
 @media (max-width: 900px) {

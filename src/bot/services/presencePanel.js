@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - cache salon absence et embeds panneau presence externalises
 
@@ -39,7 +41,7 @@ function createPresencePanelService(deps) {
                     absenceSalonCache = nextCache;
                 }
             } catch (e) {
-                console.warn('⚠️ Cache absences salon non mis à jour:', e.message);
+                log.warn('⚠️ Cache absences salon non mis à jour:', e.message);
             }
         })();
         absenceCacheUpdating = work;
@@ -57,14 +59,14 @@ function createPresencePanelService(deps) {
             absenceCacheRefreshTimeout = null;
             updateAbsenceSalonCache({ force: true })
                 .then(() => refreshAbsencePanel?.())
-                .catch(e => console.warn(`⚠️ Refresh cache absences (${reason}) échoué:`, e.message));
+                .catch(e => log.warn(`⚠️ Refresh cache absences (${reason}) échoué:`, e.message));
         }, 500);
     }
 
     function handleAbsenceSalonCacheEvent(message, reason) {
         const channelId = message?.channelId || message?.channel?.id;
         if (channelId !== CONFIG.CHANNELS.ABSENCE) return;
-        console.log(`📋 Salon absences modifié (${reason}) → cache à recalculer`);
+        log.info(`📋 Salon absences modifié (${reason}) → cache à recalculer`);
         scheduleAbsenceSalonCacheUpdate(reason);
     }
 

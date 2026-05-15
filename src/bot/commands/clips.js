@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — commandes slash clips isolées
 
 function createClipCommandHandlers(deps) {
@@ -13,10 +15,10 @@ function createClipCommandHandlers(deps) {
 
         backfillClipForum(client)
             .then(summary => {
-                console.log(`[clips] backfill slash termine: threads=${summary.threadsScanned || 0} messages=${summary.messagesScanned || 0} uploads=${summary.filesUploaded || 0} erreurs=${summary.errors || 0}`);
+                log.info(`[clips] backfill slash termine: threads=${summary.threadsScanned || 0} messages=${summary.messagesScanned || 0} uploads=${summary.filesUploaded || 0} erreurs=${summary.errors || 0}`);
             })
             .catch(error => {
-                console.error(`[clips] backfill slash echoue: ${error.message}`);
+                log.error(`[clips] backfill slash echoue: ${error.message}`);
             });
     }
 

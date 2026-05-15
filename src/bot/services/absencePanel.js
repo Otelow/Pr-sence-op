@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — service panneau absence externalisé
 
 function createAbsencePanelService(deps) {
@@ -38,7 +40,7 @@ function createAbsencePanelService(deps) {
         absencePanelData.channelId = saved.channelId;
         absencePanelData.createdAt = saved.createdAt || Date.now();
         startAbsencePanelRefresh();
-        console.log(`📋 Panneau absence restauré (${saved.ids.length} message(s))`);
+        log.info(`📋 Panneau absence restauré (${saved.ids.length} message(s))`);
     }
 
     async function refreshAbsencePanel() {
@@ -64,9 +66,9 @@ function createAbsencePanelService(deps) {
             absencePanelRefreshFailures = 0;
         } catch (e) {
             absencePanelRefreshFailures += 1;
-            console.error('⚠️ Refresh panneau erreur (non bloquant):', e.message);
+            log.error('⚠️ Refresh panneau erreur (non bloquant):', e.message);
             if (absencePanelRefreshFailures >= 3) {
-                console.warn('⚠️ Refresh panneau absence stoppé après 3 échecs consécutifs');
+                log.warn('⚠️ Refresh panneau absence stoppé après 3 échecs consécutifs');
                 stopAbsencePanelRefresh();
             }
         }
@@ -111,7 +113,7 @@ function createAbsencePanelService(deps) {
         if (absencePanelBusyTimeout) clearTimeout(absencePanelBusyTimeout);
         absencePanelBusyTimeout = setTimeout(() => {
             absencePanelData.busy = false;
-            console.warn('⚠️ Lock /absence libéré automatiquement après 30s');
+            log.warn('⚠️ Lock /absence libéré automatiquement après 30s');
         }, 30_000);
 
         try {
@@ -119,7 +121,7 @@ function createAbsencePanelService(deps) {
         } catch (e) {
             absencePanelData.busy = false;
             if (absencePanelBusyTimeout) clearTimeout(absencePanelBusyTimeout);
-            console.error('❌ /absence defer erreur:', e.message);
+            log.error('❌ /absence defer erreur:', e.message);
             return;
         }
 
@@ -175,7 +177,7 @@ function createAbsencePanelService(deps) {
             startAbsencePanelRefresh();
             await interaction.followUp({ content: '✅ Panneau absence prêt.', ephemeral: true }).catch(() => {});
         } catch (e) {
-            console.error('❌ Erreur /absence:', e.message);
+            log.error('❌ Erreur /absence:', e.message);
             await interaction.editReply({ content: '❌ Impossible de créer le panneau absence. Réessaie dans quelques secondes.', embeds: [] }).catch(() => {});
         } finally {
             absencePanelData.busy = false;

@@ -1,3 +1,5 @@
+// FINAL D2 16/05/2026 ? logs bot via pino
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — commandes utilitaires slash isolées
 
 function createUtilityCommandHandlers(deps) {
@@ -43,7 +45,7 @@ function createUtilityCommandHandlers(deps) {
         try {
             await interaction.reply({ content: `✅ Radio : **${freq}**`, ephemeral: true });
         } catch (e) {
-            console.error('❌ /radio reply erreur:', e.message);
+            log.error('❌ /radio reply erreur:', e.message);
             return;
         }
 
@@ -60,11 +62,11 @@ function createUtilityCommandHandlers(deps) {
                         await sleep(200);
                     }
                     if (oldRadios.size > 0) {
-                        console.log(`🗑️ ${oldRadios.size} ancienne(s) radio(s) supprimée(s)`);
+                        log.info(`🗑️ ${oldRadios.size} ancienne(s) radio(s) supprimée(s)`);
                     }
                 }
             } catch (e) {
-                console.error('❌ Cleanup radios:', e.message);
+                log.error('❌ Cleanup radios:', e.message);
             }
 
             try {
@@ -74,7 +76,7 @@ function createUtilityCommandHandlers(deps) {
                 });
                 setLastRadioMessageId(msg.id);
             } catch (e) {
-                console.error('❌ /radio envoi erreur:', e.message);
+                log.error('❌ /radio envoi erreur:', e.message);
             }
         })();
     }
@@ -110,7 +112,7 @@ function createUtilityCommandHandlers(deps) {
                 const bulk = await channel.bulkDelete(recent, true);
                 deleted += bulk.size;
             } catch (e) {
-                console.warn('⚠️ bulkDelete fallback:', e.message);
+                log.warn('⚠️ bulkDelete fallback:', e.message);
                 for (const msg of recent) {
                     try { await msg.delete(); deleted++; } catch {}
                     await sleep(300);
@@ -132,7 +134,7 @@ function createUtilityCommandHandlers(deps) {
         try {
             await interaction.reply({ content: '🧹 Suppression en cours...', ephemeral: true });
         } catch (e) {
-            console.error('❌ /clear reply:', e.message);
+            log.error('❌ /clear reply:', e.message);
             return;
         }
 
@@ -142,7 +144,7 @@ function createUtilityCommandHandlers(deps) {
             const count = await clearBotMessages(interaction.channel, limit);
             await interaction.editReply(`🧹 ${count} message(s) du bot supprimé(s)`).catch(() => {});
         } catch (e) {
-            console.error('❌ /clear erreur:', e.message);
+            log.error('❌ /clear erreur:', e.message);
             await interaction.editReply(`❌ Erreur : ${e.message}`).catch(() => {});
         }
     }
@@ -151,7 +153,7 @@ function createUtilityCommandHandlers(deps) {
         try {
             await interaction.reply({ content: '🧹 Suppression en cours...', ephemeral: true });
         } catch (e) {
-            console.error('❌ /clearmessage reply:', e.message);
+            log.error('❌ /clearmessage reply:', e.message);
             return;
         }
 
@@ -177,7 +179,7 @@ function createUtilityCommandHandlers(deps) {
                     const bulk = await interaction.channel.bulkDelete(recent, true);
                     deleted += bulk.size;
                 } catch (e) {
-                    console.warn('⚠️ bulkDelete fallback:', e.message);
+                    log.warn('⚠️ bulkDelete fallback:', e.message);
                     for (const msg of recent) {
                         try { await msg.delete(); deleted++; } catch {}
                         await sleep(300);
@@ -194,7 +196,7 @@ function createUtilityCommandHandlers(deps) {
 
             await interaction.editReply(`🧹 ${deleted} message(s) supprimé(s)${old.length > 0 ? ` (dont ${old.length} > 14 jours)` : ''}`).catch(() => {});
         } catch (e) {
-            console.error('❌ /clearmessage erreur:', e.message);
+            log.error('❌ /clearmessage erreur:', e.message);
             await interaction.editReply(`❌ Erreur : ${e.message}`).catch(() => {});
         }
     }
