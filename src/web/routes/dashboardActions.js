@@ -1,6 +1,8 @@
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes actions dashboard et sanctions isolées
 
+// AUDIT HOOKS 16/05/2026 — sanctions dashboard tracées dans audit_log
 const { EmbedBuilder } = require('discord.js');
+const { audit } = require('../../shared/auditLog');
 
 function memberAvatarUrl(userId, avatar, size = 32) {
     return avatar ? `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png?size=${size}` : null;
@@ -149,6 +151,11 @@ function registerDashboardActionRoutes(app, deps) {
 
                     await sanctionChannel.send(`${mention} Vous avez reçu un **avertissement** pour la raison suivante : ${raison} ${attentionEmoji} ${bs21Emoji}`);
                     emitRealtime('sanction:added', { userId: cleanId, raison });
+                    audit(req.session.user, 'sanction.add', {
+                        target_type: 'user',
+                        target_id: cleanId,
+                        details: { reason: raison, duration: null },
+                    });
                     return res.json({ success: true });
                 }
 

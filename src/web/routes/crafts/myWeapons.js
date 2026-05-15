@@ -1,5 +1,8 @@
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes Vos Armes extraites
+// AUDIT HOOKS 16/05/2026 — annonces Vos Armes tracées dans audit_log
+const { audit } = require('../../../shared/auditLog');
+
 function parseId(v, max = 2_000_000) {
     const n = parseInt(v, 10);
     return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
@@ -450,6 +453,18 @@ function registerMyWeaponsRoutes(app, deps) {
             } catch (e) { console.error('Erreur post Discord myweapons:', e.message); }
 
             emitRealtime('craft:status', { requestId: linkedCraftRequestId || null, myWeaponId: id, status: 'listed', action: 'myweapon-listed' });
+            audit(req.session.user, 'weapon.create', {
+                target_type: 'my_weapon',
+                target_id: id,
+                details: {
+                    name: weaponName,
+                    serial_number: serials.filter(Boolean).join(', '),
+                    owner: ownerName,
+                    quantity: serials.length,
+                    is_crafted: isCrafted21BS,
+                    craft_request_id: linkedCraftRequestId,
+                },
+            });
             return res.json({ success: true, id, quantity: serials.length });
         } catch (e) {
             return res.status(500).json({ error: e.message });
@@ -563,6 +578,18 @@ function registerMyWeaponsRoutes(app, deps) {
 
             const updatedWeapon = getMyWeaponById(id);
             emitRealtime('craft:status', { requestId: updatedWeapon?.craft_request_id || null, myWeaponId: id, status: updatedWeapon?.is_sold ? 'sold' : 'listed', action: 'myweapon-updated' });
+            audit(req.session.user, 'weapon.update', {
+                target_type: 'my_weapon',
+                target_id: id,
+                details: {
+                    weapon_name: weaponName,
+                    serial_number: serial || null,
+                    owner: ownerName,
+                    is_sold: nextIsSold,
+                    sold_to: soldTo,
+                    sold_price: soldPrice,
+                },
+            });
             res.json({ success: true, weapon: updatedWeapon });
         } catch (e) {
             res.status(500).json({ error: e.message });
@@ -686,6 +713,18 @@ function registerMyWeaponsRoutes(app, deps) {
             }
 
             emitRealtime('craft:status', { requestId: matchedRequestForLog?.id || existing.craft_request_id || null, myWeaponId: id, status: 'sold', action: 'myweapon-sold' });
+            audit(req.session.user, 'weapon.markSold', {
+                target_type: 'my_weapon',
+                target_id: id,
+                details: {
+                    buyer: soldTo,
+                    price: soldPrice,
+                    sold_at: now,
+                    sold_by_id: soldById,
+                    sold_by_name: soldByName,
+                    craft_request_id: matchedRequestForLog?.id || existing.craft_request_id || null,
+                },
+            });
             res.json({ success: true, autoFilledCraft });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -714,6 +753,15 @@ function registerMyWeaponsRoutes(app, deps) {
                 else db.prepare('DELETE FROM my_weapons WHERE id = ?').run(id);
 
             emitRealtime('craft:status', { requestId: existing.craft_request_id || null, myWeaponId: id, status: 'deleted', action: 'myweapon-deleted' });
+            audit(req.session.user, 'weapon.delete', {
+                target_type: 'my_weapon',
+                target_id: id,
+                details: {
+                    weapon_name: existing.weapon_name,
+                    owner: existing.user_name,
+                    batch_id: existing.batch_id || null,
+                },
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });

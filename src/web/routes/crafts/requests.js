@@ -1,6 +1,7 @@
 // FIX 15/05/2026 — justificatif Discord craft manuel
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes demandes craft extraites
+// AUDIT HOOKS 16/05/2026 — demandes craft tracées dans audit_log
 const {
     ADMIN_USER_ID,
     ADMIN_ROLE_ID,
@@ -8,6 +9,7 @@ const {
     MY_WEAPONS_DELETE_ROLE,
 } = require('../../../shared/permissions');
 const { emitRealtime } = require('../../../shared/realtime');
+const { audit } = require('../../../shared/auditLog');
 
 const MYWEAPONS_AUTHORIZED_CRAFTERS = [
     { id: 'otelow', name: 'Otelow' },
@@ -300,6 +302,18 @@ function registerCraftRequestRoutes(app, deps) {
             }
 
             emitRealtime('craft:status', { requestId: id, status: 'pending', action: 'created' });
+            audit(req.session.user, 'craft.request.create', {
+                target_type: 'craft_request',
+                target_id: id,
+                details: {
+                    weapon_id,
+                    weapon_name: weapon.name,
+                    request_type: normalizedType,
+                    is_test: requestIsTest,
+                    has_plan: !!has_plan,
+                    has_money: !!has_money,
+                },
+            });
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -463,6 +477,19 @@ function registerCraftRequestRoutes(app, deps) {
                 }
             }
 
+            audit(req.session.user, 'craft.request.create', {
+                target_type: 'craft_request',
+                target_id: requestId,
+                details: {
+                    source: 'manual',
+                    weapon_id: weapon.id,
+                    weapon_name: weapon.name,
+                    serial_number: serial,
+                    status,
+                    myWeaponId,
+                    is_sold: sold,
+                },
+            });
             res.json({ success: true, id: requestId, myWeaponId });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -510,6 +537,15 @@ function registerCraftRequestRoutes(app, deps) {
                 }
             }
             emitRealtime('craft:status', { requestId: id, status: crafted ? 'crafted' : 'in_progress', action: 'crafted' });
+            audit(req.session.user, crafted ? 'craft.request.validate' : 'craft.request.statusChange', {
+                target_type: 'craft_request',
+                target_id: id,
+                details: {
+                    from: existing.status,
+                    to: crafted ? 'crafted' : 'in_progress',
+                    serial_number,
+                },
+            });
             res.json({ success: true });
         } catch (e) { res.status(e.statusCode || 500).json({ error: e.message }); }
     });
@@ -525,6 +561,7 @@ function registerCraftRequestRoutes(app, deps) {
             const { status } = req.body;
             const allowed = ['pending', 'waiting_materials', 'in_progress', 'rejected'];
             if (!allowed.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
+            const existing = getRequest(id);
 
                             db.prepare('UPDATE craft_requests SET status = ? WHERE id = ?').run(status, id);
 
@@ -540,6 +577,15 @@ function registerCraftRequestRoutes(app, deps) {
             }
 
             emitRealtime('craft:status', { requestId: id, status, action: 'status' });
+            audit(req.session.user, status === 'rejected' ? 'craft.request.refuse' : 'craft.request.statusChange', {
+                target_type: 'craft_request',
+                target_id: id,
+                details: {
+                    from: existing?.status || null,
+                    to: status,
+                    reason: req.body.reason || req.body.refusal_reason || null,
+                },
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -570,6 +616,11 @@ function registerCraftRequestRoutes(app, deps) {
             if (isSuperAdmin) {
                 deleteCraftRequestCleanly(id);
                 emitRealtime('craft:status', { requestId: id, status: 'deleted', action: 'deleted' });
+                audit(req.session.user, 'craft.request.delete', {
+                    target_type: 'craft_request',
+                    target_id: id,
+                    details: { via: 'cancel', mode: 'admin' },
+                });
                 return res.json({ success: true });
             }
             if (existing.status !== 'pending') {
@@ -578,6 +629,11 @@ function registerCraftRequestRoutes(app, deps) {
 
             deleteRequest(id);
             emitRealtime('craft:status', { requestId: id, status: 'deleted', action: 'cancelled' });
+            audit(req.session.user, 'craft.request.delete', {
+                target_type: 'craft_request',
+                target_id: id,
+                details: { via: 'cancel', mode: 'owner' },
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -591,6 +647,11 @@ function registerCraftRequestRoutes(app, deps) {
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
             deleteCraftRequestCleanly(id);
             emitRealtime('craft:status', { requestId: id, status: 'deleted', action: 'deleted' });
+            audit(req.session.user, 'craft.request.delete', {
+                target_type: 'craft_request',
+                target_id: id,
+                details: { via: 'admin-delete' },
+            });
             res.json({ success: true });
         } catch (e) { res.status(e.statusCode || 500).json({ error: e.message }); }
     });

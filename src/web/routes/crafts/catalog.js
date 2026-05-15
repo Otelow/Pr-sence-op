@@ -1,6 +1,9 @@
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes catalogue/stock craft extraites
 
+// AUDIT HOOKS 16/05/2026 — catalogue craft/admin tracé dans audit_log
+const { audit } = require('../../../shared/auditLog');
+
 function parseId(v, max = 2_000_000) {
     const n = parseInt(v, 10);
     return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
@@ -51,6 +54,10 @@ function registerCraftCatalogRoutes(app, deps) {
             for (const item of updates) {
                 updateStockMaterial(item.ingredient_id, item.quantity);
             }
+            audit(req.session.user, 'catalog.stock.update', {
+                target_type: 'stock',
+                details: { updates },
+            });
             res.json({ success: true, ...getCraftableWeapons() });
         } catch (e) {
             console.error('POST stocks update:', e);
@@ -114,6 +121,11 @@ function registerCraftCatalogRoutes(app, deps) {
                 parseInt(max_sale_price) || 0,
                 ingredients || '[]'
             );
+            audit(req.session.user, 'catalog.weapon.create', {
+                target_type: 'catalog_weapon',
+                target_id: id,
+                details: { name, craft_time, craft_price, sale_price, max_sale_price, requires_plan },
+            });
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -147,6 +159,11 @@ function registerCraftCatalogRoutes(app, deps) {
                 max_sale_price !== undefined ? (parseInt(max_sale_price) || 0) : (existing.max_sale_price || 0),
                 ingredients || (typeof existing.ingredients === 'string' ? existing.ingredients : JSON.stringify(existing.ingredients || []))
             );
+            audit(req.session.user, 'catalog.weapon.update', {
+                target_type: 'catalog_weapon',
+                target_id: id,
+                details: { name: name || existing.name, craft_time, craft_price, sale_price, max_sale_price, requires_plan },
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -165,6 +182,11 @@ function registerCraftCatalogRoutes(app, deps) {
                 if (fs.existsSync(p)) fs.unlinkSync(p);
             }
             deleteWeapon(id);
+            audit(req.session.user, 'catalog.weapon.delete', {
+                target_type: 'catalog_weapon',
+                target_id: id,
+                details: { name: existing?.name || null },
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -186,6 +208,11 @@ function registerCraftCatalogRoutes(app, deps) {
             if (!name || !name.trim()) return res.status(400).json({ error: 'Nom requis' });
             const imagePath = req.file ? req.file.filename : null;
             const id = insertIngredient(name.trim(), imagePath);
+            audit(req.session.user, 'catalog.ingredient.create', {
+                target_type: 'catalog_ingredient',
+                target_id: id,
+                details: { name: name.trim(), imagePath },
+            });
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -202,6 +229,11 @@ function registerCraftCatalogRoutes(app, deps) {
                 if (fs.existsSync(p)) fs.unlinkSync(p);
             }
             updateIngredient(id, name || existing.name, req.file ? req.file.filename : null);
+            audit(req.session.user, 'catalog.ingredient.update', {
+                target_type: 'catalog_ingredient',
+                target_id: id,
+                details: { name: name || existing.name, imagePath: req.file ? req.file.filename : null },
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -216,6 +248,11 @@ function registerCraftCatalogRoutes(app, deps) {
                 if (fs.existsSync(p)) fs.unlinkSync(p);
             }
             deleteIngredient(id);
+            audit(req.session.user, 'catalog.ingredient.delete', {
+                target_type: 'catalog_ingredient',
+                target_id: id,
+                details: { name: existing?.name || null },
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -230,6 +267,11 @@ function registerCraftCatalogRoutes(app, deps) {
             const { name, sale_price, max_sale_price } = req.body;
             if (!name || !String(name).trim()) return res.status(400).json({ error: 'Nom requis' });
             const id = insertMyWeaponName(name, sale_price, max_sale_price);
+            audit(req.session.user, 'catalog.myWeaponName.create', {
+                target_type: 'my_weapon_name',
+                target_id: id,
+                details: { name, sale_price, max_sale_price },
+            });
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -240,6 +282,11 @@ function registerCraftCatalogRoutes(app, deps) {
             const id = parseId(req.params.id);
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
             updateMyWeaponName(id, name, sale_price, max_sale_price);
+            audit(req.session.user, 'catalog.myWeaponName.update', {
+                target_type: 'my_weapon_name',
+                target_id: id,
+                details: { name, sale_price, max_sale_price },
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -249,6 +296,10 @@ function registerCraftCatalogRoutes(app, deps) {
             const id = parseId(req.params.id);
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
             deleteMyWeaponName(id);
+            audit(req.session.user, 'catalog.myWeaponName.delete', {
+                target_type: 'my_weapon_name',
+                target_id: id,
+            });
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -266,6 +317,11 @@ function registerCraftCatalogRoutes(app, deps) {
             const { name } = req.body;
             if (!name || !name.trim()) return res.status(400).json({ error: 'Nom requis' });
             const id = insertOrg(name.trim());
+            audit(req.session.user, 'config.organization.create', {
+                target_type: 'organization',
+                target_id: id,
+                details: { name: name.trim() },
+            });
             res.json({ success: true, id });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -275,6 +331,10 @@ function registerCraftCatalogRoutes(app, deps) {
             const id = parseId(req.params.id);
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
             deleteOrg(id);
+            audit(req.session.user, 'config.organization.delete', {
+                target_type: 'organization',
+                target_id: id,
+            });
             res.json({ success: true });
         }
         catch (e) { res.status(500).json({ error: e.message }); }

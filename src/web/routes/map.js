@@ -1,10 +1,12 @@
 // STABILISATION 15/05/2026 — carte persistée en SQLite
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes carte isolées
+// AUDIT HOOKS 16/05/2026 — points carte tracés dans audit_log
 const {
     FULL_ACCESS_ROLES,
     LAB_VISIBLE_USERS,
 } = require('../../shared/permissions');
 const mapPoints = require('../services/mapPoints');
+const { audit } = require('../../shared/auditLog');
 
 function registerMapRoutes(app, deps) {
     const {
@@ -78,6 +80,11 @@ function registerMapRoutes(app, deps) {
             createdById: req.session.user.id,
             createdAt: Date.now(),
         });
+        audit(req.session.user, 'mapPoint.create', {
+            target_type: 'map_point',
+            target_id: point.id,
+            details: { x, y, label: point.label, type: point.type, color: point.color || null },
+        });
         res.json({ success: true, point });
     });
 
@@ -85,6 +92,10 @@ function registerMapRoutes(app, deps) {
         if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes' });
 
         if (!mapPoints.deleteById(req.params.id)) return res.status(404).json({ error: 'Point introuvable' });
+        audit(req.session.user, 'mapPoint.delete', {
+            target_type: 'map_point',
+            target_id: req.params.id,
+        });
         res.json({ success: true });
     });
 
@@ -106,7 +117,13 @@ function registerMapRoutes(app, deps) {
         if (Array.isArray(allowedRoles)) point.allowedRoles = allowedRoles;
         point.updatedBy = req.session.user.username;
 
-        res.json({ success: true, point: mapPoints.update(req.params.id, point) });
+        const updatedPoint = mapPoints.update(req.params.id, point);
+        audit(req.session.user, 'mapPoint.update', {
+            target_type: 'map_point',
+            target_id: req.params.id,
+            details: { x, y, label, type, color, allowedRoles },
+        });
+        res.json({ success: true, point: updatedPoint });
     });
 }
 
