@@ -1,3 +1,4 @@
+// STABILISATION FINALE 15/05/2026 - polling salons pilote par Socket.IO
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // ==========================================
 // 21 BLOCK SAVAGE — Dashboard JS
@@ -87,14 +88,17 @@ function setupRealtimeSocket() {
     realtimeSocket = io({ path: '/socket.io', transports: ['websocket', 'polling'] });
     realtimeSocket.on('connect', () => {
         realtimeConnected = true;
+        stopChannelPolling();
         console.info('[realtime] connecté');
     });
     realtimeSocket.on('disconnect', () => {
         realtimeConnected = false;
+        if (currentTab === 'channels') startChannelPolling();
         console.warn('[realtime] déconnecté, fallback polling actif');
     });
     realtimeSocket.on('connect_error', err => {
         realtimeConnected = false;
+        if (currentTab === 'channels') startChannelPolling();
         console.warn('[realtime] connexion impossible:', err?.message || err);
     });
 
@@ -991,8 +995,11 @@ async function loadMessages(channelId, before = null) {
 // ==========================================
 function startChannelPolling() {
     stopChannelPolling();
+    if (realtimeConnected) {
+        console.debug('[channels] polling skipped (realtime actif)');
+        return;
+    }
     channelPollTimer = setInterval(async () => {
-        if (realtimeConnected) return;
         if (!currentChannelId) return;
         // Skip si l'onglet n'est pas Salons
         if (currentTab !== 'channels') return;

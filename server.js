@@ -1,3 +1,4 @@
+// STABILISATION FINALE 15/05/2026 - charset statics et monitoring admin leger
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // ==========================================
 // Serveur web — Dashboard 21 Block Savage
@@ -110,7 +111,7 @@ function startServer(client, getState) {
             secure: config.isProduction || config.isRailway,
         },
     });
-    attachRealtimeSocket(httpServer, sessionMiddleware);
+    const realtimeServer = attachRealtimeSocket(httpServer, sessionMiddleware);
 
     app.set('trust proxy', 1);
     app.use(helmet({
@@ -135,7 +136,14 @@ function startServer(client, getState) {
     app.use(express.static(path.join(__dirname, 'public'), {
         maxAge: config.isProduction || config.isRailway ? '1h' : 0,
         setHeaders: (res, filePath) => {
-            if (/\.(html|js|css)$/i.test(filePath)) {
+            if (/\.html$/i.test(filePath)) {
+                res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                res.setHeader('Cache-Control', 'no-cache');
+            } else if (/\.js$/i.test(filePath)) {
+                res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+                res.setHeader('Cache-Control', 'no-cache');
+            } else if (/\.css$/i.test(filePath)) {
+                res.setHeader('Content-Type', 'text/css; charset=utf-8');
                 res.setHeader('Cache-Control', 'no-cache');
             } else if (/\.(png|jpe?g|webp|gif|svg|ico)$/i.test(filePath)) {
                 res.setHeader('Cache-Control', 'public, max-age=604800');
@@ -173,6 +181,50 @@ function startServer(client, getState) {
             });
         }
         next();
+    }
+
+    function getDbTableStats() {
+        let db;
+        try {
+            const { createConnection } = require('./src/shared/database');
+            db = createConnection(config.paths.database);
+            const tables = db.prepare(`
+                SELECT name FROM sqlite_master
+                WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+                ORDER BY name
+            `).all();
+            return tables.map(({ name }) => {
+                try {
+                    const safeName = name.replace(/"/g, '""');
+                    const row = db.prepare(`SELECT COUNT(*) AS count FROM "${safeName}"`).get();
+                    return { name, row_count: row?.count || 0 };
+                } catch {
+                    return { name, row_count: null };
+                }
+            });
+        } catch {
+            return [];
+        } finally {
+            try { db?.close?.(); } catch {}
+        }
+    }
+
+    function getBackupStats() {
+        try {
+            const files = fs.readdirSync(config.paths.backups)
+                .filter(name => /\.(db|json)$/i.test(name))
+                .map(name => {
+                    const stat = fs.statSync(path.join(config.paths.backups, name));
+                    return { name, mtimeMs: stat.mtimeMs };
+                })
+                .sort((a, b) => b.mtimeMs - a.mtimeMs);
+            return {
+                count: files.length,
+                last: files[0] ? new Date(files[0].mtimeMs).toISOString() : null,
+            };
+        } catch {
+            return { count: 0, last: null };
+        }
     }
 
     async function refreshSessionRoles(req, res, next) {
@@ -241,6 +293,29 @@ function startServer(client, getState) {
     }
 
     app.use(refreshSessionRoles);
+
+    app.get('/api/admin/health-detailed', requireAdmin, (req, res) => {
+        const memory = process.memoryUsage();
+        const backups = getBackupStats();
+        let dbSizeKb = 0;
+        try {
+            dbSizeKb = Math.round(fs.statSync(config.paths.database).size / 1024);
+        } catch {}
+
+        res.json({
+            uptime_seconds: Math.round(process.uptime()),
+            memory_mb: Math.round(memory.heapUsed / 1024 / 1024),
+            memory_rss_mb: Math.round(memory.rss / 1024 / 1024),
+            bot_ready: botClient?.isReady?.() ?? false,
+            bot_ping_ms: botClient?.ws?.ping ?? null,
+            ws_clients: realtimeServer?.engine?.clientsCount ?? 0,
+            db_size_kb: dbSizeKb,
+            db_tables: getDbTableStats(),
+            backups_count: backups.count,
+            backups_last: backups.last,
+            errors_24h: 0,
+        });
+    });
 
     // Initialiser la DB crafts
     try {

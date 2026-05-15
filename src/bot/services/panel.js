@@ -1,3 +1,4 @@
+// STABILISATION FINALE 15/05/2026 - mentions salons explicites dans les rappels
 // MODIFI? CHANTIER 6 ? 14/05/2026 ? service panel/rappels externalis?
 
 const fs = require('fs');
@@ -105,7 +106,7 @@ function formatPanelMessage(text) {
     for (const [shortcut, full] of Object.entries(PANEL_CONFIG.EMOJI_SHORTCUTS)) {
         result = result.replaceAll(shortcut, full);
     }
-    result = result.replace(/(?<!<[#@!&a-z:])(\d{17,20})(?![>:\w])/g, '<#$1>');
+    result = result.replace(/:salon:(\d{17,20})\b/g, '<#$1>');
     return result;
 }
 
