@@ -1,4 +1,5 @@
-﻿// CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier
+// CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune
+// CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier
 // CHANTIER COMMANDES 15/05/2026 — UI commandes ingrédients et publication Discord
 // ============================================================
 // ADMIN PANEL — JS
@@ -872,6 +873,18 @@ function advanceStatusMeta(order) {
     return { className: 'open', label: 'À récupérer' };
 }
 
+function ingredientSlug(name) {
+    const normalized = (name || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+    if (normalized.includes('titane')) return 'titane';
+    if (normalized.includes('chrome')) return 'chrome';
+    if (normalized.includes('tungst')) return 'tungstene';
+    return 'default';
+}
+
 async function loadAdminMembers() {
     adminMembers = [...ORDER_ADVANCE_PARTICIPANTS];
     adminMembersLoadedAt = Date.now();
@@ -1352,9 +1365,18 @@ function renderOrderAdvances() {
         const remainingClass = Number(order.remaining_amount) > 0 ? 'amount-danger' : 'amount-positive';
         const participantOptions = repaymentParticipantOptions(order);
         const itemsDisplay = (order.items || []).length
-            ? `<div class="order-advance-items-display">${order.items.map(item => `
-                <div class="item-line">${Number(item.quantity || 0).toLocaleString('fr-FR')} ${escapeHtml(item.ingredient_name)} × ${moneyDisplay(item.unit_price)} = ${moneyDisplay(item.line_total)}</div>
-            `).join('')}</div>`
+            ? `<div class="order-advance-items-display">
+                ${(order.items || []).map(item => {
+                    const slug = ingredientSlug(item.ingredient_name);
+                    return `
+                        <div class="item-line item-line-${slug}">
+                            <span class="item-name">${Number(item.quantity || 0).toLocaleString('fr-FR')} ${escapeHtml(item.ingredient_name)}</span>
+                            <span class="item-formula"> × ${moneyDisplay(item.unit_price)} = </span>
+                            <span class="item-total">${moneyDisplay(item.line_total)}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>`
             : '';
         const publishedBadge = order.discord_message_id
             ? `<span class="order-advance-published-badge">✅ Publiée${order.published_at ? ` le ${new Date(Number(order.published_at) * 1000).toLocaleDateString('fr-FR')} à ${new Date(Number(order.published_at) * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>`
@@ -1395,7 +1417,7 @@ function renderOrderAdvances() {
                     <span class="order-advance-status">${meta.label}</span>
                 </div>
                 <div class="order-advance-totals">
-                    <span>Total <strong>${moneyDisplay(order.total_amount)}</strong></span>
+                    <span>Total <strong class="order-total-amount">${moneyDisplay(order.total_amount)}</strong></span>
                     <span>Récupéré <strong class="${recoveredClass}">${moneyDisplay(order.recovered_amount)}</strong></span>
                     <span>Restant <strong class="${remainingClass}">${moneyDisplay(order.remaining_amount)}</strong></span>
                     ${!order.has_detailed_repayments && Number(order.legacy_recovered_amount) > 0 ? '<span class="order-advance-legacy">Ancien montant récupéré global</span>' : ''}

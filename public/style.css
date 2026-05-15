@@ -1,3 +1,4 @@
+/* CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune */
 /* CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier */
 /* CHANTIER COMMANDES 15/05/2026 — styles commandes ingrédients admin */
 /* FIX FORCE 15/05/2026 — vague avec !important + descendants */
@@ -10026,4 +10027,51 @@ body:has(#impersonateBanner[style*="flex"]) {
     border: 1px solid rgba(255, 170, 68, 0.3);
     border-radius: 4px;
     font-size: 12px;
+}
+
+/* Total de la commande en haut de la card -> jaune doré */
+.order-advance-totals .order-total-amount {
+    color: var(--gold, #d4af37);
+}
+
+/* Conteneur des lignes d'ingrédients */
+.order-advance-items-display {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 12px 0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* "190 Titane" -> toujours blanc gras */
+.order-advance-items-display .item-name {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+/* " x 14 000$ = " -> gris discret */
+.order-advance-items-display .item-formula {
+    color: var(--text-muted, #888);
+    font-weight: 400;
+}
+
+/* Total de la ligne -> par défaut gris clair, override par ingrédient */
+.order-advance-items-display .item-total {
+    font-weight: 700;
+    color: var(--text-dim, #b8b8b8);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Couleurs spécifiques par ingrédient sur le total de ligne */
+.order-advance-items-display .item-line-titane .item-total {
+    color: #c8d4e0; /* argenté */
+}
+
+.order-advance-items-display .item-line-chrome .item-total {
+    color: #7ec8e3; /* bleu glacé */
+}
+
+.order-advance-items-display .item-line-tungstene .item-total {
+    color: #d4a574; /* ocre chaud */
 }
