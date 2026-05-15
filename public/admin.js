@@ -1,7 +1,7 @@
-﻿// CHANTIER COMMANDES v2 15/05/2026 â€” fusion enregistrer + publier
-// CHANTIER COMMANDES 15/05/2026 â€” UI commandes ingrÃ©dients et publication Discord
+﻿// CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier
+// CHANTIER COMMANDES 15/05/2026 — UI commandes ingrédients et publication Discord
 // ============================================================
-// ADMIN PANEL â€” JS
+// ADMIN PANEL — JS
 // ============================================================
 let adminWeapons = [];
 let adminMyWeaponNames = [];
@@ -24,7 +24,7 @@ const ORDER_ADVANCE_PARTICIPANTS = [
 let adminIngredientQuery = '';
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // VÃ©rifier admin
+    // Vérifier admin
     try {
         const r = await fetch('/api/admin/check');
         const d = await r.json();
@@ -162,7 +162,7 @@ function confirmAction(options = {}) {
     });
 }
 
-// â”€â”€â”€ TABS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── TABS ───────────────────────────────────────
 function switchAdminTab(name) {
     document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b.dataset.adminTab === name));
     document.querySelectorAll('.admin-tab-content').forEach(s => {
@@ -175,7 +175,7 @@ function switchAdminTab(name) {
 }
 window.switchAdminTab = switchAdminTab;
 
-// â”€â”€â”€ ROLES (impersonate) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ROLES (impersonate) ────────────────────────
 async function loadAdminRoles() {
     try {
         const r = await fetch('/api/roles');
@@ -250,19 +250,19 @@ document.addEventListener('click', (e) => {
 
 function applyImpersonate() {
     const roleId = document.getElementById('impersonateRoleId').value;
-    if (!roleId) { toast('âŒ Choisis un rÃ´le', 'error'); return; }
+    if (!roleId) { toast('❌ Choisis un rôle', 'error'); return; }
     localStorage.setItem('impersonate_role', roleId);
-    toast('âœ… Vue impersonate active. Retourne au dashboard.');
+    toast('✅ Vue impersonate active. Retourne au dashboard.');
 }
 
 function resetImpersonate() {
     localStorage.removeItem('impersonate_role');
-    toast('â†© Vue impersonate dÃ©sactivÃ©e');
+    toast('↩ Vue impersonate désactivée');
 }
 window.applyImpersonate = applyImpersonate;
 window.resetImpersonate = resetImpersonate;
 
-// â”€â”€â”€ ARMES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ARMES ─────────────────────────────────────
 async function loadAdminWeapons() {
     try {
         const r = await fetch('/api/crafts/weapons');
@@ -351,7 +351,7 @@ function openWeaponEditor(id) {
         document.getElementById('weaponCraftTime').value = w.craft_time || 0;
         document.getElementById('weaponCraftPrice').value = w.craft_price || 0;
 
-        // Prix de vente conseillÃ©
+        // Prix de vente conseillé
         if (saleInput) saleInput.value = w.sale_price || 0;
         if (maxSaleInput) maxSaleInput.value = w.max_sale_price || 0;
 
@@ -388,25 +388,25 @@ function addIngredient() {
 function renderIngredientsEditor() {
     const list = document.getElementById('ingredientsList');
     if (!editingIngredients.length) {
-        list.innerHTML = '<p class="empty-small">Aucun ingrÃ©dient â€” clique sur "+ Ajouter"</p>';
+        list.innerHTML = '<p class="empty-small">Aucun ingrédient — clique sur "+ Ajouter"</p>';
         return;
     }
     list.innerHTML = editingIngredients.map((ing, i) => {
-        const options = '<option value="">â€” Choisir â€”</option>' +
+        const options = '<option value="">— Choisir —</option>' +
             adminIngredients.map(opt => {
                 const selected = ing.name === opt.name ? 'selected' : '';
                 return `<option value="${opt.id}" data-name="${escapeHtml(opt.name)}" data-image="${opt.image_url || ''}" ${selected}>${escapeHtml(opt.name)}</option>`;
             }).join('');
 
         const previewImg = ing.name && adminIngredients.find(opt => opt.name === ing.name)?.image_url;
-        const preview = previewImg ? `<img src="${previewImg}" class="ingredient-row-preview" alt="">` : '<span class="ingredient-row-placeholder">ðŸ§ª</span>';
+        const preview = previewImg ? `<img src="${previewImg}" class="ingredient-row-preview" alt="">` : '<span class="ingredient-row-placeholder">🧪</span>';
 
         return `
             <div class="ingredient-row">
                 ${preview}
                 <select onchange="updateIngredientName(${i}, this)">${options}</select>
-                <input type="number" placeholder="QuantitÃ©" value="${ing.amount || 0}" oninput="updateIngredientAmount(${i}, this.value)" min="0">
-                <button type="button" class="btn-danger btn-small" onclick="removeIngredient(${i})">Ã—</button>
+                <input type="number" placeholder="Quantité" value="${ing.amount || 0}" oninput="updateIngredientAmount(${i}, this.value)" min="0">
+                <button type="button" class="btn-danger btn-small" onclick="removeIngredient(${i})">×</button>
             </div>
         `;
     }).join('');
@@ -479,7 +479,7 @@ async function saveWeapon(e) {
     formData.append('craft_time', document.getElementById('weaponCraftTime').value || '0');
     formData.append('craft_price', document.getElementById('weaponCraftPrice').value || '0');
 
-    // Prix de vente conseillÃ©
+    // Prix de vente conseillé
     const saleInput = document.getElementById('weaponSalePrice');
     formData.append('sale_price', saleInput ? (saleInput.value || '0') : '0');
     const maxSaleInput = document.getElementById('weaponMaxSalePrice');
@@ -501,33 +501,33 @@ async function saveWeapon(e) {
         const data = await res.json();
 
         if (res.ok) {
-            toast('âœ… Arme enregistrÃ©e');
+            toast('✅ Arme enregistrée');
             closeWeaponEditor();
             await loadAdminWeapons();
         } else {
-            toast(`âŒ ${data.error}`, 'error');
+            toast(`❌ ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`âŒ ${e.message}`, 'error');
+        toast(`❌ ${e.message}`, 'error');
     }
 }
 window.saveWeapon = saveWeapon;
 
 async function deleteWeapon(id) {
-    if (!await confirmAction({ title: 'Supprimer lâ€™arme', message: 'Supprimer cette arme du catalogue ?', confirmText: 'Supprimer', danger: true })) return;
+    if (!await confirmAction({ title: 'Supprimer l’arme', message: 'Supprimer cette arme du catalogue ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/weapons/${id}`, { method: 'DELETE' });
         if (res.ok) {
-            toast('ðŸ—‘ SupprimÃ©e');
+            toast('Supprim?e');
             await loadAdminWeapons();
         }
     } catch (e) {
-        toast(`âŒ ${e.message}`, 'error');
+        toast(`❌ ${e.message}`, 'error');
     }
 }
 window.deleteWeapon = deleteWeapon;
 
-// â”€â”€â”€ ARMES A VENDRE (Vos Armes) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ARMES A VENDRE (Vos Armes) ───────────────────────────
 async function loadAdminMyWeaponNames() {
     try {
         const r = await fetch('/api/crafts/myweapon-names');
@@ -544,7 +544,7 @@ function renderAdminMyWeaponNames() {
     const list = document.getElementById('adminMyWeaponNamesList');
     if (!list) return;
     if (!adminMyWeaponNames.length) {
-        list.innerHTML = '<p class="empty">Aucun nom configurÃ©. Ajoute les armes disponibles pour Vos Armes.</p>';
+        list.innerHTML = '<p class="empty">Aucun nom configuré. Ajoute les armes disponibles pour Vos Armes.</p>';
         return;
     }
     list.innerHTML = adminMyWeaponNames.map(item => `
@@ -552,7 +552,7 @@ function renderAdminMyWeaponNames() {
             <input type="text" class="comm-input admin-myweapon-name-input" id="myWeaponName-${item.id}" value="${escapeHtml(item.name)}">
             <input type="number" class="comm-input admin-myweapon-price-input" id="myWeaponSalePrice-${item.id}" min="0" value="${Number(item.sale_price) || 0}" placeholder="Prix vente">
             <input type="number" class="comm-input admin-myweapon-price-input" id="myWeaponMaxSalePrice-${item.id}" min="0" value="${Number(item.max_sale_price) || 0}" placeholder="Prix maximal">
-            <span class="admin-myweapon-price-source">${item.price_source === 'craft_catalog' ? 'Prix catalogue craftable prioritaires si renseignÃ©s' : 'Prix Vos Armes'}</span>
+            <span class="admin-myweapon-price-source">${item.price_source === 'craft_catalog' ? 'Prix catalogue craftable prioritaires si renseignés' : 'Prix Vos Armes'}</span>
             <div class="admin-myweapon-name-actions">
                 <button class="btn-secondary btn-small" onclick="saveMyWeaponNameFromAdmin(${item.id})">Enregistrer</button>
                 <button class="btn-danger btn-small" onclick="deleteMyWeaponNameFromAdmin(${item.id})">Supprimer</button>
@@ -566,7 +566,7 @@ async function addMyWeaponNameFromAdmin() {
     const name = input?.value?.trim();
     const saleInput = document.getElementById('newMyWeaponSalePrice');
     const maxSaleInput = document.getElementById('newMyWeaponMaxSalePrice');
-    if (!name) { toast('âŒ Nom requis', 'error'); return; }
+    if (!name) { toast('❌ Nom requis', 'error'); return; }
     try {
         const res = await fetch('/api/crafts/myweapon-names', {
             method: 'POST',
@@ -579,16 +579,16 @@ async function addMyWeaponNameFromAdmin() {
         });
         const data = await res.json();
         if (res.ok) {
-            toast('âœ… Nom ajoutÃ©');
+            toast('✅ Nom ajouté');
             input.value = '';
             if (saleInput) saleInput.value = '';
             if (maxSaleInput) maxSaleInput.value = '';
             await loadAdminMyWeaponNames();
         } else {
-            toast(`âŒ ${data.error}`, 'error');
+            toast(`❌ ${data.error}`, 'error');
         }
     } catch (e) {
-        toast(`âŒ ${e.message}`, 'error');
+        toast(`❌ ${e.message}`, 'error');
     }
 }
 
@@ -605,7 +605,7 @@ async function saveMyWeaponNameFromAdmin(id) {
         });
         const data = await res.json();
         if (res.ok) {
-            toast('Nom/prix enregistrÃ©s');
+            toast('Nom/prix enregistrés');
             await loadAdminMyWeaponNames();
         } else {
             toast(`Erreur : ${data.error}`, 'error');
@@ -620,11 +620,11 @@ async function deleteMyWeaponNameFromAdmin(id) {
     try {
         const res = await fetch(`/api/crafts/myweapon-names/${id}`, { method: 'DELETE' });
         if (res.ok) {
-            toast('ðŸ—‘ Nom supprimÃ©');
+            toast('Nom supprim?');
             await loadAdminMyWeaponNames();
         }
     } catch (e) {
-        toast(`âŒ ${e.message}`, 'error');
+        toast(`❌ ${e.message}`, 'error');
     }
 }
 
@@ -632,7 +632,7 @@ window.addMyWeaponNameFromAdmin = addMyWeaponNameFromAdmin;
 window.saveMyWeaponNameFromAdmin = saveMyWeaponNameFromAdmin;
 window.deleteMyWeaponNameFromAdmin = deleteMyWeaponNameFromAdmin;
 
-// â”€â”€â”€ INGRÃ‰DIENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── INGRÉDIENTS ─────────────────────
 async function loadAdminIngredients() {
     try {
         const r = await fetch('/api/crafts/ingredients');
@@ -684,7 +684,7 @@ function openIngredientEditor(id) {
         document.getElementById('ingredientName').value = ing.name;
         if (safeImageUrl(ing.image_url)) document.getElementById('ingredientImagePreview').innerHTML = `<img src="${safeImageUrl(ing.image_url)}" alt="">`;
     } else {
-        title.textContent = 'Ajouter un ingrÃ©dient';
+        title.textContent = 'Ajouter un ingrédient';
         document.getElementById('ingredientId').value = '';
     }
     modal.style.display = 'flex';
@@ -710,22 +710,22 @@ async function saveIngredient(e) {
         const res = await fetch(url, { method, body: formData });
         const data = await res.json();
         if (res.ok) {
-            toast('âœ… IngrÃ©dient enregistrÃ©');
+            toast('✅ Ingrédient enregistré');
             closeIngredientEditor();
             await loadAdminIngredients();
         } else {
-            toast(`âŒ ${data.error}`, 'error');
+            toast(`❌ ${data.error}`, 'error');
         }
-    } catch (e) { toast(`âŒ ${e.message}`, 'error'); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 window.saveIngredient = saveIngredient;
 
 async function deleteIngredient(id) {
-    if (!await confirmAction({ title: 'Supprimer lâ€™ingrÃ©dient', message: 'Supprimer cet ingrÃ©dient ?', confirmText: 'Supprimer', danger: true })) return;
+    if (!await confirmAction({ title: 'Supprimer l’ingrédient', message: 'Supprimer cet ingrédient ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/ingredients/${id}`, { method: 'DELETE' });
-        if (res.ok) { toast('ðŸ—‘ SupprimÃ©'); await loadAdminIngredients(); }
-    } catch (e) { toast(`âŒ ${e.message}`, 'error'); }
+        if (res.ok) { toast('Supprim?'); await loadAdminIngredients(); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 window.deleteIngredient = deleteIngredient;
 
@@ -746,7 +746,7 @@ function renderAdminStocks() {
     const list = document.getElementById('adminStocksList');
     if (!list) return;
     if (!adminStocks.length) {
-        list.innerHTML = '<p class="empty">Aucune matiÃ¨re premiÃ¨re suivie.</p>';
+        list.innerHTML = '<p class="empty">Aucune matière première suivie.</p>';
         return;
     }
 
@@ -779,7 +779,7 @@ async function saveAdminStocks() {
         if (!res.ok) throw new Error(data.error || 'Sauvegarde impossible');
         adminStocks = data.stocks || [];
         renderAdminStocks();
-        toast('Stocks sauvegardÃ©s');
+        toast('Stocks sauvegardés');
     } catch (e) {
         toast(e.message, 'error');
     }
@@ -788,7 +788,7 @@ async function saveAdminStocks() {
 window.loadAdminStocks = loadAdminStocks;
 window.saveAdminStocks = saveAdminStocks;
 
-// â”€â”€â”€ ORGANISATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ORGANISATIONS ──────────────────
 async function loadAdminOrgs() {
     try {
         const r = await fetch('/api/crafts/organizations');
@@ -806,8 +806,8 @@ function renderAdminOrgs() {
     }
     list.innerHTML = adminOrgs.map(o => `
         <div class="admin-org-row">
-            <span>ðŸ¢ ${escapeHtml(o.name)}</span>
-            <button class="btn-danger btn-small" onclick="deleteOrg(${o.id})">Ã—</button>
+            <span>🏢 ${escapeHtml(o.name)}</span>
+            <button class="btn-danger btn-small" onclick="deleteOrg(${o.id})">×</button>
         </div>
     `).join('');
 }
@@ -823,29 +823,29 @@ async function addOrgFromAdmin() {
         });
         if (res.ok) {
             document.getElementById('newOrgName').value = '';
-            toast('âœ… AjoutÃ©e');
+            toast('✅ Ajoutée');
             await loadAdminOrgs();
         }
-    } catch (e) { toast(`âŒ ${e.message}`, 'error'); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 
 async function deleteOrg(id) {
-    if (!await confirmAction({ title: 'Supprimer lâ€™organisation', message: 'Supprimer cette organisation ?', confirmText: 'Supprimer', danger: true })) return;
+    if (!await confirmAction({ title: 'Supprimer l’organisation', message: 'Supprimer cette organisation ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/organizations/${id}`, { method: 'DELETE' });
         if (res.ok) await loadAdminOrgs();
-    } catch (e) { toast(`âŒ ${e.message}`, 'error'); }
+    } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 window.addOrgFromAdmin = addOrgFromAdmin;
 window.deleteOrg = deleteOrg;
 
-// â”€â”€â”€ AVANCES COMMANDES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── AVANCES COMMANDES ─────────────────────────────────────
 function moneyDisplay(value) {
     return `${(Number(value) || 0).toLocaleString('fr-FR')}$`;
 }
 
 function formatEuropeanDate(value) {
-    if (!value) return 'Date non renseignÃ©e';
+    if (!value) return 'Date non renseignée';
     const clean = String(value).slice(0, 10);
     const parts = clean.split('-');
     if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -857,19 +857,19 @@ function todayDateValue() {
 }
 
 function orderAdvanceTitle(order) {
-    return `Commande matiÃ¨res premiÃ¨res du ${formatEuropeanDate(order?.order_date)}`;
+    return `Commande matières premières du ${formatEuropeanDate(order?.order_date)}`;
 }
 
 function advanceStatusMeta(order) {
     const remaining = Number(order?.remaining_amount) || 0;
     const recovered = Number(order?.recovered_amount) || 0;
     if (order?.status === 'settled' || remaining <= 0) {
-        return { className: 'settled', label: 'SoldÃ©e' };
+        return { className: 'settled', label: 'Soldée' };
     }
     if (recovered > 0) {
         return { className: 'partial', label: 'Partiel' };
     }
-    return { className: 'open', label: 'Ã€ rÃ©cupÃ©rer' };
+    return { className: 'open', label: 'À récupérer' };
 }
 
 async function loadAdminMembers() {
@@ -943,8 +943,8 @@ function updateOrderAdvanceSubmitButtonLabel() {
     if (!btn) return;
     const id = document.getElementById('orderAdvanceId')?.value;
     btn.innerHTML = id
-        ? 'ðŸ’¾ Mettre Ã  jour la commande'
-        : 'ðŸš€ Passer commande';
+        ? '💾 Mettre à jour la commande'
+        : '🚀 Passer commande';
 }
 
 async function loadOrderIngredientsCatalog() {
@@ -962,7 +962,7 @@ function renderOrderAdvanceItems(prefillItems = null) {
     const container = document.getElementById('orderAdvanceItems');
     if (!container) return;
     if (!orderIngredientsCatalog.length) {
-        container.innerHTML = '<p class="empty">Catalogue ingrÃ©dients indisponible.</p>';
+        container.innerHTML = '<p class="empty">Catalogue ingrédients indisponible.</p>';
         updateOrderAdvanceTotalFromItems();
         return;
     }
@@ -970,13 +970,13 @@ function renderOrderAdvanceItems(prefillItems = null) {
         const prefilledQty = prefillItems?.find(it => it.ingredient_name === ing.name)?.quantity || 0;
         const imageHtml = ing.image_url
             ? `<img src="${escapeHtml(ing.image_url)}" alt="" class="order-item-image">`
-            : `<div class="order-item-image order-item-image-placeholder">ðŸ“¦</div>`;
+            : `<div class="order-item-image order-item-image-placeholder">📦</div>`;
         return `
             <div class="order-advance-item-row" data-ingredient="${escapeHtml(ing.name)}">
                 ${imageHtml}
                 <div class="order-item-info">
                     <div class="order-item-name">${escapeHtml(ing.name)}</div>
-                    <div class="order-item-price">${Number(ing.unit_price || 0).toLocaleString('fr-FR')} $ / unitÃ©</div>
+                    <div class="order-item-price">${Number(ing.unit_price || 0).toLocaleString('fr-FR')} $ / unité</div>
                 </div>
                 <input type="number"
                        class="comm-input order-item-quantity"
@@ -1035,9 +1035,9 @@ function normalizeOrderAdvanceLabels() {
     const title = section.querySelector('.section-title');
     const info = section.querySelector('.admin-info');
     if (title) title.textContent = 'Suivi commandes / avances';
-    if (info) info.textContent = 'Suivi admin des commandes de matiÃ¨res premiÃ¨res et remboursements dÃ©taillÃ©s.';
+    if (info) info.textContent = 'Suivi admin des commandes de matières premières et remboursements détaillés.';
     const resetButton = section.querySelector('button[onclick="resetOrderAdvanceForm()"]');
-    if (resetButton) resetButton.textContent = 'RÃ©initialiser';
+    if (resetButton) resetButton.textContent = 'Réinitialiser';
     const submitButton = section.querySelector('button[type="submit"]');
     if (submitButton) submitButton.textContent = 'Enregistrer la commande';
 }
@@ -1084,7 +1084,7 @@ function updateOrderAdvanceBalance() {
     target.innerHTML = `
         <span>Total commande : <strong>${moneyDisplay(total)}</strong></span>
         <span>Total participants : <strong>${moneyDisplay(participantTotal)}</strong></span>
-        <span class="${className}">${diff === 0 ? 'Ã‰quilibrÃ©' : `Ã‰cart : ${moneyDisplay(Math.abs(diff))}`}</span>
+        <span class="${className}">${diff === 0 ? 'Équilibré' : `Écart : ${moneyDisplay(Math.abs(diff))}`}</span>
     `;
 }
 
@@ -1104,7 +1104,7 @@ function collectOrderAdvancePayload() {
     const orderDate = document.getElementById('orderAdvanceDate')?.value;
     if (!orderDate) { toast('Date de commande requise', 'error'); return null; }
     const items = collectOrderAdvanceItems();
-    if (!items.length) { toast('Ajoute au moins un ingrÃ©dient Ã  la commande', 'error'); return null; }
+    if (!items.length) { toast('Ajoute au moins un ingrédient à la commande', 'error'); return null; }
 
     const participants = [];
     const participantIds = new Set();
@@ -1114,8 +1114,8 @@ function collectOrderAdvancePayload() {
         const userName = select?.selectedOptions?.[0]?.dataset?.name || select?.selectedOptions?.[0]?.textContent || '';
         const contributed = row.querySelector('.order-advance-participant-contributed')?.value || '';
         if (!userId && !Number(contributed)) continue;
-        if (!userId) { toast('Choisis une personne pour chaque ligne renseignÃ©e', 'error'); return null; }
-        if (participantIds.has(userId)) { toast('Chaque participant ne peut Ãªtre choisi quâ€™une seule fois', 'error'); return null; }
+        if (!userId) { toast('Choisis une personne pour chaque ligne renseignée', 'error'); return null; }
+        if (participantIds.has(userId)) { toast('Chaque participant ne peut être choisi qu’une seule fois', 'error'); return null; }
         if (!Number(contributed)) { toast('Renseigne le montant mis par chaque participant', 'error'); return null; }
         participantIds.add(userId);
         participants.push({
@@ -1239,21 +1239,21 @@ async function deleteOrderAdvance(id) {
         if (!res.ok) throw new Error(data.error || 'Suppression impossible');
         adminOrderAdvances = data.advances || [];
         renderOrderAdvances();
-        toast('Commande supprimÃ©e');
+        toast('Commande supprimée');
     } catch (e) {
         toast(e.message, 'error');
     }
 }
 
 async function settleOrderAdvance(id) {
-    if (!await confirmAction({ title: 'Marquer soldÃ©e', message: 'Marquer cette commande comme entiÃ¨rement rÃ©cupÃ©rÃ©e ?', confirmText: 'Marquer soldÃ©e' })) return;
+    if (!await confirmAction({ title: 'Marquer soldée', message: 'Marquer cette commande comme entièrement récupérée ?', confirmText: 'Marquer soldée' })) return;
     try {
         const res = await fetch(`/api/admin/order-advances/${id}/settle`, { method: 'PUT' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Action impossible');
         adminOrderAdvances = data.advances || [];
         renderOrderAdvances();
-        toast('Commande soldÃ©e');
+        toast('Commande soldée');
     } catch (e) {
         toast(e.message, 'error');
     }
@@ -1303,7 +1303,7 @@ async function saveOrderRepayment(orderId) {
         if (!res.ok) throw new Error(data.error || 'Remboursement impossible');
         adminOrderAdvances = data.advances || [];
         renderOrderAdvances();
-        toast('Remboursement enregistrÃ©');
+        toast('Remboursement enregistré');
     } catch (e) {
         toast(e.message, 'error');
     }
@@ -1331,7 +1331,7 @@ async function deleteOrderRepayment(orderId, repaymentId) {
         if (!res.ok) throw new Error(data.error || 'Suppression impossible');
         adminOrderAdvances = data.advances || [];
         renderOrderAdvances();
-        toast('Remboursement supprimÃ©');
+        toast('Remboursement supprimé');
     } catch (e) {
         toast(e.message, 'error');
     }
@@ -1341,7 +1341,7 @@ function renderOrderAdvances() {
     const list = document.getElementById('orderAdvanceList');
     if (!list) return;
     if (!adminOrderAdvances.length) {
-        list.innerHTML = '<p class="empty">Aucune avance commande enregistrÃ©e.</p>';
+        list.innerHTML = '<p class="empty">Aucune avance commande enregistrée.</p>';
         return;
     }
 
@@ -1353,11 +1353,11 @@ function renderOrderAdvances() {
         const participantOptions = repaymentParticipantOptions(order);
         const itemsDisplay = (order.items || []).length
             ? `<div class="order-advance-items-display">${order.items.map(item => `
-                <div class="item-line">${Number(item.quantity || 0).toLocaleString('fr-FR')} ${escapeHtml(item.ingredient_name)} Ã— ${moneyDisplay(item.unit_price)} = ${moneyDisplay(item.line_total)}</div>
+                <div class="item-line">${Number(item.quantity || 0).toLocaleString('fr-FR')} ${escapeHtml(item.ingredient_name)} × ${moneyDisplay(item.unit_price)} = ${moneyDisplay(item.line_total)}</div>
             `).join('')}</div>`
             : '';
         const publishedBadge = order.discord_message_id
-            ? `<span class="order-advance-published-badge">âœ… PubliÃ©e${order.published_at ? ` le ${new Date(Number(order.published_at) * 1000).toLocaleDateString('fr-FR')} Ã  ${new Date(Number(order.published_at) * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>`
+            ? `<span class="order-advance-published-badge">✅ Publiée${order.published_at ? ` le ${new Date(Number(order.published_at) * 1000).toLocaleDateString('fr-FR')} à ${new Date(Number(order.published_at) * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>`
             : '<span class="order-advance-pub-failed-badge">⚠️ Publication Discord échouée — réédite la commande pour relancer</span>';
         const participants = (order.participants || []).map(p => {
             const participantRemainingClass = Number(p.amount_remaining) > 0 ? 'amount-danger' : 'amount-positive';
@@ -1366,7 +1366,7 @@ function renderOrderAdvances() {
                 <div class="order-advance-participant-chip">
                     <strong>${escapeHtml(p.user_name)}</strong>
                     <span>Mis : <b>${moneyDisplay(p.amount_contributed)}</b></span>
-                    <span>RÃ©cupÃ©rÃ© : <b class="${participantRecoveredClass}">${moneyDisplay(p.amount_recovered)}</b></span>
+                    <span>Récupéré : <b class="${participantRecoveredClass}">${moneyDisplay(p.amount_recovered)}</b></span>
                     <span>Restant : <b class="${participantRemainingClass}">${moneyDisplay(p.amount_remaining)}</b></span>
                 </div>
             `;
@@ -1375,7 +1375,7 @@ function renderOrderAdvances() {
             <div class="order-repayment-item order-repayment-positive">
                 <div>
                     <strong>${escapeHtml(repayment.user_name || 'Participant')}</strong>
-                    <span>${formatEuropeanDate(repayment.repayment_date)} â€¢ <b class="amount-positive">+${moneyDisplay(repayment.amount)}</b></span>
+                    <span>${formatEuropeanDate(repayment.repayment_date)} • <b class="amount-positive">+${moneyDisplay(repayment.amount)}</b></span>
                     ${repayment.reason ? `<small>${escapeHtml(repayment.reason)}</small>` : ''}
                     ${repayment.weapon_name ? `<small>Arme : ${escapeHtml(repayment.weapon_name)}</small>` : ''}
                 </div>
@@ -1396,9 +1396,9 @@ function renderOrderAdvances() {
                 </div>
                 <div class="order-advance-totals">
                     <span>Total <strong>${moneyDisplay(order.total_amount)}</strong></span>
-                    <span>RÃ©cupÃ©rÃ© <strong class="${recoveredClass}">${moneyDisplay(order.recovered_amount)}</strong></span>
+                    <span>Récupéré <strong class="${recoveredClass}">${moneyDisplay(order.recovered_amount)}</strong></span>
                     <span>Restant <strong class="${remainingClass}">${moneyDisplay(order.remaining_amount)}</strong></span>
-                    ${!order.has_detailed_repayments && Number(order.legacy_recovered_amount) > 0 ? '<span class="order-advance-legacy">Ancien montant rÃ©cupÃ©rÃ© global</span>' : ''}
+                    ${!order.has_detailed_repayments && Number(order.legacy_recovered_amount) > 0 ? '<span class="order-advance-legacy">Ancien montant récupéré global</span>' : ''}
                 </div>
                 ${itemsDisplay}
                 <div class="order-advance-participants-list">${participants}</div>
@@ -1410,13 +1410,13 @@ function renderOrderAdvances() {
                     <div class="order-repayment-form" id="orderRepaymentForm-${order.id}" style="display:none;">
                         <input type="hidden" class="order-repayment-id">
                         <select class="comm-input order-repayment-participant">${participantOptions}</select>
-                        <input type="number" min="1" class="comm-input order-repayment-amount" placeholder="Montant rÃ©cupÃ©rÃ©">
+                        <input type="number" min="1" class="comm-input order-repayment-amount" placeholder="Montant récupéré">
                         <input type="text" class="comm-input order-repayment-reason" placeholder="Raison / description">
-                        <input type="text" class="comm-input order-repayment-weapon" placeholder="Arme concernÃ©e (optionnel)">
+                        <input type="text" class="comm-input order-repayment-weapon" placeholder="Arme concernée (optionnel)">
                         <input type="date" class="comm-input order-repayment-date" value="${todayDateValue()}">
                         <button class="btn-primary btn-small" onclick="saveOrderRepayment(${order.id})">Enregistrer</button>
                     </div>
-                    <div class="order-repayment-list">${repayments || '<p class="empty">Aucun remboursement dÃ©taillÃ©.</p>'}</div>
+                    <div class="order-repayment-list">${repayments || '<p class="empty">Aucun remboursement détaillé.</p>'}</div>
                 </div>
                 <div class="order-advance-actions">
                     ${publishedBadge}
