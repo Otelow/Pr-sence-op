@@ -1,3 +1,4 @@
+/* FIX 15/05/2026 — vague visible, retour version orange */
 /* NETTOYAGE 15/05/2026 — virer ancien shimmer myweapons */
 /* COSMÉTIQUE 15/05/2026 — effet vague bandeau craft warning */
 /* ==========================================
@@ -9857,8 +9858,9 @@ body:has(#impersonateBanner[style*="flex"]) {
     overflow: hidden;
 }
 
-.craft-warning-banner .shimmer-overlay,
-.craft-warning-banner .shimmer-overlay-2 {
+/* Les overlays sont positionnés en absolu, hors flux flex */
+.craft-warning-banner > .shimmer-overlay,
+.craft-warning-banner > .shimmer-overlay-2 {
     position: absolute;
     top: 0;
     left: 0;
@@ -9868,7 +9870,7 @@ body:has(#impersonateBanner[style*="flex"]) {
     animation: craftWarningShimmer 2.8s linear infinite;
 }
 
-.craft-warning-banner .shimmer-overlay {
+.craft-warning-banner > .shimmer-overlay {
     width: 40%;
     background: linear-gradient(
         100deg,
@@ -9879,7 +9881,7 @@ body:has(#impersonateBanner[style*="flex"]) {
     filter: blur(2px);
 }
 
-.craft-warning-banner .shimmer-overlay-2 {
+.craft-warning-banner > .shimmer-overlay-2 {
     width: 25%;
     background: linear-gradient(
         100deg,
@@ -9890,21 +9892,25 @@ body:has(#impersonateBanner[style*="flex"]) {
     animation-delay: -1.4s;
 }
 
-/* Le texte et l'icône passent au-dessus des vagues */
-.craft-warning-banner > *:not(.shimmer-overlay):not(.shimmer-overlay-2) {
+/* Ciblage explicite : seuls l'icône et le bloc texte passent au-dessus.
+   On NE met PAS la règle > *:not(...) qui matchait mal les overlays. */
+.craft-warning-banner > :not(.shimmer-overlay):not(.shimmer-overlay-2) {
     position: relative;
     z-index: 2;
+}
+
+/* IMPORTANT : pas de @media prefers-reduced-motion qui cache les overlays.
+   Si tu veux respecter la préférence accessibilité, désactive juste
+   l'animation, NE PAS faire display:none (sinon plus rien à voir). */
+@media (prefers-reduced-motion: reduce) {
+    .craft-warning-banner > .shimmer-overlay,
+    .craft-warning-banner > .shimmer-overlay-2 {
+        animation: none;
+        opacity: 0.5;
+    }
 }
 
 @keyframes craftWarningShimmer {
     0%   { transform: translateX(-100%); }
     100% { transform: translateX(400%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .craft-warning-banner .shimmer-overlay,
-    .craft-warning-banner .shimmer-overlay-2 {
-        animation: none;
-        display: none;
-    }
 }
