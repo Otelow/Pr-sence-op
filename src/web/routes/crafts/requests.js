@@ -1,3 +1,4 @@
+// FIX 15/05/2026 — justificatif Discord craft manuel
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes demandes craft extraites
 const {
@@ -33,6 +34,7 @@ function registerCraftRequestRoutes(app, deps) {
     const {
         requireAuth,
         botClient,
+        botState,
         db,
         isCraftManager,
         sweepRequestsForMissingMembers,
@@ -322,7 +324,7 @@ function registerCraftRequestRoutes(app, deps) {
         return roles.includes(MY_WEAPONS_DELETE_ROLE) || canDeleteRequests(user);
     }
 
-    async function postManualCraftSaleJustification(requestId, saleTimestamp) {
+    async function postManualCraftSaleJustification(requestId, saleTimestamp, myWeaponId = null) {
         const updated = getRequest(requestId);
         if (!updated || updated.posted_to_channel) return;
 
@@ -331,28 +333,49 @@ function registerCraftRequestRoutes(app, deps) {
         const channel = await fetchDiscordChannel(channelId, 'WEAPONS_LOG_MANUAL_CRAFT');
         if (!channel) return;
 
-        const saleDate = saleTimestamp ? new Date(saleTimestamp * 1000).toLocaleDateString('fr-FR') : 'N/A';
+        const saleDate = saleTimestamp ? new Date(saleTimestamp * 1000).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
         const sellerLabel = updated.completed_by_id && updated.completed_by_id !== 'former-21bs'
             ? `<@${updated.completed_by_id}>`
             : (updated.completed_by_name || 'N/A');
+        const declaredById = String(updated.user_id || '').trim();
+        const soldById = String(updated.completed_by_id || '').trim();
+        const shouldShowDeclaredBy = declaredById
+            && declaredById !== 'former-21bs'
+            && declaredById !== soldById;
+        const fields = [
+            { name: 'Arme', value: updated.weapon_name || 'N/A', inline: true },
+            { name: 'Quantité', value: '1', inline: true },
+            { name: 'Acheteur', value: updated.buyer_org || 'N/A', inline: true },
+            { name: 'Montant vendu', value: moneyLabel(updated.sale_price), inline: true },
+            { name: 'Date de vente', value: saleDate, inline: true },
+            { name: 'Vendeur', value: sellerLabel, inline: true },
+        ];
+        if (shouldShowDeclaredBy) {
+            fields.push({ name: 'Déclarée par', value: `<@${declaredById}>`, inline: true });
+        }
+        fields.push(
+            { name: 'Craftée par', value: updated.crafted_by_name || 'Non renseigné', inline: true },
+            { name: 'Numéro de série', value: updated.serial_number ? `\`${updated.serial_number}\`` : 'N/A', inline: false },
+        );
         const { EmbedBuilder } = require('discord.js');
         const embed = new EmbedBuilder()
-            .setTitle(`Justification de vente • ${updated.weapon_name}`)
-            .setDescription('Craft manuel archivé comme vente finalisée.')
-            .setColor(0xffb84d)
-            .addFields(
-                { name: 'Vendeur', value: sellerLabel, inline: true },
-                { name: 'Numéro de série', value: `\`${updated.serial_number || 'N/A'}\``, inline: true },
-                { name: 'Acheteur', value: updated.buyer_org || 'N/A', inline: true },
-                { name: 'Prix final', value: moneyLabel(updated.sale_price), inline: true },
-                { name: 'Date vente', value: saleDate, inline: true },
-            );
+            .setTitle('✅ Vente d’arme 21BS')
+            .setDescription('Une arme craftée par les 21 Block Savage vient d’être déclarée vendue.')
+            .setColor(0x22c55e)
+            .addFields(...fields);
 
-        await channel.send({
-            content: `✅ Vente archivée • **${updated.weapon_name}**`,
+        const msg = await channel.send({
+            content: `✅ Vente déclarée • **${updated.weapon_name || 'Arme'}** • 1 série`,
             embeds: [embed],
             allowedMentions: { parse: [] },
         });
+        if (myWeaponId) {
+            try {
+                db.prepare('UPDATE my_weapons SET sale_discord_message_id = ? WHERE id = ?').run(msg.id, myWeaponId);
+            } catch (e) {
+                console.error('Erreur liaison justificatif craft manuel my_weapons:', e.message);
+            }
+        }
         markRequestPosted(requestId);
     }
 
@@ -434,7 +457,7 @@ function registerCraftRequestRoutes(app, deps) {
 
             if (sold) {
                 try {
-                    await postManualCraftSaleJustification(requestId, saleTimestamp);
+                    await postManualCraftSaleJustification(requestId, saleTimestamp, myWeaponId);
                 } catch (e) {
                     console.error('Erreur justification craft manuel:', e.message);
                 }
