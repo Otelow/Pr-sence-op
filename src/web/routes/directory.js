@@ -1,5 +1,8 @@
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes référentiels Discord isolées
 
+// FINAL POST-STAB F 17/05/2026 — cache membres Discord côté serveur
+const { getCachedMembers } = require('../services/membersCache');
+
 const COMMANDS = [
     // Alertes terrain
     { id: 'qg', icon: '📍', name: 'QG', desc: 'Rendez-vous au Hood (5 min)', category: 'alert', danger: true },
@@ -46,8 +49,9 @@ function registerDirectoryRoutes(app, deps) {
 
         const guild = getGuild(getBotClient, getBotState);
         if (!guild) return res.json({ members: [] });
+        const membersCache = await getCachedMembers(guild).catch(() => guild.members.cache);
 
-        const members = [...guild.members.cache.values()]
+        const members = [...membersCache.values()]
             .filter(member => !member.user.bot)
             .filter(member => {
                 const name = (member.nickname || member.user.username).toLowerCase();
@@ -68,9 +72,9 @@ function registerDirectoryRoutes(app, deps) {
         if (!guild) return res.json({ members: [] });
 
         try {
-            await guild.members.fetch().catch(() => {});
+            const membersCache = await getCachedMembers(guild).catch(() => guild.members.cache);
 
-            const members = [...guild.members.cache.values()]
+            const members = [...membersCache.values()]
                 .filter(member => !member.user.bot)
                 .map(member => ({
                     id: member.id,

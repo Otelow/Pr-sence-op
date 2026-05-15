@@ -1,3 +1,4 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
 // ONGLET HISTORIQUE 16/05/2026 — endpoint audit log paginé
 // CHANTIER COMMANDES 15/05/2026 — catalogue commandes admin et publication Discord
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
@@ -9,6 +10,7 @@
 // MODIFIÉ CHANTIER 12 — 14/05/2026 — events temps réel craft/dashboard
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes craft extraites en modules web
 // ==========================================
+// FINAL POST-STAB D 17/05/2026 — indexes SQL performance crafts
 // STABILISATION FINALE v2 16/05/2026 — migrations suivies et audit log admin
 const path = require('path');
 const fs = require('fs');
@@ -137,6 +139,16 @@ const MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
         CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
+    `) },
+    { name: '040_perf_indexes', migrate: db => db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_craft_requests_status ON craft_requests(status);
+        CREATE INDEX IF NOT EXISTS idx_craft_requests_user ON craft_requests(user_id);
+        CREATE INDEX IF NOT EXISTS idx_craft_requests_created ON craft_requests(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_my_weapons_sold ON my_weapons(is_sold);
+        CREATE INDEX IF NOT EXISTS idx_my_weapons_owner ON my_weapons(user_id);
+        CREATE INDEX IF NOT EXISTS idx_my_weapons_created ON my_weapons(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_order_advances_status ON order_advances(status);
+        CREATE INDEX IF NOT EXISTS idx_order_advances_created ON order_advances(created_at DESC);
     `) },
 ];
 
@@ -392,7 +404,7 @@ function seedMyWeaponNamesFromWeapons() {
             const stmt = db.prepare('INSERT OR IGNORE INTO my_weapon_names (name) VALUES (?)');
             for (const row of names) stmt.run(String(row.name || '').trim());
     } catch (e) {
-        console.error('Erreur seed noms armes vente:', e.message);
+        log.error('Erreur seed noms armes vente:', e.message);
     }
 }
 
@@ -598,7 +610,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
             const member = await Promise.race([fetchMember, timeout]);
             return member?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null;
         } catch (e) {
-            console.warn(`[discord] avatar introuvable pour ${cleanUserId}: ${e.message}`);
+            log.warn(`[discord] avatar introuvable pour ${cleanUserId}: ${e.message}`);
             return null;
         }
     }
@@ -622,7 +634,7 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         for (const userId of uniqueUserIds) {
             const exists = await guildHasMember(userId);
             if (!exists) {
-                console.warn(`[craft] demandes refusées automatiquement: membre absent ${userId}`);
+                log.warn(`[craft] demandes refusées automatiquement: membre absent ${userId}`);
                 markRequestsRejectedForAbsentMember(userId);
             }
         }

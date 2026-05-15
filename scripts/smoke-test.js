@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// FINAL POST-STAB E 17/05/2026 ? smoke test ?tendu charset/assets
 // STABILISATION FINALE 15/05/2026 — smoke test post-déploiement
 
 const url = process.argv[2] || 'http://localhost:3000';
@@ -41,6 +42,30 @@ const checks = [
             const r = await fetch(`${url}/style.css`);
             const ct = r.headers.get('content-type') || '';
             if (!ct.toLowerCase().includes('utf-8')) throw new Error(`bad content-type: ${ct}`);
+        },
+    },
+    {
+        name: '/admin.js has utf-8 charset',
+        test: async () => {
+            const r = await fetch(`${url}/admin.js`);
+            const ct = r.headers.get('content-type') || '';
+            if (!ct.toLowerCase().includes('utf-8')) throw new Error(`bad content-type: ${ct}`);
+        },
+    },
+    {
+        name: '/app.js has utf-8 charset',
+        test: async () => {
+            const r = await fetch(`${url}/app.js`);
+            const ct = r.headers.get('content-type') || '';
+            if (!ct.toLowerCase().includes('utf-8')) throw new Error(`bad content-type: ${ct}`);
+        },
+    },
+    {
+        name: 'logo.webp is served as image/webp',
+        test: async () => {
+            const r = await fetch(`${url}/logo.webp`);
+            const ct = r.headers.get('content-type') || '';
+            if (!ct.includes('image/webp')) throw new Error(`bad content-type: ${ct}`);
         },
     },
 ];

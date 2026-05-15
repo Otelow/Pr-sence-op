@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('./logger');
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 const fs = require('fs');
 const path = require('path');
@@ -57,7 +59,7 @@ function safeGet(db, sql, params = []) {
     try {
         return db.prepare(sql).get(...params);
     } catch (error) {
-        console.error('[database] safeGet failed:', error.message);
+        log.error('[database] safeGet failed:', error.message);
         return null;
     }
 }
@@ -66,7 +68,7 @@ function safeAll(db, sql, params = []) {
     try {
         return db.prepare(sql).all(...params);
     } catch (error) {
-        console.error('[database] safeAll failed:', error.message);
+        log.error('[database] safeAll failed:', error.message);
         return [];
     }
 }

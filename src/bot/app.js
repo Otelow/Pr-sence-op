@@ -1,5 +1,7 @@
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../shared/logger');
+// FINAL POST-STAB G 17/05/2026 — alerte webhook fatale bot
+const { alertDiscordError } = require('../shared/alertWebhook');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // ==========================================
 // 21 Block Savage - Discord Bot
@@ -580,7 +582,7 @@ process.on('unhandledRejection', e => {
 });
 process.on('uncaughtException', e => {
     log.error('❌ Uncaught Exception (fatal):', e);
-    process.exit(1);
+    alertDiscordError('Bot uncaughtException').finally(() => process.exit(1));
 });
 
 // ==========================================

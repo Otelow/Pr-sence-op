@@ -1,3 +1,7 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('./src/shared/logger');
+// FINAL POST-STAB G 17/05/2026 — middleware alerte erreurs serveur
+const { alertDiscordError } = require('./src/shared/alertWebhook');
 // FINAL D3 16/05/2026 — route monitoring admin détaillée
 // STABILISATION FINALE 15/05/2026 - charset statics et monitoring admin leger
 // STABILISATION 15/05/2026 — corrections runtime post-audit
@@ -154,6 +158,14 @@ function startServer(client, getState) {
     }));
     app.use(sessionMiddleware);
     app.use(perfLog);
+    app.use((req, res, next) => {
+        res.on('finish', () => {
+            if (res.statusCode >= 500) {
+                alertDiscordError(`Serveur ${res.statusCode} ${req.method} ${req.path}`);
+            }
+        });
+        next();
+    });
 
     registerHealthRoutes(app, () => botClient);
 
@@ -210,7 +222,7 @@ function startServer(client, getState) {
                 ? `https://cdn.discordapp.com/avatars/${member.id}/${member.user.avatar}.png?size=128`
                 : user.avatar;
         } catch (e) {
-            console.warn(`⚠️ Refresh rôles session impossible pour ${user.id}:`, e.message);
+            log.warn(`⚠️ Refresh rôles session impossible pour ${user.id}:`, e.message);
         }
 
         next();
@@ -262,7 +274,7 @@ function startServer(client, getState) {
     try {
         initDB();
     } catch (e) {
-        console.error('Erreur init DB crafts:', e.message);
+        log.error('Erreur init DB crafts:', e.message);
         if (config.isProduction || config.isRailway) process.exit(1);
     }
 
@@ -275,9 +287,9 @@ function startServer(client, getState) {
     app.use('/api/crafts', craftsWriteLimiter);
     try {
         registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botState);
-        console.log('🔫 Endpoints crafts enregistrés');
+        log.info('🔫 Endpoints crafts enregistrés');
     } catch (e) {
-        console.error('❌ Erreur endpoints crafts:', e.message);
+        log.error('❌ Erreur endpoints crafts:', e.message);
     }
 
     registerAdminClipRoutes(app, { requireAdmin, getBotClient: () => botClient });
@@ -364,8 +376,15 @@ function startServer(client, getState) {
         canEditMapUser,
     });
 
+    app.use((err, req, res, next) => {
+        log.error({ err: err?.message, path: req.path }, 'erreur serveur 500');
+        alertDiscordError(`Serveur 500 ${req.method} ${req.path}`);
+        if (res.headersSent) return next(err);
+        return res.status(500).json({ error: 'Erreur interne' });
+    });
+
     httpServer.listen(PORT, () => {
-        console.log(`🌐 Dashboard web démarré sur le port ${PORT}`);
+        log.info(`🌐 Dashboard web démarré sur le port ${PORT}`);
     });
 }
 

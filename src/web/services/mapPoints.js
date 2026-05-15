@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../shared/logger');
 // STABILISATION 15/05/2026 — migration carte SQLite
 const fs = require('fs');
 const path = require('path');
@@ -121,9 +123,9 @@ function migrateJsonOnce() {
         });
         tx();
         fs.renameSync(MAP_POINTS_FILE, MIGRATED_FILE);
-        console.log(`🗺️ map_points.json migré vers SQLite (${points.length} point(s))`);
+        log.info(`🗺️ map_points.json migré vers SQLite (${points.length} point(s))`);
     } catch (e) {
-        console.error('❌ Migration map_points.json échouée:', e.message);
+        log.error('❌ Migration map_points.json échouée:', e.message);
     }
 }
 

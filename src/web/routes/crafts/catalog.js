@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../../shared/logger');
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes catalogue/stock craft extraites
 
@@ -43,7 +45,7 @@ function registerCraftCatalogRoutes(app, deps) {
         try {
             res.json(getCraftableWeapons());
         } catch (e) {
-            console.error('GET stocks:', e);
+            log.error('GET stocks:', e);
             res.status(500).json({ stocks: [], weapons: [], error: e.message });
         }
     });
@@ -60,7 +62,7 @@ function registerCraftCatalogRoutes(app, deps) {
             });
             res.json({ success: true, ...getCraftableWeapons() });
         } catch (e) {
-            console.error('POST stocks update:', e);
+            log.error('POST stocks update:', e);
             res.status(400).json({ success: false, error: e.message });
         }
     });
@@ -101,7 +103,7 @@ function registerCraftCatalogRoutes(app, deps) {
 
             res.json({ weapons: list });
         } catch (e) {
-            console.error('GET weapons:', e);
+            log.error('GET weapons:', e);
             res.json({ weapons: [], error: e.message });
         }
     });

@@ -1,99 +1,74 @@
-# 21 Block Savage — Bot + Dashboard Web
+﻿# 21 Block Savage — Bot Discord + Dashboard Web
 
-## 📦 Structure
+Dashboard web et bot Discord pour le serveur RP GTA 5 français 21 Block Savage, déployé sur Railway via GitHub.
 
-```
-.
-├── index.js              # Point d'entrée (lance bot + serveur web)
-├── bot.js                # Bot Discord
-├── server.js             # Serveur Express + OAuth2 + API
-├── package.json
-├── .env.example          # Variables d'environnement (à copier en .env en local)
-└── public/
-    ├── index.html        # Page de login
-    ├── dashboard.html    # Dashboard principal
-    ├── style.css         # Styles
-    └── app.js            # JavaScript frontend
-```
+## Stack
 
-## 🚀 Déploiement Railway
+Node 24, Discord.js v14, Express 4, better-sqlite3, Socket.IO, Pino, Helmet, multer 2, Supabase Storage (clips + backups).
 
-### 1. Setup OAuth2 Discord
+## Architecture
 
-1. Va sur https://discord.com/developers/applications
-2. Sélectionne ton bot "21 Block Savage"
-3. Dans **OAuth2 → General** :
-   - Note ton **Client ID**
-   - Génère un **Client Secret** et copie-le
-   - Dans **Redirects**, ajoute : `https://TON-DOMAINE-RAILWAY.up.railway.app/auth/callback`
+- `src/bot/` : code Discord (`commands`, `events`, `services`, `utils`)
+- `src/web/` : serveur web (`routes`, `services`, `middlewares`)
+- `src/shared/` : modules communs (`config`, `logger`, `database`, `auditLog`, Supabase, etc.)
+- `public/` : front statique (dashboard, admin, assets)
+- `scripts/` : utilitaires CLI (`smoke-test`, `convert-assets`)
+- `data/` : SQLite DBs + backups (volume Railway)
 
-### 2. Variables d'environnement Railway
+## Démarrage local
 
-Dans ton service Railway → **Variables**, ajoute :
-
-```
-DISCORD_TOKEN=ton-token
-GUILD_ID=1485254310894895282
-DISCORD_CLIENT_ID=ton-client-id
-DISCORD_CLIENT_SECRET=ton-client-secret
-DISCORD_REDIRECT_URI=https://TON-DOMAINE-RAILWAY.up.railway.app/auth/callback
-SESSION_SECRET=quelque-chose-de-tres-long-et-aleatoire-genre-50-caracteres
+```bash
+npm install
+cp .env.example .env
+npm start
 ```
 
-### 3. Domaine public Railway
+Remplis les valeurs Discord et session dans `.env` avant de démarrer.
 
-Dans **Settings → Networking** → **Generate Domain** pour avoir ton URL publique.
+## Variables d'environnement requises
 
-### 4. Push
+- `DISCORD_TOKEN`
+- `DISCORD_CLIENT_ID`
+- `DISCORD_CLIENT_SECRET`
+- `SESSION_SECRET`
+- `DISCORD_REDIRECT_URI`
 
-Pousse tous les fichiers sur GitHub. Railway redéploie automatiquement.
+## Variables optionnelles
 
-## 🎯 Accès
+- `SUPABASE_URL`
+- `SUPABASE_KEY`
+- `SUPABASE_BACKUP_BUCKET`
+- `ERROR_WEBHOOK_URL`
+- `LOG_LEVEL`
 
-- Va sur ton domaine Railway
-- Clique sur "CONNEXION DISCORD"
-- Autorise l'app
-- Si tu as un rôle dans `COMMAND_ROLES`, tu accèdes au dashboard
+## Scripts
 
-## 🔒 Sécurité
+- `npm start` : démarrer le bot Discord + le serveur web
+- `npm run smoke <url>` : smoke test post-déploiement
+- `npm run convert-assets` : générer les `.webp` depuis les images sources
 
-- **Login Discord OAuth2 obligatoire**
-- **Vérification de membre du serveur**
-- **Vérification de rôle** (mêmes rôles que pour les commandes slash)
-- Sessions de 7 jours
+## Déploiement
 
-## 📋 Fonctionnalités
+Push sur `main` → Railway redéploie automatiquement.
 
-### Onglet Présence
-- Vue temps réel des 1ère et 2ème OP
-- Catégories : Présents / Retards / Absents (justifié + non) / Pas réagi
-- Liste des absences posées dans le salon
-- Stats globales en haut
+- Healthcheck : `/healthz`
+- Monitoring admin : `/admin` onglet `Monitoring`
+- Historique actions : `/admin` onglet `Historique`
 
-### Onglet Commandes
-- Toutes les alertes terrain (QG, défense, garage, etc.)
-- Radio aléatoire
-- Lancer 1ère / 2ème présence OP
+## Fonctionnalités majeures
 
-### Onglet Statistiques
-- Suivi hebdomadaire des absences
-- Section dédiée aux alertes KP (2+ jours consécutifs)
-- Détail jour par jour
+- Présence OP avec rappels cron + panneau live
+- Suivi absences (panneau + alertes)
+- Crafts d'armes (catalogue + demandes + workflow validation)
+- Suivi commandes/avances (Titane/Chrome/Tungstène + remboursements + édition live message Discord)
+- Sanctions
+- Carte interactive (Los Santos GTA 5)
+- Audit log complet
+- Monitoring runtime
+- Backups locaux quotidiens + backups Supabase hebdomadaires si configurés
 
-### Onglet Sanctions
-- Historique des derniers avertissements
+## Notes prod
 
-## 🔄 Refresh
-
-- Auto toutes les 15 secondes
-- Manuel avec le bouton ↻ en haut à droite
-
-## Notes exploitation
-
-- Railway doit garder les donnees persistantes dans `/data` : SQLite, backups et fichiers runtime.
-- Supabase est reserve aux clips du forum Discord `1500520790678962317`. Les liens externes sont stockes en SQLite, les videos attachees sont envoyees dans le bucket clips.
-- Backfill clips : lancer `/clips-backfill` sur Discord ou `POST /api/admin/clips/backfill`. Les uploads echoues peuvent etre retentes via `POST /api/admin/clips/retry-failed`.
-- Role limite `1495448653945634987` : acces uniquement a Craft d'armes et Vos Armes. Les autres sections restent confidentielles.
-- Stock dynamique : le stock disponible tient compte des demandes actives et le stock admin est consomme quand une arme passe craftee.
-- Mode test craft : reserve aux hauts grades pour tester sans polluer les vrais logs Discord.
-- Suivi commandes / avances : section admin separee pour suivre participants, remboursements et restes a recuperer.
+- Le volume Railway `/data` doit rester persistant pour `crafts.db`, sessions SQLite, états bot et backups.
+- `SESSION_SECRET` est obligatoire en production.
+- Les assets WebP sont générés depuis les sources PNG/JPG et gardent les fichiers originaux en fallback.

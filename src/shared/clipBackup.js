@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('./logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 const config = require('./config');
 const { createConnection } = require('./database');
@@ -259,7 +261,7 @@ async function retryFailedClipBackups(client, limit = 25) {
         } catch (e) {
             summary.errors++;
             markClipBackupFailed(row.id, e);
-            console.error(`[clips] retry failed id=${row.id}: ${e.message}`);
+            log.error(`[clips] retry failed id=${row.id}: ${e.message}`);
         }
     }
     return summary;
@@ -323,7 +325,7 @@ async function processClipMessage(message) {
                 } catch (e) {
                     errors++;
                     markClipBackupFailed(result.row.id, e);
-                    console.error(`[clips] retry upload echoue message=${message.id}: ${e.message}`);
+                    log.error(`[clips] retry upload echoue message=${message.id}: ${e.message}`);
                 }
             }
             continue;
@@ -334,12 +336,12 @@ async function processClipMessage(message) {
         } catch (e) {
             errors++;
             markClipBackupFailed(result.row.id, e);
-            console.error(`[clips] upload echoue message=${message.id}: ${e.message}`);
+            log.error(`[clips] upload echoue message=${message.id}: ${e.message}`);
         }
     }
 
     if (found) {
-        console.log(`[clips] message=${message.id} found=${found} uploaded=${uploaded} duplicates=${duplicates} errors=${errors}`);
+        log.info(`[clips] message=${message.id} found=${found} uploaded=${uploaded} duplicates=${duplicates} errors=${errors}`);
     }
     return { found, uploaded, duplicates, errors };
 }
@@ -352,7 +354,7 @@ async function fetchThreadMessages(thread, summary) {
     while (true) {
         const messages = await thread.messages.fetch({ limit: batchSize, before }).catch(e => {
             summary.errors++;
-            console.error(`[clips] backfill messages echoue thread=${thread.id}: ${e.message}`);
+            log.error(`[clips] backfill messages echoue thread=${thread.id}: ${e.message}`);
             updateBackfillState(thread, { status: 'error', error_message: e.message });
             return null;
         });
@@ -431,13 +433,13 @@ async function backfillClipForum(client) {
         summary.completedAt = new Date().toISOString();
         summary.durationMs = Date.now() - started;
         summary.running = false;
-        console.log(`[clips] backfill termine threads=${summary.threadsScanned} messages=${summary.messagesScanned}`);
+        log.info(`[clips] backfill termine threads=${summary.threadsScanned} messages=${summary.messagesScanned}`);
         return summary;
     } catch (e) {
         summary.errors++;
         summary.error = e.message;
         summary.running = false;
-        console.error(`[clips] backfill echoue: ${e.message}`);
+        log.error(`[clips] backfill echoue: ${e.message}`);
         return summary;
     } finally {
         backfillRunning = false;

@@ -1,3 +1,4 @@
+/* FINAL POST-STAB B 17/05/2026 ? d?duplication prudente CSS */
 /* FINAL D1/D3 16/05/2026 ? WebP/gold + monitoring admin */
 /* ONGLET HISTORIQUE 16/05/2026 — styles audit log admin */
 /* CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune */
@@ -561,14 +562,6 @@ html, body {
     background: var(--orange);
 }
 
-.stat-label {
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-}
-
 .stat-value {
     font-family: var(--font-display);
     font-size: 42px;
@@ -934,16 +927,6 @@ html, body {
 /* ============================================
    SANCTIONS TAB
    ============================================ */
-.sanctions-list .sanction {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--orange);
-    padding: 16px 20px;
-    margin-bottom: 12px;
-    white-space: pre-wrap;
-    font-size: 13px;
-    line-height: 1.6;
-}
 
 .sanction-time {
     font-size: 11px;
@@ -1549,14 +1532,6 @@ html, body {
 
 .map-info strong {
     color: var(--accent);
-}
-
-.map-container {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    overflow: auto;
-    max-height: calc(100vh - 280px);
-    position: relative;
 }
 
 .map-canvas {
@@ -2183,14 +2158,6 @@ html, body {
 }
 
 /* Carte recadrée correctement */
-.map-container {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    overflow: auto;
-    height: calc(100vh - 280px);
-    position: relative;
-    cursor: grab;
-}
 
 .map-container:active {
     cursor: grabbing;
@@ -2358,8 +2325,6 @@ html, body {
     background: var(--bg-elevated);
 }
 
-.stats-list .member-row:last-child { border-bottom: 0; }
-
 .stats-member-avatar {
     width: 48px;
     height: 48px;
@@ -2372,22 +2337,6 @@ html, body {
 /* ============================================
    SANCTIONS — meilleur visuel
    ============================================ */
-.sanctions-list .sanction {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--orange);
-    padding: 16px 20px;
-    margin-bottom: 12px;
-    line-height: 1.7;
-}
-
-.sanction-time {
-    font-size: 11px;
-    color: var(--text-muted);
-    letter-spacing: 0.1em;
-    margin-bottom: 8px;
-    display: block;
-}
 
 .sanction-content {
     font-size: 13px;
@@ -2939,16 +2888,6 @@ html, body {
 /* ============================================
    SANCTIONS — Avec avatar
    ============================================ */
-.sanctions-list .sanction {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--orange);
-    padding: 16px 20px;
-    margin-bottom: 12px;
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-}
 
 .sanction-avatar {
     width: 44px;
@@ -2984,10 +2923,6 @@ html, body {
 /* ============================================
    STATS — Lisibilité
    ============================================ */
-.stat-label {
-    font-weight: 600;
-    color: #c8c8c8;
-}
 
 .calendar-table thead th {
     color: #c8c8c8;
@@ -3305,16 +3240,6 @@ html, body {
    ============================================ */
 
 /* Override toutes les règles précédentes */
-.map-container {
-    background: var(--bg-deep) !important;
-    border: 1px solid var(--border) !important;
-    overflow: hidden !important; /* Pas de scroll natif, on gère avec transform */
-    height: calc(100vh - 280px) !important;
-    position: relative !important;
-    cursor: grab !important;
-    user-select: none !important;
-    border-radius: 8px;
-}
 
 .map-container.dragging {
     cursor: grabbing !important;
@@ -3398,10 +3323,6 @@ html, body {
     transition: opacity 0.15s;
     pointer-events: none;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-}
-
-.map-point:hover .map-point-label {
-    opacity: 1;
 }
 
 /* Animation danger toujours active */
@@ -3540,17 +3461,6 @@ html, body {
     background: var(--bg-elevated);
     border-left: 3px solid var(--blue);
     border-radius: 4px;
-}
-
-.comm-textarea {
-    width: 100% !important;
-    min-height: 220px !important;
-    max-height: 500px !important;
-    resize: vertical !important;
-    font-family: var(--font-body) !important;
-    font-size: 14px !important;
-    line-height: 1.6 !important;
-    padding: 14px !important;
 }
 
 .comm-input,
@@ -3742,26 +3652,9 @@ html, body {
     font-variant-numeric: tabular-nums;
 }
 
-.comm-charcount-warn {
-    color: var(--orange);
-    font-weight: 700;
-}
-
 /* ─── Inputs / textareas ─── */
 .comm-select,
 .comm-input,
-.comm-textarea {
-    width: 100%;
-    background: var(--bg-deep);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: 14px;
-    padding: 12px 14px;
-    border-radius: 6px;
-    outline: none;
-    transition: all 0.15s;
-}
 
 .comm-select:focus,
 .comm-input:focus,
@@ -3769,14 +3662,6 @@ html, body {
     border-color: var(--accent);
     background: var(--bg-elevated);
     box-shadow: 0 0 0 3px rgba(255, 51, 51, 0.1);
-}
-
-.comm-textarea {
-    min-height: 240px;
-    max-height: 600px;
-    resize: vertical;
-    line-height: 1.6;
-    font-family: var(--font-body);
 }
 
 .comm-select {
@@ -4270,12 +4155,6 @@ body::before {
     font-weight: 700;
 }
 
-.stat-label {
-    color: var(--text-dim) !important;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-}
-
 /* ─── PRÉSENCE OP ─────────────────────────────────────────── */
 .op-status.active {
     background: rgba(74, 222, 128, 0.15) !important;
@@ -4368,12 +4247,21 @@ body::before {
 .comm-select,
 .comm-input,
 .comm-textarea {
+    width: 100%;
+    min-height: 240px;
+    max-height: 600px;
+    resize: vertical;
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px 14px;
     background: rgba(0, 0, 0, 0.4) !important;
-    backdrop-filter: blur(8px);
     border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
     color: var(--text) !important;
+    border-radius: 8px !important;
+    outline: none;
     transition: all 0.2s !important;
+    backdrop-filter: blur(8px);
 }
 
 .comm-select:focus,
@@ -4678,10 +4566,30 @@ body::before {
 }
 
 .map-container {
+
     background: rgba(0, 0, 0, 0.5) !important;
-    backdrop-filter: blur(8px);
+
     border: 1px solid var(--border) !important;
+
+    overflow: hidden !important;
+
+    max-height: calc(100vh - 280px);
+
+    position: relative !important;
+
+    height: calc(100vh - 280px);
+
+    cursor: grab !important;
+
+    /* Pas de scroll natif, on gère avec transform */
+    height: calc(100vh - 280px) !important;
+
+    user-select: none !important;
+
     border-radius: 12px !important;
+
+    backdrop-filter: blur(8px);
+
 }
 
 /* ─── STATS ──────────────────────────────────────────────── */
@@ -4714,7 +4622,17 @@ body::before {
 
 /* ─── SANCTIONS LISTE ─────────────────────────────────────── */
 .sanctions-list .sanction {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     border-left: 3px solid var(--accent) !important;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.7;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
     padding-left: 18px !important;
 }
 
@@ -5267,7 +5185,12 @@ h2.section-title {
 
 /* Sous-titres des cartes */
 .stat-label {
+    font-size: 11px;
     color: rgba(255, 184, 77, 0.65) !important;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-weight: 600;
 }
 
 /* Titres de cartes/blocs */

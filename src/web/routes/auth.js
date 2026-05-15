@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../shared/logger');
 // FINAL D1 16/05/2026 — fallback picture WebP blackmarket
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes OAuth Discord externalisees
 
@@ -166,7 +168,7 @@ body.login-body { overflow: hidden; }
 
             res.redirect('/dashboard#presence');
         } catch (e) {
-            console.error('❌ OAuth erreur:', e.message);
+            log.error('❌ OAuth erreur:', e.message);
             res.send(errorPage('Erreur de connexion. Réessaie.'));
         }
     });

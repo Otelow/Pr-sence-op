@@ -1,3 +1,7 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../shared/logger');
+// FINAL POST-STAB F 17/05/2026 — cache membres Discord côté serveur
+const { getCachedMembers } = require('../services/membersCache');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes actions dashboard et sanctions isolées
 
 // AUDIT HOOKS 16/05/2026 — sanctions dashboard tracées dans audit_log
@@ -163,7 +167,7 @@ function registerDashboardActionRoutes(app, deps) {
                     return res.status(400).json({ error: 'Commande inconnue' });
             }
         } catch (e) {
-            console.error('❌ API command erreur:', e.message);
+            log.error('❌ API command erreur:', e.message);
             res.status(500).json({ error: e.message });
         }
     });
@@ -191,6 +195,7 @@ function registerDashboardActionRoutes(app, deps) {
             const sanctions = await Promise.all(allMessages
                 .filter(message => message.author.bot)
                 .map(async message => {
+                    const membersCache = guild ? await getCachedMembers(guild).catch(() => guild.members.cache) : null;
                     let content = message.content;
 
                     content = content.replace(/<@&(\d+)>/g, (match, id) => {
@@ -205,7 +210,7 @@ function registerDashboardActionRoutes(app, deps) {
                     for (const userMatch of userMatches) {
                         const userId = userMatch[1];
                         try {
-                            const member = await guild?.members.fetch(userId).catch(() => null);
+                            const member = membersCache?.get?.(userId) || null;
                             if (member) {
                                 const name = member.nickname || member.user.username;
                                 const avatar = memberAvatarUrl(userId, member.user.avatar);

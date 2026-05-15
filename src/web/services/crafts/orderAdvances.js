@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../../shared/logger');
 // CHANTIER COMMANDES 15/05/2026 — commandes structurées et publication Discord
 // MODIFIE CHANTIER 6 - 14/05/2026 - service suivi commandes/avances extrait de crafts.js
 
@@ -251,14 +253,14 @@ async function refreshOrderDiscordMessage(orderId) {
         await message.edit({ content: buildOrderDiscordMessage(order) });
         return true;
     } catch (e) {
-        console.warn(`[order-advances] Message Discord commande ${orderId} introuvable/non éditable: ${e.message}`);
+        log.warn(`[order-advances] Message Discord commande ${orderId} introuvable/non éditable: ${e.message}`);
         return false;
     }
 }
 
 function refreshOrderDiscordMessageInBackground(orderId) {
     setTimeout(() => {
-        refreshOrderDiscordMessage(orderId).catch(e => console.warn(`[order-advances] Refresh Discord impossible pour ${orderId}: ${e.message}`));
+        refreshOrderDiscordMessage(orderId).catch(e => log.warn(`[order-advances] Refresh Discord impossible pour ${orderId}: ${e.message}`));
     }, 0);
 }
 

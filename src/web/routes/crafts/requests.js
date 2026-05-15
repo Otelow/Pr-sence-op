@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../../shared/logger');
 // FIX 15/05/2026 — justificatif Discord craft manuel
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes demandes craft extraites
@@ -55,7 +57,7 @@ function registerCraftRequestRoutes(app, deps) {
 
     async function fetchDiscordChannel(channelId, label) {
         if (!botClient) {
-            console.error(`[discord] ${label}: botClient indisponible`);
+            log.error(`[discord] ${label}: botClient indisponible`);
             return null;
         }
         const cached = botClient.channels.cache.get(channelId);
@@ -63,7 +65,7 @@ function registerCraftRequestRoutes(app, deps) {
         try {
             return await botClient.channels.fetch(channelId);
         } catch (e) {
-            console.error(`[discord] ${label}: salon ${channelId} introuvable ou inaccessible: ${e.message}`);
+            log.error(`[discord] ${label}: salon ${channelId} introuvable ou inaccessible: ${e.message}`);
             return null;
         }
     }
@@ -72,7 +74,7 @@ function registerCraftRequestRoutes(app, deps) {
             if (req.query.view === 'board' && !isCraftManager(req.session.user)) {
                 return res.status(403).json({ requests: [], error: 'Accès réservé aux hauts gradés' });
             }
-            sweepRequestsForMissingMembers().catch(e => console.error('[craft] vérification membres absents:', e.message));
+            sweepRequestsForMissingMembers().catch(e => log.error('[craft] vérification membres absents:', e.message));
             const requests = getRequests(req.query.status, {
                 productionOnly: req.query.view === 'board',
                 hideTests: !isCraftManager(req.session.user),
@@ -210,7 +212,7 @@ function registerCraftRequestRoutes(app, deps) {
                     await msg.edit({ content, embeds: [embed], allowedMentions });
                     return;
                 } catch (e) {
-                    console.error('Édition message craft échouée, création nouveau:', e.message);
+                    log.error('Édition message craft échouée, création nouveau:', e.message);
                 }
             }
 
@@ -219,7 +221,7 @@ function registerCraftRequestRoutes(app, deps) {
                             db.prepare('UPDATE craft_requests SET discord_message_id = ? WHERE id = ?').run(msg.id, requestId);
 
         } catch (e) {
-            console.error('Erreur postOrUpdateCraftRequestMessage:', e.message);
+            log.error('Erreur postOrUpdateCraftRequestMessage:', e.message);
         }
     }
     // Helper : message de notification de changement de statut dans CRAFT_STATUS_CHANNEL
@@ -277,7 +279,7 @@ function registerCraftRequestRoutes(app, deps) {
                 allowedMentions: { users: [fullReq.user_id] },
             });
         } catch (e) {
-            console.error('Erreur postCraftStatusUpdate:', e.message);
+            log.error('Erreur postCraftStatusUpdate:', e.message);
         }
     }
     app.post('/api/crafts/requests', requireAuth, async (req, res) => {
@@ -298,7 +300,7 @@ function registerCraftRequestRoutes(app, deps) {
 
             // Message Discord
             if (!requestIsTest) {
-                postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
+                postOrUpdateCraftRequestMessage(id).catch(e => log.error('post craft request async:', e.message));
             }
 
             emitRealtime('craft:status', { requestId: id, status: 'pending', action: 'created' });
@@ -387,7 +389,7 @@ function registerCraftRequestRoutes(app, deps) {
             try {
                 db.prepare('UPDATE my_weapons SET sale_discord_message_id = ? WHERE id = ?').run(msg.id, myWeaponId);
             } catch (e) {
-                console.error('Erreur liaison justificatif craft manuel my_weapons:', e.message);
+                log.error('Erreur liaison justificatif craft manuel my_weapons:', e.message);
             }
         }
         markRequestPosted(requestId);
@@ -473,7 +475,7 @@ function registerCraftRequestRoutes(app, deps) {
                 try {
                     await postManualCraftSaleJustification(requestId, saleTimestamp, myWeaponId);
                 } catch (e) {
-                    console.error('Erreur justification craft manuel:', e.message);
+                    log.error('Erreur justification craft manuel:', e.message);
                 }
             }
 
@@ -510,7 +512,7 @@ function registerCraftRequestRoutes(app, deps) {
 
             // Mettre à jour le message Discord original
             if (!existing.is_test) {
-                postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
+                postOrUpdateCraftRequestMessage(id).catch(e => log.error('post craft request async:', e.message));
             }
 
             if (crafted && !existing.is_test) {
@@ -533,7 +535,7 @@ function registerCraftRequestRoutes(app, deps) {
                         content: `✅ <@${existing.user_id}> ton arme est prête : **${existing.weapon_name}**.`,
                         embeds: [embed],
                         allowedMentions: { users: [existing.user_id] },
-                    }).catch(e => console.error('Erreur notification craft terminé:', e.message));
+                    }).catch(e => log.error('Erreur notification craft terminé:', e.message));
                 }
             }
             emitRealtime('craft:status', { requestId: id, status: crafted ? 'crafted' : 'in_progress', action: 'crafted' });
@@ -570,10 +572,10 @@ function registerCraftRequestRoutes(app, deps) {
             const updatedForDiscord = getRequest(id);
             if (!updatedForDiscord?.is_test) {
                 // Mettre à jour le message Discord original (édition embed)
-                postOrUpdateCraftRequestMessage(id).catch(e => console.error('post craft request async:', e.message));
+                postOrUpdateCraftRequestMessage(id).catch(e => log.error('post craft request async:', e.message));
 
                 // Notification dans le salon de statut
-                postCraftStatusUpdate(id, status).catch(e => console.error('post craft status async:', e.message));
+                postCraftStatusUpdate(id, status).catch(e => log.error('post craft status async:', e.message));
             }
 
             emitRealtime('craft:status', { requestId: id, status, action: 'status' });

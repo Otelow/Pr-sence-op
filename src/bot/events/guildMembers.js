@@ -1,5 +1,7 @@
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
+// FINAL POST-STAB F 17/05/2026 — invalidation cache membres web
+const { invalidateMembersCache } = require('../../web/services/membersCache');
 // MODIFIE CHANTIER 6 - 14/05/2026 - events membres Discord externalises
 
 function registerGuildMemberEvents(client, deps) {
@@ -10,6 +12,7 @@ function registerGuildMemberEvents(client, deps) {
     } = deps;
 
     client.on('guildMemberAdd', async (member) => {
+        invalidateMembersCache();
         if (member.user.bot) return;
 
         // Auto-attribution de rôles spécifiques (pour des utilisateurs précis listés dans AUTO_ROLE_USERS)
@@ -43,6 +46,14 @@ function registerGuildMemberEvents(client, deps) {
 
         log.info(`WELCOME: ${member.user.tag} a rejoint - lancement de la procedure d'accueil`);
         await startWelcomeFlow(member);
+    });
+
+    client.on('guildMemberUpdate', () => {
+        invalidateMembersCache();
+    });
+
+    client.on('guildMemberRemove', () => {
+        invalidateMembersCache();
     });
 }
 

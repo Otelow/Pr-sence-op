@@ -1,5 +1,8 @@
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes présence et statistiques isolées
 
+// FINAL POST-STAB F 17/05/2026 — cache membres Discord côté serveur
+const { getCachedMembers } = require('../services/membersCache');
+
 function avatarUrl(userId, avatar, size = 64) {
     return avatar ? `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png?size=${size}` : null;
 }
@@ -79,15 +82,12 @@ function registerPresenceStatsRoutes(app, deps) {
     app.get('/api/weekly', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = getBotState();
         const guild = getBotClient().guilds.cache.get(state.CONFIG.GUILD_ID);
+        const membersCache = guild ? await getCachedMembers(guild).catch(() => guild.members.cache) : null;
 
         const tracking = await Promise.all([...state.absenceTracking.entries()].map(async ([id, data]) => {
             let avatar = null;
-            if (guild) {
-                try {
-                    const member = await guild.members.fetch(id).catch(() => null);
-                    if (member) avatar = avatarUrl(id, member.user.avatar);
-                } catch {}
-            }
+            const member = membersCache?.get?.(id);
+            if (member) avatar = avatarUrl(id, member.user.avatar);
             return {
                 id,
                 username: data.username,
@@ -117,10 +117,7 @@ function registerPresenceStatsRoutes(app, deps) {
     app.get('/api/stats', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = getBotState();
         const guild = getBotClient().guilds.cache.get(state.CONFIG.GUILD_ID);
-
-        if (guild) {
-            try { await guild.members.fetch(); } catch {}
-        }
+        const membersCache = guild ? await getCachedMembers(guild).catch(() => guild.members.cache) : null;
 
         let totalMembers = 0;
         let totalMembersList = [];
@@ -132,7 +129,7 @@ function registerPresenceStatsRoutes(app, deps) {
             if (role2) for (const [id, member] of role2.members) if (!member.user.bot) counted.add(id);
             totalMembers = counted.size;
             totalMembersList = [...counted]
-                .map(id => guild.members.cache.get(id))
+                .map(id => membersCache?.get?.(id) || guild.members.cache.get(id))
                 .filter(Boolean)
                 .map(member => summarizeMember(member))
                 .sort((a, b) => a.username.localeCompare(b.username, 'fr'));
@@ -152,7 +149,7 @@ function registerPresenceStatsRoutes(app, deps) {
         const totalUnjustified = tracking.reduce((sum, item) => sum + item.count, 0);
         const withConsecutive = tracking.filter(item => state.getConsecutiveDays(item) >= 2).length;
         const absenceMembers = trackingEntries.map(([id, item]) => {
-            const member = guild?.members.cache.get(id);
+            const member = membersCache?.get?.(id) || guild?.members.cache.get(id);
             return {
                 id,
                 username: item.username || member?.nickname || member?.user?.username || id,

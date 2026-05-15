@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes admin clips isolées
 // AUDIT HOOKS 16/05/2026 — actions admin clips tracées dans audit_log
 const {
@@ -15,7 +17,7 @@ function registerAdminClipRoutes(app, { requireAdmin, getBotClient }) {
             if (!botClient?.isReady?.()) {
                 return res.status(503).json({ error: 'Bot Discord non pret pour le backfill clips' });
             }
-            backfillClipForum(botClient).catch(e => console.error(`[clips] backfill background echoue: ${e.message}`));
+            backfillClipForum(botClient).catch(e => log.error(`[clips] backfill background echoue: ${e.message}`));
             audit(req.session.user, 'clips.backfill', {
                 target_type: 'system',
                 details: { status: getBackfillStatus() },

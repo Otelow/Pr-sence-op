@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes salons Discord isolées
 
 function getChannelTypeLabel(type) {
@@ -252,7 +254,7 @@ function registerChannelRoutes(app, deps) {
                 channelName: channel.name,
             });
         } catch (e) {
-            console.error('❌ /api/channel/messages:', e.message);
+            log.error('❌ /api/channel/messages:', e.message);
             res.status(500).json({ error: e.message });
         }
     });
@@ -294,7 +296,7 @@ function registerChannelRoutes(app, deps) {
                     });
                 }
             } catch (e) {
-                console.error('❌ Webhook erreur:', e.message);
+                log.error('❌ Webhook erreur:', e.message);
                 return res.status(500).json({ error: 'Impossible de créer/récupérer le webhook (permissions manquantes ?)' });
             }
 
@@ -310,7 +312,7 @@ function registerChannelRoutes(app, deps) {
 
             res.json({ success: true });
         } catch (e) {
-            console.error('❌ /api/channel/send:', e.message);
+            log.error('❌ /api/channel/send:', e.message);
             res.status(500).json({ error: e.message });
         }
     });

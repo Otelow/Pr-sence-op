@@ -1,3 +1,5 @@
+// FINAL POST-STAB A 17/05/2026 ? pino backend
+const log = require('../../../shared/logger');
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes Vos Armes extraites
 // AUDIT HOOKS 16/05/2026 — annonces Vos Armes tracées dans audit_log
@@ -170,7 +172,7 @@ function registerMyWeaponsRoutes(app, deps) {
 
     async function fetchDiscordChannel(channelId, label) {
         if (!botClient) {
-            console.error(`[discord] ${label}: botClient indisponible`);
+            log.error(`[discord] ${label}: botClient indisponible`);
             return null;
         }
         const cached = botClient.channels.cache.get(channelId);
@@ -178,7 +180,7 @@ function registerMyWeaponsRoutes(app, deps) {
         try {
             return await botClient.channels.fetch(channelId);
         } catch (e) {
-            console.error(`[discord] ${label}: salon ${channelId} introuvable ou inaccessible: ${e.message}`);
+            log.error(`[discord] ${label}: salon ${channelId} introuvable ou inaccessible: ${e.message}`);
             return null;
         }
     }
@@ -285,7 +287,7 @@ function registerMyWeaponsRoutes(app, deps) {
 
             return true;
         } catch (e) {
-            console.error(`[discord] WEAPONS_LOG: log vente impossible pour ${base.weapon_name}: ${e.message}`);
+            log.error(`[discord] WEAPONS_LOG: log vente impossible pour ${base.weapon_name}: ${e.message}`);
             return false;
         }
     }
@@ -450,7 +452,7 @@ function registerMyWeaponsRoutes(app, deps) {
                 if (first) {
                     await updateMyWeaponsDiscordBatch(first);
                 }
-            } catch (e) { console.error('Erreur post Discord myweapons:', e.message); }
+            } catch (e) { log.error('Erreur post Discord myweapons:', e.message); }
 
             emitRealtime('craft:status', { requestId: linkedCraftRequestId || null, myWeaponId: id, status: 'listed', action: 'myweapon-listed' });
             audit(req.session.user, 'weapon.create', {
@@ -669,12 +671,12 @@ function registerMyWeaponsRoutes(app, deps) {
                         });
                     }
                 }
-            } catch (e) { console.error('Erreur update Discord:', e.message); }
+            } catch (e) { log.error('Erreur update Discord:', e.message); }
 
             // Auto-remplir Tableau de craft si l'arme est craftée 21BS et a un N°Série
             try {
                 await updateMyWeaponsDiscordBatch(existing);
-            } catch (e) { console.error('Erreur update Discord lot myweapons:', e.message); }
+            } catch (e) { log.error('Erreur update Discord lot myweapons:', e.message); }
 
             let autoFilledCraft = null;
             let matchedRequestForLog = null;
@@ -699,7 +701,7 @@ function registerMyWeaponsRoutes(app, deps) {
                         autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
 
                     }
-                } catch (e) { console.error('Erreur auto-fill craft:', e.message); }
+                } catch (e) { log.error('Erreur auto-fill craft:', e.message); }
             }
 
             try {
@@ -709,7 +711,7 @@ function registerMyWeaponsRoutes(app, deps) {
                     markRequestPosted(matchedRequestForLog.id);
                 }
             } catch (e) {
-                console.error('Erreur log vente WEAPONS_LOG:', e.message);
+                log.error('Erreur log vente WEAPONS_LOG:', e.message);
             }
 
             emitRealtime('craft:status', { requestId: matchedRequestForLog?.id || existing.craft_request_id || null, myWeaponId: id, status: 'sold', action: 'myweapon-sold' });
