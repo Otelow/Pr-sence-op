@@ -1,3 +1,4 @@
+/* CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier */
 /* CHANTIER COMMANDES 15/05/2026 — styles commandes ingrédients admin */
 /* FIX FORCE 15/05/2026 — vague avec !important + descendants */
 /* FIX 15/05/2026 — vague visible, retour version orange */
@@ -10013,4 +10014,16 @@ body:has(#impersonateBanner[style*="flex"]) {
 
 .order-advance-items-display .item-line {
     font-variant-numeric: tabular-nums;
+}
+
+.order-advance-pub-failed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #ffaa44;
+    background: rgba(255, 170, 68, 0.1);
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 170, 68, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
 }

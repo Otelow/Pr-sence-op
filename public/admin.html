@@ -1,3 +1,4 @@
+<!-- CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier -->
 <!-- CHANTIER COMMANDES 15/05/2026 — formulaire commandes par ingrédients -->
 <!DOCTYPE html>
 <html lang="fr">
@@ -125,6 +126,7 @@
 
             <form id="orderAdvanceForm" class="order-advance-form" onsubmit="saveOrderAdvance(event)">
                 <input type="hidden" id="orderAdvanceId">
+                <input type="hidden" id="orderAdvanceHadMessageId" value="">
                 <div class="order-advance-grid">
                     <div class="comm-field">
                         <label class="comm-label">Date commande *</label>
@@ -155,7 +157,9 @@
 
                 <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="resetOrderAdvanceForm()">Réinitialiser</button>
-                    <button type="submit" class="btn-primary">Enregistrer la commande</button>
+                    <button type="submit" class="btn-primary" id="orderAdvanceSubmitBtn">
+                        🚀 Passer commande
+                    </button>
                 </div>
             </form>
 
