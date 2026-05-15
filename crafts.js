@@ -1,3 +1,4 @@
+// CHANTIER COMMANDES 15/05/2026 — catalogue commandes admin et publication Discord
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // ==========================================
 // MODULE CRAFTS — DB SQLite
@@ -33,7 +34,14 @@ const DATA_DIR = config.paths.data;
 const DB_PATH = config.paths.database;
 const UPLOADS_DIR = config.paths.craftsUploads;
 let db = null;
+let orderAdvancesBotClient = null;
 const upload = createCraftUploadMiddleware(UPLOADS_DIR);
+
+const ORDER_INGREDIENTS_CATALOG = [
+    { name: 'Titane', unit_price: 14000 },
+    { name: 'Chrome', unit_price: 9300 },
+    { name: 'Tungstène', unit_price: 6800 },
+];
 
 const STOCK_MATERIAL_NAMES = [
     'Bloc de chrome',
@@ -179,8 +187,21 @@ function initDB() {
                     remaining_amount INTEGER DEFAULT 0,
                     note TEXT,
                     status TEXT DEFAULT 'open',
+                    discord_message_id TEXT,
+                    discord_channel_id TEXT,
+                    published_at INTEGER,
                     created_at INTEGER DEFAULT (strftime('%s','now')),
                     updated_at INTEGER DEFAULT (strftime('%s','now'))
+                );
+                CREATE TABLE IF NOT EXISTS order_advance_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_id INTEGER NOT NULL,
+                    ingredient_name TEXT NOT NULL,
+                    unit_price INTEGER NOT NULL,
+                    quantity INTEGER NOT NULL DEFAULT 0,
+                    line_total INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER DEFAULT (strftime('%s','now')),
+                    FOREIGN KEY (order_id) REFERENCES order_advances(id) ON DELETE CASCADE
                 );
                 CREATE TABLE IF NOT EXISTS order_advance_participants (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -215,6 +236,7 @@ function initDB() {
                 CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
                 CREATE INDEX IF NOT EXISTS idx_myweapons_user ON my_weapons(user_id);
                 CREATE INDEX IF NOT EXISTS idx_stock_materials_ingredient ON stock_materials(ingredient_id);
+                CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_advance_items(order_id);
                 CREATE INDEX IF NOT EXISTS idx_order_repayments_order ON order_advance_repayments(order_id);
             `);
 
@@ -248,11 +270,17 @@ function initDB() {
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN request_type TEXT`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN is_test INTEGER DEFAULT 0`); } catch {}
             try { db.exec(`ALTER TABLE craft_requests ADD COLUMN refusal_reason TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE order_advances ADD COLUMN discord_message_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE order_advances ADD COLUMN discord_channel_id TEXT`); } catch {}
+            try { db.exec(`ALTER TABLE order_advances ADD COLUMN published_at INTEGER`); } catch {}
             try { db.exec(`CREATE INDEX IF NOT EXISTS idx_myweapons_craft_request ON my_weapons(craft_request_id)`); } catch {}
 
             const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
                 try { db.prepare('INSERT OR IGNORE INTO ingredients (name) VALUES (?)').run(ing); } catch {}
+            }
+            for (const ingredient of ORDER_INGREDIENTS_CATALOG) {
+                try { db.prepare('INSERT OR IGNORE INTO ingredients (name, image_path) VALUES (?, NULL)').run(ingredient.name); } catch {}
             }
             seedStockMaterials();
             seedMyWeaponNamesFromWeapons();
@@ -408,7 +436,14 @@ const {
     settleOrderAdvance,
     saveOrderAdvanceRepayment,
     deleteOrderAdvanceRepayment,
-} = createOrderAdvanceService({ getDb: () => db });
+    getOrderAdvanceCatalog,
+    publishOrderAdvance,
+    refreshOrderDiscordMessage,
+} = createOrderAdvanceService({
+    getDb: () => db,
+    getBotClient: () => orderAdvancesBotClient,
+    catalog: ORDER_INGREDIENTS_CATALOG,
+});
 
 ({
     getRequests,
@@ -434,6 +469,7 @@ const {
 }));
 
 function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botState) {
+    orderAdvancesBotClient = botClient;
     const express = require('express');
     function canAccessCraftImages(user) {
         if (canValidateCraft(user)) return true;
@@ -580,6 +616,9 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         settleOrderAdvance,
         saveOrderAdvanceRepayment,
         deleteOrderAdvanceRepayment,
+        getOrderAdvanceCatalog,
+        publishOrderAdvance,
+        refreshOrderDiscordMessage,
     });
 
     registerCraftRequestRoutes(app, {

@@ -1,3 +1,4 @@
+<!-- CHANTIER COMMANDES 15/05/2026 — formulaire commandes par ingrédients -->
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -130,10 +131,6 @@
                         <input type="date" id="orderAdvanceDate" class="comm-input" required>
                     </div>
                     <div class="comm-field">
-                        <label class="comm-label">Montant total ($)</label>
-                        <input type="number" id="orderAdvanceTotal" class="comm-input" min="0" placeholder="11948000">
-                    </div>
-                    <div class="comm-field">
                         <label class="comm-label">Nombre de participants</label>
                         <select id="orderAdvanceParticipantCount" class="comm-input" onchange="setOrderAdvanceParticipantCount()">
                             <option value="1">1 participant</option>
@@ -142,6 +139,15 @@
                         </select>
                     </div>
                 </div>
+
+                <h3 class="admin-subtitle">Contenu de la commande</h3>
+                <div class="order-advance-items" id="orderAdvanceItems">
+                    <!-- Rempli par JS au load -->
+                </div>
+                <div class="order-advance-total-display" id="orderAdvanceTotalDisplay">
+                    Total : <strong>0 $</strong>
+                </div>
+                <input type="hidden" id="orderAdvanceTotal" value="0">
 
                 <h3 class="admin-subtitle">Participants</h3>
                 <div class="order-advance-participants" id="orderAdvanceParticipants"></div>

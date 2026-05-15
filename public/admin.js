@@ -1,3 +1,4 @@
+// CHANTIER COMMANDES 15/05/2026 — UI commandes ingrédients et publication Discord
 // ============================================================
 // ADMIN PANEL — JS
 // ============================================================
@@ -9,6 +10,7 @@ let adminOrgs = [];
 let adminRoles = [];
 let adminMembers = [];
 let adminOrderAdvances = [];
+let orderIngredientsCatalog = [];
 let adminMembersLoadedAt = 0;
 let editingIngredients = []; // [{ ingredient_id, name, amount }]
 let adminWeaponQuery = '';
@@ -40,6 +42,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadAdminStocks();
     loadAdminOrgs();
     loadAdminRoles();
+    await loadOrderIngredientsCatalog();
+    renderOrderAdvanceItems();
     loadAdminOrderAdvances();
     initOrderAdvanceParticipants();
 
@@ -932,6 +936,88 @@ function initOrderAdvanceParticipants() {
     setOrderAdvanceParticipantCount();
 }
 
+async function loadOrderIngredientsCatalog() {
+    try {
+        const res = await fetch('/api/admin/order-advances/catalog');
+        if (!res.ok) return;
+        const data = await res.json();
+        orderIngredientsCatalog = data.ingredients || [];
+    } catch {
+        orderIngredientsCatalog = [];
+    }
+}
+
+function renderOrderAdvanceItems(prefillItems = null) {
+    const container = document.getElementById('orderAdvanceItems');
+    if (!container) return;
+    if (!orderIngredientsCatalog.length) {
+        container.innerHTML = '<p class="empty">Catalogue ingrédients indisponible.</p>';
+        updateOrderAdvanceTotalFromItems();
+        return;
+    }
+    container.innerHTML = orderIngredientsCatalog.map(ing => {
+        const prefilledQty = prefillItems?.find(it => it.ingredient_name === ing.name)?.quantity || 0;
+        const imageHtml = ing.image_url
+            ? `<img src="${escapeHtml(ing.image_url)}" alt="" class="order-item-image">`
+            : `<div class="order-item-image order-item-image-placeholder">📦</div>`;
+        return `
+            <div class="order-advance-item-row" data-ingredient="${escapeHtml(ing.name)}">
+                ${imageHtml}
+                <div class="order-item-info">
+                    <div class="order-item-name">${escapeHtml(ing.name)}</div>
+                    <div class="order-item-price">${Number(ing.unit_price || 0).toLocaleString('fr-FR')} $ / unité</div>
+                </div>
+                <input type="number"
+                       class="comm-input order-item-quantity"
+                       min="0" step="1"
+                       placeholder="0"
+                       value="${prefilledQty || ''}"
+                       data-unit-price="${Number(ing.unit_price) || 0}"
+                       data-ingredient-name="${escapeHtml(ing.name)}"
+                       oninput="updateOrderAdvanceTotalFromItems()">
+                <div class="order-item-line-total" data-line-total="${escapeHtml(ing.name)}">
+                    ${(prefilledQty * (Number(ing.unit_price) || 0)).toLocaleString('fr-FR')} $
+                </div>
+            </div>
+        `;
+    }).join('');
+    updateOrderAdvanceTotalFromItems();
+}
+
+function updateOrderAdvanceTotalFromItems() {
+    let total = 0;
+    document.querySelectorAll('.order-item-quantity').forEach(input => {
+        const qty = parseInt(input.value, 10) || 0;
+        const price = parseInt(input.dataset.unitPrice, 10) || 0;
+        const lineTotal = qty * price;
+        total += lineTotal;
+        const lineDisplay = input.closest('.order-advance-item-row')?.querySelector('.order-item-line-total');
+        if (lineDisplay) lineDisplay.textContent = `${lineTotal.toLocaleString('fr-FR')} $`;
+    });
+    const totalInput = document.getElementById('orderAdvanceTotal');
+    const totalDisplay = document.getElementById('orderAdvanceTotalDisplay');
+    if (totalInput) totalInput.value = total;
+    if (totalDisplay) totalDisplay.innerHTML = `Total : <strong>${total.toLocaleString('fr-FR')} $</strong>`;
+    updateOrderAdvanceBalance();
+}
+
+function collectOrderAdvanceItems() {
+    return Array.from(document.querySelectorAll('.order-advance-item-row'))
+        .map(row => {
+            const input = row.querySelector('.order-item-quantity');
+            const qty = parseInt(input?.value, 10) || 0;
+            if (qty <= 0) return null;
+            const unitPrice = parseInt(input.dataset.unitPrice, 10) || 0;
+            return {
+                ingredient_name: input.dataset.ingredientName,
+                unit_price: unitPrice,
+                quantity: qty,
+                line_total: qty * unitPrice,
+            };
+        })
+        .filter(Boolean);
+}
+
 function normalizeOrderAdvanceLabels() {
     const section = document.getElementById('adminTab-advances');
     if (!section) return;
@@ -1006,6 +1092,8 @@ async function loadAdminOrderAdvances() {
 function collectOrderAdvancePayload() {
     const orderDate = document.getElementById('orderAdvanceDate')?.value;
     if (!orderDate) { toast('Date de commande requise', 'error'); return null; }
+    const items = collectOrderAdvanceItems();
+    if (!items.length) { toast('Ajoute au moins un ingrédient à la commande', 'error'); return null; }
 
     const participants = [];
     const participantIds = new Set();
@@ -1034,6 +1122,7 @@ function collectOrderAdvancePayload() {
     return {
         order_date: orderDate,
         total_amount: document.getElementById('orderAdvanceTotal')?.value || 0,
+        items,
         participants,
     };
 }
@@ -1083,6 +1172,7 @@ function editOrderAdvance(id) {
     document.getElementById('orderAdvanceId').value = order.id;
     document.getElementById('orderAdvanceDate').value = order.order_date || '';
     document.getElementById('orderAdvanceTotal').value = order.total_amount || '';
+    renderOrderAdvanceItems(order.items || []);
     const rows = [...document.querySelectorAll('[data-advance-participant]')];
     const participantCount = Math.min(3, Math.max(1, (order.participants || []).length || 1));
     setOrderAdvanceParticipantCount(participantCount);
@@ -1098,6 +1188,7 @@ function resetOrderAdvanceForm() {
     const idInput = document.getElementById('orderAdvanceId');
     if (idInput) idInput.value = '';
     document.getElementById('orderAdvanceDate').value = todayDateValue();
+    renderOrderAdvanceItems();
     setOrderAdvanceParticipantCount(1);
     document.querySelectorAll('[data-advance-participant]').forEach(row => fillParticipantRow(row, {}));
     updateOrderAdvanceBalance();
@@ -1126,6 +1217,20 @@ async function settleOrderAdvance(id) {
         adminOrderAdvances = data.advances || [];
         renderOrderAdvances();
         toast('Commande soldée');
+    } catch (e) {
+        toast(e.message, 'error');
+    }
+}
+
+async function publishOrderAdvance(orderId) {
+    if (!await confirmAction({ title: 'Publier la commande', message: 'Publier cette commande dans le salon Discord ?', confirmText: 'Passer commande' })) return;
+    try {
+        const res = await fetch(`/api/admin/order-advances/${orderId}/publish`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erreur publication');
+        adminOrderAdvances = data.advances || [];
+        renderOrderAdvances();
+        toast('Commande publiée sur Discord');
     } catch (e) {
         toast(e.message, 'error');
     }
@@ -1223,6 +1328,14 @@ function renderOrderAdvances() {
         const recoveredClass = Number(order.recovered_amount) > 0 ? 'amount-positive' : 'amount-neutral';
         const remainingClass = Number(order.remaining_amount) > 0 ? 'amount-danger' : 'amount-positive';
         const participantOptions = repaymentParticipantOptions(order);
+        const itemsDisplay = (order.items || []).length
+            ? `<div class="order-advance-items-display">${order.items.map(item => `
+                <div class="item-line">${Number(item.quantity || 0).toLocaleString('fr-FR')} ${escapeHtml(item.ingredient_name)} × ${moneyDisplay(item.unit_price)} = ${moneyDisplay(item.line_total)}</div>
+            `).join('')}</div>`
+            : '';
+        const publishedBadge = order.discord_message_id
+            ? `<span class="order-advance-published-badge">✅ Publiée${order.published_at ? ` le ${new Date(Number(order.published_at) * 1000).toLocaleDateString('fr-FR')} à ${new Date(Number(order.published_at) * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}</span>`
+            : `<button class="order-advance-publish-btn btn-small" onclick="publishOrderAdvance(${order.id})">🚀 Passer commande</button>`;
         const participants = (order.participants || []).map(p => {
             const participantRemainingClass = Number(p.amount_remaining) > 0 ? 'amount-danger' : 'amount-positive';
             const participantRecoveredClass = Number(p.amount_recovered) > 0 ? 'amount-positive' : 'amount-neutral';
@@ -1264,6 +1377,7 @@ function renderOrderAdvances() {
                     <span>Restant <strong class="${remainingClass}">${moneyDisplay(order.remaining_amount)}</strong></span>
                     ${!order.has_detailed_repayments && Number(order.legacy_recovered_amount) > 0 ? '<span class="order-advance-legacy">Ancien montant récupéré global</span>' : ''}
                 </div>
+                ${itemsDisplay}
                 <div class="order-advance-participants-list">${participants}</div>
                 <div class="order-repayment-section">
                     <div class="order-repayment-head">
@@ -1282,6 +1396,7 @@ function renderOrderAdvances() {
                     <div class="order-repayment-list">${repayments || '<p class="empty">Aucun remboursement détaillé.</p>'}</div>
                 </div>
                 <div class="order-advance-actions">
+                    ${publishedBadge}
                     <button class="btn-secondary btn-small" onclick="editOrderAdvance(${order.id})">Modifier</button>
                     <button class="btn-primary btn-small" onclick="settleOrderAdvance(${order.id})" ${meta.className === 'settled' ? 'disabled' : ''}>Solder</button>
                     <button class="btn-danger btn-small" onclick="deleteOrderAdvance(${order.id})">Supprimer</button>
@@ -1294,11 +1409,13 @@ function renderOrderAdvances() {
 window.loadAdminMembers = loadAdminMembers;
 window.loadAdminOrderAdvances = loadAdminOrderAdvances;
 window.setOrderAdvanceParticipantCount = setOrderAdvanceParticipantCount;
+window.updateOrderAdvanceTotalFromItems = updateOrderAdvanceTotalFromItems;
 window.saveOrderAdvance = saveOrderAdvance;
 window.editOrderAdvance = editOrderAdvance;
 window.resetOrderAdvanceForm = resetOrderAdvanceForm;
 window.deleteOrderAdvance = deleteOrderAdvance;
 window.settleOrderAdvance = settleOrderAdvance;
+window.publishOrderAdvance = publishOrderAdvance;
 window.toggleOrderRepaymentForm = toggleOrderRepaymentForm;
 window.saveOrderRepayment = saveOrderRepayment;
 window.editOrderRepayment = editOrderRepayment;

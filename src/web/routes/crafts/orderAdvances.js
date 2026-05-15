@@ -1,3 +1,4 @@
+// CHANTIER COMMANDES 15/05/2026 — routes catalogue/publish commandes
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes admin suivi commandes/avances extraites
 
@@ -15,7 +16,18 @@ function registerOrderAdvanceRoutes(app, deps) {
         settleOrderAdvance,
         saveOrderAdvanceRepayment,
         deleteOrderAdvanceRepayment,
+        getOrderAdvanceCatalog,
+        publishOrderAdvance,
+        refreshOrderDiscordMessage,
     } = deps;
+
+    app.get('/api/admin/order-advances/catalog', requireAdmin, (req, res) => {
+        try {
+            res.json({ ingredients: getOrderAdvanceCatalog() });
+        } catch (e) {
+            res.status(500).json({ ingredients: [], error: e.message });
+        }
+    });
 
     app.get('/api/admin/order-advances', requireAdmin, (req, res) => {
         try {
@@ -64,6 +76,30 @@ function registerOrderAdvanceRoutes(app, deps) {
             res.json({ success: true, advances: getOrderAdvances() });
         } catch (e) {
             res.status(400).json({ error: e.message });
+        }
+    });
+
+    app.post('/api/admin/order-advances/:id/publish', requireAdmin, async (req, res) => {
+        try {
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
+            const result = await publishOrderAdvance(id);
+            res.json({ success: true, messageId: result.messageId, advances: getOrderAdvances() });
+        } catch (e) {
+            const message = e.message || 'Publication impossible';
+            const status = message.toLowerCase().includes('déjà publiée') || message.toLowerCase().includes('deja publiee') ? 400 : 502;
+            res.status(status).json({ error: message });
+        }
+    });
+
+    app.post('/api/admin/order-advances/:id/refresh-message', requireAdmin, async (req, res) => {
+        try {
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
+            await refreshOrderDiscordMessage(id);
+            res.json({ success: true });
+        } catch (e) {
+            res.status(502).json({ error: e.message || 'Édition Discord impossible' });
         }
     });
 

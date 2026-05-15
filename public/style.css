@@ -1,3 +1,4 @@
+/* CHANTIER COMMANDES 15/05/2026 — styles commandes ingrédients admin */
 /* FIX FORCE 15/05/2026 — vague avec !important + descendants */
 /* FIX 15/05/2026 — vague visible, retour version orange */
 /* NETTOYAGE 15/05/2026 — virer ancien shimmer myweapons */
@@ -9908,3 +9909,108 @@ body:has(#impersonateBanner[style*="flex"]) {
    L'utilisateur a cette préférence activée sur son OS, donc
    display:none rendrait l'effet invisible. On accepte l'animation
    même en reduced-motion. */
+
+.order-advance-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.order-advance-item-row {
+    display: grid;
+    grid-template-columns: 56px 1fr 120px 140px;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.order-item-image {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.order-item-image-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.order-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.order-item-name {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.order-item-price {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.order-item-line-total {
+    text-align: right;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+}
+
+.order-advance-total-display {
+    text-align: right;
+    font-size: 18px;
+    margin: 8px 0 20px;
+    color: var(--text-dim);
+}
+
+.order-advance-total-display strong {
+    color: var(--accent);
+    font-size: 22px;
+    margin-left: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.order-advance-publish-btn {
+    background: linear-gradient(90deg, #ff8a00, #ff5722);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.order-advance-publish-btn:hover {
+    filter: brightness(1.15);
+}
+
+.order-advance-published-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--green, #00ff88);
+    font-size: 13px;
+}
+
+.order-advance-items-display {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 8px 0;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.order-advance-items-display .item-line {
+    font-variant-numeric: tabular-nums;
+}

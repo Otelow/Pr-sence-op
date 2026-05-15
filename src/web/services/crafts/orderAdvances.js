@@ -1,3 +1,4 @@
+// CHANTIER COMMANDES 15/05/2026 — commandes structurées et publication Discord
 // MODIFIE CHANTIER 6 - 14/05/2026 - service suivi commandes/avances extrait de crafts.js
 
 function createDbProxy(getDb) {
@@ -12,8 +13,9 @@ function createDbProxy(getDb) {
 }
 
 function createOrderAdvanceService(deps) {
-    const { getDb } = deps;
+    const { getDb, getBotClient, catalog = [] } = deps;
     const db = createDbProxy(getDb);
+    const ORDER_DISCORD_CHANNEL_ID = '1504837371261354188';
 
 function cleanMoney(value) {
     const parsed = parseInt(String(value ?? '').replace(/[^\d-]/g, ''), 10);
@@ -26,6 +28,43 @@ function todayIsoDate() {
 
 function orderAdvanceTitle(orderDate) {
     return `Commande matières premières du ${orderDate || todayIsoDate()}`;
+}
+
+function formatMoney(value) {
+    return `${(Number(value) || 0).toLocaleString('fr-FR')} $`;
+}
+
+function normalizeOrderItems(items = []) {
+    const byCatalog = new Map(catalog.map(item => [String(item.name).toLowerCase(), item]));
+    return (Array.isArray(items) ? items : [])
+        .map(item => {
+            const ingredientName = String(item.ingredient_name || item.name || '').trim();
+            if (!ingredientName) return null;
+            const catalogItem = byCatalog.get(ingredientName.toLowerCase());
+            const unitPrice = cleanMoney(catalogItem?.unit_price || item.unit_price);
+            const quantity = Math.max(0, parseInt(item.quantity, 10) || 0);
+            if (!unitPrice || quantity <= 0) return null;
+            return {
+                ingredient_name: catalogItem?.name || ingredientName,
+                unit_price: unitPrice,
+                quantity,
+                line_total: unitPrice * quantity,
+            };
+        })
+        .filter(Boolean);
+}
+
+function getOrderAdvanceCatalog() {
+    const ingredientRows = db.prepare('SELECT name, image_path FROM ingredients').all();
+    const imageByName = new Map(ingredientRows.map(row => [String(row.name || '').toLowerCase(), row.image_path || null]));
+    return catalog.map(item => {
+        const imagePath = imageByName.get(String(item.name).toLowerCase()) || null;
+        return {
+            name: item.name,
+            unit_price: item.unit_price,
+            image_url: imagePath ? `/crafts/images/${imagePath}` : null,
+        };
+    });
 }
 
 function normalizeAdvanceParticipants(participants = []) {
@@ -55,9 +94,10 @@ function normalizeAdvanceParticipants(participants = []) {
     return normalized;
 }
 
-function calculateAdvanceTotals(payload, participants, legacyRecoveredAmount = 0) {
+function calculateAdvanceTotals(payload, participants, legacyRecoveredAmount = 0, items = []) {
     const contributedTotal = participants.reduce((sum, p) => sum + p.amount_contributed, 0);
-    const totalAmount = cleanMoney(payload.total_amount) || contributedTotal;
+    const itemsTotal = items.reduce((sum, item) => sum + item.line_total, 0);
+    const totalAmount = itemsTotal || cleanMoney(payload.total_amount) || contributedTotal;
     const recoveredFromPayload = Object.prototype.hasOwnProperty.call(payload, 'recovered_amount')
         ? cleanMoney(payload.recovered_amount)
         : cleanMoney(legacyRecoveredAmount);
@@ -70,7 +110,7 @@ function calculateAdvanceTotals(payload, participants, legacyRecoveredAmount = 0
     };
 }
 
-function hydrateOrderAdvance(order, participants = [], repayments = []) {
+function hydrateOrderAdvance(order, participants = [], repayments = [], items = []) {
     const totalAmount = cleanMoney(order.total_amount);
     const legacyRecoveredAmount = cleanMoney(order.recovered_amount);
     const detailedRepayments = Array.isArray(repayments) ? repayments : [];
@@ -129,6 +169,7 @@ function hydrateOrderAdvance(order, participants = [], repayments = []) {
         remaining_amount: remainingAmount,
         status: order.status === 'settled' || remainingAmount <= 0 ? 'settled' : (recoveredAmount > 0 ? 'partial' : 'open'),
         has_detailed_repayments: hasDetailedRepayments,
+        items: Array.isArray(items) ? items : [],
         participants: hydratedParticipants,
         repayments: detailedRepayments,
     };
@@ -138,7 +179,87 @@ function getOrderAdvances() {
             const orders = db.prepare('SELECT * FROM order_advances ORDER BY status ASC, order_date DESC, id DESC').all();
         const getParticipants = db.prepare('SELECT * FROM order_advance_participants WHERE order_id = ? ORDER BY id ASC');
         const getRepayments = db.prepare('SELECT * FROM order_advance_repayments WHERE order_id = ? ORDER BY repayment_date DESC, id DESC');
-        return orders.map(order => hydrateOrderAdvance(order, getParticipants.all(order.id), getRepayments.all(order.id)));
+        const getItems = db.prepare('SELECT * FROM order_advance_items WHERE order_id = ? ORDER BY id ASC');
+        return orders.map(order => hydrateOrderAdvance(order, getParticipants.all(order.id), getRepayments.all(order.id), getItems.all(order.id)));
+}
+
+function getOrderAdvanceById(id) {
+    return getOrderAdvances().find(order => Number(order.id) === Number(id)) || null;
+}
+
+function buildOrderDiscordMessage(order) {
+    const total = cleanMoney(order.total_amount);
+    const recovered = cleanMoney(order.recovered_amount);
+    const remaining = Math.max(0, total - recovered);
+    const percent = total > 0 ? Math.round((recovered / total) * 100) : 0;
+    const items = (order.items || []).length
+        ? order.items.map(item => `• ${item.quantity.toLocaleString('fr-FR')} ${item.ingredient_name} (× ${formatMoney(item.unit_price)} = ${formatMoney(item.line_total)})`).join('\n')
+        : '• Aucun ingrédient renseigné';
+    const participants = (order.participants || []).length
+        ? order.participants.map(participant => `• ${participant.user_name} : ${formatMoney(participant.amount_contributed)}`).join('\n')
+        : '• Aucun participant renseigné';
+    const updatedAt = new Date().toLocaleString('fr-FR', {
+        timeZone: 'Europe/Paris',
+        dateStyle: 'short',
+        timeStyle: 'short',
+    });
+    const lines = [
+        '🛒 **Nouvelle commande passée**',
+        '',
+        '📦 **Contenu :**',
+        items,
+        '',
+        `💰 **Total : ${formatMoney(total)}**`,
+        '',
+        '👥 **Avancé par :**',
+        participants,
+        '',
+        `💸 **Remboursé : ${formatMoney(recovered)} / ${formatMoney(total)} (${percent} %)**`,
+        `🔄 Reste : ${formatMoney(remaining)}`,
+        '',
+        `⏱ Dernière mise à jour : ${updatedAt}`,
+        order.status === 'settled' ? '✅ **Commande soldée**' : '',
+    ];
+    while (lines.length && lines[lines.length - 1] === '') lines.pop();
+    return lines.join('\n');
+}
+
+async function fetchOrderDiscordChannel(channelId = ORDER_DISCORD_CHANNEL_ID) {
+    const botClient = typeof getBotClient === 'function' ? getBotClient() : null;
+    if (!botClient?.channels) throw new Error('Bot Discord indisponible');
+    return botClient.channels.fetch(channelId);
+}
+
+async function publishOrderAdvance(orderId) {
+    const order = getOrderAdvanceById(orderId);
+    if (!order) throw new Error('Commande introuvable');
+    if (order.discord_message_id) throw new Error('Commande déjà publiée');
+    const channel = await fetchOrderDiscordChannel(ORDER_DISCORD_CHANNEL_ID);
+    const content = buildOrderDiscordMessage(order);
+    const message = await channel.send({ content });
+    db.prepare(`UPDATE order_advances SET discord_message_id = ?, discord_channel_id = ?, published_at = strftime('%s','now'), updated_at = strftime('%s','now') WHERE id = ?`)
+        .run(message.id, ORDER_DISCORD_CHANNEL_ID, orderId);
+    return { messageId: message.id, content };
+}
+
+async function refreshOrderDiscordMessage(orderId) {
+    const order = getOrderAdvanceById(orderId);
+    if (!order?.discord_message_id) return false;
+    try {
+        const channel = await fetchOrderDiscordChannel(order.discord_channel_id || ORDER_DISCORD_CHANNEL_ID);
+        const message = await channel.messages.fetch(order.discord_message_id);
+        await message.edit({ content: buildOrderDiscordMessage(order) });
+        return true;
+    } catch (e) {
+        console.warn(`[order-advances] Message Discord commande ${orderId} introuvable/non éditable: ${e.message}`);
+        return false;
+    }
+}
+
+function refreshOrderDiscordMessageInBackground(orderId) {
+    setTimeout(() => {
+        refreshOrderDiscordMessage(orderId).catch(e => console.warn(`[order-advances] Refresh Discord impossible pour ${orderId}: ${e.message}`));
+    }, 0);
 }
 
 function upsertOrderAdvance(payload, id = null) {
@@ -150,6 +271,7 @@ function upsertOrderAdvance(payload, id = null) {
     }
     const participants = normalizeAdvanceParticipants(payload.participants);
     if (!participants.length) throw new Error('Ajoute au moins un participant');
+    const items = normalizeOrderItems(payload.items);
     const now = Math.floor(Date.now() / 1000);
     const orderDate = String(payload.order_date || '').trim() || null;
     if (!orderDate) throw new Error('Date de commande requise');
@@ -157,7 +279,7 @@ function upsertOrderAdvance(payload, id = null) {
     const legacyRecovered = existingOrder && !Object.prototype.hasOwnProperty.call(payload, 'recovered_amount')
         ? existingOrder.recovered_amount
         : payload.recovered_amount;
-    const totals = calculateAdvanceTotals(payload, participants, legacyRecovered);
+    const totals = calculateAdvanceTotals(payload, participants, legacyRecovered, items);
     const note = Object.prototype.hasOwnProperty.call(payload, 'note')
         ? (String(payload.note || '').trim() || null)
         : (existingOrder?.note || null);
@@ -170,6 +292,7 @@ function upsertOrderAdvance(payload, id = null) {
             db.prepare(`UPDATE order_advances SET title = ?, order_date = ?, total_amount = ?, recovered_amount = ?, remaining_amount = ?, note = ?, status = ?, updated_at = ? WHERE id = ?`)
                 .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, orderId);
             db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(orderId);
+            db.prepare('DELETE FROM order_advance_items WHERE order_id = ?').run(orderId);
         } else {
             const r = db.prepare(`INSERT INTO order_advances (title, order_date, total_amount, recovered_amount, remaining_amount, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
                 .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, now);
@@ -179,14 +302,21 @@ function upsertOrderAdvance(payload, id = null) {
         for (const p of participants) {
             stmt.run(orderId, p.user_id, p.user_name, p.amount_contributed, p.amount_recovered, p.amount_remaining, p.amount_to_compensate_next_order, p.note, now, now);
         }
+        const itemStmt = db.prepare(`INSERT INTO order_advance_items (order_id, ingredient_name, unit_price, quantity, line_total, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
+        for (const item of items) {
+            itemStmt.run(orderId, item.ingredient_name, item.unit_price, item.quantity, item.line_total, now);
+        }
         return orderId;
     });
-    return tx();
+    const savedId = tx();
+    if (existingOrder?.discord_message_id) refreshOrderDiscordMessageInBackground(savedId);
+    return savedId;
 }
 
 function deleteOrderAdvance(id) {
             db.prepare('DELETE FROM order_advance_repayments WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(id);
+        db.prepare('DELETE FROM order_advance_items WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advances WHERE id = ?').run(id);
         return;
 }
@@ -197,6 +327,7 @@ function settleOrderAdvance(id) {
         if (!order) throw new Error('Commande introuvable');
         db.prepare(`UPDATE order_advances SET recovered_amount = total_amount, remaining_amount = 0, status = 'settled', updated_at = ? WHERE id = ?`).run(now, id);
         db.prepare(`UPDATE order_advance_participants SET amount_recovered = amount_contributed, amount_remaining = 0, updated_at = ? WHERE order_id = ?`).run(now, id);
+        refreshOrderDiscordMessageInBackground(id);
         return;
 }
 
@@ -234,16 +365,19 @@ function saveOrderAdvanceRepayment(orderId, payload, repaymentId = null) {
             if (!existing) throw new Error('Remboursement introuvable');
             db.prepare(`UPDATE order_advance_repayments SET participant_id = ?, user_id = ?, user_name = ?, amount = ?, reason = ?, weapon_name = ?, repayment_date = ?, updated_at = ? WHERE id = ? AND order_id = ?`)
                 .run(normalized.participant_id, normalized.user_id, normalized.user_name, normalized.amount, normalized.reason, normalized.weapon_name, normalized.repayment_date, now, repaymentId, orderId);
+            refreshOrderDiscordMessageInBackground(orderId);
             return repaymentId;
         }
         const result = db.prepare(`INSERT INTO order_advance_repayments (order_id, participant_id, user_id, user_name, amount, reason, weapon_name, repayment_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(orderId, normalized.participant_id, normalized.user_id, normalized.user_name, normalized.amount, normalized.reason, normalized.weapon_name, normalized.repayment_date, now, now);
+        refreshOrderDiscordMessageInBackground(orderId);
         return result.lastInsertRowid;
 }
 
 function deleteOrderAdvanceRepayment(orderId, repaymentId) {
             const result = db.prepare('DELETE FROM order_advance_repayments WHERE id = ? AND order_id = ?').run(repaymentId, orderId);
         if (!result.changes) throw new Error('Remboursement introuvable');
+        refreshOrderDiscordMessageInBackground(orderId);
         return;
 }
 
@@ -256,6 +390,9 @@ function deleteOrderAdvanceRepayment(orderId, repaymentId) {
         settleOrderAdvance,
         saveOrderAdvanceRepayment,
         deleteOrderAdvanceRepayment,
+        getOrderAdvanceCatalog,
+        publishOrderAdvance,
+        refreshOrderDiscordMessage,
     };
 }
 
