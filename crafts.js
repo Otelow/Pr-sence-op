@@ -8,10 +8,13 @@
 // MODIFIÉ CHANTIER 12 — 14/05/2026 — events temps réel craft/dashboard
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes craft extraites en modules web
 // ==========================================
+// STABILISATION FINALE v2 16/05/2026 — migrations suivies et audit log admin
 const path = require('path');
 const fs = require('fs');
 const config = require('./src/shared/config');
-const { ensureDataDirs, createConnection } = require('./src/shared/database');
+const { ensureDataDirs, createConnection, runMigration } = require('./src/shared/database');
+const log = require('./src/shared/logger');
+const { audit, listAuditLogs } = require('./src/shared/auditLog');
 const {
     ADMIN_USER_ID,
     ADMIN_ROLE_ID,
@@ -83,6 +86,84 @@ const CRAFT_STOCK_RESERVED_STATUSES = ['materials', 'waiting_materials', 'in_pro
 function parseId(v, max = 2_000_000) {
     const n = parseInt(v, 10);
     return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
+}
+
+const MIGRATIONS = [
+    { name: '001_weapons_plan_image_path', migrate: db => db.exec('ALTER TABLE weapons ADD COLUMN plan_image_path TEXT') },
+    { name: '002_weapons_requires_plan', migrate: db => db.exec('ALTER TABLE weapons ADD COLUMN requires_plan INTEGER DEFAULT 0') },
+    { name: '003_weapons_sale_price', migrate: db => db.exec('ALTER TABLE weapons ADD COLUMN sale_price INTEGER DEFAULT 0') },
+    { name: '004_weapons_max_sale_price', migrate: db => db.exec('ALTER TABLE weapons ADD COLUMN max_sale_price INTEGER DEFAULT 0') },
+    { name: '005_my_weapon_names_sale_price', migrate: db => db.exec('ALTER TABLE my_weapon_names ADD COLUMN sale_price INTEGER DEFAULT 0') },
+    { name: '006_my_weapon_names_max_sale_price', migrate: db => db.exec('ALTER TABLE my_weapon_names ADD COLUMN max_sale_price INTEGER DEFAULT 0') },
+    { name: '007_my_weapons_user_avatar', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN user_avatar TEXT') },
+    { name: '008_my_weapons_asking_price', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN asking_price INTEGER') },
+    { name: '009_my_weapons_min_price', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN min_price INTEGER') },
+    { name: '010_my_weapons_is_sold', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN is_sold INTEGER DEFAULT 0') },
+    { name: '011_my_weapons_sold_to', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN sold_to TEXT') },
+    { name: '012_my_weapons_sold_price', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN sold_price INTEGER') },
+    { name: '013_my_weapons_sold_at', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN sold_at INTEGER') },
+    { name: '014_my_weapons_crafted_by_id', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN crafted_by_id TEXT') },
+    { name: '015_my_weapons_crafted_by_name', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN crafted_by_name TEXT') },
+    { name: '016_my_weapons_sold_by_id', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN sold_by_id TEXT') },
+    { name: '017_my_weapons_sold_by_name', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN sold_by_name TEXT') },
+    { name: '018_my_weapons_discord_message_id', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN discord_message_id TEXT') },
+    { name: '019_my_weapons_weapons_log_message_id', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN weapons_log_message_id TEXT') },
+    { name: '020_my_weapons_sale_discord_message_id', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN sale_discord_message_id TEXT') },
+    { name: '021_my_weapons_batch_id', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN batch_id TEXT') },
+    { name: '022_my_weapons_created_by_id', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN created_by_id TEXT') },
+    { name: '023_my_weapons_created_by_name', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN created_by_name TEXT') },
+    { name: '024_my_weapons_craft_request_id', migrate: db => db.exec('ALTER TABLE my_weapons ADD COLUMN craft_request_id INTEGER') },
+    { name: '025_craft_requests_discord_message_id', migrate: db => db.exec('ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT') },
+    { name: '026_craft_requests_stock_consumed_at', migrate: db => db.exec('ALTER TABLE craft_requests ADD COLUMN stock_consumed_at INTEGER') },
+    { name: '027_craft_requests_request_type', migrate: db => db.exec('ALTER TABLE craft_requests ADD COLUMN request_type TEXT') },
+    { name: '028_craft_requests_is_test', migrate: db => db.exec('ALTER TABLE craft_requests ADD COLUMN is_test INTEGER DEFAULT 0') },
+    { name: '029_craft_requests_refusal_reason', migrate: db => db.exec('ALTER TABLE craft_requests ADD COLUMN refusal_reason TEXT') },
+    { name: '030_order_advances_discord_message_id', migrate: db => db.exec('ALTER TABLE order_advances ADD COLUMN discord_message_id TEXT') },
+    { name: '031_order_advances_discord_channel_id', migrate: db => db.exec('ALTER TABLE order_advances ADD COLUMN discord_channel_id TEXT') },
+    { name: '032_order_advances_published_at', migrate: db => db.exec('ALTER TABLE order_advances ADD COLUMN published_at INTEGER') },
+    { name: '033_myweapons_craft_request_index', migrate: db => db.exec('CREATE INDEX IF NOT EXISTS idx_myweapons_craft_request ON my_weapons(craft_request_id)') },
+    { name: '034_create_audit_log', migrate: db => db.exec(`
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at INTEGER NOT NULL,
+            user_id TEXT,
+            user_name TEXT,
+            action TEXT NOT NULL,
+            target_type TEXT,
+            target_id TEXT,
+            details TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log(action);
+        CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
+    `) },
+];
+
+function markMigrationApplied(name) {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            name TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    db.prepare('INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)').run(name);
+}
+
+function applyMigrations() {
+    for (const migration of MIGRATIONS) {
+        try {
+            const applied = runMigration(db, migration.name, migration.migrate);
+            if (applied) log.info(`↳ migration appliquée : ${migration.name}`);
+        } catch (e) {
+            if (/duplicate column name|already exists/i.test(e.message || '')) {
+                markMigrationApplied(migration.name);
+                log.info(`↳ migration déjà présente : ${migration.name}`);
+            } else {
+                log.error({ err: e.message, migration: migration.name }, '❌ Migration échouée');
+                throw e;
+            }
+        }
+    }
 }
 
 function initDB() {
@@ -240,40 +321,7 @@ function initDB() {
                 CREATE INDEX IF NOT EXISTS idx_order_repayments_order ON order_advance_repayments(order_id);
             `);
 
-            // Migrations
-            try { db.exec(`ALTER TABLE weapons ADD COLUMN plan_image_path TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE weapons ADD COLUMN requires_plan INTEGER DEFAULT 0`); } catch {}
-            try { db.exec(`ALTER TABLE weapons ADD COLUMN sale_price INTEGER DEFAULT 0`); } catch {}
-            try { db.exec(`ALTER TABLE weapons ADD COLUMN max_sale_price INTEGER DEFAULT 0`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapon_names ADD COLUMN sale_price INTEGER DEFAULT 0`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapon_names ADD COLUMN max_sale_price INTEGER DEFAULT 0`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN user_avatar TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN asking_price INTEGER`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN min_price INTEGER`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN is_sold INTEGER DEFAULT 0`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_to TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_price INTEGER`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_at INTEGER`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN crafted_by_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN crafted_by_name TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_by_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sold_by_name TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN discord_message_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN weapons_log_message_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN sale_discord_message_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN batch_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN created_by_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN created_by_name TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE my_weapons ADD COLUMN craft_request_id INTEGER`); } catch {}
-            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN discord_message_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN stock_consumed_at INTEGER`); } catch {}
-            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN request_type TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN is_test INTEGER DEFAULT 0`); } catch {}
-            try { db.exec(`ALTER TABLE craft_requests ADD COLUMN refusal_reason TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE order_advances ADD COLUMN discord_message_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE order_advances ADD COLUMN discord_channel_id TEXT`); } catch {}
-            try { db.exec(`ALTER TABLE order_advances ADD COLUMN published_at INTEGER`); } catch {}
-            try { db.exec(`CREATE INDEX IF NOT EXISTS idx_myweapons_craft_request ON my_weapons(craft_request_id)`); } catch {}
+            applyMigrations();
 
             const defaultIngredients = ['Tungstène', 'Bloc de tungstène', 'Bloc de chrome', 'Bloc de titane', 'Corps de Pistolet', 'Corps de Fusil à pompe', 'Corps de Mitraillette', 'Corps de Fusil'];
             for (const ing of defaultIngredients) {
@@ -285,9 +333,9 @@ function initDB() {
             seedStockMaterials();
             seedMyWeaponNamesFromWeapons();
 
-            console.log('💾 DB Crafts initialisée (SQLite)');
+            log.info('💾 DB Crafts initialisée (SQLite)');
         } catch (e) {
-            console.error('❌ SQLite init error, arrêt du module crafts:', e.message);
+            log.error({ err: e.message }, '❌ SQLite init error, arrêt du module crafts');
             throw e;
         }
 
@@ -660,6 +708,32 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         markRequestPosted,
         emitRealtime,
         moneyLabel,
+    });
+
+    app.get('/api/admin/audit-log', requireAdmin, (req, res) => {
+        try {
+            const logs = listAuditLogs({
+                limit: req.query.limit,
+                offset: req.query.offset,
+                action: req.query.action,
+                user_id: req.query.user_id,
+                since: req.query.since,
+            });
+            audit(req.session.user, 'audit.read', {
+                target_type: 'audit_log',
+                details: {
+                    limit: req.query.limit || null,
+                    offset: req.query.offset || null,
+                    action: req.query.action || null,
+                    user_id: req.query.user_id || null,
+                    since: req.query.since || null,
+                },
+            });
+            res.json({ logs });
+        } catch (e) {
+            log.warn({ err: e.message }, 'audit log lecture échouée');
+            res.status(500).json({ error: 'Impossible de lire l’historique admin' });
+        }
     });
 
 }
