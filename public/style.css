@@ -1,3 +1,4 @@
+/* VAGUE EN COURS 17/05/2026 — shimmer jaune armes en cours */
 /* FIX VISUEL EN COURS 17/05/2026 — uniformisation badge + bouton */
 /* STATUT EN COURS 17/05/2026 — badges et bouton admin Vos Armes */
 /* HOTFIX 17/05/2026 ? min-height inputs/selects corrig? */
@@ -9913,6 +9914,61 @@ body:has(#impersonateBanner[style*="flex"]) {
    L'utilisateur a cette préférence activée sur son OS, donc
    display:none rendrait l'effet invisible. On accepte l'animation
    même en reduced-motion. */
+
+/* ==========================================
+   Effet vague jaune sur cards "En cours de vente"
+   ========================================== */
+.weapon-card-in-progress {
+    position: relative !important;
+    overflow: hidden !important;
+    border-color: rgba(250, 199, 117, 0.5) !important;
+    box-shadow: 0 0 12px rgba(250, 199, 117, 0.08) !important;
+}
+
+.weapon-card-in-progress::before {
+    display: none !important;
+}
+
+/* Les 2 overlays héritent du style générique mais on override
+   les couleurs pour le jaune */
+.weapon-card-in-progress > .shimmer-overlay,
+.weapon-card-in-progress > .shimmer-overlay-2 {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100% !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+    animation: craftWarningShimmer 2.8s linear infinite !important;
+}
+
+.weapon-card-in-progress > .shimmer-overlay {
+    width: 40% !important;
+    background: linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(250, 199, 117, 0.45) 50%,
+        transparent 100%
+    ) !important;
+    filter: blur(2px) !important;
+}
+
+.weapon-card-in-progress > .shimmer-overlay-2 {
+    width: 25% !important;
+    background: linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(255, 220, 150, 0.35) 50%,
+        transparent 100%
+    ) !important;
+    animation-delay: -1.4s !important;
+}
+
+/* Tout le contenu utile passe au-dessus des vagues */
+.weapon-card-in-progress > :not(.shimmer-overlay):not(.shimmer-overlay-2) {
+    position: relative;
+    z-index: 2;
+}
 
 .order-advance-items {
     display: flex;

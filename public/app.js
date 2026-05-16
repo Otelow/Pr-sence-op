@@ -1,3 +1,4 @@
+// VAGUE EN COURS 17/05/2026 — shimmer jaune armes en cours
 // FIX VISUEL EN COURS 17/05/2026 — uniformisation badge + bouton
 // FIX LABEL 17/05/2026 — "En cours" → "En cours de vente"
 // STATUT EN COURS 17/05/2026 — badges et boutons admin Vos Armes
@@ -4929,8 +4930,14 @@ function renderMyWeapons() {
         ].filter(Boolean).join('');
         actions = actionButtons ? `<div class="mw-actions">${actionButtons}</div>` : '';
 
+        const inProgressWave = isInProgress ? `
+                <span class="shimmer-overlay"></span>
+                <span class="shimmer-overlay-2"></span>` : '';
+        const inProgressCardClass = isInProgress ? 'weapon-card-in-progress' : '';
+
         return `
-            <div class="myweapons-item weapon-sale-card ${isSold ? 'mw-sold-row' : 'mw-available-row mw-sale-active dynamic-sale-effect'} ${isMine ? 'mw-mine' : ''}">
+            <div class="myweapons-item weapon-sale-card ${isSold ? 'mw-sold-row' : 'mw-available-row mw-sale-active dynamic-sale-effect'} ${inProgressCardClass} ${isMine ? 'mw-mine' : ''}">
+                ${inProgressWave}
                 ${avatar}
                 <div class="myweapons-item-body">
                     <div class="myweapons-item-name">
