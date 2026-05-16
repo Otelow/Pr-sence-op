@@ -1,3 +1,4 @@
+// HISTORIQUE CRAFT 16/05/2026 — protection des crafts finalisés permanents
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('../../../shared/logger');
 // FIX 15/05/2026 — justificatif Discord craft manuel
@@ -616,6 +617,9 @@ function registerCraftRequestRoutes(app, deps) {
                 return res.status(403).json({ error: 'Tu peux annuler uniquement tes propres demandes' });
             }
             if (isSuperAdmin) {
+                if (existing.status === 'completed') {
+                    return res.status(409).json({ error: 'Craft finalisé permanent : impossible de le supprimer depuis le dashboard' });
+                }
                 deleteCraftRequestCleanly(id);
                 emitRealtime('craft:status', { requestId: id, status: 'deleted', action: 'deleted' });
                 audit(req.session.user, 'craft.request.delete', {
@@ -647,6 +651,11 @@ function registerCraftRequestRoutes(app, deps) {
             }
             const id = parseId(req.params.id);
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
+            const existing = getRequest(id);
+            if (!existing) return res.status(404).json({ error: 'Demande introuvable' });
+            if (existing.status === 'completed') {
+                return res.status(409).json({ error: 'Craft finalisé permanent : impossible de le supprimer depuis le dashboard' });
+            }
             deleteCraftRequestCleanly(id);
             emitRealtime('craft:status', { requestId: id, status: 'deleted', action: 'deleted' });
             audit(req.session.user, 'craft.request.delete', {

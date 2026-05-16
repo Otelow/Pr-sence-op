@@ -1,3 +1,4 @@
+// HISTORIQUE CRAFT 16/05/2026 — tableau craft complet, tri logique et historique permanent
 // VAGUE EN COURS 17/05/2026 — shimmer jaune armes en cours
 // FIX VISUEL EN COURS 17/05/2026 — uniformisation badge + bouton
 // FIX LABEL 17/05/2026 — "En cours" → "En cours de vente"
@@ -2576,13 +2577,13 @@ let craftCatalogFilters = {
 };
 let craftBoardState = {
     page: 1,
-    pageSize: 10,
-    sortBy: 'created',
+    pageSize: 50,
+    sortBy: 'logic',
     sortDir: 'asc',
 };
 let craftHistoryState = {
     page: 1,
-    pageSize: 10,
+    pageSize: 50,
 };
 let craftRequestsListState = {
     page: 1,
@@ -2592,7 +2593,7 @@ let craftRequestsListState = {
     userSearch: '',
     statusFilter: 'all',
 };
-const CRAFT_BOARD_ACTIVE_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted'];
+const CRAFT_BOARD_VISIBLE_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted', 'completed'];
 let MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
 
 function compareWeaponsBySalePrice(a, b) {
@@ -3552,8 +3553,20 @@ function getCraftRequestTypeLabel(type) {
 function getCraftBoardActiveRequests() {
     const hasFullAccess = canValidateCraftClient();
     if (!hasFullAccess) return [];
-    let active = craftRequestsCache.filter(r => CRAFT_BOARD_ACTIVE_STATUSES.includes(r.status));
+    let active = craftRequestsCache.filter(r => CRAFT_BOARD_VISIBLE_STATUSES.includes(r.status));
     return active;
+}
+
+function getCraftBoardLogicRank(r) {
+    if (r.status === 'materials' || r.status === 'waiting_materials') return 10;
+    if (r.status === 'in_progress') return 20;
+    if (r.status === 'crafted' || r.crafted || r.craft_date || r.serial_number) return 30;
+    if (r.status === 'completed') return 40;
+    return 90;
+}
+
+function getCraftBoardLogicDate(r) {
+    return Number(r.sale_date || r.craft_date || r.created_at || r.id || 0);
 }
 
 function getCraftBoardSortValue(r, key) {
@@ -3566,6 +3579,19 @@ function sortCraftBoardRequests(items) {
     const sortBy = craftBoardState.sortBy;
     const dir = craftBoardState.sortDir === 'desc' ? -1 : 1;
     return [...items].sort((a, b) => {
+        if (sortBy === 'logic') {
+            const rankDiff = getCraftBoardLogicRank(a) - getCraftBoardLogicRank(b);
+            if (rankDiff !== 0) return rankDiff;
+
+            const dateDiff = getCraftBoardLogicDate(b) - getCraftBoardLogicDate(a);
+            if (dateDiff !== 0) return dateDiff;
+
+            const weaponDiff = String(a.weapon_name || '').localeCompare(String(b.weapon_name || ''), 'fr', { numeric: true, sensitivity: 'base' });
+            if (weaponDiff !== 0) return weaponDiff;
+
+            return Number(b.id || 0) - Number(a.id || 0);
+        }
+
         const craftedPriorityA = (a.crafted || a.craft_date || a.serial_number) ? 1 : 0;
         const craftedPriorityB = (b.crafted || b.craft_date || b.serial_number) ? 1 : 0;
         if (craftedPriorityA !== craftedPriorityB) return craftedPriorityA - craftedPriorityB;
@@ -3580,6 +3606,16 @@ function sortCraftBoardRequests(items) {
         }
         if (result === 0) result = Number(a.created_at || a.id || 0) - Number(b.created_at || b.id || 0);
         return result * dir;
+    });
+}
+
+function sortCraftHistoryRequests(items) {
+    return [...items].sort((a, b) => {
+        const dateDiff = getCraftBoardLogicDate(b) - getCraftBoardLogicDate(a);
+        if (dateDiff !== 0) return dateDiff;
+        const weaponDiff = String(a.weapon_name || '').localeCompare(String(b.weapon_name || ''), 'fr', { numeric: true, sensitivity: 'base' });
+        if (weaponDiff !== 0) return weaponDiff;
+        return Number(b.id || 0) - Number(a.id || 0);
     });
 }
 
@@ -3652,15 +3688,16 @@ function renderCraftBoard() {
     const end = Math.min(start + pageSize, total);
     const pageItems = active.slice(start, end);
 
-    // Vue production : matières attendues, en cours ou déjà craftées.
+    // Vue production + historique : matières attendues, en cours, craftées et finalisées.
 
     // Hauts gradés voient toutes les demandes, les autres seulement les leurs
 
     // Compter les "En cours" pour le bandeau de notification
     const inProgressCount = active.filter(r => r.status === 'in_progress' || r.status === 'waiting_materials').length;
+    const completedCount = active.filter(r => r.status === 'completed').length;
     const wrapper = document.querySelector('#craftSection-board .craft-board-wrapper');
     let banner = document.getElementById('craftBoardInProgressBanner');
-    if (inProgressCount > 0) {
+    if (inProgressCount > 0 || completedCount > 0) {
         if (!banner && wrapper) {
             banner = document.createElement('div');
             banner.id = 'craftBoardInProgressBanner';
@@ -3668,7 +3705,7 @@ function renderCraftBoard() {
             wrapper.parentNode.insertBefore(banner, wrapper);
         }
         if (banner) {
-            banner.innerHTML = `⏳ <strong>${inProgressCount}</strong> demande${inProgressCount > 1 ? 's' : ''} actuellement <strong>en cours de craft</strong>`;
+            banner.innerHTML = `⏳ <strong>${inProgressCount}</strong> demande${inProgressCount > 1 ? 's' : ''} en cours de craft · <strong>${completedCount}</strong> craft${completedCount > 1 ? 's' : ''} finalisé${completedCount > 1 ? 's' : ''} visible${completedCount > 1 ? 's' : ''} en historique permanent`;
             banner.style.display = 'flex';
         }
     } else if (banner) {
@@ -3677,7 +3714,7 @@ function renderCraftBoard() {
 
     renderCraftBoardPagination(total, totalPages, start, end);
     if (!pageItems.length) {
-        tbody.innerHTML = '<tr class="craft-board-empty"><td colspan="7"><em>Aucune demande a afficher</em></td></tr>';
+        tbody.innerHTML = '<tr class="craft-board-empty"><td colspan="7"><em>Aucun craft à afficher</em></td></tr>';
         return;
     }
 
@@ -3732,7 +3769,7 @@ function renderCraftBoardLine(num, r) {
             <td>${renderCraftBoardSaleState(r, saleState)}</td>
             <td>
                 ${canListWeapon ? `<button class="btn-craft-validate" onclick="openCraftListingFromBoard(${r.id})">Mettre en vente</button>` : ''}
-                ${canEditCraft ? `<button class="btn-status-delete btn-craft-delete" onclick="deleteCraftRequest(${r.id})">Supprimer</button>` : ''}
+                ${canEditCraft && !completed ? `<button class="btn-status-delete btn-craft-delete" onclick="deleteCraftRequest(${r.id})">Supprimer</button>` : ''}
             </td>
         </tr>
     `;
@@ -3888,8 +3925,7 @@ function renderCraftHistory() {
     if (!list) return;
     renderManualCraftForm();
 
-    const completed = craftRequestsCache.filter(r => r.status === 'completed');
-    const isSuperAdmin = canDeleteRequestsClient();
+    const completed = sortCraftHistoryRequests(craftRequestsCache.filter(r => r.status === 'completed'));
 
     if (completed.length === 0) {
         list.innerHTML = '<p class="empty">Aucun craft finalisé</p>';
@@ -3915,9 +3951,6 @@ function renderCraftHistory() {
     const items = pageItems.map(r => {
         const craftDate = r.craft_date ? new Date(r.craft_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
         const saleDate = r.sale_date ? new Date(r.sale_date * 1000).toLocaleDateString('fr-FR') : 'N/A';
-        const deleteBtn = isSuperAdmin
-            ? `<button class="btn-history-delete" onclick="deleteHistoryEntry(${r.id})" title="Supprimer">🗑</button>`
-            : '';
         return `
             <div class="craft-history-item">
                 ${safeImageUrl(r.weapon_image_url) ? `<img class="craft-history-image" src="${safeImageUrl(r.weapon_image_url)}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
@@ -3933,7 +3966,6 @@ function renderCraftHistory() {
                         <span>📅 Vente : ${saleDate}</span>
                     </div>
                 </div>
-                ${deleteBtn}
             </div>
         `;
     }).join('');
