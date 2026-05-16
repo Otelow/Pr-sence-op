@@ -1,9 +1,11 @@
+// BOARD ARMES 17/05/2026 — refresh board live sur mutations Vos Armes
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('../../../shared/logger');
 // STABILISATION 15/05/2026 — corrections sécurité et persistance
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes Vos Armes extraites
 // AUDIT HOOKS 16/05/2026 — annonces Vos Armes tracées dans audit_log
 const { audit } = require('../../../shared/auditLog');
+const { refreshArmesBoard } = require('../../../bot/services/armesBoard');
 
 function parseId(v, max = 2_000_000) {
     const n = parseInt(v, 10);
@@ -40,6 +42,11 @@ function registerMyWeaponsRoutes(app, deps) {
     ];
 
     const maxSalePriceError = (max) => `Le prix ne peut pas dépasser le prix maximal autorisé pour cette arme : ${Number(max).toLocaleString('fr-FR')}$.`;
+
+    function queueArmesBoardRefresh(reason) {
+        if (!botClient) return;
+        refreshArmesBoard(botClient).catch(e => log.warn({ err: e.message, reason }, 'refresh board armes échoué'));
+    }
 
     function validateMyWeaponPriceLimit({ weaponName, weaponId, askingPrice, minPrice }) {
         const adminWeapon = weaponId ? getWeapon(weaponId) : getWeaponByName(weaponName);
@@ -467,6 +474,7 @@ function registerMyWeaponsRoutes(app, deps) {
                     craft_request_id: linkedCraftRequestId,
                 },
             });
+            queueArmesBoardRefresh('weapon.create');
             return res.json({ success: true, id, quantity: serials.length });
         } catch (e) {
             return res.status(500).json({ error: e.message });
@@ -592,6 +600,7 @@ function registerMyWeaponsRoutes(app, deps) {
                     sold_price: soldPrice,
                 },
             });
+            queueArmesBoardRefresh('weapon.update');
             res.json({ success: true, weapon: updatedWeapon });
         } catch (e) {
             res.status(500).json({ error: e.message });
@@ -727,6 +736,7 @@ function registerMyWeaponsRoutes(app, deps) {
                     craft_request_id: matchedRequestForLog?.id || existing.craft_request_id || null,
                 },
             });
+            queueArmesBoardRefresh('weapon.markSold');
             res.json({ success: true, autoFilledCraft });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });
@@ -764,6 +774,7 @@ function registerMyWeaponsRoutes(app, deps) {
                     batch_id: existing.batch_id || null,
                 },
             });
+            queueArmesBoardRefresh('weapon.delete');
             res.json({ success: true });
         } catch (e) { res.status(500).json({ error: e.message }); }
     });

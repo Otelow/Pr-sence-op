@@ -1,3 +1,4 @@
+// BOARD ARMES 17/05/2026 — init board armes live Discord
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../shared/logger');
 // FINAL POST-STAB G 17/05/2026 — alerte webhook fatale bot
@@ -56,6 +57,7 @@ const { registerGuildMemberEvents } = require('./events/guildMembers');
 const { sleep } = require('./utils/sleep');
 const { safeReact, addPresenceReactions } = require('./utils/safeReact');
 const { scheduleDailyBackups } = require('./services/backup');
+const { initArmesBoard } = require('./services/armesBoard');
 const { loadState, saveState, deleteState } = require('./services/state');
 const { createWelcomeService } = require('./services/welcome');
 const { createWelcomeStatePersistence } = require('./services/welcomeState');
@@ -508,6 +510,7 @@ registerReadyEvent({
     registerCommands,
     setupPresenceCron,
     scheduleDailyBackups,
+    initArmesBoard,
     restoreAbsencePanelState,
     restoreRenameChecks,
     loadReminders,

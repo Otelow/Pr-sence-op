@@ -1,3 +1,4 @@
+// BOARD ARMES 17/05/2026 — init board armes live au ready
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
@@ -30,6 +31,7 @@ function registerReadyEvent(deps) {
         absenceTracking,
         saveAbsenceTracking,
         sendPresenceMessage,
+        initArmesBoard,
     } = deps;
 
 client.once('ready', async () => {
@@ -38,6 +40,9 @@ client.once('ready', async () => {
     setupPresenceCron();
     scheduleDailyBackups();
     restoreAbsencePanelState();
+    if (initArmesBoard) {
+        await initArmesBoard(client).catch(e => log.error({ err: e.message }, 'init armes board échoué'));
+    }
 
     // Charger les rappels du panel
     loadReminders();

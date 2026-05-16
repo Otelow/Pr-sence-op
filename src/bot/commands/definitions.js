@@ -1,3 +1,4 @@
+// BOARD ARMES 17/05/2026 — commande refresh board armes
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — définitions slash commands isolées
 const { SlashCommandBuilder } = require('discord.js');
 
@@ -42,6 +43,7 @@ function buildSlashCommands() {
         new SlashCommandBuilder().setName('panel').setDescription('🎮 Ouvrir le panneau de contrôle (rappels programmés)'),
         new SlashCommandBuilder().setName('clips-backfill').setDescription('Lancer le scan historique des clips du forum'),
         new SlashCommandBuilder().setName('clips-backfill-status').setDescription('Voir l etat du scan historique des clips'),
+        new SlashCommandBuilder().setName('board-armes-refresh').setDescription('Rafraîchir manuellement la board armes live'),
     ];
 }
 

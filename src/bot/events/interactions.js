@@ -1,4 +1,10 @@
+// BOARD ARMES 17/05/2026 — slash refresh manuel board armes
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routeur interactions Discord isolé
+const log = require('../../shared/logger');
+const { audit } = require('../../shared/auditLog');
+const { ADMIN_USER_ID } = require('../../shared/permissions');
+const { refreshArmesBoard, BOARD_CHANNEL_ID } = require('../services/armesBoard');
+
 function registerInteractionEvents(client, context) {
     const {
         CONFIG,
@@ -35,7 +41,7 @@ function registerInteractionEvents(client, context) {
             return interaction.reply({ content: '❌ Pas la permission.', ephemeral: true });
         }
 
-        const exempt = ['presence-test', 'presence-test2', 'clear', 'clearmessage', 'absence', 'presence-force', 'panel', 'clips-backfill', 'clips-backfill-status'];
+        const exempt = ['presence-test', 'presence-test2', 'clear', 'clearmessage', 'absence', 'presence-force', 'panel', 'clips-backfill', 'clips-backfill-status', 'board-armes-refresh'];
         if (!exempt.includes(interaction.commandName) && interaction.channelId !== CONFIG.CHANNELS.COMMANDES) {
             return interaction.reply({ content: `❌ Utilise <#${CONFIG.CHANNELS.COMMANDES}>`, ephemeral: true });
         }
@@ -67,6 +73,23 @@ function registerInteractionEvents(client, context) {
             case 'panel': return handlePanel(interaction);
             case 'clips-backfill': return handleClipsBackfill(interaction);
             case 'clips-backfill-status': return handleClipsBackfillStatus(interaction);
+            case 'board-armes-refresh': {
+                if (interaction.user.id !== ADMIN_USER_ID) {
+                    return interaction.reply({ content: '❌ Commande réservée à l’admin.', ephemeral: true });
+                }
+                await interaction.deferReply({ ephemeral: true });
+                try {
+                    await refreshArmesBoard(client);
+                    audit({ id: interaction.user.id, username: interaction.user.username }, 'board.armes.refresh.manual', {
+                        target_type: 'discord_board',
+                        target_id: BOARD_CHANNEL_ID,
+                    });
+                    return interaction.editReply('✅ Board armes rafraîchie.');
+                } catch (e) {
+                    log.warn({ err: e.message }, 'refresh board armes manuel échoué');
+                    return interaction.editReply(`❌ Refresh impossible : ${e.message}`);
+                }
+            }
             default: return undefined;
         }
     });
