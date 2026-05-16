@@ -1,3 +1,4 @@
+<!-- REORG ADMIN 17/05/2026 - drag-drop onglets + localStorage -->
 <!-- ONGLET HISTORIQUE 16/05/2026 — ajout consultation audit log admin -->
 <!-- STABILISATION FINALE 15/05/2026 - bump cache assets -->
 <!-- CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune -->
@@ -10,7 +11,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Admin · 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260517-input-fix">
+<link rel="stylesheet" href="/style.css?v=20260517-reorg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -27,8 +28,13 @@
 
 <main class="admin-main">
 
+    <div class="admin-reorder-controls">
+        <button id="adminReorderToggleBtn" class="btn-secondary btn-small" onclick="toggleAdminTabReorder()">&#128295; R&eacute;organiser</button>
+        <button id="adminReorderResetBtn" class="btn-secondary btn-small" onclick="resetAdminTabOrder()" style="display:none;">&#8634; Ordre par d&eacute;faut</button>
+    </div>
+
     <!-- TABS ADMIN -->
-    <nav class="admin-tabs">
+    <nav class="admin-tabs" id="adminTabsNav">
         <button class="admin-tab active" data-admin-tab="weapons" onclick="switchAdminTab('weapons')">🔫 Armes</button>
         <button class="admin-tab" data-admin-tab="saleNames" onclick="switchAdminTab('saleNames')">📋 Armes à vendre</button>
         <button class="admin-tab" data-admin-tab="ingredients" onclick="switchAdminTab('ingredients')">🧪 Ingrédients</button>
@@ -374,6 +380,6 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="/admin.js?v=20260517"></script>
+<script src="/admin.js?v=20260517-reorg"></script>
 </body>
 </html>

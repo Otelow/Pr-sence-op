@@ -3,6 +3,7 @@
 // CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier
 // CHANTIER COMMANDES 15/05/2026 — UI commandes ingrédients et publication Discord
 // FINAL D3 16/05/2026 — monitoring runtime admin
+// RÉORG ADMIN 17/05/2026 — drag-drop onglets + localStorage
 // ============================================================
 // ADMIN PANEL — JS
 // ============================================================
@@ -25,6 +26,9 @@ let monitoringTimer = null;
 let adminMembersLoadedAt = 0;
 let editingIngredients = []; // [{ ingredient_id, name, amount }]
 let adminWeaponQuery = '';
+const ADMIN_TAB_ORDER_KEY = 'admin.tabOrder.v1';
+let adminReorderMode = false;
+let adminDraggedTab = null;
 
 const ORDER_ADVANCE_PARTICIPANTS = [
     { id: 'otelow', name: 'Otelow' },
@@ -34,6 +38,8 @@ const ORDER_ADVANCE_PARTICIPANTS = [
 let adminIngredientQuery = '';
 
 document.addEventListener('DOMContentLoaded', async () => {
+    applySavedAdminTabOrder();
+
     // Vérifier admin
     try {
         const r = await fetch('/api/admin/check');
@@ -280,6 +286,172 @@ function stopMonitoringPolling() {
 }
 
 window.loadAdminMonitoring = loadAdminMonitoring;
+
+// ==========================================
+// RÉORGANISATION ONGLETS ADMIN (drag & drop)
+// ==========================================
+function getAdminTabsNav() {
+    return document.getElementById('adminTabsNav') || document.querySelector('.admin-tabs');
+}
+
+function getAdminTabButtons() {
+    const nav = getAdminTabsNav();
+    return nav ? Array.from(nav.querySelectorAll('[data-admin-tab]')) : [];
+}
+
+function applySavedAdminTabOrder() {
+    const raw = localStorage.getItem(ADMIN_TAB_ORDER_KEY);
+    if (!raw) return;
+
+    let savedOrder;
+    try {
+        savedOrder = JSON.parse(raw);
+    } catch {
+        return;
+    }
+    if (!Array.isArray(savedOrder)) return;
+
+    const nav = getAdminTabsNav();
+    if (!nav) return;
+
+    const buttons = getAdminTabButtons();
+    const byName = new Map(buttons.map(button => [button.dataset.adminTab, button]));
+    savedOrder.forEach(name => {
+        const button = byName.get(name);
+        if (button) nav.appendChild(button);
+    });
+    buttons.forEach(button => {
+        if (!savedOrder.includes(button.dataset.adminTab)) nav.appendChild(button);
+    });
+}
+
+function saveAdminTabOrder() {
+    const order = getAdminTabButtons().map(button => button.dataset.adminTab);
+    localStorage.setItem(ADMIN_TAB_ORDER_KEY, JSON.stringify(order));
+}
+
+function toggleAdminTabReorder() {
+    adminReorderMode = !adminReorderMode;
+    const nav = getAdminTabsNav();
+    const toggleBtn = document.getElementById('adminReorderToggleBtn');
+    const resetBtn = document.getElementById('adminReorderResetBtn');
+    if (!nav || !toggleBtn) return;
+
+    if (adminReorderMode) {
+        nav.classList.add('admin-tabs-reorder');
+        toggleBtn.innerHTML = '✅ Terminé';
+        toggleBtn.classList.add('btn-primary');
+        toggleBtn.classList.remove('btn-secondary');
+        if (resetBtn) resetBtn.style.display = '';
+        enableTabDragAndDrop();
+        toast('🔧 Glisse les onglets pour réorganiser', 'info');
+    } else {
+        nav.classList.remove('admin-tabs-reorder');
+        toggleBtn.innerHTML = '🔧 Réorganiser';
+        toggleBtn.classList.remove('btn-primary');
+        toggleBtn.classList.add('btn-secondary');
+        if (resetBtn) resetBtn.style.display = 'none';
+        disableTabDragAndDrop();
+        saveAdminTabOrder();
+        toast('✅ Ordre sauvegardé', 'success');
+    }
+}
+
+function enableTabDragAndDrop() {
+    getAdminTabButtons().forEach(button => {
+        button.setAttribute('draggable', 'true');
+        button.addEventListener('click', onTabReorderClick, true);
+        button.addEventListener('dragstart', onTabDragStart);
+        button.addEventListener('dragover', onTabDragOver);
+        button.addEventListener('drop', onTabDrop);
+        button.addEventListener('dragend', onTabDragEnd);
+        button.addEventListener('dragenter', onTabDragEnter);
+        button.addEventListener('dragleave', onTabDragLeave);
+    });
+}
+
+function disableTabDragAndDrop() {
+    getAdminTabButtons().forEach(button => {
+        button.removeAttribute('draggable');
+        button.removeEventListener('click', onTabReorderClick, true);
+        button.removeEventListener('dragstart', onTabDragStart);
+        button.removeEventListener('dragover', onTabDragOver);
+        button.removeEventListener('drop', onTabDrop);
+        button.removeEventListener('dragend', onTabDragEnd);
+        button.removeEventListener('dragenter', onTabDragEnter);
+        button.removeEventListener('dragleave', onTabDragLeave);
+        button.classList.remove('tab-dragging', 'tab-drag-over');
+    });
+}
+
+function onTabReorderClick(e) {
+    if (!adminReorderMode) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+}
+
+function onTabDragStart(e) {
+    adminDraggedTab = e.currentTarget;
+    e.currentTarget.classList.add('tab-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', e.currentTarget.dataset.adminTab);
+}
+
+function onTabDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function onTabDragEnter(e) {
+    if (e.currentTarget !== adminDraggedTab) {
+        e.currentTarget.classList.add('tab-drag-over');
+    }
+}
+
+function onTabDragLeave(e) {
+    e.currentTarget.classList.remove('tab-drag-over');
+}
+
+function onTabDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.classList.remove('tab-drag-over');
+    if (!adminDraggedTab || adminDraggedTab === target) return;
+
+    const nav = getAdminTabsNav();
+    const buttons = getAdminTabButtons();
+    const fromIdx = buttons.indexOf(adminDraggedTab);
+    const toIdx = buttons.indexOf(target);
+    if (!nav || fromIdx < 0 || toIdx < 0) return;
+
+    if (fromIdx < toIdx) {
+        nav.insertBefore(adminDraggedTab, target.nextSibling);
+    } else {
+        nav.insertBefore(adminDraggedTab, target);
+    }
+}
+
+function onTabDragEnd(e) {
+    e.currentTarget.classList.remove('tab-dragging');
+    getAdminTabButtons().forEach(button => button.classList.remove('tab-drag-over'));
+    adminDraggedTab = null;
+}
+
+async function resetAdminTabOrder() {
+    const ok = await confirmAction({
+        title: 'Réinitialiser',
+        message: 'Réinitialiser l’ordre des onglets ?',
+        confirmText: 'Réinitialiser',
+        danger: true,
+    });
+    if (!ok) return;
+    localStorage.removeItem(ADMIN_TAB_ORDER_KEY);
+    location.reload();
+}
+
+window.toggleAdminTabReorder = toggleAdminTabReorder;
+window.resetAdminTabOrder = resetAdminTabOrder;
 
 // ─── HISTORIQUE AUDIT ─────────────────────────────────────
 async function initAdminAuditTab() {

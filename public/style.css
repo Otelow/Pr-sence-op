@@ -10233,6 +10233,40 @@ body:has(#impersonateBanner[style*="flex"]) {
     display: contents;
 }
 
+/* RÉORG ADMIN 17/05/2026 — drag-drop onglets + localStorage */
+.admin-reorder-controls {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 0 20px 8px;
+}
+
+.admin-tabs-reorder [data-admin-tab] {
+    cursor: grab;
+    border: 1px dashed rgba(255, 140, 0, 0.4);
+    transition: all 0.15s;
+}
+
+.admin-tabs-reorder [data-admin-tab]:hover {
+    background: rgba(255, 140, 0, 0.1);
+}
+
+.admin-tabs-reorder [data-admin-tab]:active,
+.admin-tabs-reorder .tab-dragging {
+    cursor: grabbing;
+    opacity: 0.4;
+}
+
+.admin-tabs-reorder .tab-drag-over {
+    border-color: var(--accent) !important;
+    background: rgba(255, 140, 0, 0.18) !important;
+    box-shadow: -3px 0 0 var(--accent), 3px 0 0 var(--accent);
+}
+
+.admin-tabs-reorder [data-admin-tab] {
+    pointer-events: auto;
+}
+
 @media (max-width: 900px) {
     .audit-filters {
         grid-template-columns: 1fr;
