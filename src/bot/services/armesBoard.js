@@ -1,3 +1,4 @@
+// FIX LABEL 17/05/2026 — "En cours" → "En cours de vente"
 // STATUT EN COURS 17/05/2026 — statut jaune sur board armes
 // BOARD ARMES v2 17/05/2026 — format clean + regroupement
 const { EmbedBuilder } = require('discord.js');
@@ -101,7 +102,7 @@ function pluralExemplaires(count) {
 
 function buildGroupEntry(group, { sold = false } = {}) {
     const name = escapeMarkdown(group.name);
-    const status = group.inProgress && !sold ? ' 🟡 EN COURS' : '';
+    const status = group.inProgress && !sold ? ' 🟡 EN COURS DE VENTE' : '';
     const owner = escapeMarkdown(group.ownerName);
     const unitPrice = formatMoney(group.unitPrice);
     const total = formatMoney(group.unitPrice * group.count);
