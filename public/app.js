@@ -1,3 +1,4 @@
+// TRI CRAFT 16/05/2026 — ordre affichage prêt à vendre, en vente, vendu
 // HISTORIQUE CRAFT 16/05/2026 — tableau craft complet, tri logique et historique permanent
 // VAGUE EN COURS 17/05/2026 — shimmer jaune armes en cours
 // FIX VISUEL EN COURS 17/05/2026 — uniformisation badge + bouton
@@ -2578,8 +2579,8 @@ let craftCatalogFilters = {
 let craftBoardState = {
     page: 1,
     pageSize: 50,
-    sortBy: 'logic',
-    sortDir: 'asc',
+    sortBy: 'created',
+    sortDir: 'desc',
 };
 let craftHistoryState = {
     page: 1,
@@ -3558,10 +3559,13 @@ function getCraftBoardActiveRequests() {
 }
 
 function getCraftBoardLogicRank(r) {
-    if (r.status === 'materials' || r.status === 'waiting_materials') return 10;
-    if (r.status === 'in_progress') return 20;
-    if (r.status === 'crafted' || r.crafted || r.craft_date || r.serial_number) return 30;
-    if (r.status === 'completed') return 40;
+    const saleState = r.sale_state || 'not_listed';
+    const readyToSell = r.status === 'crafted' || r.crafted || r.craft_date || r.serial_number;
+    if (saleState === 'not_listed' && readyToSell && r.status !== 'completed') return 10;
+    if (saleState === 'listed') return 20;
+    if (saleState === 'sold' || r.status === 'completed') return 30;
+    if (r.status === 'materials' || r.status === 'waiting_materials') return 40;
+    if (r.status === 'in_progress') return 50;
     return 90;
 }
 
@@ -3579,10 +3583,10 @@ function sortCraftBoardRequests(items) {
     const sortBy = craftBoardState.sortBy;
     const dir = craftBoardState.sortDir === 'desc' ? -1 : 1;
     return [...items].sort((a, b) => {
-        if (sortBy === 'logic') {
-            const rankDiff = getCraftBoardLogicRank(a) - getCraftBoardLogicRank(b);
-            if (rankDiff !== 0) return rankDiff;
+        const rankDiff = getCraftBoardLogicRank(a) - getCraftBoardLogicRank(b);
+        if (rankDiff !== 0) return rankDiff;
 
+        if (sortBy === 'logic') {
             const dateDiff = getCraftBoardLogicDate(b) - getCraftBoardLogicDate(a);
             if (dateDiff !== 0) return dateDiff;
 

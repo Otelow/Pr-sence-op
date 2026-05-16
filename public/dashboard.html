@@ -1,3 +1,4 @@
+<!-- TRI CRAFT 16/05/2026 - ordre prêt à vendre, en vente, vendu -->
 <!-- HISTORIQUE CRAFT 16/05/2026 - tableau craft complet et permanent -->
 <!-- VAGUE EN COURS 17/05/2026 - shimmer jaune armes en cours -->
 <!-- FIX VISUEL EN COURS 17/05/2026 - uniformisation badge + bouton -->
@@ -14,7 +15,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260516-craft-history">
+<link rel="stylesheet" href="/style.css?v=20260516-craft-sort">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -742,7 +743,6 @@
                 <div class="craft-board-sort">
                     <label class="comm-label" for="craftBoardSortBy">Trier par</label>
                     <select id="craftBoardSortBy" class="comm-input craft-board-select" onchange="updateCraftBoardSort()">
-                        <option value="logic">Logique automatique</option>
                         <option value="created">Date de demande</option>
                         <option value="user">Utilisateur</option>
                         <option value="weapon">Nom de l'arme</option>
@@ -1122,6 +1122,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260516-craft-history"></script>
+<script src="/app.js?v=20260516-craft-sort"></script>
 </body>
 </html>
