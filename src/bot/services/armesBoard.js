@@ -1,4 +1,4 @@
-// BOARD ARMES 17/05/2026 — messages live armes en vente/vendues
+// BOARD ARMES v2 17/05/2026 — format clean + regroupement
 const { EmbedBuilder } = require('discord.js');
 const log = require('../../shared/logger');
 const { createConnection } = require('../../shared/database');
@@ -6,8 +6,7 @@ const { loadState, saveState } = require('./state');
 
 const BOARD_CHANNEL_ID = '1505212389203644447';
 const STATE_KEY = 'armes_board';
-const MAX_DESCRIPTION = 3900;
-const MAX_EMBEDS_PER_MESSAGE = 10;
+const MAX_DESCRIPTION = 4096;
 
 let db = null;
 let isRefreshing = false;
@@ -18,6 +17,15 @@ function getDb() {
     return db;
 }
 
+function cleanText(value, fallback = '—') {
+    const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+    return text || fallback;
+}
+
+function escapeMarkdown(value) {
+    return cleanText(value).replace(/([\\`*_{}\[\]()#+\-.!|>])/g, '\\$1');
+}
+
 function formatMoney(value) {
     const amount = Number(value) || 0;
     return `${amount.toLocaleString('fr-FR')} $`;
@@ -26,119 +34,126 @@ function formatMoney(value) {
 function formatDateParis() {
     return new Date().toLocaleString('fr-FR', {
         timeZone: 'Europe/Paris',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+        dateStyle: 'short',
+        timeStyle: 'short',
     });
-}
-
-function truncatePad(value, width, align = 'left') {
-    const raw = String(value || '-').replace(/\s+/g, ' ').trim();
-    const shortened = raw.length > width ? `${raw.slice(0, Math.max(0, width - 1))}…` : raw;
-    return align === 'right' ? shortened.padStart(width, ' ') : shortened.padEnd(width, ' ');
 }
 
 function salePrice(row) {
     return Number(row.sold_price ?? row.asking_price ?? row.min_price ?? 0) || 0;
 }
 
+function shortSerial(value) {
+    const serial = String(value ?? '').trim();
+    if (!serial) return null;
+    return serial.length > 5 ? `${serial.slice(0, 5)}…` : serial;
+}
+
 function loadWeapons() {
-    const rows = getDb().prepare(`
+    return getDb().prepare(`
         SELECT *
         FROM my_weapons
         ORDER BY COALESCE(sold_price, asking_price, min_price, 0) DESC, created_at DESC, id DESC
-    `).all();
+    `).all().map(row => ({
+        ...row,
+        board_price: salePrice(row),
+    }));
+}
 
-    const batchCounts = new Map();
+function groupWeapons(rows) {
+    const groups = new Map();
+
     for (const row of rows) {
-        const key = row.batch_id || `single-${row.id}`;
-        const current = batchCounts.get(key) || { total: 0, sold: 0, available: 0 };
-        current.total += 1;
-        if (row.is_sold) current.sold += 1;
-        else current.available += 1;
-        batchCounts.set(key, current);
-    }
+        const key = [
+            cleanText(row.weapon_name, '').toLowerCase(),
+            cleanText(row.user_name, '').toLowerCase(),
+            String(row.board_price),
+            cleanText(row.sold_to, '').toLowerCase(),
+        ].join('|');
 
-    return rows.map(row => {
-        const counts = batchCounts.get(row.batch_id || `single-${row.id}`) || { total: 1, sold: row.is_sold ? 1 : 0, available: row.is_sold ? 0 : 1 };
-        return {
-            ...row,
-            board_price: salePrice(row),
-            board_quantity: row.is_sold ? `${counts.sold}/${counts.total}` : `${counts.available}/${counts.total}`,
-            board_serial: row.serial_number || 'N/A',
-        };
-    });
-}
-
-function buildOnSaleLine(row) {
-    return [
-        truncatePad(row.weapon_name, 25),
-        truncatePad(row.user_name, 18),
-        truncatePad(row.board_quantity, 5),
-        truncatePad(row.board_serial, 6),
-        truncatePad(formatMoney(row.board_price), 13, 'right'),
-    ].join(' ');
-}
-
-function buildSoldLine(row) {
-    return [
-        truncatePad(row.weapon_name, 22),
-        truncatePad(row.sold_by_name || row.user_name, 18),
-        truncatePad(row.board_quantity, 5),
-        truncatePad(row.board_serial, 6),
-        truncatePad(formatMoney(row.board_price), 13, 'right'),
-        truncatePad(row.sold_to || '-', 18),
-    ].join(' ');
-}
-
-function chunkLines(header, separator, lines) {
-    const chunks = [];
-    let current = [header, separator];
-
-    for (const line of lines) {
-        const next = [...current, line];
-        const candidate = `\`\`\`\n${next.join('\n')}\n\`\`\``;
-        if (candidate.length > MAX_DESCRIPTION && current.length > 2) {
-            chunks.push(current);
-            current = [header, separator, line];
-        } else {
-            current = next;
+        if (!groups.has(key)) {
+            groups.set(key, {
+                name: cleanText(row.weapon_name),
+                ownerName: cleanText(row.user_name),
+                soldTo: cleanText(row.sold_to, ''),
+                unitPrice: row.board_price,
+                createdAt: row.created_at || 0,
+                count: 0,
+                serials: [],
+            });
         }
+
+        const group = groups.get(key);
+        group.count += 1;
+        group.createdAt = Math.max(group.createdAt, row.created_at || 0);
+        if (row.serial_number) group.serials.push(String(row.serial_number).trim());
     }
 
-    if (current.length === 2) current.push('Aucune arme à afficher.');
-    chunks.push(current);
-    return chunks;
+    return [...groups.values()].sort((a, b) => (b.unitPrice - a.unitPrice) || (b.createdAt - a.createdAt));
 }
 
-function buildEmbeds({ title, color, rows, lineBuilder, header, separator }) {
-    const sorted = [...rows].sort((a, b) => (b.board_price - a.board_price) || ((b.created_at || 0) - (a.created_at || 0)));
-    const lines = sorted.map(lineBuilder);
-    const chunks = chunkLines(header, separator, lines);
-    const updatedAt = formatDateParis();
-
-    return chunks.map((chunk, index) => {
-        const total = chunks.length;
-        const pageTitle = total > 1
-            ? title.replace('{count}', `${rows.length} (${index + 1}/${total})`)
-            : title.replace('{count}', String(rows.length));
-
-        return new EmbedBuilder()
-            .setTitle(pageTitle)
-            .setColor(color)
-            .setDescription(`\`\`\`\n${chunk.join('\n')}\n\`\`\``)
-            .setFooter({ text: `Mise à jour : ${updatedAt} — Triées du + cher au - cher` });
-    });
+function pluralExemplaires(count) {
+    return `${count} exemplaire${count > 1 ? 's' : ''}`;
 }
 
-function splitEmbedsIntoMessages(embeds) {
-    const messages = [];
-    for (let i = 0; i < embeds.length; i += MAX_EMBEDS_PER_MESSAGE) {
-        messages.push(embeds.slice(i, i + MAX_EMBEDS_PER_MESSAGE));
+function buildGroupEntry(group, { sold = false } = {}) {
+    const name = escapeMarkdown(group.name);
+    const owner = escapeMarkdown(group.ownerName);
+    const unitPrice = formatMoney(group.unitPrice);
+    const total = formatMoney(group.unitPrice * group.count);
+
+    if (group.count > 1) {
+        const lines = [
+            `**${name}** \`×${group.count}\` — \`${unitPrice} /u\``,
+            `${owner} · ${pluralExemplaires(group.count)} · *Total : ${total}*`,
+        ];
+        if (sold && group.soldTo) lines.push(`🛒 Vendu à **${escapeMarkdown(group.soldTo)}**`);
+        return lines.join('\n');
     }
-    return messages;
+
+    const details = [owner, pluralExemplaires(1)];
+    const serial = shortSerial(group.serials[0]);
+    if (serial) details.push(`Série \`${escapeMarkdown(serial)}\``);
+
+    const lines = [
+        `**${name}** — \`${unitPrice}\``,
+        details.join(' · '),
+    ];
+    if (sold && group.soldTo) lines.push(`🛒 Vendu à **${escapeMarkdown(group.soldTo)}**`);
+    return lines.join('\n');
+}
+
+function fitDescription(entries) {
+    if (!entries.length) return { description: '_Aucune arme à afficher._', hidden: 0 };
+
+    let description = '';
+    for (let i = 0; i < entries.length; i += 1) {
+        const next = description ? `${description}\n\n${entries[i]}` : entries[i];
+        const hiddenAfterThis = entries.length - i - 1;
+        const suffix = hiddenAfterThis > 0 ? `\n\n*… +${hiddenAfterThis} autres groupes non affichés*` : '';
+        if ((next + suffix).length > MAX_DESCRIPTION) {
+            return {
+                description: `${description}\n\n*… +${entries.length - i} autres groupes non affichés*`.trim(),
+                hidden: entries.length - i,
+            };
+        }
+        description = next;
+    }
+
+    return { description, hidden: 0 };
+}
+
+function buildCategoryEmbed({ title, color, rows, sold = false }) {
+    const groups = groupWeapons(rows);
+    const entries = groups.map(group => buildGroupEntry(group, { sold }));
+    const { description, hidden } = fitDescription(entries);
+    if (hidden > 0) log.warn({ hidden, title }, 'board armes description tronquée');
+
+    return new EmbedBuilder()
+        .setTitle(title.replace('{count}', String(groups.length)))
+        .setColor(color)
+        .setDescription(description)
+        .setFooter({ text: `Mise à jour : ${formatDateParis()}` });
 }
 
 async function editOrCreateMessage(channel, messageId, embeds) {
@@ -191,24 +206,20 @@ async function runRefresh(botClient) {
     const onSale = weapons.filter(row => !row.is_sold);
     const sold = weapons.filter(row => row.is_sold);
 
-    const onSaleEmbeds = buildEmbeds({
+    const onSaleEmbeds = [buildCategoryEmbed({
         title: '🟢 ARMES EN VENTE — {count}',
-        color: 0x4ade80,
+        color: 0x1D9E75,
         rows: onSale,
-        lineBuilder: buildOnSaleLine,
-        header: 'Arme                      Vendeur            Qté   Série  Prix',
-        separator: '======================================================================',
-    });
-    const soldEmbeds = buildEmbeds({
+        sold: false,
+    })];
+    const soldEmbeds = [buildCategoryEmbed({
         title: '🔴 ARMES VENDUES — {count}',
-        color: 0xef4444,
+        color: 0xA32D2D,
         rows: sold,
-        lineBuilder: buildSoldLine,
-        header: 'Arme                   Vendeur            Qté   Série  Prix          Vendu à',
-        separator: '================================================================================',
-    });
+        sold: true,
+    })];
 
-    const nextOnSaleMessageIds = await syncCategoryMessages(channel, state.onSaleMessageIds, splitEmbedsIntoMessages(onSaleEmbeds));
+    const nextOnSaleMessageIds = await syncCategoryMessages(channel, state.onSaleMessageIds, [onSaleEmbeds]);
     saveState(STATE_KEY, {
         ...state,
         channelId: BOARD_CHANNEL_ID,
@@ -216,15 +227,14 @@ async function runRefresh(botClient) {
         lastUpdate: Math.floor(Date.now() / 1000),
     });
 
-    const nextSoldMessageIds = await syncCategoryMessages(channel, state.soldMessageIds, splitEmbedsIntoMessages(soldEmbeds));
-    const nextState = {
+    const nextSoldMessageIds = await syncCategoryMessages(channel, state.soldMessageIds, [soldEmbeds]);
+    saveState(STATE_KEY, {
         channelId: BOARD_CHANNEL_ID,
         onSaleMessageIds: nextOnSaleMessageIds,
         soldMessageIds: nextSoldMessageIds,
         lastUpdate: Math.floor(Date.now() / 1000),
-    };
+    });
 
-    saveState(STATE_KEY, nextState);
     log.info({ onSale: onSale.length, sold: sold.length }, '✅ Board armes rafraîchi');
 }
 
