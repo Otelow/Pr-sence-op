@@ -1,3 +1,4 @@
+/* FIX VISUEL EN COURS 17/05/2026 — uniformisation badge + bouton */
 /* STATUT EN COURS 17/05/2026 — badges et bouton admin Vos Armes */
 /* HOTFIX 17/05/2026 ? min-height inputs/selects corrig? */
 /* FINAL POST-STAB B 17/05/2026 ? d?duplication prudente CSS */
@@ -37,24 +38,66 @@
 }
 
 .weapon-status-in-progress {
-    background: rgba(250, 199, 117, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(250, 199, 117, 0.08);
     color: #FAC775;
-    border: 1px solid rgba(250, 199, 117, 0.3);
+    border: 1px solid rgba(250, 199, 117, 0.4);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.weapon-status-in-progress::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #FAC775;
+    flex-shrink: 0;
 }
 
 .btn-status-in-progress {
-    background: rgba(250, 199, 117, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(250, 199, 117, 0.08);
     color: #FAC775;
     border: 1px solid rgba(250, 199, 117, 0.4);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.btn-status-in-progress::before {
+    content: "";
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #FAC775;
+    flex-shrink: 0;
 }
 
 .btn-status-in-progress:hover {
-    background: rgba(250, 199, 117, 0.25);
+    background: rgba(250, 199, 117, 0.15);
+    border-color: rgba(250, 199, 117, 0.6);
 }
 
 .btn-status-in-progress.active {
-    background: #FAC775;
-    color: #1a1a1a;
+    background: rgba(250, 199, 117, 0.2);
 }
 
 :root {

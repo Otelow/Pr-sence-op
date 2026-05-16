@@ -1,3 +1,4 @@
+// FIX VISUEL EN COURS 17/05/2026 — uniformisation badge + bouton
 // FIX LABEL 17/05/2026 — "En cours" → "En cours de vente"
 // STATUT EN COURS 17/05/2026 — badges et boutons admin Vos Armes
 // STABILISATION FINALE 15/05/2026 - polling salons pilote par Socket.IO
@@ -4918,11 +4919,11 @@ function renderMyWeapons() {
         const statusBadge = isSold
             ? '<span class="myweapons-tag-status sold">VENDUE</span>'
             : (isInProgress
-                ? '<span class="weapon-status-badge weapon-status-in-progress">🟡 EN COURS DE VENTE</span>'
+                ? '<span class="weapon-status-in-progress">En cours de vente</span>'
                 : '<span class="myweapons-tag-status available"><span class="wave-text-effect sale-badge-wave">' + renderWaveTextSpans('EN VENTE') + '</span></span>');
         const actionButtons = [
             canEditWeapon ? `<button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>` : '',
-            canToggleInProgress ? `<button class="btn-status-in-progress ${isInProgress ? 'active' : ''}" onclick="toggleWeaponInProgress(${w.id}, ${isInProgress ? 'false' : 'true'})">${isInProgress ? '🟡 Annuler en cours de vente' : '🟡 En cours de vente'}</button>` : '',
+            canToggleInProgress ? `<button class="btn-status-in-progress ${isInProgress ? 'active' : ''}" onclick="toggleWeaponInProgress(${w.id}, ${isInProgress ? 'false' : 'true'})">${isInProgress ? 'Annuler en cours de vente' : 'En cours de vente'}</button>` : '',
             canMarkSoldWeapon ? `<button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>` : '',
             canDeleteWeapon ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : '',
         ].filter(Boolean).join('');
