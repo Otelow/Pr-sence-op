@@ -1,3 +1,4 @@
+// STATUT EN COURS 17/05/2026 — toggle vente en cours et actions admin
 // BOARD ARMES 17/05/2026 — refresh board live sur mutations Vos Armes
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('../../../shared/logger');
@@ -48,6 +49,14 @@ function registerMyWeaponsRoutes(app, deps) {
         refreshArmesBoard(botClient).catch(e => log.warn({ err: e.message, reason }, 'refresh board armes échoué'));
     }
 
+    function getMyWeaponById(id) {
+        return db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
+    }
+
+    function canMarkAnyWeaponSold(user) {
+        return canValidateCraft(user) || canDeleteMyWeapons(user);
+    }
+
     function validateMyWeaponPriceLimit({ weaponName, weaponId, askingPrice, minPrice }) {
         const adminWeapon = weaponId ? getWeapon(weaponId) : getWeaponByName(weaponName);
         const myWeaponName = getMyWeaponNameByName(weaponName);
@@ -88,9 +97,11 @@ function registerMyWeaponsRoutes(app, deps) {
                     quantity_total: 0,
                     quantity_available: 0,
                     is_mine: item.user_id === userId,
+                    is_in_progress: item.is_in_progress ? 1 : 0,
                 });
             }
             const group = grouped.get(key);
+            if (item.is_in_progress) group.is_in_progress = 1;
             group.quantity_total++;
             group.row_ids.push(item.id);
             const serialEntry = {
@@ -110,6 +121,7 @@ function registerMyWeaponsRoutes(app, deps) {
                 group.available_row_ids.push(item.id);
                 group.id = item.id;
                 group.is_sold = 0;
+                group.is_in_progress = item.is_in_progress ? 1 : group.is_in_progress;
                 group.sold_to = null;
                 group.sold_price = null;
                 group.sold_at = null;
@@ -504,6 +516,45 @@ function registerMyWeaponsRoutes(app, deps) {
         }
     });
 
+    app.put('/api/crafts/my-weapons/:id/toggle-in-progress', requireAuth, (req, res) => {
+        try {
+            const id = parseId(req.params.id);
+            if (id === null) return res.status(400).json({ error: 'ID invalide' });
+            const existing = getMyWeaponById(id);
+            if (!existing) return res.status(404).json({ error: 'Annonce introuvable' });
+            if (!canMarkAnyWeaponSold(req.session.user)) {
+                return res.status(403).json({ error: 'Action admin requise' });
+            }
+            if (existing.is_sold) {
+                return res.status(400).json({ error: 'Une arme vendue ne peut pas passer en cours de vente' });
+            }
+
+            const inProgress = req.body?.in_progress === true || req.body?.in_progress === 1 || req.body?.in_progress === '1' || req.body?.in_progress === 'true';
+            const now = Math.floor(Date.now() / 1000);
+            db.prepare(`
+                UPDATE my_weapons
+                SET is_in_progress = ?, in_progress_at = ?, in_progress_by = ?
+                WHERE id = ?
+            `).run(inProgress ? 1 : 0, inProgress ? now : null, inProgress ? req.session.user.id : null, id);
+
+            const updatedWeapon = getMyWeaponById(id);
+            emitRealtime('weapon:updated', { id });
+            emitRealtime('craft:status', { requestId: updatedWeapon?.craft_request_id || null, myWeaponId: id, status: inProgress ? 'in_progress' : 'listed', action: 'myweapon-in-progress' });
+            audit(req.session.user, 'weapon.toggleInProgress', {
+                target_type: 'my_weapon',
+                target_id: id,
+                details: {
+                    in_progress: inProgress,
+                    weapon_name: existing.weapon_name,
+                },
+            });
+            queueArmesBoardRefresh('weapon.toggleInProgress');
+            res.json({ success: true, weapon: updatedWeapon });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     app.put('/api/crafts/myweapons/:id', requireAuth, async (req, res) => {
         try {
             const id = parseId(req.params.id);
@@ -586,6 +637,9 @@ function registerMyWeaponsRoutes(app, deps) {
                 `).run(ownerId, ownerName, ownerAvatar, weaponName, isCrafted ? 1 : 0, serial || null, askingPrice, minPrice, nextIsSold ? 1 : 0, soldTo, soldPrice, soldAt, id);
 
 
+            if (nextIsSold) {
+                db.prepare('UPDATE my_weapons SET is_in_progress = 0, in_progress_at = NULL, in_progress_by = NULL WHERE id = ?').run(id);
+            }
             const updatedWeapon = getMyWeaponById(id);
             emitRealtime('craft:status', { requestId: updatedWeapon?.craft_request_id || null, myWeaponId: id, status: updatedWeapon?.is_sold ? 'sold' : 'listed', action: 'myweapon-updated' });
             audit(req.session.user, 'weapon.update', {
@@ -620,7 +674,8 @@ function registerMyWeaponsRoutes(app, deps) {
                             existing = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
 
             if (!existing) return res.status(404).json({ error: 'Introuvable' });
-            if (existing.user_id !== userId && !canDeleteRequests(req.session.user)) {
+            const adminMarkSold = String(existing.user_id) !== String(userId) && canMarkAnyWeaponSold(req.session.user);
+            if (String(existing.user_id) !== String(userId) && !canMarkAnyWeaponSold(req.session.user)) {
                 return res.status(403).json({ error: 'Action non autorisée — seul le vendeur peut marquer comme vendu' });
             }
 
@@ -637,7 +692,7 @@ function registerMyWeaponsRoutes(app, deps) {
             const soldByName = String(sold_by_name || '').trim();
             if (!soldById) return res.status(400).json({ error: 'Vendeur obligatoire' });
 
-                            db.prepare(`UPDATE my_weapons SET is_sold = 1, sold_to = ?, sold_price = ?, sold_at = ?, sold_by_id = ?, sold_by_name = ? WHERE id = ?`)
+                            db.prepare(`UPDATE my_weapons SET is_sold = 1, is_in_progress = 0, in_progress_at = NULL, in_progress_by = NULL, sold_to = ?, sold_price = ?, sold_at = ?, sold_by_id = ?, sold_by_name = ? WHERE id = ?`)
                     .run(soldTo, soldPrice, now, soldById, soldByName, id);
 
 
@@ -736,6 +791,17 @@ function registerMyWeaponsRoutes(app, deps) {
                     craft_request_id: matchedRequestForLog?.id || existing.craft_request_id || null,
                 },
             });
+            if (adminMarkSold) {
+                audit(req.session.user, 'weapon.markSold.byAdmin', {
+                    target_type: 'my_weapon',
+                    target_id: id,
+                    details: {
+                        weapon_name: existing.weapon_name,
+                        original_owner: existing.user_name,
+                        original_owner_id: existing.user_id,
+                    },
+                });
+            }
             queueArmesBoardRefresh('weapon.markSold');
             res.json({ success: true, autoFilledCraft });
         } catch (e) { res.status(500).json({ error: e.message }); }

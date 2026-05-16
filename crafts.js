@@ -10,6 +10,7 @@
 // MODIFIÉ CHANTIER 12 — 14/05/2026 — events temps réel craft/dashboard
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes craft extraites en modules web
 // ==========================================
+// STATUT EN COURS 17/05/2026 — colonnes suivi vente en cours
 // FINAL POST-STAB D 17/05/2026 — indexes SQL performance crafts
 // STABILISATION FINALE v2 16/05/2026 — migrations suivies et audit log admin
 const path = require('path');
@@ -150,6 +151,11 @@ const MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_order_advances_status ON order_advances(status);
         CREATE INDEX IF NOT EXISTS idx_order_advances_created ON order_advances(created_at DESC);
     `) },
+    { name: '050_my_weapons_in_progress', migrate: db => db.exec(`
+        ALTER TABLE my_weapons ADD COLUMN is_in_progress INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE my_weapons ADD COLUMN in_progress_at INTEGER;
+        ALTER TABLE my_weapons ADD COLUMN in_progress_by TEXT;
+    `) },
 ];
 
 function markMigrationApplied(name) {
@@ -265,6 +271,9 @@ function initDB() {
                     crafted_by_name TEXT,
                     sold_by_id TEXT,
                     sold_by_name TEXT,
+                    is_in_progress INTEGER NOT NULL DEFAULT 0,
+                    in_progress_at INTEGER,
+                    in_progress_by TEXT,
                     discord_message_id TEXT,
                     weapons_log_message_id TEXT,
                     sale_discord_message_id TEXT,

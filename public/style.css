@@ -1,3 +1,4 @@
+/* STATUT EN COURS 17/05/2026 — badges et bouton admin Vos Armes */
 /* HOTFIX 17/05/2026 ? min-height inputs/selects corrig? */
 /* FINAL POST-STAB B 17/05/2026 ? d?duplication prudente CSS */
 /* FINAL D1/D3 16/05/2026 ? WebP/gold + monitoring admin */
@@ -18,6 +19,42 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+/* STATUT EN COURS 17/05/2026 — badges et bouton admin Vos Armes */
+.weapon-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.weapon-status-in-progress {
+    background: rgba(250, 199, 117, 0.15);
+    color: #FAC775;
+    border: 1px solid rgba(250, 199, 117, 0.3);
+}
+
+.btn-status-in-progress {
+    background: rgba(250, 199, 117, 0.15);
+    color: #FAC775;
+    border: 1px solid rgba(250, 199, 117, 0.4);
+}
+
+.btn-status-in-progress:hover {
+    background: rgba(250, 199, 117, 0.25);
+}
+
+.btn-status-in-progress.active {
+    background: #FAC775;
+    color: #1a1a1a;
 }
 
 :root {

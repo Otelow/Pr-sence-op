@@ -1,3 +1,4 @@
+// STATUT EN COURS 17/05/2026 — badges et boutons admin Vos Armes
 // STABILISATION FINALE 15/05/2026 - polling salons pilote par Socket.IO
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // ==========================================
@@ -3440,6 +3441,10 @@ function canDeleteMyWeaponsClient() {
     return roles.includes(MY_WEAPONS_DELETE_ROLE) || canDeleteRequestsClient();
 }
 
+function canAdminManageMyWeaponsClient() {
+    return canDeleteMyWeaponsClient() || canValidateCraftClient();
+}
+
 function syncCraftPermissionUI() {
     const canManageCraft = canValidateCraftClient();
     const testField = document.getElementById('craftTestField');
@@ -4882,7 +4887,9 @@ function renderMyWeapons() {
                 ${w.min_price ? `<span class="mw-min-price">📉 Min : ${w.min_price.toLocaleString('fr-FR')}$</span>` : ''}
             `;
 
-        const canEditWeapon = (isMine && !isSold) || canDeleteMyWeaponsClient();
+        const isAdminWeaponManager = canAdminManageMyWeaponsClient();
+        const isInProgress = !isSold && (w.is_in_progress === true || w.is_in_progress === 1 || w.is_in_progress === '1');
+        const canEditWeapon = isMine && !isSold;
         const canDeleteWeapon = isMine || canDeleteMyWeaponsClient();
         let actions = isMine && !isSold ? `
             <div class="mw-actions">
@@ -4905,13 +4912,28 @@ function renderMyWeapons() {
             `;
         }
 
+        const canMarkSoldWeapon = !isSold && (isMine || isAdminWeaponManager);
+        const canToggleInProgress = !isSold && isAdminWeaponManager;
+        const statusBadge = isSold
+            ? '<span class="myweapons-tag-status sold">VENDUE</span>'
+            : (isInProgress
+                ? '<span class="weapon-status-badge weapon-status-in-progress">🟡 EN COURS</span>'
+                : '<span class="myweapons-tag-status available"><span class="wave-text-effect sale-badge-wave">' + renderWaveTextSpans('EN VENTE') + '</span></span>');
+        const actionButtons = [
+            canEditWeapon ? `<button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>` : '',
+            canToggleInProgress ? `<button class="btn-status-in-progress ${isInProgress ? 'active' : ''}" onclick="toggleWeaponInProgress(${w.id}, ${isInProgress ? 'false' : 'true'})">${isInProgress ? '🟡 Annuler en cours' : '🟡 En cours'}</button>` : '',
+            canMarkSoldWeapon ? `<button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>` : '',
+            canDeleteWeapon ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : '',
+        ].filter(Boolean).join('');
+        actions = actionButtons ? `<div class="mw-actions">${actionButtons}</div>` : '';
+
         return `
             <div class="myweapons-item weapon-sale-card ${isSold ? 'mw-sold-row' : 'mw-available-row mw-sale-active dynamic-sale-effect'} ${isMine ? 'mw-mine' : ''}">
                 ${avatar}
                 <div class="myweapons-item-body">
                     <div class="myweapons-item-name">
                         ${escapeHtml(w.weapon_name)}
-                        <span class="myweapons-tag-status ${isSold ? 'sold' : 'available'}">${isSold ? 'VENDUE' : `<span class="wave-text-effect sale-badge-wave">${renderWaveTextSpans('EN VENTE')}</span>`}</span>
+                        ${statusBadge}
                         ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
                         <span class="myweapons-tag-stock">${availableQty}/${totalQty}</span>
                     </div>
@@ -5166,6 +5188,23 @@ async function confirmMarkSold(e) {
     }
 }
 
+async function toggleWeaponInProgress(id, newState) {
+    try {
+        const res = await fetch(`/api/crafts/my-weapons/${id}/toggle-in-progress`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ in_progress: newState }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erreur');
+        toast(newState ? '🟡 Marquée en cours de vente' : '✅ Statut "en cours" annulé', 'success');
+        await loadMyWeapons();
+        renderMyWeapons();
+    } catch (e) {
+        toast(`❌ ${e.message}`, 'error');
+    }
+}
+
 async function deleteMyWeapon(id) {
     if (!await confirmAction({ title: 'Supprimer l’annonce', message: 'Supprimer cette annonce de vente ?', confirmText: 'Supprimer', danger: true })) return;
     try {
@@ -5192,4 +5231,5 @@ window.toggleMyWeaponDetails = toggleMyWeaponDetails;
 window.toggleMarkSoldBuyerDropdown = toggleMarkSoldBuyerDropdown;
 window.selectMarkSoldBuyer = selectMarkSoldBuyer;
 window.confirmMarkSold = confirmMarkSold;
+window.toggleWeaponInProgress = toggleWeaponInProgress;
 window.deleteMyWeapon = deleteMyWeapon;

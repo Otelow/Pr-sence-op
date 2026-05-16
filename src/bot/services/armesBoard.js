@@ -1,3 +1,4 @@
+// STATUT EN COURS 17/05/2026 — statut jaune sur board armes
 // BOARD ARMES v2 17/05/2026 — format clean + regroupement
 const { EmbedBuilder } = require('discord.js');
 const log = require('../../shared/logger');
@@ -69,6 +70,7 @@ function groupWeapons(rows) {
             cleanText(row.user_name, '').toLowerCase(),
             String(row.board_price),
             cleanText(row.sold_to, '').toLowerCase(),
+            row.is_in_progress ? 'in_progress' : 'normal',
         ].join('|');
 
         if (!groups.has(key)) {
@@ -77,6 +79,7 @@ function groupWeapons(rows) {
                 ownerName: cleanText(row.user_name),
                 soldTo: cleanText(row.sold_to, ''),
                 unitPrice: row.board_price,
+                inProgress: !!row.is_in_progress,
                 createdAt: row.created_at || 0,
                 count: 0,
                 serials: [],
@@ -98,13 +101,14 @@ function pluralExemplaires(count) {
 
 function buildGroupEntry(group, { sold = false } = {}) {
     const name = escapeMarkdown(group.name);
+    const status = group.inProgress && !sold ? ' 🟡 EN COURS' : '';
     const owner = escapeMarkdown(group.ownerName);
     const unitPrice = formatMoney(group.unitPrice);
     const total = formatMoney(group.unitPrice * group.count);
 
     if (group.count > 1) {
         const lines = [
-            `**${name}** \`×${group.count}\` — \`${unitPrice} /u\``,
+            `**${name}**${status} \`×${group.count}\` — \`${unitPrice} /u\``,
             `${owner} · ${pluralExemplaires(group.count)} · *Total : ${total}*`,
         ];
         if (sold && group.soldTo) lines.push(`🛒 Vendu à **${escapeMarkdown(group.soldTo)}**`);
@@ -116,7 +120,7 @@ function buildGroupEntry(group, { sold = false } = {}) {
     if (serial) details.push(`Série \`${escapeMarkdown(serial)}\``);
 
     const lines = [
-        `**${name}** — \`${unitPrice}\``,
+        `**${name}**${status} — \`${unitPrice}\``,
         details.join(' · '),
     ];
     if (sold && group.soldTo) lines.push(`🛒 Vendu à **${escapeMarkdown(group.soldTo)}**`);
