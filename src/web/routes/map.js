@@ -1,3 +1,4 @@
+// ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // STABILISATION 15/05/2026 — carte persistée en SQLite
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes carte isolées
 // AUDIT HOOKS 16/05/2026 — points carte tracés dans audit_log
@@ -11,7 +12,7 @@ const { audit } = require('../../shared/auditLog');
 function registerMapRoutes(app, deps) {
     const {
         requireAuth,
-        requireFullSiteAccess,
+        requireMapViewAccess,
         isUserAdmin,
         canEditMapUser,
     } = deps;
@@ -20,7 +21,7 @@ function registerMapRoutes(app, deps) {
         return canEditMapUser(req.session.user);
     }
 
-    app.get('/api/map/points', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/map/points', requireAuth, requireMapViewAccess, (req, res) => {
         const userId = req.session.user?.id;
         const userRoles = req.session.user?.roles || [];
 

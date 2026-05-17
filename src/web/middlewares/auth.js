@@ -1,9 +1,11 @@
+// ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — middlewares auth/permissions web isolés
 const {
     ADMIN_USER_ID,
     FULL_ACCESS_ROLES,
     LIMITED_CRAFT_ACCESS_ROLES,
+    canViewMap,
 } = require('../../shared/permissions');
 
 function requireAuth(req, res, next) {
@@ -40,6 +42,14 @@ function canEditMapUser(user) {
     return hasFullSiteAccess(user);
 }
 
+function requireMapViewAccess(req, res, next) {
+    if (!req.session.user) return res.status(401).json({ error: 'Non connecté' });
+    if (!canViewMap(req.session.user)) {
+        return res.status(403).json({ error: 'Accès carte refusé' });
+    }
+    next();
+}
+
 function requireFullSiteAccess(req, res, next) {
     if (!hasFullSiteAccess(req.session.user)) {
         return res.status(403).json({ error: 'Accès confidentiel réservé aux hauts gradés' });
@@ -57,10 +67,12 @@ module.exports = {
     requireAuth,
     requireAdmin,
     requireFullSiteAccess,
+    requireMapViewAccess,
     isUserAdmin,
     hasFullSiteAccess,
     hasLimitedCraftAccess,
     canAccessCrafts,
     canAccessMyWeapons,
     canEditMapUser,
+    canViewMap,
 };

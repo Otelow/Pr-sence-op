@@ -1,3 +1,4 @@
+// ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème
 // TRI CRAFT 16/05/2026 — ordre affichage prêt à vendre, en vente, vendu
 // HISTORIQUE CRAFT 16/05/2026 — tableau craft complet, tri logique et historique permanent
@@ -210,6 +211,9 @@ let ADMIN_ROLE_ID = '1485279148246175764';
 let FULL_ACCESS_ROLES = ['1485279148246175764', '1486744891848654988', '1485279534650494976'];
 let LIMITED_CRAFT_ACCESS_ROLES = [
     '1495448653945634987',
+];
+let MAP_VIEW_ROLES = [
+    ...FULL_ACCESS_ROLES,
     '1485636099853516982',
     '1485270431291277383',
 ];
@@ -224,6 +228,7 @@ async function loadPublicConfig() {
         ADMIN_ROLE_ID = data.adminRoleId || ADMIN_ROLE_ID;
         FULL_ACCESS_ROLES = Array.isArray(data.fullAccessRoles) ? data.fullAccessRoles : FULL_ACCESS_ROLES;
         LIMITED_CRAFT_ACCESS_ROLES = Array.isArray(data.limitedCraftAccessRoles) ? data.limitedCraftAccessRoles : LIMITED_CRAFT_ACCESS_ROLES;
+        MAP_VIEW_ROLES = Array.isArray(data.mapViewRoles) ? data.mapViewRoles : MAP_VIEW_ROLES;
         if (data.myWeaponsDeleteRole) MY_WEAPONS_DELETE_ROLE = data.myWeaponsDeleteRole;
     } catch (e) {
         console.warn('Config publique indisponible, fallback local utilisé:', e.message);
@@ -255,9 +260,19 @@ function canAccessMyWeaponsTab() {
     return checkUserAccess() || hasLimitedCraftAccess();
 }
 
+function canViewMapTab() {
+    if (!window.currentUser) return false;
+    const impersonateRole = localStorage.getItem('impersonate_role');
+    if (impersonateRole) return MAP_VIEW_ROLES.includes(impersonateRole);
+    if (window.currentUser.id === ADMIN_USER_ID) return true;
+    const roles = window.currentUser.roles || [];
+    return MAP_VIEW_ROLES.some(r => roles.includes(r));
+}
+
 function canAccessDashboardTab(tabName) {
     if (tabName === 'crafts') return canAccessCraftsTab();
     if (tabName === 'myweapons') return canAccessMyWeaponsTab();
+    if (tabName === 'map') return canViewMapTab();
     return checkUserAccess();
 }
 

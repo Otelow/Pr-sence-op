@@ -1,3 +1,4 @@
+// ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('./src/shared/logger');
 // FINAL POST-STAB G 17/05/2026 — middleware alerte erreurs serveur
@@ -37,6 +38,7 @@ const {
     requireAuth,
     requireAdmin,
     requireFullSiteAccess,
+    requireMapViewAccess,
     isUserAdmin,
     hasFullSiteAccess,
     hasLimitedCraftAccess,
@@ -371,7 +373,7 @@ function startServer(client, getState) {
     // ==========================================
     registerMapRoutes(app, {
         requireAuth,
-        requireFullSiteAccess,
+        requireMapViewAccess,
         isUserAdmin,
         canEditMapUser,
     });

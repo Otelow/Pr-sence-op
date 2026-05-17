@@ -1,11 +1,14 @@
+// ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes config utilisateur isolées
 const {
     ADMIN_USER_ID,
     ADMIN_ROLE_ID,
     FULL_ACCESS_ROLES,
     LIMITED_CRAFT_ACCESS_ROLES,
+    MAP_VIEW_ROLES,
     LAB_VISIBLE_USERS,
     MY_WEAPONS_DELETE_ROLE,
+    canViewMap,
 } = require('../../shared/permissions');
 
 function registerConfigRoutes(app, deps) {
@@ -27,6 +30,7 @@ function registerConfigRoutes(app, deps) {
             hasLimitedCraftAccess: hasLimitedCraftAccess(req.session.user),
             canAccessCrafts: canAccessCrafts(req.session.user),
             canAccessMyWeapons: canAccessMyWeapons(req.session.user),
+            canViewMap: canViewMap(req.session.user),
         };
         res.json(user);
     });
@@ -37,6 +41,7 @@ function registerConfigRoutes(app, deps) {
             adminRoleId: ADMIN_ROLE_ID,
             fullAccessRoles: FULL_ACCESS_ROLES,
             limitedCraftAccessRoles: LIMITED_CRAFT_ACCESS_ROLES,
+            mapViewRoles: MAP_VIEW_ROLES,
             labVisibleUsers: LAB_VISIBLE_USERS,
             myWeaponsDeleteRole: MY_WEAPONS_DELETE_ROLE,
         });
@@ -50,6 +55,7 @@ function registerConfigRoutes(app, deps) {
             hasLimitedCraftAccess: hasLimitedCraftAccess(req.session.user),
             canAccessCrafts: canAccessCrafts(req.session.user),
             canAccessMyWeapons: canAccessMyWeapons(req.session.user),
+            canViewMap: canViewMap(req.session.user),
         });
     });
 
