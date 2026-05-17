@@ -1,3 +1,4 @@
+// DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème
 // TRI CRAFT 16/05/2026 — ordre affichage prêt à vendre, en vente, vendu
 // HISTORIQUE CRAFT 16/05/2026 — tableau craft complet, tri logique et historique permanent
 // VAGUE EN COURS 17/05/2026 — shimmer jaune armes en cours
@@ -427,6 +428,7 @@ async function loadPresence() {
 
         renderOP('op1', data.op1);
         renderOP('op2', data.op2);
+        renderDecrochesOP(data.decrochesEntre1ereEt2eme);
         renderAbsencesSalon(data.absencesSalon);
     } catch (e) {
         console.error('Presence:', e);
@@ -481,6 +483,56 @@ function renderOP(prefix, op) {
             </div>
         </div>
     `).join('');
+}
+
+function renderDecrochesOP(data) {
+    const card = document.getElementById('decrochesCard');
+    const count = document.getElementById('decrochesCount');
+    const list = document.getElementById('decrochesList');
+    if (!card || !count || !list) return;
+
+    if (!data || data.hidden) {
+        card.style.display = 'none';
+        return;
+    }
+
+    card.style.display = '';
+    const members = Array.isArray(data.members) ? data.members : [];
+    count.textContent = data.count === null || data.count === undefined ? '—' : String(data.count);
+
+    if (data.message === 'En attente de la 2ème OP') {
+        list.innerHTML = '<p class="decroches-pending">⏳ En attente de la 2ème présence OP</p>';
+        return;
+    }
+
+    if (!members.length) {
+        list.innerHTML = '<p class="decroches-empty">👍 Aucun décrochage</p>';
+        return;
+    }
+
+    const icon1 = { 'présent': '✅', retard: '🕐' };
+    const icon2 = { pasDeReaction: '⚠️', absentNonJustifie: '❌' };
+    const label1 = { 'présent': 'Présent', retard: 'Retard' };
+    const label2 = { pasDeReaction: 'Pas de réaction', absentNonJustifie: 'Absent non justifié' };
+    const fallbackAvatar = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><rect width='28' height='28' fill='%23262626'/></svg>`;
+
+    list.innerHTML = members.map(member => {
+        const avatar = safeImageUrl(member.avatar_url) || fallbackAvatar;
+        const color = safeColor(member.role_color);
+        const statut1 = member.statut_1ere || 'présent';
+        const statut2 = member.statut_2eme || 'pasDeReaction';
+        return `
+            <div class="decroche-item">
+                <img class="decroche-avatar" src="${avatar}" alt="">
+                <div class="decroche-info">
+                    <span class="decroche-name" style="${color ? `color:${color};` : ''}">${escapeHtml(member.username || member.user_id || '?')}</span>
+                    <span class="decroche-trajectory" title="${escapeHtml(label1[statut1] || statut1)} → ${escapeHtml(label2[statut2] || statut2)}">
+                        ${icon1[statut1] || '✅'} → ${icon2[statut2] || '⚠️'}
+                    </span>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 function renderAbsencesSalon(data) {

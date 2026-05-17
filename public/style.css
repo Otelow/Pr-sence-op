@@ -1,3 +1,4 @@
+/* DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème */
 /* VAGUE EN COURS 17/05/2026 — shimmer jaune armes en cours */
 /* FIX VISUEL EN COURS 17/05/2026 — uniformisation badge + bouton */
 /* STATUT EN COURS 17/05/2026 — badges et bouton admin Vos Armes */
@@ -9968,6 +9969,113 @@ body:has(#impersonateBanner[style*="flex"]) {
 .weapon-card-in-progress > :not(.shimmer-overlay):not(.shimmer-overlay-2) {
     position: relative;
     z-index: 2;
+}
+
+/* Décrochés entre 1ère et 2ème OP */
+.decroches-card {
+    grid-column: 1 / -1;
+    margin-top: 16px;
+    border: 1px solid rgba(255, 170, 50, 0.25);
+}
+
+.presence-card {
+    background: var(--bg-card);
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.presence-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.presence-card-header h3 {
+    margin: 0;
+    color: var(--text);
+    font-family: var(--font-title);
+    letter-spacing: 0.04em;
+}
+
+.presence-card-count {
+    min-width: 42px;
+    text-align: center;
+    color: #ffaa44;
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.presence-card-sub {
+    margin: 6px 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.decroches-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.decroche-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+
+.decroche-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.decroche-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.decroche-name {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.decroche-trajectory {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+}
+
+.decroches-empty,
+.decroches-pending {
+    text-align: center;
+    padding: 18px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin: 0;
+    width: 100%;
+}
+
+.decroches-empty {
+    color: #00ff88;
+}
+
+.decroches-pending {
+    color: #ffaa44;
 }
 
 .order-advance-items {

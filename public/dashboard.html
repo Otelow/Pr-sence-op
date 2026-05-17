@@ -1,3 +1,4 @@
+<!-- DÉCROCHÉS OP 18/05/2026 - section décrochage entre 1ère et 2ème -->
 <!-- TRI CRAFT 16/05/2026 - ordre prêt à vendre, en vente, vendu -->
 <!-- HISTORIQUE CRAFT 16/05/2026 - tableau craft complet et permanent -->
 <!-- VAGUE EN COURS 17/05/2026 - shimmer jaune armes en cours -->
@@ -15,7 +16,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260516-craft-sort">
+<link rel="stylesheet" href="/style.css?v=20260518-decroches">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -137,6 +138,15 @@
                 </div>
                 <div class="op-categories" id="op2Categories"></div>
             </div>
+        </div>
+
+        <div class="presence-card decroches-card" id="decrochesCard" style="display:none;">
+            <div class="presence-card-header">
+                <h3>⚠️ Décrochés entre 1ère et 2ème OP</h3>
+                <span class="presence-card-count" id="decrochesCount">—</span>
+            </div>
+            <p class="presence-card-sub">Membres présents à la 1ère mais absents/sans réaction à la 2ème</p>
+            <div class="decroches-list" id="decrochesList"></div>
         </div>
 
         <div class="absences-panel">
@@ -1122,6 +1132,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260516-craft-sort"></script>
+<script src="/app.js?v=20260518-decroches"></script>
 </body>
 </html>

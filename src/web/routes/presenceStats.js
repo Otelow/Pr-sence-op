@@ -1,3 +1,4 @@
+// DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes présence et statistiques isolées
 
 // FINAL POST-STAB F 17/05/2026 — cache membres Discord côté serveur
@@ -54,8 +55,13 @@ function registerPresenceStatsRoutes(app, deps) {
                 const name = member.nickname || member.user.username;
                 const item = {
                     id: member.id,
+                    user_id: member.id,
                     name,
+                    username: name,
                     avatar: avatarUrl(member.id, member.user.avatar),
+                    avatar_url: avatarUrl(member.id, member.user.avatar),
+                    color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
+                    role_color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
                 };
                 const reaction = reactionMap.get(member.id);
 
@@ -69,9 +75,60 @@ function registerPresenceStatsRoutes(app, deps) {
             return result;
         };
 
+        const op1 = collectFromOP(state.presenceData, state.reactionsOP1);
+        const op2 = collectFromOP(state.presence2Data, state.reactionsOP2);
+
+        const buildDecroches = () => {
+            const op1Started = Boolean(state.presenceData.active && state.presenceData.messageId);
+            const op2Started = Boolean(state.presence2Data.active && state.presence2Data.messageId);
+            const op2HasReaction = Boolean(state.reactionsOP2?.size);
+            if (!op1Started) {
+                return {
+                    count: 0,
+                    members: [],
+                    message: '1ère présence OP non démarrée',
+                    hidden: true,
+                };
+            }
+            if (!op2Started || !op2HasReaction) {
+                return {
+                    count: null,
+                    members: [],
+                    message: 'En attente de la 2ème OP',
+                };
+            }
+
+            const op1PresentMembers = new Map();
+            for (const member of op1.present) op1PresentMembers.set(member.id, { member, statut_1ere: 'présent' });
+            for (const member of op1.late) op1PresentMembers.set(member.id, { member, statut_1ere: 'retard' });
+
+            const op2Dropped = new Map();
+            for (const member of op2.noReaction) op2Dropped.set(member.id, 'pasDeReaction');
+            for (const member of op2.absentReact) op2Dropped.set(member.id, 'absentNonJustifie');
+
+            const members = [...op1PresentMembers.entries()]
+                .filter(([id]) => op2Dropped.has(id))
+                .map(([id, entry]) => ({
+                    user_id: id,
+                    username: entry.member.username || entry.member.name,
+                    avatar_url: entry.member.avatar_url || entry.member.avatar,
+                    role_color: entry.member.role_color || entry.member.color,
+                    statut_1ere: entry.statut_1ere,
+                    statut_2eme: op2Dropped.get(id),
+                }))
+                .sort((a, b) => a.username.localeCompare(b.username, 'fr', { sensitivity: 'base' }));
+
+            return {
+                count: members.length,
+                members,
+                message: members.length ? null : 'Aucun décrochage',
+            };
+        };
+
         res.json({
-            op1: collectFromOP(state.presenceData, state.reactionsOP1),
-            op2: collectFromOP(state.presence2Data, state.reactionsOP2),
+            op1,
+            op2,
+            decrochesEntre1ereEt2eme: buildDecroches(),
             absencesSalon: {
                 valid: state.absenceSalonCache.validAbsenceNames || [],
                 invalid: state.absenceSalonCache.invalidAbsenceNames || [],
