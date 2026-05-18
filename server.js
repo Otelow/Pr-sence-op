@@ -1,3 +1,4 @@
+// QUICK WINS 3 18/05/2026 — erreurs 500 tracées pour monitoring
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('./src/shared/logger');
@@ -380,7 +381,7 @@ function startServer(client, getState) {
 
     app.use((err, req, res, next) => {
         log.error({ err: err?.message, path: req.path }, 'erreur serveur 500');
-        alertDiscordError(`Serveur 500 ${req.method} ${req.path}`);
+        alertDiscordError(`Serveur 500 ${req.method} ${req.path}`, err, { path: req.path });
         if (res.headersSent) return next(err);
         return res.status(500).json({ error: 'Erreur interne' });
     });

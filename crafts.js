@@ -1,3 +1,4 @@
+// QUICK WINS 2 18/05/2026 — export CSV audit log admin
 // NETTOYAGE 18/05/2026 — petits ajustements
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 // ONGLET HISTORIQUE 16/05/2026 — endpoint audit log paginé
@@ -19,7 +20,7 @@ const fs = require('fs');
 const config = require('./src/shared/config');
 const { ensureDataDirs, createConnection, runMigration } = require('./src/shared/database');
 const log = require('./src/shared/logger');
-const { audit, queryAuditLogs } = require('./src/shared/auditLog');
+const { audit, queryAuditLogs, exportAuditLogs } = require('./src/shared/auditLog');
 const {
     ADMIN_USER_ID,
     ADMIN_ROLE_ID,
@@ -761,6 +762,55 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         }
     });
 
+    function csvCell(value) {
+        const text = String(value ?? '');
+        if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+        return text;
+    }
+
+    app.get('/api/admin/audit-log/export.csv', requireAdmin, (req, res) => {
+        try {
+            const filters = {
+                action: req.query.action || '',
+                user_id: req.query.user_id || '',
+                since: req.query.since || '',
+            };
+            const rows = exportAuditLogs({
+                limit: 10000,
+                action: filters.action,
+                user_id: filters.user_id,
+                since: filters.since,
+            });
+            const header = ['Date ISO', 'Date FR', 'Utilisateur', 'User ID', 'Action', 'Type cible', 'ID cible', 'Détails JSON'];
+            const csv = [header.map(csvCell).join(',')];
+            for (const row of rows) {
+                const date = new Date((Number(row.created_at) || 0) * 1000);
+                const dateFR = date.toLocaleString('fr-FR', { timeZone: 'Europe/Paris' });
+                csv.push([
+                    date.toISOString(),
+                    dateFR,
+                    row.user_name || '',
+                    row.user_id || '',
+                    row.action || '',
+                    row.target_type || '',
+                    row.target_id || '',
+                    row.details || '',
+                ].map(csvCell).join(','));
+            }
+
+            audit(req.session.user, 'audit.export', {
+                target_type: 'audit_log',
+                details: { rows: rows.length, filters },
+            });
+
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="audit-log-${new Date().toISOString().slice(0, 10)}.csv"`);
+            res.send(`\ufeff${csv.join('\n')}`);
+        } catch (e) {
+            log.warn({ err: e.message }, 'audit log export CSV échoué');
+            res.status(500).json({ error: 'Impossible d’exporter l’historique admin' });
+        }
+    });
 }
 
 module.exports = { initDB, registerCraftEndpoints };

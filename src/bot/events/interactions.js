@@ -1,9 +1,12 @@
 // BOARD ARMES 17/05/2026 — slash refresh manuel board armes
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routeur interactions Discord isolé
+// QUICK WINS 5 18/05/2026 — commande slash stats hebdo
 const log = require('../../shared/logger');
 const { audit } = require('../../shared/auditLog');
+const config = require('../../shared/config');
 const { ADMIN_USER_ID } = require('../../shared/permissions');
 const { refreshArmesBoard, BOARD_CHANNEL_ID } = require('../services/armesBoard');
+const { postWeeklyStats } = require('../services/weeklyStats');
 
 function registerInteractionEvents(client, context) {
     const {
@@ -41,7 +44,7 @@ function registerInteractionEvents(client, context) {
             return interaction.reply({ content: '❌ Pas la permission.', ephemeral: true });
         }
 
-        const exempt = ['presence-test', 'presence-test2', 'clear', 'clearmessage', 'absence', 'presence-force', 'panel', 'clips-backfill', 'clips-backfill-status', 'board-armes-refresh'];
+        const exempt = ['presence-test', 'presence-test2', 'clear', 'clearmessage', 'absence', 'presence-force', 'panel', 'clips-backfill', 'clips-backfill-status', 'board-armes-refresh', 'stats-hebdo-now'];
         if (!exempt.includes(interaction.commandName) && interaction.channelId !== CONFIG.CHANNELS.COMMANDES) {
             return interaction.reply({ content: `❌ Utilise <#${CONFIG.CHANNELS.COMMANDES}>`, ephemeral: true });
         }
@@ -88,6 +91,29 @@ function registerInteractionEvents(client, context) {
                 } catch (e) {
                     log.warn({ err: e.message }, 'refresh board armes manuel échoué');
                     return interaction.editReply(`❌ Refresh impossible : ${e.message}`);
+                }
+            }
+            case 'stats-hebdo-now': {
+                if (interaction.user.id !== ADMIN_USER_ID) {
+                    return interaction.reply({ content: '❌ Commande réservée à l’admin.', ephemeral: true });
+                }
+                if (!config.discord.weeklyStatsChannelId) {
+                    return interaction.reply({
+                        content: 'Salon stats hebdo non configuré, ajouter WEEKLY_STATS_CHANNEL_ID en variable env.',
+                        ephemeral: true,
+                    });
+                }
+                await interaction.deferReply({ ephemeral: true });
+                try {
+                    await postWeeklyStats(client);
+                    audit({ id: interaction.user.id, username: interaction.user.username }, 'weekly.stats.manual', {
+                        target_type: 'discord_channel',
+                        target_id: config.discord.weeklyStatsChannelId,
+                    });
+                    return interaction.editReply('✅ Bilan hebdomadaire publié.');
+                } catch (e) {
+                    log.warn({ err: e.message }, 'stats hebdo manuel échoué');
+                    return interaction.editReply(`❌ Publication impossible : ${e.message}`);
                 }
             }
             default: return undefined;

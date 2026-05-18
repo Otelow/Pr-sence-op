@@ -1,3 +1,4 @@
+// QUICK WINS 5 18/05/2026 — cron stats hebdomadaires Discord
 // BOARD ARMES 17/05/2026 — init board armes live Discord
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../shared/logger');
@@ -58,6 +59,7 @@ const { sleep } = require('./utils/sleep');
 const { safeReact, addPresenceReactions } = require('./utils/safeReact');
 const { scheduleDailyBackups } = require('./services/backup');
 const { initArmesBoard } = require('./services/armesBoard');
+const { scheduleWeeklyStats } = require('./services/weeklyStats');
 const { loadState, saveState, deleteState } = require('./services/state');
 const { createWelcomeService } = require('./services/welcome');
 const { createWelcomeStatePersistence } = require('./services/welcomeState');
@@ -510,6 +512,7 @@ registerReadyEvent({
     registerCommands,
     setupPresenceCron,
     scheduleDailyBackups,
+    scheduleWeeklyStats,
     initArmesBoard,
     restoreAbsencePanelState,
     restoreRenameChecks,
@@ -585,7 +588,7 @@ process.on('unhandledRejection', e => {
 });
 process.on('uncaughtException', e => {
     log.error('❌ Uncaught Exception (fatal):', e);
-    alertDiscordError('Bot uncaughtException').finally(() => process.exit(1));
+    alertDiscordError('Bot uncaughtException', e).finally(() => process.exit(1));
 });
 
 // ==========================================

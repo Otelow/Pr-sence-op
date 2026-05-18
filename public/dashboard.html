@@ -1,3 +1,5 @@
+<!-- QUICK WINS 1 18/05/2026 - toasts audit temps reel -->
+<!-- QUICK WINS 4 18/05/2026 - reorganisation onglets dashboard -->
 <!-- ROLES MAP VIEW 18/05/2026 - accès lecture seule carte sans labs armes -->
 <!-- DÉCROCHÉS OP 18/05/2026 - section décrochage entre 1ère et 2ème -->
 <!-- TRI CRAFT 16/05/2026 - ordre prêt à vendre, en vente, vendu -->
@@ -17,7 +19,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260518-fixregression">
+<link rel="stylesheet" href="/style.css?v=20260518-quickwins">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -32,7 +34,12 @@
         <span class="sidebar-title">Centre Contrôle</span>
     </div>
 
-    <nav class="nav">
+    <div class="dashboard-reorder-controls">
+        <button id="dashReorderToggleBtn" class="btn-secondary btn-small" onclick="toggleDashTabReorder()">🔧 Réorganiser</button>
+        <button id="dashReorderResetBtn" class="btn-secondary btn-small" onclick="resetDashTabOrder()" style="display:none;">↺ Ordre par défaut</button>
+    </div>
+
+    <nav class="nav" id="dashTabsNav">
         <a href="#" class="nav-item active" data-tab="presence">
             <span class="nav-icon">▣</span>
             <span>Présence</span>
@@ -81,6 +88,10 @@
                 <a href="/auth/logout" class="logout-link">Déconnexion ↗</a>
             </div>
         </div>
+        <label class="audit-toast-toggle">
+            <input type="checkbox" id="auditToastToggle" onchange="toggleAuditToastPreference()" checked>
+            <span>🔔 Notifications activités admin</span>
+        </label>
     </div>
 </aside>
 
@@ -1133,6 +1144,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260518-fixregression"></script>
+<script src="/app.js?v=20260518-quickwins"></script>
 </body>
 </html>

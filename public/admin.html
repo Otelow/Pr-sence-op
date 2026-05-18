@@ -1,3 +1,5 @@
+<!-- QUICK WINS 2 18/05/2026 - export CSV audit log -->
+<!-- QUICK WINS 3 18/05/2026 - erreurs 24h monitoring -->
 <!-- VAGUE EN COURS 17/05/2026 - shimmer jaune armes en cours -->
 <!-- FIX VISUEL EN COURS 17/05/2026 - uniformisation badge + bouton -->
 <!-- FIX LABEL 17/05/2026 - libelle en cours de vente -->
@@ -16,7 +18,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Admin · 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260518-fixregression">
+<link rel="stylesheet" href="/style.css?v=20260518-quickwins">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -211,6 +213,7 @@
                 </div>
                 <div class="audit-filters-actions">
                     <button class="btn-primary" onclick="applyAuditFilters()">Filtrer</button>
+                    <button class="btn-secondary" onclick="exportAuditCSV()">📥 Exporter CSV</button>
                     <button class="btn-secondary" onclick="resetAuditFilters()">Réinitialiser</button>
                 </div>
             </div>
@@ -385,6 +388,6 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="/admin.js?v=20260518-fixregression"></script>
+<script src="/admin.js?v=20260518-quickwins"></script>
 </body>
 </html>

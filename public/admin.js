@@ -1,3 +1,5 @@
+// QUICK WINS 2 18/05/2026 — export CSV audit log
+// QUICK WINS 3 18/05/2026 — erreurs 24h monitoring
 // ONGLET HISTORIQUE 16/05/2026 — consultation visuelle audit log admin
 // CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune
 // CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier
@@ -245,6 +247,11 @@ function renderMonitoringGrid(data) {
             label: 'Backups',
             value: `${data.backups_count || 0} (${data.backups_last ? new Date(data.backups_last).toLocaleDateString('fr-FR') : '—'})`,
             color: data.backups_count ? 'normal' : 'orange',
+        },
+        {
+            label: 'Erreurs 24h',
+            value: data.errors_24h ?? 0,
+            color: (data.errors_24h ?? 0) > 10 ? 'red' : (data.errors_24h ?? 0) > 0 ? 'orange' : 'green',
         },
         { label: 'Version', value: `v${data.version} (Node ${data.node_version})`, color: 'normal' },
     ];
@@ -516,6 +523,15 @@ function resetAuditFilters() {
     loadAdminAuditLogs();
 }
 
+function exportAuditCSV() {
+    const params = new URLSearchParams();
+    if (adminAuditFilters.action) params.set('action', adminAuditFilters.action);
+    if (adminAuditFilters.user_id) params.set('user_id', adminAuditFilters.user_id);
+    if (adminAuditFilters.since) params.set('since', adminAuditFilters.since);
+    const query = params.toString();
+    window.location.href = `/api/admin/audit-log/export.csv${query ? `?${query}` : ''}`;
+}
+
 function auditActionClass(action) {
     const category = String(action || '').split('.')[0] || 'default';
     return category.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -571,6 +587,7 @@ function renderAdminAuditTable() {
 window.applyAuditFilters = applyAuditFilters;
 window.resetAuditFilters = resetAuditFilters;
 window.loadMoreAuditLogs = loadMoreAuditLogs;
+window.exportAuditCSV = exportAuditCSV;
 
 // ─── ROLES (impersonate) ────────────────────────
 async function loadAdminRoles() {

@@ -1,5 +1,6 @@
 // BOARD ARMES 17/05/2026 — commande refresh board armes
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — définitions slash commands isolées
+// QUICK WINS 5 18/05/2026 — commande slash stats hebdo
 const { SlashCommandBuilder } = require('discord.js');
 
 function buildSlashCommands() {
@@ -44,6 +45,7 @@ function buildSlashCommands() {
         new SlashCommandBuilder().setName('clips-backfill').setDescription('Lancer le scan historique des clips du forum'),
         new SlashCommandBuilder().setName('clips-backfill-status').setDescription('Voir l etat du scan historique des clips'),
         new SlashCommandBuilder().setName('board-armes-refresh').setDescription('Rafraîchir manuellement la board armes live'),
+        new SlashCommandBuilder().setName('stats-hebdo-now').setDescription('Publier le bilan hebdomadaire maintenant'),
     ];
 }
 

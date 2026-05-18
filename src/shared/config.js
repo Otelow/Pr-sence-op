@@ -1,3 +1,4 @@
+// QUICK WINS 5 18/05/2026 — salon stats hebdomadaires configurable
 const path = require('path');
 
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
@@ -22,7 +23,8 @@ const config = {
     discord: {
         token: process.env.DISCORD_TOKEN || '',
         guildId: process.env.GUILD_ID || '',
-        clientId: process.env.DISCORD_CLIENT_ID || ''
+        clientId: process.env.DISCORD_CLIENT_ID || '',
+        weeklyStatsChannelId: process.env.WEEKLY_STATS_CHANNEL_ID || ''
     },
     web: {
         port: Number(process.env.PORT || 3000),

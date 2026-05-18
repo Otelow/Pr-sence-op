@@ -1,3 +1,5 @@
+// QUICK WINS 1 18/05/2026 — notifications audit temps réel
+// QUICK WINS 4 18/05/2026 — drag-drop onglets dashboard
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème
 // TRI CRAFT 16/05/2026 — ordre affichage prêt à vendre, en vente, vendu
@@ -64,6 +66,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await runInitStep('loadPermissions', () => loadPermissions());
     await runInitStep('updateImpersonateBanner', () => updateImpersonateBanner());
     await runInitStep('applyPermissionsUI', () => applyPermissionsUI());
+    await runInitStep('applySavedDashTabOrder', () => applySavedDashTabOrder());
+    await runInitStep('setupAuditToastPreference', () => setupAuditToastPreference());
     await runInitStep('restoreLastTab', () => restoreLastTab());
     await runInitStep('setupRealtimeSocket', () => setupRealtimeSocket());
     await runInitStep('refreshAll', () => refreshAll());
@@ -123,6 +127,13 @@ function setupRealtimeSocket() {
         realtimeSocket.on(eventName, () => {
             if (tabs.includes(currentTab)) scheduleRealtimeRefresh(eventName);
         });
+    });
+
+    realtimeSocket.on('audit:new', payload => {
+        if (!checkUserAccess()) return;
+        if (window.currentUser?.username === payload.user_name) return;
+        if (localStorage.getItem('disable_audit_toasts') === '1') return;
+        showAuditToast(payload);
     });
 }
 
@@ -199,10 +210,144 @@ function setupNav() {
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', e => {
             e.preventDefault();
+            if (dashReorderMode) return;
             const tab = item.dataset.tab;
             switchTab(tab);
         });
     });
+}
+
+const DASH_TAB_ORDER_KEY = 'dashboard.tabOrder.v1';
+let dashReorderMode = false;
+let dashDraggedTab = null;
+
+function getDashTabsNav() {
+    return document.getElementById('dashTabsNav') || document.querySelector('.nav');
+}
+
+function getDashTabButtons() {
+    const nav = getDashTabsNav();
+    return nav ? Array.from(nav.querySelectorAll('[data-tab]')) : [];
+}
+
+function applySavedDashTabOrder() {
+    const raw = localStorage.getItem(DASH_TAB_ORDER_KEY);
+    if (!raw) return;
+    let savedOrder;
+    try { savedOrder = JSON.parse(raw); } catch { return; }
+    if (!Array.isArray(savedOrder)) return;
+    const nav = getDashTabsNav();
+    if (!nav) return;
+    const buttons = getDashTabButtons();
+    const byName = new Map(buttons.map(button => [button.dataset.tab, button]));
+    savedOrder.forEach(name => {
+        const button = byName.get(name);
+        if (button) nav.appendChild(button);
+    });
+    buttons.forEach(button => {
+        if (!savedOrder.includes(button.dataset.tab)) nav.appendChild(button);
+    });
+}
+
+function saveDashTabOrder() {
+    localStorage.setItem(DASH_TAB_ORDER_KEY, JSON.stringify(getDashTabButtons().map(button => button.dataset.tab)));
+}
+
+function toggleDashTabReorder() {
+    dashReorderMode = !dashReorderMode;
+    const nav = getDashTabsNav();
+    const toggleBtn = document.getElementById('dashReorderToggleBtn');
+    const resetBtn = document.getElementById('dashReorderResetBtn');
+    if (!nav || !toggleBtn) return;
+
+    if (dashReorderMode) {
+        nav.classList.add('dashboard-tabs-reorder');
+        toggleBtn.innerHTML = '✅ Terminé';
+        toggleBtn.classList.add('btn-primary');
+        toggleBtn.classList.remove('btn-secondary');
+        if (resetBtn) resetBtn.style.display = '';
+        enableDashTabDragAndDrop();
+        toast('🔧 Glisse les onglets pour réorganiser', 'info');
+    } else {
+        nav.classList.remove('dashboard-tabs-reorder');
+        toggleBtn.innerHTML = '🔧 Réorganiser';
+        toggleBtn.classList.remove('btn-primary');
+        toggleBtn.classList.add('btn-secondary');
+        if (resetBtn) resetBtn.style.display = 'none';
+        disableDashTabDragAndDrop();
+        saveDashTabOrder();
+        toast('✅ Ordre sauvegardé', 'success');
+    }
+}
+
+function enableDashTabDragAndDrop() {
+    getDashTabButtons().forEach(button => {
+        button.setAttribute('draggable', 'true');
+        button.addEventListener('dragstart', onDashTabDragStart);
+        button.addEventListener('dragover', onDashTabDragOver);
+        button.addEventListener('drop', onDashTabDrop);
+        button.addEventListener('dragend', onDashTabDragEnd);
+        button.addEventListener('dragenter', onDashTabDragEnter);
+        button.addEventListener('dragleave', onDashTabDragLeave);
+    });
+}
+
+function disableDashTabDragAndDrop() {
+    getDashTabButtons().forEach(button => {
+        button.removeAttribute('draggable');
+        button.removeEventListener('dragstart', onDashTabDragStart);
+        button.removeEventListener('dragover', onDashTabDragOver);
+        button.removeEventListener('drop', onDashTabDrop);
+        button.removeEventListener('dragend', onDashTabDragEnd);
+        button.removeEventListener('dragenter', onDashTabDragEnter);
+        button.removeEventListener('dragleave', onDashTabDragLeave);
+        button.classList.remove('tab-dragging', 'tab-drag-over');
+    });
+}
+
+function onDashTabDragStart(e) {
+    dashDraggedTab = e.currentTarget;
+    e.currentTarget.classList.add('tab-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', e.currentTarget.dataset.tab);
+}
+
+function onDashTabDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function onDashTabDragEnter(e) {
+    if (e.currentTarget !== dashDraggedTab) e.currentTarget.classList.add('tab-drag-over');
+}
+
+function onDashTabDragLeave(e) {
+    e.currentTarget.classList.remove('tab-drag-over');
+}
+
+function onDashTabDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.classList.remove('tab-drag-over');
+    if (!dashDraggedTab || dashDraggedTab === target) return;
+    const nav = getDashTabsNav();
+    const buttons = getDashTabButtons();
+    const fromIndex = buttons.indexOf(dashDraggedTab);
+    const toIndex = buttons.indexOf(target);
+    nav.insertBefore(dashDraggedTab, fromIndex < toIndex ? target.nextSibling : target);
+}
+
+function onDashTabDragEnd(e) {
+    e.currentTarget.classList.remove('tab-dragging');
+    getDashTabButtons().forEach(button => button.classList.remove('tab-drag-over'));
+    dashDraggedTab = null;
+}
+
+function resetDashTabOrder() {
+    if (!confirm('Réinitialiser l’ordre des onglets ?')) return;
+    localStorage.removeItem(DASH_TAB_ORDER_KEY);
+    location.reload();
 }
 
 // Permissions UI
@@ -792,6 +937,71 @@ function toast(message, type = 'success') {
         setTimeout(() => t.remove(), 300);
     }, 4000);
 }
+
+function setupAuditToastPreference() {
+    const input = document.getElementById('auditToastToggle');
+    if (!input) return;
+    input.checked = localStorage.getItem('disable_audit_toasts') !== '1';
+}
+
+function toggleAuditToastPreference() {
+    const input = document.getElementById('auditToastToggle');
+    if (!input) return;
+    localStorage.setItem('disable_audit_toasts', input.checked ? '0' : '1');
+    toast(input.checked ? '🔔 Notifications activités admin activées' : '🔕 Notifications activités admin désactivées', 'info');
+}
+
+function relativeAuditTime(createdAt) {
+    const seconds = Math.max(0, Math.floor(Date.now() / 1000) - (Number(createdAt) || Math.floor(Date.now() / 1000)));
+    if (seconds < 60) return `il y a ${seconds || 1} sec`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `il y a ${minutes} min`;
+    return `il y a ${Math.floor(minutes / 60)} h`;
+}
+
+function auditToastMessage(payload) {
+    const user = payload.user_name || 'Un admin';
+    const summary = payload.details_summary ? ` : ${payload.details_summary}` : '';
+    const messages = {
+        'sanction.add': `⚠️ ${user} a ajouté une sanction${summary}`,
+        'craft.request.validate': `✅ ${user} a validé un craft${summary}`,
+        'craft.request.create': `⚒ ${user} a créé une demande craft${summary}`,
+        'weapon.markSold': `💰 ${user} a marqué vendu${summary}`,
+        'weapon.markSold.byAdmin': `💰 ${user} a marqué vendu${summary}`,
+        'order.create': `🛒 ${user} a passé une commande${summary}`,
+        'order.update': `🛒 ${user} a modifié une commande${summary}`,
+        'mapPoint.create': `📍 ${user} a ajouté un point sur la carte`,
+        'mapPoint.update': `📍 ${user} a modifié un point sur la carte${summary}`,
+        'mapPoint.delete': `📍 ${user} a supprimé un point sur la carte`,
+    };
+    return messages[payload.action] || `📋 ${user} : ${payload.action || 'activité admin'}${summary}`;
+}
+
+function showAuditToast(payload) {
+    let stack = document.getElementById('auditToastStack');
+    if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'auditToastStack';
+        stack.className = 'audit-toast-stack';
+        document.body.appendChild(stack);
+    }
+    while (stack.children.length >= 3) stack.firstElementChild?.remove();
+    const item = document.createElement('div');
+    item.className = 'audit-toast';
+    item.innerHTML = `
+        <span>${escapeHtml(auditToastMessage(payload))}</span>
+        <span class="audit-toast-time">${escapeHtml(relativeAuditTime(payload.created_at))}</span>
+    `;
+    stack.appendChild(item);
+    setTimeout(() => {
+        item.classList.add('fade-out');
+        setTimeout(() => item.remove(), 400);
+    }, 6000);
+}
+
+window.toggleDashTabReorder = toggleDashTabReorder;
+window.resetDashTabOrder = resetDashTabOrder;
+window.toggleAuditToastPreference = toggleAuditToastPreference;
 
 function confirmAction(options = {}) {
     const {

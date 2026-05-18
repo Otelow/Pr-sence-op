@@ -1,3 +1,4 @@
+// QUICK WINS 3 18/05/2026 — compteur erreurs 24h monitoring
 // FINAL D3 16/05/2026 — endpoint monitoring admin détaillé
 const fs = require('fs');
 const path = require('path');
@@ -16,6 +17,7 @@ function registerHealthDetailedRoutes(app, { requireAdmin, getBotClient, getReal
         } catch {}
 
         const tableStats = [];
+        let errors24h = 0;
         let db;
         try {
             db = createConnection(config.paths.database);
@@ -35,6 +37,15 @@ function registerHealthDetailedRoutes(app, { requireAdmin, getBotClient, getReal
                     tableStats.push({ name: table, rows: row?.c || 0 });
                 } catch {}
             }
+            try {
+                const since24h = Math.floor(Date.now() / 1000) - 86400;
+                const row = db.prepare(`
+                    SELECT COUNT(*) as c
+                    FROM audit_log
+                    WHERE action LIKE 'error.%' AND created_at >= ?
+                `).get(since24h);
+                errors24h = Number(row?.c) || 0;
+            } catch {}
         } catch {
             // Monitoring non critique : on renvoie juste les métriques disponibles.
         } finally {
@@ -69,6 +80,7 @@ function registerHealthDetailedRoutes(app, { requireAdmin, getBotClient, getReal
             db_tables: tableStats,
             backups_count: backupsCount,
             backups_last: backupsLast,
+            errors_24h: errors24h,
             version: require('../../../package.json').version,
             node_version: process.version,
         });

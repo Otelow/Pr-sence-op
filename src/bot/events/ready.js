@@ -1,5 +1,6 @@
 // BOARD ARMES 17/05/2026 — init board armes live au ready
 // FINAL D2 16/05/2026 ? logs bot via pino
+// QUICK WINS 5 18/05/2026 — cron stats hebdomadaires Discord
 const log = require('../../shared/logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - event ready externalise
@@ -13,6 +14,7 @@ function registerReadyEvent(deps) {
         registerCommands,
         setupPresenceCron,
         scheduleDailyBackups,
+        scheduleWeeklyStats,
         restoreAbsencePanelState,
         restoreRenameChecks,
         loadReminders,
@@ -39,6 +41,8 @@ client.once('ready', async () => {
     await registerCommands();
     setupPresenceCron();
     scheduleDailyBackups();
+    scheduleWeeklyStats?.(client);
+    log.info('📊 Cron stats hebdomadaires programmé (dimanche 19h Paris)');
     restoreAbsencePanelState();
     if (initArmesBoard) {
         await initArmesBoard(client).catch(e => log.error({ err: e.message }, 'init armes board échoué'));
