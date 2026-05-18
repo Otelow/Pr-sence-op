@@ -1,3 +1,4 @@
+// WHITELIST CATEGORIES 18/05/2026 — autoriser liens/vidéos
 // QUICK WINS 5 18/05/2026 — salon stats hebdomadaires configurable
 const path = require('path');
 
@@ -47,7 +48,13 @@ const config = {
         forumChannelId: process.env.CLIPS_FORUM_CHANNEL_ID || '1500520790678962317',
         bucket: process.env.SUPABASE_CLIPS_BUCKET || 'clips',
         maxFileSizeBytes: Number(process.env.CLIPS_MAX_FILE_SIZE_MB || 100) * 1024 * 1024,
-        backfillBatchSize: Number(process.env.CLIPS_BACKFILL_BATCH_SIZE || 50)
+        backfillBatchSize: Number(process.env.CLIPS_BACKFILL_BATCH_SIZE || 50),
+        // Catégories Discord (parentId d'un salon) où les liens/vidéos sont autorisés
+        // sans suppression ni rappel automatique.
+        allowedCategoryIds: (process.env.CLIPS_ALLOWED_CATEGORY_IDS || '1485642192746971146')
+            .split(',')
+            .map(id => id.trim())
+            .filter(Boolean)
     },
     timeouts: {
         requestMs: Number(process.env.REQUEST_TIMEOUT_MS || 15000),

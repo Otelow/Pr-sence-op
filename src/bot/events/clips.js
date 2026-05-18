@@ -1,3 +1,4 @@
+// WHITELIST CATEGORIES 18/05/2026 — autoriser liens/vidéos
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — events clips forum isolés
@@ -11,6 +12,14 @@ function isClipForumMessage(message) {
     return String(message.channelId) === String(forumId) || String(message.channel?.parentId || '') === String(forumId);
 }
 
+function isInAllowedCategory(message) {
+    const allowedCats = config.clips.allowedCategoryIds || [];
+    if (allowedCats.length === 0) return false;
+    const parentId = String(message.channel?.parentId || '');
+    if (!parentId) return false;
+    return allowedCats.includes(parentId);
+}
+
 function messageHasClipPayload(message) {
     const hasClipLink = extractClipLinks(message.content).length > 0;
     const hasClipAttachment = message.attachments?.some(attachment => isClipAttachment(attachment));
@@ -20,6 +29,7 @@ function messageHasClipPayload(message) {
 async function maybeRemindClipForum(message) {
     if (!message || message.author?.bot) return;
     if (isClipForumMessage(message)) return;
+    if (isInAllowedCategory(message)) return;
     if (!messageHasClipPayload(message)) return;
 
     const now = Date.now();
@@ -69,5 +79,6 @@ function registerClipEvents(client) {
 module.exports = {
     registerClipEvents,
     isClipForumMessage,
+    isInAllowedCategory,
     maybeRemindClipForum,
 };
