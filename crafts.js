@@ -1,3 +1,4 @@
+// NETTOYAGE 18/05/2026 — petits ajustements
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 // ONGLET HISTORIQUE 16/05/2026 — endpoint audit log paginé
 // CHANTIER COMMANDES 15/05/2026 — catalogue commandes admin et publication Discord
@@ -92,6 +93,8 @@ function parseId(v, max = 2_000_000) {
     return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
 }
 
+// Ne jamais supprimer les anciennes migrations : schema_migrations garde la trace
+// de ce qui a déjà été appliqué sur les DB existantes en prod/Railway.
 const MIGRATIONS = [
     { name: '001_weapons_plan_image_path', migrate: db => db.exec('ALTER TABLE weapons ADD COLUMN plan_image_path TEXT') },
     { name: '002_weapons_requires_plan', migrate: db => db.exec('ALTER TABLE weapons ADD COLUMN requires_plan INTEGER DEFAULT 0') },

@@ -1,4 +1,5 @@
-﻿# 21 Block Savage — Bot Discord + Dashboard Web
+﻿<!-- NETTOYAGE 18/05/2026 — petits ajustements -->
+# 21 Block Savage — Bot Discord + Dashboard Web
 
 Dashboard web et bot Discord pour le serveur RP GTA 5 français 21 Block Savage, déployé sur Railway via GitHub.
 
@@ -14,6 +15,14 @@ Node 24, Discord.js v14, Express 4, better-sqlite3, Socket.IO, Pino, Helmet, mul
 - `public/` : front statique (dashboard, admin, assets)
 - `scripts/` : utilitaires CLI (`smoke-test`, `convert-assets`)
 - `data/` : SQLite DBs + backups (volume Railway)
+
+## Architecture des permissions
+
+Les rôles d'accès sont centralisés dans `src/shared/permissions.js`.
+
+- `FULL_ACCESS_ROLES` : hauts gradés, accès complet au dashboard et aux fonctions sensibles.
+- `LIMITED_CRAFT_ACCESS_ROLES` : accès limité aux onglets Crafts + Vos Armes.
+- `MAP_VIEW_ROLES` : accès lecture seule à la carte. Les points sensibles de type `weapon-lab` restent filtrés côté backend selon les règles dédiées.
 
 ## Démarrage local
 
