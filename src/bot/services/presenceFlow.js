@@ -1,3 +1,4 @@
+// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
@@ -36,7 +37,11 @@ function createPresenceFlowService(deps) {
         getPresenceItems,
         getCustomPresenceMessage,
         getAbsenceTracking,
+        loadState,
+        saveState,
         savePresenceState,
+        snapshotPresenceDay,
+        getParisDateKey,
         saveAbsenceTracking,
         refreshAbsencePanel,
         stopAbsencePanelRefresh,
@@ -47,6 +52,27 @@ function createPresenceFlowService(deps) {
     const presenceData = createStateProxy(getPresenceData);
     const presence2Data = createStateProxy(getPresence2Data);
     const absenceTracking = getAbsenceTracking();
+
+async function preparePresenceDayForFirstOp() {
+    const todayKey = getParisDateKey ? getParisDateKey() : new Date().toISOString().slice(0, 10);
+    const currentDay = loadState ? loadState('presence_current_day', null) : null;
+    if (currentDay === todayKey) return;
+
+    if (currentDay && typeof snapshotPresenceDay === 'function') {
+        await snapshotPresenceDay(currentDay).catch(e => {
+            log.warn({ err: e.message, date: currentDay }, 'snapshot présence avant reset échoué');
+        });
+    }
+
+    if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+    reactionsOP1.clear();
+    reactionsOP2.clear();
+    setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false });
+    setPresence2Data({ messageId: null, active: false, terminated: false });
+    if (saveState) saveState('presence_current_day', todayKey);
+    savePresenceState();
+    log.info(`📅 Nouveau jour présence initialisé : ${todayKey}`);
+}
 
 async function sendPresence2Message(channelOverride) {
     const channelId = channelOverride || CONFIG.CHANNELS.PRESENCE;
@@ -79,6 +105,7 @@ async function sendPresence2Message(channelOverride) {
 
         presence2Data.messageId = msg.id;
         presence2Data.active = true;
+        presence2Data.terminated = false;
         reactionsOP2.clear();
         savePresenceState();
         log.info(`📋 2ème Présence OP envoyée (${dateStr} ${timeStr})`);
@@ -91,7 +118,9 @@ async function sendPresence2Message(channelOverride) {
                 await oldMsg.delete();
                 log.info('🗑️ 2ème Présence OP supprimée (30min)');
             } catch {}
-            setPresence2Data({ messageId: null, active: false }); reactionsOP2.clear(); savePresenceState();
+            presence2Data.active = false;
+            presence2Data.terminated = true;
+            savePresenceState();
             await refreshAbsencePanel();
         }, 30 * 60 * 1000);
     } catch (error) {
@@ -109,8 +138,10 @@ function setupPresenceCron() {
 }
 
 async function sendPresenceMessage(channelOverride) {
+    await preparePresenceDayForFirstOp();
     if (presenceData.active) return;
     presenceData.active = true;
+    presenceData.terminated = false;
 
     const channelId = channelOverride || CONFIG.CHANNELS.PRESENCE;
     const channel = client.channels.cache.get(channelId);
@@ -140,7 +171,6 @@ async function sendPresenceMessage(channelOverride) {
 
         presenceData.messageId = msg.id;
         presenceData.reminderIds = [];
-        reactionsOP1.clear();
         savePresenceState();
         log.info(`📋 1ère Présence OP envoyée (${dateStr})`);
 
@@ -212,7 +242,7 @@ async function startPresenceReminders(channel, presenceMsg) {
             // 22h00 — Nettoyage des messages Discord (présence reste visible sur le site)
             replacePresenceCron('cleanup:22h00', '0 22 * * *', async () => {
                 if (!presenceData.active && !presence2Data.active) return;
-                log.info('🌙 22h — Nettoyage messages Discord (le panel site reste actif jusqu\'à 2h)');
+                log.info('🌙 22h — Nettoyage messages Discord (le panel site reste actif jusqu\'au lendemain)');
                 stopAbsencePanelRefresh();
 
                 // Supprimer les messages Discord mais garder l'état actif
@@ -225,23 +255,27 @@ async function startPresenceReminders(channel, presenceMsg) {
                 if (presence2Data.messageId) {
                     try { const m = await channel.messages.fetch(presence2Data.messageId); await m.delete(); } catch {}
                 }
-                // L'état reste 'active' avec les données de réactions pour que le site continue à les montrer
-                savePresenceState();
-            });
-
-            // 2h00 du matin — Reset complet (présence disparaît du site)
-            replacePresenceCron('reset:02h00', '0 2 * * *', async () => {
-                log.info('🌃 2h — Reset complet présence (site + état)');
-                clearAbsencePanelState();
-                if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
-                setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false });
-                reactionsOP1.clear();
-                setPresence2Data({ messageId: null, active: false });
-                reactionsOP2.clear();
+                presenceData.active = false;
+                presenceData.terminated = true;
+                presence2Data.active = false;
+                presence2Data.terminated = true;
                 savePresenceState();
                 try { await refreshAbsencePanel(); } catch {}
             });
-            log.info('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, reset complet 2h');
+
+            // 2h00 du matin — Conservation jusqu'à la nouvelle 1ère OP du lendemain
+            replacePresenceCron('reset:02h00', '0 2 * * *', async () => {
+                log.info('🌃 2h — Présence conservée jusqu\'à la nouvelle 1ère OP');
+                if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+                presenceData.reminderInterval = null;
+                presenceData.active = false;
+                presenceData.terminated = Boolean(presenceData.messageId || reactionsOP1.size);
+                presence2Data.active = false;
+                presence2Data.terminated = Boolean(presence2Data.messageId || reactionsOP2.size);
+                savePresenceState();
+                try { await refreshAbsencePanel(); } catch {}
+            });
+            log.info('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, conservation 2h');
         }
 
         // Mode TEST/TURBO : on lance des crons * * * * * temporaires
@@ -290,7 +324,7 @@ async function mentionNonReactors(channel, presenceMsg) {
 // ==========================================
 // PARSING ABSENCES
 // ==========================================
-async function getAbsentUsersToday() {
+async function getAbsentUsersToday(targetDate = new Date()) {
     const validAbsences = new Set(), invalidAbsences = new Set();
     const validAbsenceNames = [], invalidAbsenceNames = [];
     const ch = client.channels.cache.get(CONFIG.CHANNELS.ABSENCE);
@@ -305,7 +339,9 @@ async function getAbsentUsersToday() {
                 controller.signal.addEventListener('abort', () => reject(new Error('timeout fetch salon absences')), { once: true });
             }),
         ]).finally(() => clearTimeout(timeout));
-        const today = new Date(), td = today.getDate(), tm = today.getMonth() + 1;
+        const today = targetDate instanceof Date ? targetDate : new Date();
+        const td = today.getDate();
+        const tm = today.getMonth() + 1;
 
         for (const [, m] of msgs) {
             if (m.author.bot) continue;

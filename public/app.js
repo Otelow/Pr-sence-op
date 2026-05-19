@@ -1,3 +1,4 @@
+// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // QUICK WINS 1 18/05/2026 — notifications audit temps réel
 // QUICK WINS 4 18/05/2026 — drag-drop onglets dashboard
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
@@ -476,7 +477,7 @@ async function refreshAll() {
             return;
         }
         if (currentTab === 'presence') {
-            await Promise.all([loadStats(), loadPresence()]);
+            await Promise.all([loadStats(), loadPresence(), loadPresenceHistory()]);
         } else if (currentTab === 'stats') {
             await loadWeekly();
         } else if (currentTab === 'sanctions') {
@@ -601,15 +602,15 @@ function renderOP(prefix, op) {
     if (!status || !cats) return;
     op = op || { active: false, present: [], late: [], absentReact: [], absentValid: [], noReaction: [] };
 
-    if (!op.active) {
+    if (!op.active && !op.terminated) {
         status.textContent = 'INACTIVE';
         status.className = 'op-status inactive';
         cats.innerHTML = '<p class="empty-cat">⚠ Pas de présence active</p>';
         return;
     }
 
-    status.textContent = 'EN COURS';
-    status.className = 'op-status active';
+    status.textContent = op.terminated ? 'TERMINÉE' : 'EN COURS';
+    status.className = `op-status ${op.terminated ? 'inactive' : 'active'}`;
 
     const total = op.present.length + op.late.length + op.absentReact.length + op.absentValid.length + op.noReaction.length;
 
@@ -720,6 +721,69 @@ function renderAbsencesSalon(data) {
     invalidList.innerHTML = data.invalid.length === 0
         ? '<p class="empty-list">Aucune absence non conforme</p>'
         : `<div class="chips-grid">${data.invalid.map(n => renderChip(n, false)).join('')}</div>`;
+}
+
+async function loadPresenceHistory() {
+    try {
+        const res = await fetch('/api/presence/history?days=7');
+        if (!res.ok) throw new Error(`Presence history API ${res.status}`);
+        const data = await res.json();
+        renderPresenceHistory(data.history);
+    } catch (e) {
+        console.error('Erreur chargement historique présence:', e);
+        const container = document.getElementById('presenceHistoryContainer');
+        if (container) container.innerHTML = '<p class="empty-state">Impossible de charger l’historique présence.</p>';
+    }
+}
+
+function formatPresenceHistoryDateFR(dateStr) {
+    const [year, month, day] = String(dateStr || '').split('-');
+    if (!year || !month || !day) return escapeHtml(dateStr || '—');
+    return `${day}/${month}/${year}`;
+}
+
+function renderOpStats(counts = {}) {
+    return `
+        <div class="history-stat-line">✅ Présents : <b>${Number(counts.present || 0).toLocaleString('fr-FR')}</b></div>
+        <div class="history-stat-line">🕐 Retards : <b>${Number(counts.late || 0).toLocaleString('fr-FR')}</b></div>
+        <div class="history-stat-line">❌ Non justifiés : <b>${Number(counts.absentReact || 0).toLocaleString('fr-FR')}</b></div>
+        <div class="history-stat-line">📋 Justifiés : <b>${Number(counts.absentValid || 0).toLocaleString('fr-FR')}</b></div>
+        <div class="history-stat-line">⚠️ Pas réagi : <b>${Number(counts.noReaction || 0).toLocaleString('fr-FR')}</b></div>
+    `;
+}
+
+function renderPresenceHistory(history) {
+    const container = document.getElementById('presenceHistoryContainer');
+    if (!container) return;
+
+    if (!history || history.length === 0) {
+        container.innerHTML = '<p class="empty-state">Aucune donnée historique pour le moment. Les snapshots commencent demain.</p>';
+        return;
+    }
+
+    container.innerHTML = history.map(day => `
+        <div class="history-day-card">
+            <div class="history-day-header">
+                <h4>📆 ${formatPresenceHistoryDateFR(day.date)}</h4>
+            </div>
+            <div class="history-day-stats">
+                <div class="history-op-block">
+                    <h5>1ère OP</h5>
+                    ${renderOpStats(day.op1?.counts)}
+                </div>
+                <div class="history-op-block">
+                    <h5>2ème OP</h5>
+                    ${renderOpStats(day.op2?.counts)}
+                </div>
+                <div class="history-op-block">
+                    <h5>⚠️ Décrochés (${(day.decroches || []).length})</h5>
+                    ${(day.decroches || []).length === 0
+                        ? '<p class="empty-mini">👍 Aucun</p>'
+                        : day.decroches.map(member => `<div class="history-decroche">${escapeHtml(member.username || member.user_id || '?')}</div>`).join('')}
+                </div>
+            </div>
+        </div>
+    `).join('');
 }
 
 // ===== WEEKLY (avec calendrier) =====

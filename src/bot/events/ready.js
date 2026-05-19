@@ -1,3 +1,4 @@
+// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // BOARD ARMES 17/05/2026 — init board armes live au ready
 // FINAL D2 16/05/2026 ? logs bot via pino
 // QUICK WINS 5 18/05/2026 — cron stats hebdomadaires Discord
@@ -90,12 +91,13 @@ client.once('ready', async () => {
     let op2Restored = false;
 
     if (savedState) {
-        if (savedState.op1 && savedState.op1.active && savedState.op1.messageId) {
+        if (savedState.op1 && savedState.op1.messageId && (savedState.op1.active || savedState.op1.terminated)) {
             log.info('🔄 Restauration 1ère Présence OP depuis fichier...');
             const restored = await restoreReactionsFromMessage(savedState.op1.messageId, reactionsOP1);
             if (restored) {
                 presenceData.messageId = savedState.op1.messageId;
-                presenceData.active = true;
+                presenceData.active = Boolean(savedState.op1.active);
+                presenceData.terminated = Boolean(savedState.op1.terminated);
                 op1Restored = true;
                 log.info('✅ 1ère Présence OP restaurée');
 
@@ -103,19 +105,20 @@ client.once('ready', async () => {
                 const channel = client.channels.cache.get(CONFIG.CHANNELS.PRESENCE);
                 if (channel) {
                     const msg = await channel.messages.fetch(savedState.op1.messageId).catch(() => null);
-                    if (msg) startPresenceReminders(channel, msg);
+                    if (msg && presenceData.active) startPresenceReminders(channel, msg);
                 }
             } else {
                 log.info('⚠️ Message 1ère OP introuvable dans le fichier');
             }
         }
 
-        if (savedState.op2 && savedState.op2.active && savedState.op2.messageId) {
+        if (savedState.op2 && savedState.op2.messageId && (savedState.op2.active || savedState.op2.terminated)) {
             log.info('🔄 Restauration 2ème Présence OP depuis fichier...');
             const restored = await restoreReactionsFromMessage(savedState.op2.messageId, reactionsOP2);
             if (restored) {
                 presence2Data.messageId = savedState.op2.messageId;
-                presence2Data.active = true;
+                presence2Data.active = Boolean(savedState.op2.active);
+                presence2Data.terminated = Boolean(savedState.op2.terminated);
                 op2Restored = true;
                 log.info('✅ 2ème Présence OP restaurée');
             } else {

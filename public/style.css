@@ -1,3 +1,4 @@
+/* HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours */
 /* QUICK WINS 1/4 18/05/2026 — toasts audit + réorg dashboard */
 /* DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème */
 /* VAGUE EN COURS 17/05/2026 — shimmer jaune armes en cours */
@@ -10609,4 +10610,79 @@ body:has(#impersonateBanner[style*="flex"]) {
     border-color: var(--accent) !important;
     background: rgba(255, 140, 0, 0.18) !important;
     box-shadow: -3px 0 0 var(--accent), 3px 0 0 var(--accent);
+}
+
+.presence-history-section {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.presence-history-section h3 {
+    font-size: 16px;
+    margin-bottom: 16px;
+    color: var(--accent);
+}
+
+.history-day-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+
+.history-day-header h4 {
+    font-size: 14px;
+    margin: 0 0 12px;
+    color: var(--text);
+    font-weight: 600;
+}
+
+.history-day-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+}
+
+.history-op-block h5 {
+    font-size: 12px;
+    margin: 0 0 8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.history-stat-line {
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 2px 0;
+}
+
+.history-stat-line b {
+    color: var(--text);
+}
+
+.history-decroche {
+    display: inline-block;
+    font-size: 11px;
+    padding: 3px 8px;
+    background: rgba(255, 170, 50, 0.1);
+    border: 1px solid rgba(255, 170, 50, 0.25);
+    border-radius: 4px;
+    margin: 2px 4px 2px 0;
+    color: #ffaa44;
+}
+
+.empty-mini {
+    font-size: 12px;
+    color: #00ff88;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .history-day-stats {
+        grid-template-columns: 1fr;
+    }
 }

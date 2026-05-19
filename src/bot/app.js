@@ -1,3 +1,4 @@
+// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // QUICK WINS 5 18/05/2026 — cron stats hebdomadaires Discord
 // BOARD ARMES 17/05/2026 — init board armes live Discord
@@ -199,6 +200,8 @@ let sendPresence2Message;
 let sendPresenceMessage;
 let startPresenceReminders;
 let getAbsentUsersToday;
+let getParisDateKey;
+let snapshotPresenceDay;
 
 // ==========================================
 // STOCKAGE EN MÉMOIRE
@@ -358,12 +361,21 @@ const STATE_FILE = dataFile('presence_state.json');
 const {
     savePresenceState,
     loadPresenceState,
+    getParisDateKey: getPresenceParisDateKey,
+    snapshotPresenceDay: snapshotPresenceDayForHistory,
 } = createPresenceStatePersistence({
     fs,
     stateFile: STATE_FILE,
+    CONFIG,
+    client,
+    reactionsOP1,
+    reactionsOP2,
     getPresenceData: () => presenceData,
     getPresence2Data: () => presence2Data,
+    getAbsentUsersToday: targetDate => getAbsentUsersToday(targetDate),
 });
+getParisDateKey = getPresenceParisDateKey;
+snapshotPresenceDay = snapshotPresenceDayForHistory;
 
 // Restaurer les réactions depuis le message Discord (une seule fois au boot)
 const { restoreReactionsFromMessage } = createReactionRestoreService({
@@ -402,7 +414,11 @@ const { restoreReactionsFromMessage } = createReactionRestoreService({
     getPresenceItems: () => presenceItems,
     getCustomPresenceMessage: () => customPresenceMessage,
     getAbsenceTracking: () => absenceTracking,
+    loadState,
+    saveState,
     savePresenceState,
+    snapshotPresenceDay,
+    getParisDateKey,
     saveAbsenceTracking,
     refreshAbsencePanel: () => refreshAbsencePanel(),
     stopAbsencePanelRefresh: () => stopAbsencePanelRefresh(),

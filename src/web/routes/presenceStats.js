@@ -1,3 +1,4 @@
+// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes présence et statistiques isolées
@@ -5,6 +6,7 @@
 // FINAL POST-STAB F 17/05/2026 — cache membres Discord côté serveur
 const { getCachedMembers } = require('../services/membersCache');
 const { pickReactionPriority } = require('../../shared/presenceReactions');
+const { createConnection } = require('../../shared/database');
 
 function avatarUrl(userId, avatar, size = 64) {
     return avatar ? `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png?size=${size}` : null;
@@ -18,6 +20,31 @@ function summarizeMember(member, extra = {}) {
         color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
         ...extra,
     };
+}
+
+function ensurePresenceHistoryTable(db) {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS presence_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            op_number INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            username TEXT,
+            status TEXT NOT NULL,
+            recorded_at INTEGER NOT NULL,
+            UNIQUE(date, op_number, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_presence_history_date ON presence_history(date DESC);
+        CREATE INDEX IF NOT EXISTS idx_presence_history_user ON presence_history(user_id);
+    `);
+}
+
+function aggregateByStatus(rows) {
+    const counts = { present: 0, late: 0, absentReact: 0, absentValid: 0, noReaction: 0 };
+    for (const row of rows) {
+        if (row.status in counts) counts[row.status] += 1;
+    }
+    return { total: rows.length, counts, members: rows };
 }
 
 function registerPresenceStatsRoutes(app, deps) {
@@ -40,7 +67,7 @@ function registerPresenceStatsRoutes(app, deps) {
         const collectFromOP = (data, reactionMap) => {
             const result = {
                 active: data.active,
-                terminated: false,
+                terminated: Boolean(data.terminated),
                 present: [],
                 late: [],
                 absentReact: [],
@@ -48,7 +75,7 @@ function registerPresenceStatsRoutes(app, deps) {
                 noReaction: [],
             };
 
-            if (!data.active || !data.messageId) return result;
+            if ((!data.active && !data.terminated) || (!data.messageId && reactionMap.size === 0)) return result;
 
             for (const [, member] of role.members) {
                 if (member.user.bot) continue;
@@ -136,6 +163,52 @@ function registerPresenceStatsRoutes(app, deps) {
                 invalid: state.absenceSalonCache.invalidAbsenceNames || [],
             },
         });
+    });
+
+    app.get('/api/presence/history', requireAuth, requireFullSiteAccess, (req, res) => {
+        const rawDays = parseInt(req.query.days || '7', 10);
+        const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 7, 1), 30);
+        const sinceDate = new Date();
+        sinceDate.setDate(sinceDate.getDate() - days);
+        const sinceStr = sinceDate.toISOString().slice(0, 10);
+
+        const db = createConnection();
+        ensurePresenceHistoryTable(db);
+        const rows = db.prepare(`
+            SELECT date, op_number, user_id, username, status, recorded_at
+            FROM presence_history
+            WHERE date >= ?
+            ORDER BY date DESC, op_number ASC, username COLLATE NOCASE ASC
+        `).all(sinceStr);
+
+        const byDate = {};
+        for (const row of rows) {
+            if (!byDate[row.date]) byDate[row.date] = { op1: [], op2: [] };
+            const key = `op${row.op_number}`;
+            if (!byDate[row.date][key]) byDate[row.date][key] = [];
+            byDate[row.date][key].push(row);
+        }
+
+        const history = Object.entries(byDate).map(([date, data]) => {
+            const presents1 = new Set(data.op1.filter(row => row.status === 'present' || row.status === 'late').map(row => row.user_id));
+            const decroches2 = new Set(data.op2.filter(row => row.status === 'noReaction' || row.status === 'absentReact').map(row => row.user_id));
+            const decrocheursIds = [...presents1].filter(userId => decroches2.has(userId));
+            const decrocheursMap = new Map(data.op2.filter(row => decrocheursIds.includes(row.user_id)).map(row => [row.user_id, row]));
+
+            return {
+                date,
+                op1: aggregateByStatus(data.op1),
+                op2: aggregateByStatus(data.op2),
+                decroches: [...decrocheursMap.values()].map(row => ({
+                    user_id: row.user_id,
+                    username: row.username,
+                    statut_op1: data.op1.find(item => item.user_id === row.user_id)?.status,
+                    statut_op2: row.status,
+                })),
+            };
+        });
+
+        res.json({ days, history });
     });
 
     app.get('/api/weekly', requireAuth, requireFullSiteAccess, async (req, res) => {

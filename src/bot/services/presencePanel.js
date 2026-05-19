@@ -1,3 +1,4 @@
+// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
@@ -107,12 +108,8 @@ function createPresencePanelService(deps) {
     function buildPresenceEmbed(title, data, reactionMap, role, absData, color) {
         const embed = new EmbedBuilder().setTitle(`📋 ${title}`).setColor(color);
 
-        if (!data.active || !data.messageId) {
+        if ((!data.active && !data.terminated) || (!data.messageId && reactionMap.size === 0)) {
             return embed.setDescription('⚠️ *Pas encore lancée*').setColor(0x95A5A6);
-        }
-
-        if (data.terminated) {
-            return embed.setDescription('⏹️ *Terminée*').setColor(0x95A5A6);
         }
 
         if (!role) return embed.setDescription('❌ Rôle introuvable');
@@ -158,7 +155,8 @@ function createPresencePanelService(deps) {
             return truncated.join('\n');
         };
 
-        embed.setDescription(`👥 **${total}** membres au total`);
+        const stateLabel = data.terminated && !data.active ? '⏹️ **Terminée**' : '🟢 **En cours**';
+        embed.setDescription(`${stateLabel}\n👥 **${total}** membres au total`);
         embed.addFields(
             { name: `✅ Présents — ${present.length}`, value: formatList(present), inline: false },
             { name: `⏰ Retards — ${late.length}`, value: formatList(late), inline: false },

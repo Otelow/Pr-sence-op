@@ -1,3 +1,4 @@
+// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // QUICK WINS 2 18/05/2026 — export CSV audit log admin
 // NETTOYAGE 18/05/2026 — petits ajustements
 // FINAL POST-STAB A 17/05/2026 ? pino backend
@@ -159,6 +160,20 @@ const MIGRATIONS = [
         ALTER TABLE my_weapons ADD COLUMN is_in_progress INTEGER NOT NULL DEFAULT 0;
         ALTER TABLE my_weapons ADD COLUMN in_progress_at INTEGER;
         ALTER TABLE my_weapons ADD COLUMN in_progress_by TEXT;
+    `) },
+    { name: '051_presence_history', migrate: db => db.exec(`
+        CREATE TABLE IF NOT EXISTS presence_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            op_number INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            username TEXT,
+            status TEXT NOT NULL,
+            recorded_at INTEGER NOT NULL,
+            UNIQUE(date, op_number, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_presence_history_date ON presence_history(date DESC);
+        CREATE INDEX IF NOT EXISTS idx_presence_history_user ON presence_history(user_id);
     `) },
 ];
 
