@@ -1,8 +1,10 @@
+// FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes présence et statistiques isolées
 
 // FINAL POST-STAB F 17/05/2026 — cache membres Discord côté serveur
 const { getCachedMembers } = require('../services/membersCache');
+const { pickReactionPriority } = require('../../shared/presenceReactions');
 
 function avatarUrl(userId, avatar, size = 64) {
     return avatar ? `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png?size=${size}` : null;
@@ -63,12 +65,12 @@ function registerPresenceStatsRoutes(app, deps) {
                     color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
                     role_color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
                 };
-                const reaction = reactionMap.get(member.id);
+                const reaction = pickReactionPriority(reactionMap.get(member.id));
 
-                if (reaction === 'check') result.present.push(item);
+                if (state.absenceSalonCache.validAbsences.has(member.id)) result.absentValid.push(item);
+                else if (reaction === 'check') result.present.push(item);
                 else if (reaction === 'retard') result.late.push(item);
                 else if (reaction === 'no') result.absentReact.push(item);
-                else if (state.absenceSalonCache.validAbsences.has(member.id)) result.absentValid.push(item);
                 else result.noReaction.push(item);
             }
 

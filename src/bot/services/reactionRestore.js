@@ -1,5 +1,7 @@
+// FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
+const { ensureReactionSet } = require('../../shared/presenceReactions');
 // MODIFIE CHANTIER 6 - 14/05/2026 - restauration reactions presence externalisee
 
 function createReactionRestoreService(deps) {
@@ -23,7 +25,7 @@ function createReactionRestoreService(deps) {
                 for (const [userId, user] of users) {
                     if (user.bot) continue;
                     const type = emojiToType(reaction.emoji.name, reaction.emoji.id);
-                    if (type) reactionMap.set(userId, type);
+                    if (type) ensureReactionSet(reactionMap, userId).add(type);
                 }
             }
             log.info(`   ↳ ${reactionMap.size} réaction(s) restaurées`);

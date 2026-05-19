@@ -1,3 +1,4 @@
+// FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // QUICK WINS 5 18/05/2026 — cron stats hebdomadaires Discord
 // BOARD ARMES 17/05/2026 — init board armes live Discord
 // FINAL D2 16/05/2026 ? logs bot via pino
@@ -187,6 +188,7 @@ let scheduleAbsencePanelRefresh;
 let clearAbsencePanelState;
 let handleAbsencePanel;
 let updateAbsenceSalonCache;
+let scheduleAbsenceSalonCacheUpdate;
 let handleAbsenceSalonCacheEvent;
 let buildAbsencePanelEmbeds;
 let buildAbsencePanelPlaceholderEmbed;
@@ -333,8 +335,8 @@ let presence2Data = {
     active: false,
 };
 
-const reactionsOP1 = new Map();
-const reactionsOP2 = new Map();
+const reactionsOP1 = new Map(); // Map<userId, Set<reactionType>>
+const reactionsOP2 = new Map(); // Map<userId, Set<reactionType>>
 
 function getReactionMap(messageId) {
     if (presenceData.messageId === messageId) return reactionsOP1;
@@ -437,6 +439,7 @@ const { restoreReactionsFromMessage } = createReactionRestoreService({
 
 ({
     updateAbsenceSalonCache,
+    scheduleAbsenceSalonCacheUpdate,
     handleAbsenceSalonCacheEvent,
     buildAbsencePanelEmbeds,
     buildAbsencePanelPlaceholderEmbed,
@@ -578,7 +581,7 @@ registerInteractionEvents(client, {
 // ==========================================
 
 registerClipEvents(client);
-registerAbsenceValidatorEvent(client, { CONFIG });
+registerAbsenceValidatorEvent(client, { CONFIG, scheduleAbsenceSalonCacheUpdate });
 
 // ==========================================
 // ERREURS

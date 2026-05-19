@@ -1,9 +1,11 @@
+// FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - cache salon absence et embeds panneau presence externalises
 
 const { EmbedBuilder } = require('discord.js');
+const { pickReactionPriority } = require('../../shared/presenceReactions');
 
 function createPresencePanelService(deps) {
     const {
@@ -126,12 +128,12 @@ function createPresencePanelService(deps) {
             if (member.roles.cache.has(CONFIG.ROLES.EXCLUDED_ROLE)) continue;
 
             const name = member.nickname || member.user.username;
-            const reaction = reactionMap.get(member.id);
+            const reaction = pickReactionPriority(reactionMap.get(member.id));
 
-            if (reaction === 'check') present.push(name);
+            if (absData.validAbsences.has(member.id)) absentValid.push(name);
+            else if (reaction === 'check') present.push(name);
             else if (reaction === 'retard') late.push(name);
             else if (reaction === 'no') absentReact.push(name);
-            else if (absData.validAbsences.has(member.id)) absentValid.push(name);
             else noReaction.push(name);
         }
 
