@@ -1,3 +1,4 @@
+// RELANCE ABSENCE + CONTRASTE 19/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // BOARD ARMES 17/05/2026 — init board armes live au ready
@@ -40,6 +41,7 @@ function registerReadyEvent(deps) {
         hasPresenceSnapshot,
         snapshotPresenceDay,
         expirePresenceAtMidnight,
+        initAbsenceReminder,
     } = deps;
 
 function getYesterdayParisKey() {
@@ -240,6 +242,8 @@ client.once('ready', async () => {
         absenceTracking.clear();
         saveAbsenceTracking();
     }, { timezone: 'Europe/Paris' });
+
+    initAbsenceReminder?.();
 
     if (TURBO_MODE) setTimeout(() => sendPresenceMessage(), 3_000);
 });

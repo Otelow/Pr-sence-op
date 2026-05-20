@@ -1,3 +1,4 @@
+// RELANCE ABSENCE + CONTRASTE 19/05/2026
 // QUICK WINS 1 18/05/2026 — notifications audit temps réel
 // QUICK WINS 2 18/05/2026 — export CSV audit log
 // ONGLET HISTORIQUE 16/05/2026 — pagination et filtres audit log
@@ -36,6 +37,10 @@ function summarizeDetails(action, details = {}) {
         case 'mapPoint.create':
         case 'mapPoint.update':
             return truncateSummary(details.label);
+        case 'presence.reminder.sent':
+            return truncateSummary(`Relance #${details.reminder_count || 1}`);
+        case 'presence.reminder.stopped':
+            return truncateSummary(details.reason || 'stop');
         default:
             return '';
     }

@@ -1,3 +1,4 @@
+// RELANCE ABSENCE + CONTRASTE 19/05/2026
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
@@ -46,7 +47,7 @@ async function warnInvalidDate(message, CONFIG) {
     } catch {}
 }
 
-async function validateAbsenceMessage(message, { CONFIG, scheduleAbsenceSalonCacheUpdate, warnOnInvalid, reason }) {
+async function validateAbsenceMessage(message, { CONFIG, scheduleAbsenceSalonCacheUpdate, stopRemindUserAbsence, warnOnInvalid, reason }) {
     if (!message || message.channelId !== CONFIG.CHANNELS.ABSENCE) return;
     if (message.author?.bot) return;
 
@@ -82,13 +83,15 @@ async function validateAbsenceMessage(message, { CONFIG, scheduleAbsenceSalonCac
     }
 
     triggerAbsenceCacheRefresh(scheduleAbsenceSalonCacheUpdate, reason);
+    stopRemindUserAbsence?.(message.author.id, 'absence_posted');
 }
 
-function registerAbsenceValidatorEvent(client, { CONFIG, scheduleAbsenceSalonCacheUpdate }) {
+function registerAbsenceValidatorEvent(client, { CONFIG, scheduleAbsenceSalonCacheUpdate, stopRemindUserAbsence }) {
     client.on('messageCreate', async message => {
         await validateAbsenceMessage(message, {
             CONFIG,
             scheduleAbsenceSalonCacheUpdate,
+            stopRemindUserAbsence,
             warnOnInvalid: true,
             reason: 'new-absence-message',
         });
@@ -99,6 +102,7 @@ function registerAbsenceValidatorEvent(client, { CONFIG, scheduleAbsenceSalonCac
         await validateAbsenceMessage(message, {
             CONFIG,
             scheduleAbsenceSalonCacheUpdate,
+            stopRemindUserAbsence,
             warnOnInvalid: false,
             reason: 'absence-message-update',
         });

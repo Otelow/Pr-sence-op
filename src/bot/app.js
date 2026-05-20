@@ -1,3 +1,4 @@
+// RELANCE ABSENCE + CONTRASTE 19/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
@@ -73,6 +74,12 @@ const { createPanelService } = require('./services/panel');
 const { createPresencePanelService } = require('./services/presencePanel');
 const { createPresenceFlowService } = require('./services/presenceFlow');
 const { createAbsencePanelService } = require('./services/absencePanel');
+const {
+    registerAbsenceReminder,
+    startRemindUserAbsence,
+    stopRemindUserAbsence,
+    stopAllReminders,
+} = require('./services/absenceReminder');
 const { emitRealtime } = require('../shared/realtime');
 const { backfillClipForum, getBackfillStatus } = require('../shared/clipBackup');
 
@@ -507,6 +514,7 @@ async function syncPresenceReactions() {
     stopAbsencePanelRefresh: () => stopAbsencePanelRefresh(),
     clearAbsencePanelState: () => clearAbsencePanelState(),
     getConsecutiveDays: data => getConsecutiveDays(data),
+    stopAllReminders,
 }));
 
 ({
@@ -575,6 +583,15 @@ async function syncPresenceReactions() {
     buildAbsencePanelPlaceholderEmbed,
 }));
 
+const initAbsenceReminder = () => registerAbsenceReminder(client, {
+    guildId: CONFIG.GUILD_ID,
+    absenceSalonCache: getAbsenceSalonCache,
+    updateAbsenceSalonCache,
+    scheduleAbsenceSalonCacheUpdate,
+    channels: CHANNELS,
+    logger: log,
+});
+
 ({
     loadReminders,
     restorePanelState,
@@ -638,6 +655,7 @@ registerReadyEvent({
     hasPresenceSnapshot,
     snapshotPresenceDay,
     expirePresenceAtMidnight,
+    initAbsenceReminder,
 });
 
 registerGuildMemberEvents(client,
@@ -658,6 +676,8 @@ registerPresenceReactionEvents(client, {
     emojiToType,
     getPresenceOpForMessageId,
     scheduleAbsencePanelRefresh,
+    startRemindUserAbsence,
+    stopRemindUserAbsence,
 });
 
 registerInteractionEvents(client, {
@@ -684,7 +704,7 @@ registerInteractionEvents(client, {
 // ==========================================
 
 registerClipEvents(client);
-registerAbsenceValidatorEvent(client, { CONFIG, scheduleAbsenceSalonCacheUpdate });
+registerAbsenceValidatorEvent(client, { CONFIG, scheduleAbsenceSalonCacheUpdate, stopRemindUserAbsence });
 
 // ==========================================
 // ERREURS

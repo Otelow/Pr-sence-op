@@ -1,3 +1,4 @@
+/* RELANCE ABSENCE + CONTRASTE 19/05/2026 */
 /* // CC PATCH 19/05/2026 — vrais effets visibles */
 /* // COMMAND CENTER 19/05/2026 — refonte v3 */
 /* STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats */
@@ -108,7 +109,7 @@
 }
 
 :root {
-    --bg-deep: #0a0a0a;
+    --bg-deep: #1a1410;
     --bg-dark: #111111;
     --bg-card: #161616;
     --bg-elevated: #1c1c1c;
@@ -4045,7 +4046,7 @@ html, body {
 /* ─── PALETTE ─────────────────────────────────────────────── */
 :root {
     /* Backgrounds noirs profonds */
-    --bg-deep: #050505;
+    --bg-deep: #1a1410;
     --bg-dark: #0b0b0d;
     --bg-card: rgba(20, 20, 22, 0.65);
     --bg-elevated: rgba(30, 30, 33, 0.7);
@@ -11334,7 +11335,7 @@ tr:hover td {
     --accent-glow: rgba(255, 138, 0, 0.55);
     --accent-soft: rgba(255, 138, 0, 0.1);
     --accent-hover: rgba(255, 138, 0, 0.18);
-    --bg-deep: #070503;
+    --bg-deep: #1a1410;
     --bg-warm: rgba(20, 12, 5, 0.92);
     --glass-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
     --glass-bg-hover: linear-gradient(180deg, rgba(255, 138, 0, 0.04), rgba(255, 138, 0, 0.01));

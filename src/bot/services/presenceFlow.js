@@ -1,3 +1,4 @@
+// RELANCE ABSENCE + CONTRASTE 19/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FINAL D2 16/05/2026 ? logs bot via pino
@@ -47,6 +48,7 @@ function createPresenceFlowService(deps) {
         stopAbsencePanelRefresh,
         clearAbsencePanelState,
         getConsecutiveDays,
+        stopAllReminders,
     } = deps;
 
     const presenceData = createStateProxy(getPresenceData);
@@ -55,6 +57,7 @@ function createPresenceFlowService(deps) {
 
 function resetPresenceStateForNewFirstOp(todayKey) {
     if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+    stopAllReminders?.('new_op_started');
     reactionsOP1.clear();
     reactionsOP2.clear();
     setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false, startedAt: null });
