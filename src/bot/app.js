@@ -332,12 +332,14 @@ let presenceData = {
     reminderIds: [],
     reminderInterval: null,
     active: false,
+    startedAt: null,
 };
 
 // 2ème Présence OP
 let presence2Data = {
     messageId: null,
     active: false,
+    startedAt: null,
 };
 
 const reactionsOP1 = new Map(); // Map<userId, Set<reactionType>>
@@ -387,6 +389,84 @@ const { restoreReactionsFromMessage } = createReactionRestoreService({
     client,
     emojiToType,
 });
+
+function getDiscordMessageDate(messageId) {
+    try {
+        if (!messageId) return null;
+        const timestamp = (BigInt(String(messageId)) >> 22n) + 1420070400000n;
+        const millis = Number(timestamp);
+        if (!Number.isFinite(millis)) return null;
+        return new Date(millis);
+    } catch {
+        return null;
+    }
+}
+
+function getPresenceStartDate(data) {
+    if (data?.startedAt) {
+        const date = new Date(data.startedAt);
+        if (!Number.isNaN(date.getTime())) return date;
+    }
+    return getDiscordMessageDate(data?.messageId);
+}
+
+function getParisDayKey(date = new Date()) {
+    if (typeof getParisDateKey === 'function') return getParisDateKey(date);
+    return new Intl.DateTimeFormat('fr-FR', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(date);
+}
+
+function shouldExpirePresenceAtMidnight(data, now = new Date()) {
+    if (!data?.active) return false;
+    const startedAt = getPresenceStartDate(data);
+    if (!startedAt) return false;
+    return getParisDayKey(startedAt) !== getParisDayKey(now);
+}
+
+function expirePresenceAtMidnight() {
+    let changed = false;
+
+    if (shouldExpirePresenceAtMidnight(presenceData)) {
+        if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+        presenceData.reminderInterval = null;
+        presenceData.active = false;
+        presenceData.terminated = true;
+        changed = true;
+        log.info('Presence OP1 expiree automatiquement apres minuit Paris');
+    }
+
+    if (shouldExpirePresenceAtMidnight(presence2Data)) {
+        presence2Data.active = false;
+        presence2Data.terminated = true;
+        changed = true;
+        log.info('Presence OP2 expiree automatiquement apres minuit Paris');
+    }
+
+    if (changed) savePresenceState();
+    return changed;
+}
+
+let presenceReactionSyncPromise = null;
+
+async function syncPresenceReactions() {
+    if (presenceReactionSyncPromise) return presenceReactionSyncPromise;
+
+    presenceReactionSyncPromise = (async () => {
+        const jobs = [];
+        if (presenceData.messageId) jobs.push(restoreReactionsFromMessage(presenceData.messageId, reactionsOP1));
+        if (presence2Data.messageId) jobs.push(restoreReactionsFromMessage(presence2Data.messageId, reactionsOP2));
+        if (jobs.length === 0) return [];
+        return Promise.allSettled(jobs);
+    })().finally(() => {
+        presenceReactionSyncPromise = null;
+    });
+
+    return presenceReactionSyncPromise;
+}
 
 ({
     setupPresenceCron,
@@ -557,6 +637,7 @@ registerReadyEvent({
     getParisDateKey,
     hasPresenceSnapshot,
     snapshotPresenceDay,
+    expirePresenceAtMidnight,
 });
 
 registerGuildMemberEvents(client,
@@ -625,6 +706,7 @@ client.login(CONFIG.TOKEN);
 // EXPORTS pour le serveur web
 // ==========================================
 function getBotState() {
+    expirePresenceAtMidnight();
     return {
         CONFIG,
         presenceData,
@@ -637,6 +719,7 @@ function getBotState() {
         sendPresence2Message,
         getAbsentUsersToday,
         updateAbsenceSalonCache,
+        syncPresenceReactions,
         getConsecutiveDays,
         saveAbsenceTracking,
     };

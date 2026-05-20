@@ -502,16 +502,17 @@ function switchTab(tab) {
     refreshAll();
 }
 
-async function refreshAll() {
+async function refreshAll(options = {}) {
     if (refreshAllInFlight) return;
     refreshAllInFlight = true;
+    const forceSync = Boolean(options.forceSync);
     try {
         if (!canAccessDashboardTab(currentTab)) {
             applyPermissionsUI();
             return;
         }
         if (currentTab === 'presence') {
-            await Promise.all([loadStats(), loadPresence(), loadPresenceHistory(), loadPresenceStats()]);
+            await Promise.all([loadStats(), loadPresence({ forceSync }), loadPresenceHistory(), loadPresenceStats()]);
         } else if (currentTab === 'stats') {
             await loadWeekly();
         } else if (currentTab === 'sanctions') {
@@ -615,9 +616,10 @@ function closePresenceStatDetails() {
 }
 
 // ===== PRÉSENCE =====
-async function loadPresence() {
+async function loadPresence(options = {}) {
     try {
-        const res = await fetch('/api/presence');
+        const query = options.forceSync ? '?sync=1' : '';
+        const res = await fetch(`/api/presence${query}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`Presence API ${res.status}`);
         const data = await res.json();
 

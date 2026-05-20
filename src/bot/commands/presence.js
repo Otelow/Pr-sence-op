@@ -38,7 +38,7 @@ function createPresenceCommandHandlers(deps) {
     }
 
     async function handlePresenceTest2(interaction) {
-        setPresence2Data({ messageId: null, active: false });
+        setPresence2Data({ messageId: null, active: false, terminated: false, startedAt: null });
         reactionsOP2.clear();
         savePresenceState();
         await interaction.reply({ content: '🧪 Test 2ème présence OP...', ephemeral: true });
@@ -48,7 +48,7 @@ function createPresenceCommandHandlers(deps) {
     async function handlePresenceTest(interaction) {
         const currentPresence = getPresenceData();
         if (currentPresence.reminderInterval) clearInterval(currentPresence.reminderInterval);
-        setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false });
+        setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false, startedAt: null });
         reactionsOP1.clear();
         savePresenceState();
         await interaction.reply({ content: '🧪 Test 1ère présence OP...', ephemeral: true });

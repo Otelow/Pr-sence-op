@@ -39,6 +39,7 @@ function registerReadyEvent(deps) {
         getParisDateKey,
         hasPresenceSnapshot,
         snapshotPresenceDay,
+        expirePresenceAtMidnight,
     } = deps;
 
 function getYesterdayParisKey() {
@@ -124,6 +125,8 @@ client.once('ready', async () => {
                 presenceData.messageId = savedState.op1.messageId;
                 presenceData.active = Boolean(savedState.op1.active);
                 presenceData.terminated = Boolean(savedState.op1.terminated);
+                presenceData.startedAt = savedState.op1.startedAt || presenceData.startedAt || null;
+                expirePresenceAtMidnight?.();
                 op1Restored = true;
                 log.info('✅ 1ère Présence OP restaurée');
 
@@ -145,6 +148,8 @@ client.once('ready', async () => {
                 presence2Data.messageId = savedState.op2.messageId;
                 presence2Data.active = Boolean(savedState.op2.active);
                 presence2Data.terminated = Boolean(savedState.op2.terminated);
+                presence2Data.startedAt = savedState.op2.startedAt || presence2Data.startedAt || null;
+                expirePresenceAtMidnight?.();
                 op2Restored = true;
                 log.info('✅ 2ème Présence OP restaurée');
             } else {
@@ -179,9 +184,12 @@ client.once('ready', async () => {
                             if (restored) {
                                 presenceData.messageId = msg.id;
                                 presenceData.active = true;
+                                presenceData.terminated = false;
+                                presenceData.startedAt = new Date(msg.createdTimestamp || Date.now()).toISOString();
+                                expirePresenceAtMidnight?.();
                                 op1Restored = true;
                                 savePresenceState();
-                                startPresenceReminders(presenceChannel, msg);
+                                if (presenceData.active) startPresenceReminders(presenceChannel, msg);
                                 log.info('✅ 1ère Présence OP récupérée depuis le salon');
                             }
                         }
@@ -193,6 +201,9 @@ client.once('ready', async () => {
                             if (restored) {
                                 presence2Data.messageId = msg.id;
                                 presence2Data.active = true;
+                                presence2Data.terminated = false;
+                                presence2Data.startedAt = new Date(msg.createdTimestamp || Date.now()).toISOString();
+                                expirePresenceAtMidnight?.();
                                 op2Restored = true;
                                 savePresenceState();
                                 log.info('✅ 2ème Présence OP récupérée depuis le salon');

@@ -57,8 +57,8 @@ function resetPresenceStateForNewFirstOp(todayKey) {
     if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
     reactionsOP1.clear();
     reactionsOP2.clear();
-    setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false });
-    setPresence2Data({ messageId: null, active: false, terminated: false });
+    setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false, startedAt: null });
+    setPresence2Data({ messageId: null, active: false, terminated: false, startedAt: null });
     if (saveState) saveState('presence_current_day', todayKey);
     savePresenceState();
     log.info(`📅 Nouveau jour présence initialisé : ${todayKey}`);
@@ -104,6 +104,7 @@ async function sendPresence2Message(channelOverride) {
         presence2Data.messageId = msg.id;
         presence2Data.active = true;
         presence2Data.terminated = false;
+        presence2Data.startedAt = new Date(msg.createdTimestamp || Date.now()).toISOString();
         reactionsOP2.clear();
         savePresenceState();
         log.info(`📋 2ème Présence OP envoyée (${dateStr} ${timeStr})`);
@@ -169,6 +170,7 @@ async function sendPresenceMessage(channelOverride) {
 
         presenceData.messageId = msg.id;
         presenceData.reminderIds = [];
+        presenceData.startedAt = new Date(msg.createdTimestamp || Date.now()).toISOString();
         savePresenceState();
         log.info(`📋 1ère Présence OP envoyée (${dateStr})`);
 
@@ -261,9 +263,9 @@ async function startPresenceReminders(channel, presenceMsg) {
                 try { await refreshAbsencePanel(); } catch {}
             });
 
-            // 2h00 du matin — Conservation jusqu'à la nouvelle 1ère OP du lendemain
-            replacePresenceCron('reset:02h00', '0 2 * * *', async () => {
-                log.info('🌃 2h — Présence conservée jusqu\'à la nouvelle 1ère OP');
+            // 00h00 Paris: les OP du jour ne sont plus en cours.
+            replacePresenceCron('reset:00h00', '0 0 * * *', async () => {
+                log.info('00h00 Paris - Presence OP basculee en terminee');
                 if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
                 presenceData.reminderInterval = null;
                 presenceData.active = false;
@@ -273,7 +275,7 @@ async function startPresenceReminders(channel, presenceMsg) {
                 savePresenceState();
                 try { await refreshAbsencePanel(); } catch {}
             });
-            log.info('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, conservation 2h');
+            log.info('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, expiration 00h');
         }
 
         // Mode TEST/TURBO : on lance des crons * * * * * temporaires

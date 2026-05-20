@@ -152,8 +152,8 @@ function createPresenceStatePersistence(deps) {
             const presenceData = getPresenceData();
             const presence2Data = getPresence2Data();
             const state = {
-                op1: { messageId: presenceData.messageId, active: presenceData.active, terminated: Boolean(presenceData.terminated) },
-                op2: { messageId: presence2Data.messageId, active: presence2Data.active, terminated: Boolean(presence2Data.terminated) },
+                op1: { messageId: presenceData.messageId, active: presenceData.active, terminated: Boolean(presenceData.terminated), startedAt: presenceData.startedAt || null },
+                op2: { messageId: presence2Data.messageId, active: presence2Data.active, terminated: Boolean(presence2Data.terminated), startedAt: presence2Data.startedAt || null },
                 savedAt: new Date().toISOString(),
             };
             fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));

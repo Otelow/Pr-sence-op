@@ -67,6 +67,13 @@ function registerPresenceStatsRoutes(app, deps) {
 
     app.get('/api/presence', requireAuth, requireFullSiteAccess, async (req, res) => {
         const state = getBotState();
+        if (req.query.sync === '1' || req.query.sync === 'true') {
+            await Promise.allSettled([
+                state.syncPresenceReactions?.(),
+                state.updateAbsenceSalonCache?.({ force: true }),
+            ]);
+        }
+
         const guild = getBotClient().guilds.cache.get(state.CONFIG.GUILD_ID);
         if (!guild) return res.json({ error: 'Guild not found' });
 
