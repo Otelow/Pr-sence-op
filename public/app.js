@@ -8,7 +8,6 @@
     function inject() {
         if (document.querySelector('.cc-particles')) return;
         if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return;
-        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
         const container = document.createElement('div');
         container.className = 'cc-particles';
@@ -5640,7 +5639,6 @@ async function deleteMyWeapon(id) {
 (function injectCommandCenterParticles() {
     if (document.querySelector('.cc-particles')) return;
     if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return;
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const container = document.createElement('div');
     container.className = 'cc-particles';
