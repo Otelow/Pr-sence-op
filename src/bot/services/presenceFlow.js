@@ -1,3 +1,4 @@
+// STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
@@ -40,7 +41,6 @@ function createPresenceFlowService(deps) {
         loadState,
         saveState,
         savePresenceState,
-        snapshotPresenceDay,
         getParisDateKey,
         saveAbsenceTracking,
         refreshAbsencePanel,
@@ -53,17 +53,7 @@ function createPresenceFlowService(deps) {
     const presence2Data = createStateProxy(getPresence2Data);
     const absenceTracking = getAbsenceTracking();
 
-async function preparePresenceDayForFirstOp() {
-    const todayKey = getParisDateKey ? getParisDateKey() : new Date().toISOString().slice(0, 10);
-    const currentDay = loadState ? loadState('presence_current_day', null) : null;
-    if (currentDay === todayKey) return;
-
-    if (currentDay && typeof snapshotPresenceDay === 'function') {
-        await snapshotPresenceDay(currentDay).catch(e => {
-            log.warn({ err: e.message, date: currentDay }, 'snapshot présence avant reset échoué');
-        });
-    }
-
+function resetPresenceStateForNewFirstOp(todayKey) {
     if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
     reactionsOP1.clear();
     reactionsOP2.clear();
@@ -72,6 +62,14 @@ async function preparePresenceDayForFirstOp() {
     if (saveState) saveState('presence_current_day', todayKey);
     savePresenceState();
     log.info(`📅 Nouveau jour présence initialisé : ${todayKey}`);
+}
+
+async function preparePresenceDayForFirstOp() {
+    const todayKey = getParisDateKey ? getParisDateKey() : new Date().toISOString().slice(0, 10);
+    const currentDay = loadState ? loadState('presence_current_day', null) : null;
+    if (currentDay === todayKey) return;
+
+    resetPresenceStateForNewFirstOp(todayKey);
 }
 
 async function sendPresence2Message(channelOverride) {

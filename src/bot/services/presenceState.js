@@ -1,3 +1,4 @@
+// STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
@@ -92,8 +93,23 @@ function createPresenceStatePersistence(deps) {
         return entries;
     }
 
-    async function snapshotPresenceDay(dateStr) {
+    function hasPresenceSnapshot(dateStr, options = {}) {
+        if (!dateStr) return false;
+        const { only = null } = options;
+        const db = createConnection();
+        ensurePresenceHistoryTable(db);
+        if (only === 'op1') {
+            return Boolean(db.prepare('SELECT 1 FROM presence_history WHERE date = ? AND op_number = 1 LIMIT 1').get(dateStr));
+        }
+        if (only === 'op2') {
+            return Boolean(db.prepare('SELECT 1 FROM presence_history WHERE date = ? AND op_number = 2 LIMIT 1').get(dateStr));
+        }
+        return Boolean(db.prepare('SELECT 1 FROM presence_history WHERE date = ? LIMIT 1').get(dateStr));
+    }
+
+    async function snapshotPresenceDay(dateStr, options = {}) {
         if (!dateStr || !hasPresenceDataToSnapshot()) return false;
+        const { only = null } = options;
 
         const guild = client.guilds.cache.get(CONFIG.GUILD_ID);
         const role = guild?.roles.cache.get(CONFIG.ROLES.MEMBRE_1);
@@ -101,10 +117,8 @@ function createPresenceStatePersistence(deps) {
 
         const absData = await getAbsentUsersToday(dateFromKey(dateStr));
         const validAbsences = absData.validAbsences || new Set();
-        const op1Entries = collectPresenceHistoryEntries(getPresenceData(), reactionsOP1, validAbsences, role);
-        const op2Entries = collectPresenceHistoryEntries(getPresence2Data(), reactionsOP2, validAbsences, role);
-
-        if (op1Entries.size === 0 && op2Entries.size === 0) return false;
+        const op1Entries = only === 'op2' ? new Map() : collectPresenceHistoryEntries(getPresenceData(), reactionsOP1, validAbsences, role);
+        const op2Entries = only === 'op1' ? new Map() : collectPresenceHistoryEntries(getPresence2Data(), reactionsOP2, validAbsences, role);
 
         const db = createConnection();
         ensurePresenceHistoryTable(db);
@@ -123,7 +137,12 @@ function createPresenceStatePersistence(deps) {
             }
         });
 
-        tx([{ num: 1, entries: op1Entries }, { num: 2, entries: op2Entries }]);
+        const ops = [];
+        if (only !== 'op2' && op1Entries.size > 0) ops.push({ num: 1, entries: op1Entries });
+        if (only !== 'op1' && op2Entries.size > 0) ops.push({ num: 2, entries: op2Entries });
+        if (ops.length === 0) return false;
+
+        tx(ops);
         log.info(`📸 Snapshot présence ${dateStr} : OP1 ${op1Entries.size} / OP2 ${op2Entries.size}`);
         return true;
     }
@@ -167,6 +186,7 @@ function createPresenceStatePersistence(deps) {
         loadPresenceState,
         clearPresenceState,
         getParisDateKey,
+        hasPresenceSnapshot,
         snapshotPresenceDay,
     };
 }

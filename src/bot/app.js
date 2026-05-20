@@ -1,3 +1,4 @@
+// STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // QUICK WINS 5 18/05/2026 — cron stats hebdomadaires Discord
@@ -201,6 +202,7 @@ let sendPresenceMessage;
 let startPresenceReminders;
 let getAbsentUsersToday;
 let getParisDateKey;
+let hasPresenceSnapshot;
 let snapshotPresenceDay;
 
 // ==========================================
@@ -362,6 +364,7 @@ const {
     savePresenceState,
     loadPresenceState,
     getParisDateKey: getPresenceParisDateKey,
+    hasPresenceSnapshot: hasPresenceSnapshotForHistory,
     snapshotPresenceDay: snapshotPresenceDayForHistory,
 } = createPresenceStatePersistence({
     fs,
@@ -375,6 +378,7 @@ const {
     getAbsentUsersToday: targetDate => getAbsentUsersToday(targetDate),
 });
 getParisDateKey = getPresenceParisDateKey;
+hasPresenceSnapshot = hasPresenceSnapshotForHistory;
 snapshotPresenceDay = snapshotPresenceDayForHistory;
 
 // Restaurer les réactions depuis le message Discord (une seule fois au boot)
@@ -417,7 +421,6 @@ const { restoreReactionsFromMessage } = createReactionRestoreService({
     loadState,
     saveState,
     savePresenceState,
-    snapshotPresenceDay,
     getParisDateKey,
     saveAbsenceTracking,
     refreshAbsencePanel: () => refreshAbsencePanel(),
@@ -551,6 +554,9 @@ registerReadyEvent({
     absenceTracking,
     saveAbsenceTracking,
     sendPresenceMessage,
+    getParisDateKey,
+    hasPresenceSnapshot,
+    snapshotPresenceDay,
 });
 
 registerGuildMemberEvents(client,
