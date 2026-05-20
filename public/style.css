@@ -12381,3 +12381,135 @@ body::after {
         display: none !important;
     }
 }
+
+/* ==========================================
+   CC PATCH VISUEL 20/05/2026 — intensité cockpit
+   Objectif : effets visibles immédiatement, même sans hover.
+   ========================================== */
+:root {
+    --cc-hot-glow: rgba(255, 138, 0, 0.38);
+    --cc-hot-border: rgba(255, 138, 0, 0.32);
+}
+
+body {
+    background:
+        radial-gradient(circle at 8% 6%, rgba(255, 138, 0, 0.34), transparent 30%),
+        radial-gradient(circle at 88% 96%, rgba(255, 90, 0, 0.24), transparent 38%),
+        radial-gradient(circle at 50% 55%, rgba(255, 138, 0, 0.08), transparent 52%),
+        var(--bg-deep) !important;
+}
+
+html::before {
+    background-image:
+        radial-gradient(circle, rgba(255, 138, 0, 0.95) 0 2px, transparent 3px),
+        radial-gradient(circle, rgba(255, 184, 77, 0.62) 0 1.5px, transparent 3px),
+        radial-gradient(circle, rgba(255, 90, 0, 0.70) 0 2px, transparent 4px) !important;
+    opacity: 0.72 !important;
+}
+
+.cc-particle {
+    width: 4px !important;
+    height: 4px !important;
+    background: #ff9c1a !important;
+    box-shadow:
+        0 0 8px rgba(255, 138, 0, 0.95),
+        0 0 22px rgba(255, 138, 0, 0.42) !important;
+    animation-duration: 8s !important;
+}
+
+.cc-particle:nth-child(3n) {
+    width: 6px !important;
+    height: 6px !important;
+}
+
+.cc-particle:nth-child(4n) {
+    background: #ff5a00 !important;
+}
+
+.stat-card,
+.stat-card-action,
+.user-card,
+.presence-card,
+.decroches-card,
+.op-panel,
+.op-stat,
+.presence-stat,
+.manual-craft-card,
+.myweapons-form-card,
+.comm-card,
+.stats-top-card,
+.stats-block,
+.absences-block,
+.mw-section,
+.mw-form-section {
+    border-color: var(--cc-hot-border) !important;
+    box-shadow:
+        0 8px 26px rgba(0, 0, 0, 0.48),
+        0 0 26px rgba(255, 138, 0, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.stat-card::before,
+.stat-card-action::before,
+.user-card::before,
+.presence-card::before,
+.decroches-card::before,
+.op-panel::before,
+.op-stat::before,
+.presence-stat::before,
+.manual-craft-card::before,
+.myweapons-form-card::before,
+.comm-card::before,
+.stats-top-card::before,
+.stats-block::before,
+.absences-block::before,
+.mw-section::before,
+.mw-form-section::before {
+    opacity: 0.22 !important;
+}
+
+.stat-card[data-bento="hero"] {
+    min-height: 300px !important;
+    background:
+        radial-gradient(circle at 8% 18%, rgba(255, 138, 0, 0.34), transparent 42%),
+        linear-gradient(180deg, rgba(255, 138, 0, 0.12), rgba(255, 138, 0, 0.025)) !important;
+    border-color: rgba(255, 138, 0, 0.48) !important;
+    box-shadow:
+        0 18px 54px rgba(0, 0, 0, 0.62),
+        0 0 58px rgba(255, 138, 0, 0.26),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
+}
+
+.stat-card[data-bento="hero"] .stat-value {
+    font-size: clamp(88px, 8.8vw, 132px) !important;
+    line-height: 0.82 !important;
+    text-shadow:
+        0 0 18px rgba(255, 138, 0, 0.35),
+        0 0 54px rgba(255, 138, 0, 0.22) !important;
+}
+
+.stat-card[data-bento="hero"] .stat-label {
+    color: rgba(255, 184, 77, 0.78) !important;
+}
+
+.op-panel {
+    min-height: 320px;
+}
+
+.topbar,
+.admin-header,
+.dashboard-header,
+header {
+    box-shadow:
+        0 16px 44px rgba(0, 0, 0, 0.62),
+        0 0 60px rgba(255, 138, 0, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+}
+
+body::before {
+    background: radial-gradient(circle, rgba(255, 138, 0, 0.38) 0%, transparent 58%) !important;
+}
+
+body::after {
+    background: radial-gradient(circle, rgba(255, 90, 0, 0.28) 0%, transparent 64%) !important;
+}
