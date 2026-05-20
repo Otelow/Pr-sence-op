@@ -1,3 +1,4 @@
+// CC PATCH 19/05/2026 — vrais effets visibles
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // QUICK WINS 1 18/05/2026 — notifications audit temps réel
 // QUICK WINS 4 18/05/2026 — drag-drop onglets dashboard
@@ -5603,6 +5604,29 @@ async function deleteMyWeapon(id) {
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 
+// ==========================================
+// COMMAND CENTER — particules orange flottantes
+// ==========================================
+(function injectCommandCenterParticles() {
+    if (document.querySelector('.cc-particles')) return;
+    if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const container = document.createElement('div');
+    container.className = 'cc-particles';
+    container.setAttribute('aria-hidden', 'true');
+
+    for (let i = 0; i < 14; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'cc-particle';
+        particle.style.left = `${Math.random() * 100}%`;
+        particle.style.animationDelay = `${Math.random() * 9}s`;
+        particle.style.animationDuration = `${8 + Math.random() * 6}s`;
+        container.appendChild(particle);
+    }
+
+    document.body.appendChild(container);
+})();
 window.toggleMwCrafted = toggleMwCrafted;
 window.handleMwSellForChange = handleMwSellForChange;
 window.updateMwSerialFields = updateMwSerialFields;

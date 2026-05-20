@@ -1,3 +1,4 @@
+/* // CC PATCH 19/05/2026 — vrais effets visibles */
 /* // COMMAND CENTER 19/05/2026 — refonte v3 */
 /* STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats */
 /* HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours */
@@ -12022,5 +12023,361 @@ textarea.comm-textarea {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+    }
+}
+
+/* ==========================================
+   CC PATCH 19/05/2026 — vrais effets visibles
+   Sélecteurs précis du site, au-dessus de la v3 générique.
+   ========================================== */
+.cc-particles {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.cc-particle {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: var(--accent, #ff8a00);
+    opacity: 0;
+    box-shadow: 0 0 6px rgba(255, 138, 0, 0.6);
+    animation: ccFloat 10s linear infinite;
+}
+
+@keyframes ccFloat {
+    0% {
+        transform: translateY(110vh) scale(0);
+        opacity: 0;
+    }
+    8% {
+        opacity: 0.8;
+    }
+    90% {
+        opacity: 0.5;
+    }
+    100% {
+        transform: translateY(-40px) scale(1);
+        opacity: 0;
+    }
+}
+
+.stat-card,
+.stat-card-action,
+.user-card,
+.presence-card,
+.decroches-card,
+.op-panel,
+.op-stat,
+.presence-stat,
+.manual-craft-card,
+.myweapons-form-card,
+.comm-card,
+.stats-top-card,
+.stats-block,
+.absences-block,
+.mw-section,
+.mw-form-section {
+    position: relative;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015)) !important;
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-radius: 18px !important;
+    transition: all 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+}
+
+.stat-card::before,
+.stat-card-action::before,
+.user-card::before,
+.presence-card::before,
+.decroches-card::before,
+.op-panel::before,
+.op-stat::before,
+.presence-stat::before,
+.manual-craft-card::before,
+.myweapons-form-card::before,
+.comm-card::before,
+.stats-top-card::before,
+.stats-block::before,
+.absences-block::before,
+.mw-section::before,
+.mw-form-section::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 18px;
+    padding: 1px;
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(255, 138, 0, 0.7) 90deg, transparent 180deg, transparent 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+}
+
+.stat-card::after,
+.stat-card-action::after,
+.user-card::after,
+.presence-card::after,
+.decroches-card::after,
+.op-panel::after,
+.op-stat::after,
+.presence-stat::after,
+.manual-craft-card::after,
+.myweapons-form-card::after,
+.comm-card::after,
+.stats-top-card::after,
+.stats-block::after,
+.absences-block::after,
+.mw-section::after,
+.mw-form-section::after {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 20%;
+    right: 20%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 138, 0, 0.8), transparent);
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+}
+
+.stat-card:hover,
+.stat-card-action:hover,
+.user-card:hover,
+.presence-card:hover,
+.decroches-card:hover,
+.op-panel:hover,
+.op-stat:hover,
+.presence-stat:hover,
+.manual-craft-card:hover,
+.myweapons-form-card:hover,
+.comm-card:hover,
+.stats-top-card:hover,
+.stats-block:hover,
+.absences-block:hover,
+.mw-section:hover,
+.mw-form-section:hover {
+    transform: translateY(-4px) scale(1.005);
+    background: linear-gradient(180deg, rgba(255, 138, 0, 0.05), rgba(255, 138, 0, 0.012)) !important;
+    border-color: rgba(255, 138, 0, 0.25) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 138, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+}
+
+.stat-card:hover::before,
+.stat-card-action:hover::before,
+.user-card:hover::before,
+.presence-card:hover::before,
+.decroches-card:hover::before,
+.op-panel:hover::before,
+.op-stat:hover::before,
+.presence-stat:hover::before,
+.manual-craft-card:hover::before,
+.myweapons-form-card:hover::before,
+.comm-card:hover::before,
+.stats-top-card:hover::before,
+.stats-block:hover::before,
+.absences-block:hover::before,
+.mw-section:hover::before,
+.mw-form-section:hover::before {
+    opacity: 1;
+    animation: ccRotate 3s linear infinite;
+}
+
+.stat-card:hover::after,
+.stat-card-action:hover::after,
+.user-card:hover::after,
+.presence-card:hover::after,
+.decroches-card:hover::after,
+.op-panel:hover::after,
+.op-stat:hover::after,
+.presence-stat:hover::after,
+.manual-craft-card:hover::after,
+.myweapons-form-card:hover::after,
+.comm-card:hover::after,
+.stats-top-card:hover::after,
+.stats-block:hover::after,
+.absences-block:hover::after,
+.mw-section:hover::after,
+.mw-form-section:hover::after {
+    opacity: 1;
+}
+
+.weapon-card-in-progress::before,
+.craft-warning-banner::before {
+    background: inherit !important;
+    opacity: inherit !important;
+    animation: inherit !important;
+}
+
+.stat-card[data-bento="hero"] {
+    grid-column: span 2;
+    grid-row: span 2;
+    min-height: 240px;
+    padding: 28px !important;
+}
+
+.stat-card[data-bento="hero"] .stat-value {
+    font-size: 76px !important;
+    font-weight: 700 !important;
+    line-height: 0.95 !important;
+    letter-spacing: -0.04em !important;
+    background: linear-gradient(135deg, #fff 0%, #ffb84d 80%, #ff8a00 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    margin: 14px 0 8px !important;
+}
+
+.stat-card[data-bento="hero"] .stat-label {
+    font-size: 11px !important;
+    letter-spacing: 0.18em !important;
+    text-transform: uppercase !important;
+    color: rgba(255, 255, 255, 0.4) !important;
+    font-weight: 600 !important;
+}
+
+.presence-card[data-bento="wide"],
+[data-bento="wide"] {
+    grid-column: 1 / -1 !important;
+}
+
+.stats-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 14px !important;
+}
+
+.badge-mini,
+.logo,
+.brand,
+.topbar-logo,
+.header-logo {
+    position: relative !important;
+    overflow: visible !important;
+    isolation: isolate;
+}
+
+.badge-mini::before,
+.logo::before,
+.brand::before,
+.topbar-logo::before,
+.header-logo::before {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    padding: 2px;
+    background: conic-gradient(from 0deg, transparent 0deg, #ff8a00 90deg, transparent 180deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: ccRotate 4s linear infinite;
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.live-indicator,
+[class*="-live"],
+[class*="status-live"] {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    padding: 6px 12px !important;
+    background: rgba(34, 197, 94, 0.1) !important;
+    border: 1px solid rgba(34, 197, 94, 0.3) !important;
+    border-radius: 999px !important;
+    color: #4ade80 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.05em !important;
+}
+
+.live-indicator::before,
+[class*="-live"]::before,
+[class*="status-live"]::before,
+.live-dot {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4ade80 !important;
+    box-shadow: 0 0 10px #4ade80;
+    animation: ccBlink 1.5s ease-in-out infinite;
+    flex-shrink: 0;
+}
+
+.live-indicator::before {
+    display: none;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    top: -200px;
+    left: -150px;
+    width: 900px;
+    height: 900px;
+    background: radial-gradient(circle, rgba(255, 138, 0, 0.25) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+    animation: ccPulseGlow 12s ease-in-out infinite;
+    will-change: transform, opacity;
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    right: -180px;
+    bottom: -250px;
+    width: 1000px;
+    height: 1000px;
+    background: radial-gradient(circle, rgba(255, 90, 0, 0.18) 0%, transparent 65%);
+    pointer-events: none;
+    z-index: 0;
+    animation: ccPulseGlow 16s ease-in-out infinite reverse;
+    will-change: transform, opacity;
+}
+
+@keyframes ccPulseGlow {
+    0%,
+    100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.9;
+    }
+    50% {
+        transform: translate(50px, 35px) scale(1.15);
+        opacity: 0.55;
+    }
+}
+
+@media (max-width: 1100px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    .stat-card[data-bento="hero"] {
+        grid-column: span 2;
+        grid-row: auto;
+    }
+
+    .stat-card[data-bento="hero"] .stat-value {
+        font-size: 56px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .cc-particles {
+        display: none !important;
     }
 }
