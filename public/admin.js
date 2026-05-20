@@ -2,6 +2,38 @@
 // QUICK WINS 2 18/05/2026 — export CSV audit log
 // QUICK WINS 3 18/05/2026 — erreurs 24h monitoring
 // ONGLET HISTORIQUE 16/05/2026 — consultation visuelle audit log admin
+
+// ==========================================
+// COMMAND CENTER — particules orange flottantes
+// Injection volontairement placée tout en haut : si une autre logique
+// JS plante plus loin, l'effet visuel est déjà posé.
+// ==========================================
+(function injectCommandCenterParticlesEarly() {
+    function inject() {
+        if (document.querySelector('.cc-particles')) return;
+        if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return;
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        const container = document.createElement('div');
+        container.className = 'cc-particles';
+        container.setAttribute('aria-hidden', 'true');
+
+        for (let i = 0; i < 14; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'cc-particle';
+            particle.style.left = `${Math.random() * 100}%`;
+            particle.style.animationDelay = `${Math.random() * 9}s`;
+            particle.style.animationDuration = `${8 + Math.random() * 6}s`;
+            container.appendChild(particle);
+        }
+
+        document.body.appendChild(container);
+    }
+
+    if (document.body) inject();
+    else document.addEventListener('DOMContentLoaded', inject, { once: true });
+})();
+
 // CHANTIER COMMANDES v3 15/05/2026 — couleurs ingrédients + total jaune
 // CHANTIER COMMANDES v2 15/05/2026 — fusion enregistrer + publier
 // CHANTIER COMMANDES 15/05/2026 — UI commandes ingrédients et publication Discord

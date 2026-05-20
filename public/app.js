@@ -1,4 +1,34 @@
 // CC PATCH 19/05/2026 — vrais effets visibles
+// ==========================================
+// COMMAND CENTER — particules orange flottantes
+// Injection volontairement placée tout en haut : si une autre logique
+// JS plante plus loin, l'effet visuel est déjà posé.
+// ==========================================
+(function injectCommandCenterParticlesEarly() {
+    function inject() {
+        if (document.querySelector('.cc-particles')) return;
+        if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return;
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+        const container = document.createElement('div');
+        container.className = 'cc-particles';
+        container.setAttribute('aria-hidden', 'true');
+
+        for (let i = 0; i < 14; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'cc-particle';
+            particle.style.left = `${Math.random() * 100}%`;
+            particle.style.animationDelay = `${Math.random() * 9}s`;
+            particle.style.animationDuration = `${8 + Math.random() * 6}s`;
+            container.appendChild(particle);
+        }
+
+        document.body.appendChild(container);
+    }
+
+    if (document.body) inject();
+    else document.addEventListener('DOMContentLoaded', inject, { once: true });
+})();
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // QUICK WINS 1 18/05/2026 — notifications audit temps réel
 // QUICK WINS 4 18/05/2026 — drag-drop onglets dashboard
