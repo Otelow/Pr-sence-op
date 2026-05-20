@@ -1,3 +1,4 @@
+// STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // BOARD ARMES 17/05/2026 — init board armes live au ready
 // FINAL D2 16/05/2026 ? logs bot via pino
@@ -35,7 +36,32 @@ function registerReadyEvent(deps) {
         saveAbsenceTracking,
         sendPresenceMessage,
         initArmesBoard,
+        getParisDateKey,
+        hasPresenceSnapshot,
+        snapshotPresenceDay,
     } = deps;
+
+function getYesterdayParisKey() {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return getParisDateKey ? getParisDateKey(yesterday) : yesterday.toISOString().slice(0, 10);
+}
+
+async function runPresenceSnapshot(dateStr, options = {}, label = 'snapshot') {
+    if (typeof snapshotPresenceDay !== 'function') return false;
+    const ok = await snapshotPresenceDay(dateStr, options);
+    if (ok) log.info(`📸 ${label} pour ${dateStr}`);
+    return ok;
+}
+
+async function catchUpYesterdaySnapshot() {
+    if (typeof hasPresenceSnapshot !== 'function') return;
+    const dateStr = getYesterdayParisKey();
+    if (hasPresenceSnapshot(dateStr)) return;
+    if (!reactionsOP1.size && !reactionsOP2.size) return;
+    await runPresenceSnapshot(dateStr, {}, 'Rattrapage snapshot au boot').catch(e => {
+        log.error(`❌ Rattrapage snapshot ${dateStr} échoué: ${e.message}`);
+    });
+}
 
 client.once('ready', async () => {
     log.info(`🤖 ${client.user.tag} connecté | ${client.guilds.cache.size} serveur(s)`);
@@ -183,6 +209,20 @@ client.once('ready', async () => {
             log.error('❌ Erreur scan salon présence:', e.message);
         }
     }
+
+    await catchUpYesterdaySnapshot();
+
+    cron.schedule('0 0 * * *', () => {
+        const dateStr = getYesterdayParisKey();
+        runPresenceSnapshot(dateStr, { only: 'op1' }, 'Snapshot OP1 à minuit')
+            .catch(e => log.error(`❌ Snapshot OP1 minuit échoué: ${e.message}`));
+    }, { timezone: 'Europe/Paris' });
+
+    cron.schedule('0 1 * * *', () => {
+        const dateStr = getYesterdayParisKey();
+        runPresenceSnapshot(dateStr, { only: 'op2' }, 'Snapshot OP2 à 01h00')
+            .catch(e => log.error(`❌ Snapshot OP2 01h00 échoué: ${e.message}`));
+    }, { timezone: 'Europe/Paris' });
 
     cron.schedule('0 22 * * 0', () => {
         log.info('📊 RESET HEBDO ABSENCES');

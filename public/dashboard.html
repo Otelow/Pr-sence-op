@@ -1,3 +1,4 @@
+<!-- STATS PRÉSENCE 19/05/2026 - snapshots minuit + dashboard stats -->
 <!-- HISTORIQUE PRÉSENCE 19/05/2026 - persistance + 7 jours -->
 <!-- QUICK WINS 1 18/05/2026 - toasts audit temps reel -->
 <!-- QUICK WINS 4 18/05/2026 - reorganisation onglets dashboard -->
@@ -24,6 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -166,6 +168,52 @@
             <h3>📅 Historique 7 jours</h3>
             <div id="presenceHistoryContainer">
                 <p class="loading">⏳ Chargement de l'historique...</p>
+            </div>
+        </div>
+
+        <div class="presence-stats-section">
+            <div class="presence-stats-header">
+                <h3>📊 Statistiques de présence</h3>
+                <select id="presenceStatsPeriod" onchange="loadPresenceStats()">
+                    <option value="7">7 derniers jours</option>
+                    <option value="30" selected>30 derniers jours</option>
+                    <option value="90">90 derniers jours</option>
+                </select>
+            </div>
+
+            <div class="stats-summary-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Taux de présence global</span>
+                    <span class="stat-value" id="statTauxPresence">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Total OPs</span>
+                    <span class="stat-value" id="statTotalOps">—</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Membres actifs</span>
+                    <span class="stat-value" id="statTotalUsers">—</span>
+                </div>
+            </div>
+
+            <div class="stats-tops-grid">
+                <div class="stats-top-card">
+                    <h4>🏆 Top 5 réguliers</h4>
+                    <div id="topRegulierList"></div>
+                </div>
+                <div class="stats-top-card">
+                    <h4>⚠️ Top 5 décrocheurs</h4>
+                    <div id="topDecrocheList"></div>
+                </div>
+                <div class="stats-top-card">
+                    <h4>❌ Top 5 absents</h4>
+                    <div id="topAbsentList"></div>
+                </div>
+            </div>
+
+            <div class="stats-chart-container">
+                <h4>📈 Évolution sur la période</h4>
+                <canvas id="presenceEvolutionChart"></canvas>
             </div>
         </div>
 

@@ -1,4 +1,9 @@
 // CC PATCH 19/05/2026 — vrais effets visibles
+// STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
+// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
+// QUICK WINS 1 18/05/2026 — notifications audit temps réel
+// QUICK WINS 4 18/05/2026 — drag-drop onglets dashboard
+
 // ==========================================
 // COMMAND CENTER — particules orange flottantes
 // Injection volontairement placée tout en haut : si une autre logique
@@ -28,9 +33,7 @@
     if (document.body) inject();
     else document.addEventListener('DOMContentLoaded', inject, { once: true });
 })();
-// HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
-// QUICK WINS 1 18/05/2026 — notifications audit temps réel
-// QUICK WINS 4 18/05/2026 — drag-drop onglets dashboard
+
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème
 // TRI CRAFT 16/05/2026 — ordre affichage prêt à vendre, en vente, vendu
@@ -71,6 +74,7 @@ const SITE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 let idleLogoutTimer = null;
 let userPermissions = { canEditMap: false };
 let presenceStatsCache = null;
+let presenceEvolutionChart = null;
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -507,7 +511,7 @@ async function refreshAll() {
             return;
         }
         if (currentTab === 'presence') {
-            await Promise.all([loadStats(), loadPresence(), loadPresenceHistory()]);
+            await Promise.all([loadStats(), loadPresence(), loadPresenceHistory(), loadPresenceStats()]);
         } else if (currentTab === 'stats') {
             await loadWeekly();
         } else if (currentTab === 'sanctions') {
@@ -814,6 +818,103 @@ function renderPresenceHistory(history) {
             </div>
         </div>
     `).join('');
+}
+
+async function loadPresenceStats() {
+    const period = document.getElementById('presenceStatsPeriod')?.value || '30';
+    try {
+        const res = await fetch(`/api/presence/stats?days=${encodeURIComponent(period)}`);
+        if (!res.ok) throw new Error(`Presence stats API ${res.status}`);
+        const data = await res.json();
+        renderPresenceStatsSummary(data);
+        renderTopLists(data);
+        renderEvolutionChart(data);
+    } catch (e) {
+        console.error('Erreur stats présence:', e);
+    }
+}
+
+function renderPresenceStatsSummary(data) {
+    const taux = document.getElementById('statTauxPresence');
+    const totalOps = document.getElementById('statTotalOps');
+    const totalUsers = document.getElementById('statTotalUsers');
+    if (taux) taux.textContent = `${data.taux_presence_global ?? 0}%`;
+    if (totalOps) totalOps.textContent = Number(data.total_ops || 0).toLocaleString('fr-FR');
+    if (totalUsers) totalUsers.textContent = Number(data.total_users || 0).toLocaleString('fr-FR');
+}
+
+function renderTopLists(data) {
+    const renderList = (containerId, users, valueKey, suffix = '') => {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        if (!users || users.length === 0) {
+            container.innerHTML = '<p class="stats-empty">Aucune donnée pour le moment</p>';
+            return;
+        }
+        container.innerHTML = users.map((user, index) => `
+            <div class="stats-top-row">
+                <span class="stats-top-rank">${index + 1}</span>
+                <span class="stats-top-name">${escapeHtml(user.username || user.user_id || '?')}</span>
+                <span class="stats-top-value">${Number(user[valueKey] || 0).toLocaleString('fr-FR')}${suffix}</span>
+            </div>
+        `).join('');
+    };
+
+    renderList('topRegulierList', data.top_regulier, 'present', ' OPs');
+    renderList('topDecrocheList', data.top_decroche, 'decroches', ' fois');
+    const decoratedAbsent = (data.top_absent || []).map(user => ({
+        ...user,
+        total_absent: (user.absentReact || 0) + (user.noReaction || 0),
+    }));
+    renderList('topAbsentList', decoratedAbsent, 'total_absent', ' OPs');
+}
+
+function renderEvolutionChart(data) {
+    const canvas = document.getElementById('presenceEvolutionChart');
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx || typeof Chart !== 'function') return;
+
+    const daily = data.daily || [];
+    const labels = daily.map(day => {
+        const [, month, date] = String(day.date || '').split('-');
+        return date && month ? `${date}/${month}` : day.date;
+    });
+    const datasetPresent = daily.map(day => (day.op1.present || 0) + (day.op2.present || 0));
+    const datasetRetard = daily.map(day => (day.op1.late || 0) + (day.op2.late || 0));
+    const datasetAbsent = daily.map(day =>
+        (day.op1.absentReact || 0) +
+        (day.op2.absentReact || 0) +
+        (day.op1.noReaction || 0) +
+        (day.op2.noReaction || 0)
+    );
+    const datasetDecroche = daily.map(day => day.decroches || 0);
+
+    if (presenceEvolutionChart) presenceEvolutionChart.destroy();
+    presenceEvolutionChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Présents', data: datasetPresent, borderColor: '#00ff88', backgroundColor: 'rgba(0,255,136,0.1)', tension: 0.35, fill: true },
+                { label: 'Retards', data: datasetRetard, borderColor: '#ffaa44', backgroundColor: 'rgba(255,170,68,0.05)', tension: 0.35 },
+                { label: 'Absents', data: datasetAbsent, borderColor: '#ff4466', backgroundColor: 'rgba(255,68,102,0.05)', tension: 0.35 },
+                { label: 'Décrochés', data: datasetDecroche, borderColor: '#ffd700', backgroundColor: 'rgba(255,215,0,0.05)', tension: 0.35, borderDash: [4, 4] },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#ddd', font: { size: 12 } } },
+                tooltip: { backgroundColor: 'rgba(20,20,20,0.95)', borderColor: '#444', borderWidth: 1 },
+            },
+            scales: {
+                x: { ticks: { color: '#999' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { ticks: { color: '#999' }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true },
+            },
+        },
+    });
 }
 
 // ===== WEEKLY (avec calendrier) =====
@@ -5655,6 +5756,7 @@ async function deleteMyWeapon(id) {
 
     document.body.appendChild(container);
 })();
+
 window.toggleMwCrafted = toggleMwCrafted;
 window.handleMwSellForChange = handleMwSellForChange;
 window.updateMwSerialFields = updateMwSerialFields;

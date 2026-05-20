@@ -1,3 +1,4 @@
+// STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // DÉCROCHÉS OP 18/05/2026 — section décrochage entre 1ère et 2ème
@@ -45,6 +46,14 @@ function aggregateByStatus(rows) {
         if (row.status in counts) counts[row.status] += 1;
     }
     return { total: rows.length, counts, members: rows };
+}
+
+function aggregateCounts(statuses) {
+    const counts = { present: 0, late: 0, absentReact: 0, absentValid: 0, noReaction: 0 };
+    for (const status of statuses) {
+        if (status in counts) counts[status] += 1;
+    }
+    return counts;
 }
 
 function registerPresenceStatsRoutes(app, deps) {
@@ -209,6 +218,107 @@ function registerPresenceStatsRoutes(app, deps) {
         });
 
         res.json({ days, history });
+    });
+
+    app.get('/api/presence/stats', requireAuth, requireFullSiteAccess, (req, res) => {
+        const rawDays = parseInt(req.query.days || '30', 10);
+        const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 30, 1), 90);
+        const sinceDate = new Date();
+        sinceDate.setDate(sinceDate.getDate() - days);
+        const sinceStr = sinceDate.toISOString().slice(0, 10);
+
+        const db = createConnection();
+        ensurePresenceHistoryTable(db);
+        const rows = db.prepare(`
+            SELECT date, op_number, user_id, username, status, recorded_at
+            FROM presence_history
+            WHERE date >= ?
+            ORDER BY date ASC, op_number ASC, username COLLATE NOCASE ASC
+        `).all(sinceStr);
+
+        const byUser = new Map();
+        for (const row of rows) {
+            if (!byUser.has(row.user_id)) {
+                byUser.set(row.user_id, {
+                    user_id: row.user_id,
+                    username: row.username,
+                    present: 0,
+                    late: 0,
+                    absentReact: 0,
+                    absentValid: 0,
+                    noReaction: 0,
+                    decroches: 0,
+                    totalOps: 0,
+                });
+            }
+            const user = byUser.get(row.user_id);
+            if (row.status in user) user[row.status] += 1;
+            user.totalOps += 1;
+            if (row.username && !user.username) user.username = row.username;
+        }
+
+        const byDate = {};
+        for (const row of rows) {
+            if (!byDate[row.date]) byDate[row.date] = { op1: new Map(), op2: new Map() };
+            byDate[row.date][`op${row.op_number}`].set(row.user_id, row.status);
+        }
+
+        for (const day of Object.values(byDate)) {
+            for (const [userId, op1Status] of day.op1) {
+                if (op1Status === 'present' || op1Status === 'late') {
+                    const op2Status = day.op2.get(userId);
+                    if (op2Status === 'noReaction' || op2Status === 'absentReact') {
+                        const user = byUser.get(userId);
+                        if (user) user.decroches += 1;
+                    }
+                }
+            }
+        }
+
+        const daily = Object.entries(byDate).map(([date, day]) => {
+            const op1 = aggregateCounts([...day.op1.values()]);
+            const op2 = aggregateCounts([...day.op2.values()]);
+            let decroches = 0;
+            for (const [userId, op1Status] of day.op1) {
+                if (op1Status === 'present' || op1Status === 'late') {
+                    const op2Status = day.op2.get(userId);
+                    if (op2Status === 'noReaction' || op2Status === 'absentReact') decroches += 1;
+                }
+            }
+            return { date, op1, op2, decroches };
+        });
+
+        const usersArr = [...byUser.values()].map(user => ({
+            ...user,
+            username: user.username || user.user_id,
+        }));
+        const topRegulier = usersArr.slice()
+            .sort((a, b) => (b.present - a.present) || (b.late - a.late) || a.username.localeCompare(b.username, 'fr'))
+            .slice(0, 5);
+        const topDecroche = usersArr.slice()
+            .sort((a, b) => (b.decroches - a.decroches) || a.username.localeCompare(b.username, 'fr'))
+            .filter(user => user.decroches > 0)
+            .slice(0, 5);
+        const topAbsent = usersArr.slice()
+            .sort((a, b) => ((b.absentReact + b.noReaction) - (a.absentReact + a.noReaction)) || a.username.localeCompare(b.username, 'fr'))
+            .filter(user => (user.absentReact + user.noReaction) > 0)
+            .slice(0, 5);
+
+        const totalRows = rows.length;
+        const totalPresent = usersArr.reduce((sum, user) => sum + user.present, 0);
+        const tauxPresence = totalRows > 0 ? Number(((totalPresent / totalRows) * 100).toFixed(1)) : 0;
+
+        res.json({
+            period_days: days,
+            total_users: byUser.size,
+            total_ops: daily.length * 2,
+            taux_presence_global: tauxPresence,
+            top_regulier: topRegulier,
+            top_decroche: topDecroche,
+            top_absent: topAbsent,
+            daily,
+            by_user: usersArr,
+        });
     });
 
     app.get('/api/weekly', requireAuth, requireFullSiteAccess, async (req, res) => {
