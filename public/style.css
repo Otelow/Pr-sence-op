@@ -1,3 +1,4 @@
+/* PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026 */
 /* RELANCE ABSENCE + CONTRASTE 19/05/2026 */
 /* // CC PATCH 19/05/2026 — vrais effets visibles */
 /* // COMMAND CENTER 19/05/2026 — refonte v3 */
@@ -12513,4 +12514,97 @@ body::before {
 
 body::after {
     background: radial-gradient(circle, rgba(255, 90, 0, 0.28) 0%, transparent 64%) !important;
+}
+
+/* PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026 */
+.history-day-card {
+    cursor: pointer;
+    transition: all 0.3s var(--liquid-easing);
+}
+
+.history-day-card:hover,
+.history-day-card:focus-visible {
+    border-color: rgba(255, 138, 0, 0.3) !important;
+    transform: translateY(-2px);
+    outline: none;
+}
+
+.history-detail-modal {
+    max-width: 720px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.history-detail-modal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.history-detail-modal .modal-title {
+    margin: 0;
+}
+
+.history-detail-modal .modal-body {
+    display: grid;
+    gap: 18px;
+}
+
+.modal-close {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    border-color: rgba(255, 138, 0, 0.35);
+    color: #ffaa44;
+}
+
+.history-detail-op {
+    margin-bottom: 20px;
+}
+
+.history-detail-op h4 {
+    color: #fff;
+    font-size: 14px;
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+}
+
+.history-detail-cat {
+    margin-bottom: 12px;
+}
+
+.history-detail-cat b {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.history-detail-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    margin: 2px 4px 2px 0;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.history-detail-modal .empty-mini {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-style: italic;
+    margin: 0;
 }

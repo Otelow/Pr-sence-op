@@ -1,3 +1,4 @@
+// PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // CC PATCH 19/05/2026 — vrais effets visibles
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
@@ -798,7 +799,7 @@ function renderPresenceHistory(history) {
     }
 
     container.innerHTML = history.map(day => `
-        <div class="history-day-card">
+        <div class="history-day-card" role="button" tabindex="0" onclick="openHistoryDayModal('${escapeJsArg(day.date)}')" onkeydown="if(event.key==='Enter'||event.key===' ') openHistoryDayModal('${escapeJsArg(day.date)}')">
             <div class="history-day-header">
                 <h4>📆 ${formatPresenceHistoryDateFR(day.date)}</h4>
             </div>
@@ -821,6 +822,64 @@ function renderPresenceHistory(history) {
         </div>
     `).join('');
 }
+
+async function openHistoryDayModal(date) {
+    const modal = document.getElementById('historyDayModal');
+    const body = document.getElementById('historyDayModalBody');
+    const title = document.getElementById('historyDayModalTitle');
+    if (!modal || !body || !title) return;
+
+    title.textContent = `Détails du ${formatPresenceHistoryDateFR(date)}`;
+    body.innerHTML = '<p class="loading">⏳ Chargement...</p>';
+    modal.style.display = 'flex';
+
+    try {
+        const res = await fetch(`/api/presence/history/${encodeURIComponent(date)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Erreur de chargement');
+        renderHistoryDayDetails(body, data);
+    } catch (e) {
+        body.innerHTML = `<p class="error">Erreur de chargement : ${escapeHtml(e.message || 'inconnue')}</p>`;
+    }
+}
+
+function closeHistoryDayModal() {
+    const modal = document.getElementById('historyDayModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function renderHistoryDayDetails(container, data) {
+    const renderUserList = (users, color = '#fff') => {
+        if (!users || users.length === 0) return '<p class="empty-mini">—</p>';
+        return users.map(user => (
+            `<span class="history-detail-pill" style="color:${color}">${escapeHtml(user.username || user.user_id || '?')}</span>`
+        )).join('');
+    };
+
+    const renderOpSection = (opLabel, op = {}) => `
+        <div class="history-detail-op">
+            <h4>${opLabel}</h4>
+            <div class="history-detail-cat"><b style="color:#4ade80">✅ Présents (${(op.present || []).length})</b>${renderUserList(op.present, '#4ade80')}</div>
+            <div class="history-detail-cat"><b style="color:#ffaa44">🕐 Retards (${(op.late || []).length})</b>${renderUserList(op.late, '#ffaa44')}</div>
+            <div class="history-detail-cat"><b style="color:#f87171">❌ Non justifiés (${(op.absentReact || []).length})</b>${renderUserList(op.absentReact, '#f87171')}</div>
+            <div class="history-detail-cat"><b style="color:#cbd5e1">📋 Justifiés (${(op.absentValid || []).length})</b>${renderUserList(op.absentValid, '#cbd5e1')}</div>
+            <div class="history-detail-cat"><b style="color:#fcd34d">⚠️ Pas réagi (${(op.noReaction || []).length})</b>${renderUserList(op.noReaction, '#fcd34d')}</div>
+        </div>
+    `;
+
+    const decroches = data.decroches || [];
+    container.innerHTML = `
+        ${renderOpSection('1ère OP', data.op1)}
+        ${renderOpSection('2ème OP', data.op2)}
+        <div class="history-detail-op">
+            <h4>⚠️ Décrochés entre 1ère et 2ème OP (${decroches.length})</h4>
+            ${renderUserList(decroches, '#ffaa44')}
+        </div>
+    `;
+}
+
+window.openHistoryDayModal = openHistoryDayModal;
+window.closeHistoryDayModal = closeHistoryDayModal;
 
 async function loadPresenceStats() {
     const period = document.getElementById('presenceStatsPeriod')?.value || '30';

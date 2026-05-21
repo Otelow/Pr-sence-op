@@ -1,3 +1,4 @@
+// PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // RELANCE ABSENCE + CONTRASTE 19/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
@@ -26,6 +27,7 @@ function registerReadyEvent(deps) {
         startReminderLoop,
         updateAbsenceSalonCache,
         loadPresenceState,
+        deserializeReactionMap,
         restoreReactionsFromMessage,
         reactionsOP1,
         reactionsOP2,
@@ -64,6 +66,22 @@ async function catchUpYesterdaySnapshot() {
     await runPresenceSnapshot(dateStr, {}, 'Rattrapage snapshot au boot').catch(e => {
         log.error(`❌ Rattrapage snapshot ${dateStr} échoué: ${e.message}`);
     });
+}
+
+function restoreReactionMapFromDisk(label, savedOp, reactionMap) {
+    if (typeof deserializeReactionMap !== 'function') return 0;
+    if (!savedOp?.reactions || typeof savedOp.reactions !== 'object') return 0;
+    deserializeReactionMap(savedOp.reactions, reactionMap);
+    log.info(`📥 Réactions ${label} restaurées depuis disk : ${reactionMap.size} user(s)`);
+    return reactionMap.size;
+}
+
+function applySavedPresenceData(target, savedOp) {
+    if (!savedOp) return;
+    target.messageId = savedOp.messageId || target.messageId || null;
+    target.active = Boolean(savedOp.active);
+    target.terminated = Boolean(savedOp.terminated);
+    target.startedAt = savedOp.startedAt || target.startedAt || null;
 }
 
 client.once('ready', async () => {
@@ -120,43 +138,40 @@ client.once('ready', async () => {
     let op2Restored = false;
 
     if (savedState) {
-        if (savedState.op1 && savedState.op1.messageId && (savedState.op1.active || savedState.op1.terminated)) {
-            log.info('🔄 Restauration 1ère Présence OP depuis fichier...');
-            const restored = await restoreReactionsFromMessage(savedState.op1.messageId, reactionsOP1);
-            if (restored) {
-                presenceData.messageId = savedState.op1.messageId;
-                presenceData.active = Boolean(savedState.op1.active);
-                presenceData.terminated = Boolean(savedState.op1.terminated);
-                presenceData.startedAt = savedState.op1.startedAt || presenceData.startedAt || null;
-                expirePresenceAtMidnight?.();
-                op1Restored = true;
-                log.info('✅ 1ère Présence OP restaurée');
+        const op1DiskUsers = restoreReactionMapFromDisk('OP1', savedState.op1, reactionsOP1);
+        const op2DiskUsers = restoreReactionMapFromDisk('OP2', savedState.op2, reactionsOP2);
 
-                // Relancer les rappels et crons
-                const channel = client.channels.cache.get(CONFIG.CHANNELS.PRESENCE);
-                if (channel) {
-                    const msg = await channel.messages.fetch(savedState.op1.messageId).catch(() => null);
-                    if (msg && presenceData.active) startPresenceReminders(channel, msg);
-                }
-            } else {
-                log.info('⚠️ Message 1ère OP introuvable dans le fichier');
+        if (savedState.op1 && (savedState.op1.messageId || savedState.op1.active || savedState.op1.terminated || op1DiskUsers > 0)) {
+            log.info('🔄 Restauration 1ère Présence OP depuis fichier...');
+            applySavedPresenceData(presenceData, savedState.op1);
+            const restored = savedState.op1.messageId
+                ? await restoreReactionsFromMessage(savedState.op1.messageId, reactionsOP1)
+                : false;
+            expirePresenceAtMidnight?.();
+            op1Restored = Boolean(restored || op1DiskUsers > 0);
+            log.info(restored
+                ? '✅ 1ère Présence OP restaurée depuis Discord'
+                : `⚠️ Discord indisponible pour OP1, réactions disk conservées (${reactionsOP1.size} user(s))`);
+
+            // Relancer les rappels et crons
+            const channel = client.channels.cache.get(CONFIG.CHANNELS.PRESENCE);
+            if (channel && presenceData.messageId) {
+                const msg = await channel.messages.fetch(presenceData.messageId).catch(() => null);
+                if (msg && presenceData.active) startPresenceReminders(channel, msg);
             }
         }
 
-        if (savedState.op2 && savedState.op2.messageId && (savedState.op2.active || savedState.op2.terminated)) {
+        if (savedState.op2 && (savedState.op2.messageId || savedState.op2.active || savedState.op2.terminated || op2DiskUsers > 0)) {
             log.info('🔄 Restauration 2ème Présence OP depuis fichier...');
-            const restored = await restoreReactionsFromMessage(savedState.op2.messageId, reactionsOP2);
-            if (restored) {
-                presence2Data.messageId = savedState.op2.messageId;
-                presence2Data.active = Boolean(savedState.op2.active);
-                presence2Data.terminated = Boolean(savedState.op2.terminated);
-                presence2Data.startedAt = savedState.op2.startedAt || presence2Data.startedAt || null;
-                expirePresenceAtMidnight?.();
-                op2Restored = true;
-                log.info('✅ 2ème Présence OP restaurée');
-            } else {
-                log.info('⚠️ Message 2ème OP introuvable');
-            }
+            applySavedPresenceData(presence2Data, savedState.op2);
+            const restored = savedState.op2.messageId
+                ? await restoreReactionsFromMessage(savedState.op2.messageId, reactionsOP2)
+                : false;
+            expirePresenceAtMidnight?.();
+            op2Restored = Boolean(restored || op2DiskUsers > 0);
+            log.info(restored
+                ? '✅ 2ème Présence OP restaurée depuis Discord'
+                : `⚠️ Discord indisponible pour OP2, réactions disk conservées (${reactionsOP2.size} user(s))`);
         }
     }
 
@@ -223,6 +238,13 @@ client.once('ready', async () => {
         }
     }
 
+    const todayStr = getParisDateKey ? getParisDateKey(new Date()) : new Date().toISOString().slice(0, 10);
+    if (reactionsOP1.size > 0 || reactionsOP2.size > 0) {
+        await runPresenceSnapshot(todayStr, {}, 'Snapshot de rattrapage au boot').catch(e => {
+            log.error(`❌ Snapshot de rattrapage au boot ${todayStr} échoué: ${e.message}`);
+        });
+    }
+
     await catchUpYesterdaySnapshot();
 
     cron.schedule('0 0 * * *', () => {
@@ -235,6 +257,21 @@ client.once('ready', async () => {
         const dateStr = getYesterdayParisKey();
         runPresenceSnapshot(dateStr, { only: 'op2' }, 'Snapshot OP2 à 01h00')
             .catch(e => log.error(`❌ Snapshot OP2 01h00 échoué: ${e.message}`));
+    }, { timezone: 'Europe/Paris' });
+
+    cron.schedule('*/10 * * * *', async () => {
+        if (typeof snapshotPresenceDay !== 'function') return;
+        const currentDay = getParisDateKey ? getParisDateKey(new Date()) : new Date().toISOString().slice(0, 10);
+        try {
+            const hasOP1 = reactionsOP1.size > 0;
+            const hasOP2 = reactionsOP2.size > 0;
+            if (hasOP1 || hasOP2) {
+                await snapshotPresenceDay(currentDay);
+                log.debug(`📸 Snapshot intermédiaire ${currentDay} (OP1: ${reactionsOP1.size}, OP2: ${reactionsOP2.size})`);
+            }
+        } catch (e) {
+            log.error('Snapshot intermédiaire échoué:', e.message);
+        }
     }, { timezone: 'Europe/Paris' });
 
     cron.schedule('0 22 * * 0', () => {

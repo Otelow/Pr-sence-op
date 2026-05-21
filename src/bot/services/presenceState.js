@@ -1,3 +1,4 @@
+// PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FINAL D2 16/05/2026 ? logs bot via pino
@@ -21,6 +22,25 @@ function dateFromKey(dateStr) {
     const [year, month, day] = String(dateStr || '').split('-').map(Number);
     if (!year || !month || !day) return new Date();
     return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function serializeReactionMap(map) {
+    const out = {};
+    if (!map || typeof map.entries !== 'function') return out;
+    for (const [userId, set] of map.entries()) {
+        out[userId] = [...set];
+    }
+    return out;
+}
+
+function deserializeReactionMap(obj, targetMap) {
+    targetMap.clear();
+    if (!obj || typeof obj !== 'object') return;
+    for (const [userId, types] of Object.entries(obj)) {
+        if (Array.isArray(types)) {
+            targetMap.set(userId, new Set(types));
+        }
+    }
 }
 
 function ensurePresenceHistoryTable(db) {
@@ -138,8 +158,8 @@ function createPresenceStatePersistence(deps) {
         });
 
         const ops = [];
-        if (only !== 'op2' && op1Entries.size > 0) ops.push({ num: 1, entries: op1Entries });
-        if (only !== 'op1' && op2Entries.size > 0) ops.push({ num: 2, entries: op2Entries });
+        if (only !== 'op2') ops.push({ num: 1, entries: op1Entries });
+        if (only !== 'op1') ops.push({ num: 2, entries: op2Entries });
         if (ops.length === 0) return false;
 
         tx(ops);
@@ -152,8 +172,21 @@ function createPresenceStatePersistence(deps) {
             const presenceData = getPresenceData();
             const presence2Data = getPresence2Data();
             const state = {
-                op1: { messageId: presenceData.messageId, active: presenceData.active, terminated: Boolean(presenceData.terminated), startedAt: presenceData.startedAt || null },
-                op2: { messageId: presence2Data.messageId, active: presence2Data.active, terminated: Boolean(presence2Data.terminated), startedAt: presence2Data.startedAt || null },
+                op1: {
+                    messageId: presenceData.messageId,
+                    active: presenceData.active,
+                    terminated: Boolean(presenceData.terminated),
+                    startedAt: presenceData.startedAt || null,
+                    reactions: serializeReactionMap(reactionsOP1),
+                },
+                op2: {
+                    messageId: presence2Data.messageId,
+                    active: presence2Data.active,
+                    terminated: Boolean(presence2Data.terminated),
+                    startedAt: presence2Data.startedAt || null,
+                    reactions: serializeReactionMap(reactionsOP2),
+                },
+                currentDay: getParisDateKey(new Date()),
                 savedAt: new Date().toISOString(),
             };
             fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
@@ -186,6 +219,7 @@ function createPresenceStatePersistence(deps) {
         loadPresenceState,
         clearPresenceState,
         getParisDateKey,
+        deserializeReactionMap,
         hasPresenceSnapshot,
         snapshotPresenceDay,
     };
@@ -193,4 +227,6 @@ function createPresenceStatePersistence(deps) {
 
 module.exports = {
     createPresenceStatePersistence,
+    serializeReactionMap,
+    deserializeReactionMap,
 };

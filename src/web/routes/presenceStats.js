@@ -1,3 +1,4 @@
+// PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
@@ -225,6 +226,46 @@ function registerPresenceStatsRoutes(app, deps) {
         });
 
         res.json({ days, history });
+    });
+
+    app.get('/api/presence/history/:date', requireAuth, requireFullSiteAccess, (req, res) => {
+        const date = req.params.date;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: 'Format date invalide (YYYY-MM-DD)' });
+        }
+
+        const db = createConnection();
+        ensurePresenceHistoryTable(db);
+        const rows = db.prepare(`
+            SELECT op_number, user_id, username, status, recorded_at
+            FROM presence_history
+            WHERE date = ?
+            ORDER BY op_number ASC, status ASC, username COLLATE NOCASE ASC
+        `).all(date);
+
+        const makeOp = () => ({ present: [], late: [], absentReact: [], absentValid: [], noReaction: [] });
+        const op1 = makeOp();
+        const op2 = makeOp();
+        for (const row of rows) {
+            const target = Number(row.op_number) === 1 ? op1 : op2;
+            if (row.status in target) {
+                target[row.status].push({
+                    user_id: row.user_id,
+                    username: row.username || row.user_id,
+                });
+            }
+        }
+
+        const presents1 = new Set([...op1.present, ...op1.late].map(user => user.user_id));
+        const decroches2 = new Map();
+        for (const user of [...op2.noReaction, ...op2.absentReact]) {
+            decroches2.set(user.user_id, user);
+        }
+        const decroches = [...presents1]
+            .filter(userId => decroches2.has(userId))
+            .map(userId => decroches2.get(userId));
+
+        return res.json({ date, op1, op2, decroches });
     });
 
     app.get('/api/presence/stats', requireAuth, requireFullSiteAccess, (req, res) => {

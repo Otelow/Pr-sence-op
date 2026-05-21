@@ -1,3 +1,4 @@
+// PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // RELANCE ABSENCE + CONTRASTE 19/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
@@ -372,6 +373,7 @@ const STATE_FILE = dataFile('presence_state.json');
 const {
     savePresenceState,
     loadPresenceState,
+    deserializeReactionMap,
     getParisDateKey: getPresenceParisDateKey,
     hasPresenceSnapshot: hasPresenceSnapshotForHistory,
     snapshotPresenceDay: snapshotPresenceDayForHistory,
@@ -641,6 +643,7 @@ registerReadyEvent({
     startReminderLoop,
     updateAbsenceSalonCache,
     loadPresenceState,
+    deserializeReactionMap,
     restoreReactionsFromMessage,
     reactionsOP1,
     reactionsOP2,
