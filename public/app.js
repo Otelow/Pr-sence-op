@@ -1,3 +1,4 @@
+// CCV5 21/05/2026 — palette stricte + cards cliquables + fix
 // COMMAND CENTER v4 20/05/2026 — refonte fidèle mockup
 // PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // CC PATCH 19/05/2026 — vrais effets visibles
@@ -628,6 +629,132 @@ async function reloadDashboardOverview() {
 function setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
+}
+
+async function openCommandModal(target) {
+    const modal = document.getElementById('cmdDetailModal');
+    const body = document.getElementById('cmdDetailModalBody');
+    const title = document.getElementById('cmdDetailModalTitle');
+    if (!modal || !body || !title) return;
+    modal.style.display = 'flex';
+    body.innerHTML = '<p class="loading">Chargement...</p>';
+
+    try {
+        if (target === 'membres-list') {
+            title.textContent = 'Membres 21BS inscrits';
+            const data = await fetchJson('/api/dashboard/members-list');
+            body.innerHTML = renderMembersList(data.members || []);
+        } else if (target === 'weapons-list') {
+            title.textContent = 'Armes en vente';
+            const data = await fetchJson('/api/dashboard/weapons-on-sale');
+            body.innerHTML = renderWeaponsList(data.weapons || []);
+        } else if (target === 'absences-list') {
+            title.textContent = 'Absences cette semaine';
+            const data = await fetchJson('/api/dashboard/absences-week');
+            body.innerHTML = renderAbsencesList(data.absences || []);
+        } else if (target === 'crafts-list') {
+            title.textContent = 'Crafts en cours';
+            const data = await fetchJson('/api/dashboard/crafts-open');
+            body.innerHTML = renderCraftsList(data.crafts || []);
+        } else if (target === 'decroches-detail') {
+            title.textContent = "Décrochés aujourd'hui";
+            const data = await fetchJson('/api/dashboard/decroches-today');
+            body.innerHTML = renderDecrochesList(data.decroches || []);
+        } else {
+            title.textContent = 'Détail présence 1ère OP';
+            const data = await fetchJson('/api/dashboard/presence-detail');
+            body.innerHTML = renderPresenceDetail(data);
+        }
+    } catch (error) {
+        body.innerHTML = `<p class="error">Erreur de chargement : ${escapeHtml(error.message)}</p>`;
+    }
+}
+
+function closeCommandModal() {
+    const modal = document.getElementById('cmdDetailModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function fetchJson(url) {
+    const res = await fetch(url, { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+}
+
+function renderEmptyMini(text = 'Aucune donnée') {
+    return `<p class="empty-mini">${escapeHtml(text)}</p>`;
+}
+
+function renderMembersList(members) {
+    if (!members.length) return renderEmptyMini('Aucun membre');
+    return `<div class="cmd-detail-list">${members.map(member => `
+        <div class="cmd-detail-row">
+            ${member.avatar_url ? `<img class="cmd-detail-avatar" src="${safeImageUrl(member.avatar_url)}" alt="">` : '<span class="cmd-detail-avatar cmd-detail-avatar-fallback"></span>'}
+            <div>
+                <strong>${escapeHtml(member.username)}</strong>
+                <span>${escapeHtml((member.roles || []).slice(0, 3).join(' · ') || '21BS')}</span>
+            </div>
+        </div>
+    `).join('')}</div>`;
+}
+
+function renderWeaponsList(weapons) {
+    if (!weapons.length) return renderEmptyMini('Aucune arme en vente');
+    return `<div class="cmd-detail-list">${weapons.map(weapon => `
+        <div class="cmd-detail-row">
+            <div>
+                <strong>${escapeHtml(weapon.name || 'Arme')}</strong>
+                <span>${escapeHtml(weapon.owner_name || 'Vendeur inconnu')} · ${escapeHtml(weapon.serial_number || 'N/S')}</span>
+            </div>
+            <span class="history-detail-pill">${Number(weapon.sale_price || 0).toLocaleString('fr-FR')}$</span>
+        </div>
+    `).join('')}</div>`;
+}
+
+function renderAbsencesList(absences) {
+    if (!absences.length) return renderEmptyMini('Aucune absence cette semaine');
+    return `<div class="cmd-detail-list">${absences.map(absence => `
+        <div class="cmd-detail-row">
+            <div>
+                <strong>${escapeHtml(absence.username || absence.user_id)}</strong>
+                <span>${escapeHtml(absence.date)} · ${escapeHtml(absence.status)}</span>
+            </div>
+        </div>
+    `).join('')}</div>`;
+}
+
+function renderCraftsList(crafts) {
+    if (!crafts.length) return renderEmptyMini('Aucun craft ouvert');
+    return `<div class="cmd-detail-list">${crafts.map(craft => `
+        <div class="cmd-detail-row">
+            <div>
+                <strong>${escapeHtml(craft.weapon_name || 'Arme')}</strong>
+                <span>${escapeHtml(craft.requester_name || 'Demandeur inconnu')}</span>
+            </div>
+            <span class="history-detail-pill">${escapeHtml(craft.status || 'pending')}</span>
+        </div>
+    `).join('')}</div>`;
+}
+
+function renderDecrochesList(decroches) {
+    return renderMembersList(decroches);
+}
+
+function renderPresenceDetail(data) {
+    const groups = [
+        ['Présents', data.present || []],
+        ['Retards', data.late || []],
+        ['Absents justifiés', data.absentValid || []],
+        ['Absents non justifiés', data.absentReact || []],
+        ['Pas de réaction', data.noReaction || []],
+    ];
+    return groups.map(([label, members]) => `
+        <div class="history-detail-cat">
+            <b>${escapeHtml(label)} (${members.length})</b>
+            ${members.length ? renderMembersList(members) : renderEmptyMini('—')}
+        </div>
+    `).join('');
 }
 
 function renderPresenceMemberList(items, emptyText, showAbsences = false) {
@@ -4851,6 +4978,8 @@ window.closeCraftWeaponDetails = closeCraftWeaponDetails;
 window.openPresenceStatDetails = openPresenceStatDetails;
 window.closePresenceStatDetails = closePresenceStatDetails;
 window.reloadDashboardOverview = reloadDashboardOverview;
+window.openCommandModal = openCommandModal;
+window.closeCommandModal = closeCommandModal;
 window.toggleCraftWeaponDropdown = toggleCraftWeaponDropdown;
 window.selectCraftWeapon = selectCraftWeapon;
 window.submitCraftRequest = submitCraftRequest;
@@ -5033,6 +5162,7 @@ let myWeaponsSubmitInFlight = false;
 let myWeaponsMarkSoldInFlight = false;
 let myWeaponsEditInFlight = false;
 let myWeaponsSearchQuery = '';
+let myWeaponsActiveFilter = 'all';
 let myWeaponsActiveMaxSalePrice = 0;
 const myWeaponsAuthorizedCrafters = [
     { id: 'otelow', name: 'Otelow' },
@@ -5072,13 +5202,24 @@ function bindMyWeaponsPriceLimit() {
 
 function bindMyWeaponsSearch() {
     const input = document.getElementById('myWeaponsSearch');
-    if (!input || input.dataset.bound === '1') return;
-    input.value = myWeaponsSearchQuery;
-    input.addEventListener('input', () => {
-        myWeaponsSearchQuery = input.value.trim().toLowerCase();
-        renderMyWeapons();
-    });
-    input.dataset.bound = '1';
+    if (input && input.dataset.bound !== '1') {
+        input.value = myWeaponsSearchQuery;
+        input.addEventListener('input', () => {
+            myWeaponsSearchQuery = input.value.trim().toLowerCase();
+            renderMyWeapons();
+        });
+        input.dataset.bound = '1';
+    }
+    const pills = document.getElementById('myWeaponsFilterPills');
+    if (pills && pills.dataset.bound !== '1') {
+        pills.addEventListener('click', event => {
+            const btn = event.target.closest?.('.weapons-filter');
+            if (!btn) return;
+            myWeaponsActiveFilter = btn.dataset.filter || 'all';
+            renderMyWeapons();
+        });
+        pills.dataset.bound = '1';
+    }
 }
 
 function isMyWeaponsFormActive() {
@@ -5501,18 +5642,6 @@ async function submitMyWeapon() {
 function renderMyWeapons() {
     const list = document.getElementById('myWeaponsList');
     if (!list) return;
-    if (myWeaponsCache.length === 0) {
-        list.innerHTML = '<p class="empty">Aucune arme en vente</p>';
-        return;
-    }
-    const query = myWeaponsSearchQuery.trim().toLowerCase();
-    const visibleWeapons = query
-        ? myWeaponsCache.filter(w => String(w.weapon_name || '').toLowerCase().includes(query))
-        : myWeaponsCache;
-    if (visibleWeapons.length === 0) {
-        list.innerHTML = '<p class="empty">Aucune arme ne correspond à cette recherche</p>';
-        return;
-    }
 
     const getAvailableQty = (weapon) => (
         typeof weapon.quantity_available === 'number'
@@ -5520,9 +5649,48 @@ function renderMyWeapons() {
             : (weapon.is_sold ? 0 : 1)
     );
     const getTotalQty = (weapon) => weapon.quantity_total || 1;
+    const isWeaponSold = weapon => getAvailableQty(weapon) <= 0;
+    const isWeaponInProgress = weapon => !isWeaponSold(weapon)
+        && (weapon.is_in_progress === true || weapon.is_in_progress === 1 || weapon.is_in_progress === '1');
+
+    const allCount = myWeaponsCache.length;
+    const onSaleCount = myWeaponsCache.filter(w => !isWeaponSold(w)).length;
+    const inProgressCount = myWeaponsCache.filter(isWeaponInProgress).length;
+    const soldCount = myWeaponsCache.filter(isWeaponSold).length;
+    document.querySelectorAll('.weapons-filter').forEach(btn => {
+        const filter = btn.dataset.filter || 'all';
+        const counts = { all: allCount, onsale: onSaleCount, inprogress: inProgressCount, sold: soldCount };
+        const labels = { all: 'Toutes', onsale: 'En vente', inprogress: 'En cours', sold: 'Vendues' };
+        btn.textContent = `${labels[filter] || 'Toutes'} (${counts[filter] ?? allCount})`;
+        btn.classList.toggle('active', filter === myWeaponsActiveFilter);
+    });
+
+    if (myWeaponsCache.length === 0) {
+        list.innerHTML = '<p class="empty">Aucune arme en vente</p>';
+        return;
+    }
+
+    const query = myWeaponsSearchQuery.trim().toLowerCase();
+    const visibleWeapons = myWeaponsCache.filter(w => {
+        if (myWeaponsActiveFilter === 'onsale' && isWeaponSold(w)) return false;
+        if (myWeaponsActiveFilter === 'inprogress' && !isWeaponInProgress(w)) return false;
+        if (myWeaponsActiveFilter === 'sold' && !isWeaponSold(w)) return false;
+        if (!query) return true;
+        return [
+            w.weapon_name,
+            w.user_name,
+            w.serial_number,
+            ...(Array.isArray(w.serials) ? w.serials.map(s => s.serial_number) : []),
+        ].some(value => String(value || '').toLowerCase().includes(query));
+    });
+    if (visibleWeapons.length === 0) {
+        list.innerHTML = '<p class="empty">Aucune arme ne correspond à cette vue</p>';
+        return;
+    }
+
     const sortedWeapons = [...visibleWeapons].sort((a, b) => {
-        const aSold = getAvailableQty(a) <= 0;
-        const bSold = getAvailableQty(b) <= 0;
+        const aSold = isWeaponSold(a);
+        const bSold = isWeaponSold(b);
         if (aSold !== bSold) return aSold ? 1 : -1;
         if (!aSold && !bSold) {
             const aPrice = Number(a.asking_price) || 0;
@@ -5543,20 +5711,11 @@ function renderMyWeapons() {
 
     const rows = sortedWeapons.map(w => {
         const date = new Date(w.created_at * 1000).toLocaleDateString('fr-FR');
-        const avatarUrl = safeImageUrl(w.user_avatar);
-        const avatar = avatarUrl
-            ? `<img class="mw-avatar" src="${avatarUrl}" alt="${escapeHtml(w.user_name)}">`
-            : `<div class="mw-avatar mw-avatar-fallback">${(w.user_name || '?').substring(0, 1).toUpperCase()}</div>`;
-
         const isMine = w.is_mine;
         const totalQty = w.quantity_total || 1;
-        const availableQty = typeof w.quantity_available === 'number' ? w.quantity_available : (w.is_sold ? 0 : 1);
+        const availableQty = getAvailableQty(w);
         const serials = Array.isArray(w.serials) ? w.serials : [];
-        const isSold = availableQty <= 0;
-        let serialPreview = serials.length
-            ? serials.slice(0, 6).map(s => `${s.is_sold ? 'Vendu' : 'Dispo'}: ${escapeHtml(s.serial_number || 'Non renseigne')}${s.sold_by_name ? ` par ${escapeHtml(s.sold_by_name)}` : ''}`).join(' • ')
-            : (w.serial_number ? escapeHtml(w.serial_number) : '');
-        let moreSerials = serials.length > 6 ? ` +${serials.length - 6}` : '';
+        const isSold = isWeaponSold(w);
         const availableSerials = serials
             .filter(s => !s.is_sold && String(s.serial_number || '').trim())
             .map(s => escapeHtml(s.serial_number));
@@ -5566,96 +5725,73 @@ function renderMyWeapons() {
         const serialValues = availableSerials.length
             ? availableSerials
             : (soldSerials.length ? soldSerials : (w.serial_number ? [escapeHtml(w.serial_number)] : []));
-        const serialLabel = availableSerials.length ? 'N° Dispo' : (soldSerials.length ? 'N° vendu' : 'N°');
-        serialPreview = serialValues.length
-            ? `${serialLabel} : ${serialValues.slice(0, 4).join(' • ')}`
-            : '';
-        moreSerials = serialValues.length > 4 ? ` +${serialValues.length - 4}` : '';
-        const craftedByLine = w.is_crafted && w.crafted_by_name
-            ? `<span>Craft : ${escapeHtml(w.crafted_by_name)}</span>`
-            : '';
-
-        const craftDateLine = w.is_crafted && w.craft_date
-            ? `<span>Date craft : ${new Date(w.craft_date * 1000).toLocaleDateString('fr-FR')}</span>`
-            : '';
-        const craftDetails = [craftedByLine, serialPreview ? `<span>${serialPreview}${moreSerials}</span>` : '', craftDateLine].filter(Boolean).join('');
-        const craftDetailsId = `mwCraftDetails-${w.id}`;
-        const craftDetailsBlock = craftDetails ? `
-            <button type="button" class="mw-details-toggle" onclick="toggleMyWeaponDetails('${craftDetailsId}', this)" aria-expanded="false" aria-controls="${craftDetailsId}">Détails</button>
-            <div class="mw-hidden-details" id="${craftDetailsId}" hidden>${craftDetails}</div>
-        ` : '';
-
-        const priceBlock = isSold
-            ? `<span class="mw-sold-price">Vendu : ${(w.sold_price || 0).toLocaleString('fr-FR')}$ ${w.sold_to ? '→ ' + escapeHtml(w.sold_to) : ''}</span>`
-            : `
-                <span class="mw-asking-price">💰 Souhaité : ${(w.asking_price || 0).toLocaleString('fr-FR')}$</span>
-                ${w.min_price ? `<span class="mw-min-price">📉 Min : ${w.min_price.toLocaleString('fr-FR')}$</span>` : ''}
-            `;
-
+        const serialDisplay = serialValues.length ? serialValues.slice(0, 3).join(' / ') : 'Non renseigné';
+        const serialMore = serialValues.length > 3 ? ` +${serialValues.length - 3}` : '';
         const isAdminWeaponManager = canAdminManageMyWeaponsClient();
-        const isInProgress = !isSold && (w.is_in_progress === true || w.is_in_progress === 1 || w.is_in_progress === '1');
+        const isInProgress = isWeaponInProgress(w);
         const canEditWeapon = isMine && !isSold;
         const canDeleteWeapon = isMine || canDeleteMyWeaponsClient();
-        let actions = isMine && !isSold ? `
-            <div class="mw-actions">
-                <button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>
-                <button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>
-                <button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>
-            </div>
-        ` : (isMine && isSold ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : '');
-
-        if (!isMine && canDeleteWeapon) {
-            actions = `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>`;
-        }
-
-        if ((!isMine || isSold) && canEditWeapon) {
-            actions = `
-                <div class="mw-actions">
-                    <button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>
-                    ${canDeleteWeapon ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : ''}
-                </div>
-            `;
-        }
-
         const canMarkSoldWeapon = !isSold && (isMine || isAdminWeaponManager);
         const canToggleInProgress = !isSold && isAdminWeaponManager;
         const statusBadge = isSold
-            ? '<span class="myweapons-tag-status sold">VENDUE</span>'
+            ? '<span class="weapon-status-badge weapon-status-sold">Vendue</span>'
             : (isInProgress
-                ? '<span class="weapon-status-in-progress">En cours de vente</span>'
-                : '<span class="myweapons-tag-status available"><span class="wave-text-effect sale-badge-wave">' + renderWaveTextSpans('EN VENTE') + '</span></span>');
+                ? '<span class="weapon-status-badge weapon-status-progress">En cours</span>'
+                : '<span class="weapon-status-badge weapon-status-onsale"><span class="wave-text-effect sale-badge-wave">' + renderWaveTextSpans('En vente') + '</span></span>');
         const actionButtons = [
-            canEditWeapon ? `<button class="btn-mw-edit" onclick="openEditMyWeaponModal(${w.id})">Modifier</button>` : '',
-            canToggleInProgress ? `<button class="btn-status-in-progress ${isInProgress ? 'active' : ''}" onclick="toggleWeaponInProgress(${w.id}, ${isInProgress ? 'false' : 'true'})">${isInProgress ? 'Annuler en cours de vente' : 'En cours de vente'}</button>` : '',
-            canMarkSoldWeapon ? `<button class="btn-mw-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>` : '',
-            canDeleteWeapon ? `<button class="btn-status-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : '',
+            canEditWeapon ? `<button class="btn-action btn-edit" onclick="openEditMyWeaponModal(${w.id})">✏ Modifier</button>` : '',
+            canToggleInProgress ? `<button class="btn-action btn-progress ${isInProgress ? 'active' : ''}" onclick="toggleWeaponInProgress(${w.id}, ${isInProgress ? 'false' : 'true'})">${isInProgress ? 'Annuler en cours' : '🟡 En cours de vente'}</button>` : '',
+            canMarkSoldWeapon ? `<button class="btn-action btn-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>` : '',
+            canDeleteWeapon ? `<button class="btn-action btn-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : '',
         ].filter(Boolean).join('');
-        actions = actionButtons ? `<div class="mw-actions">${actionButtons}</div>` : '';
-
         const inProgressWave = isInProgress ? `
                 <span class="shimmer-overlay"></span>
                 <span class="shimmer-overlay-2"></span>` : '';
-        const inProgressCardClass = isInProgress ? 'weapon-card-in-progress' : '';
+        const cardClass = [
+            'weapon-card-pro',
+            isSold ? 'mw-sold-row' : 'mw-available-row dynamic-sale-effect',
+            isInProgress ? 'weapon-card-in-progress' : '',
+            isMine ? 'mw-mine' : '',
+        ].filter(Boolean).join(' ');
+        const priceMain = isSold
+            ? `${(w.sold_price || 0).toLocaleString('fr-FR')}$`
+            : `${(w.asking_price || 0).toLocaleString('fr-FR')}$`;
+        const priceSub = isSold
+            ? (w.sold_to ? `Vendu à ${escapeHtml(w.sold_to)}` : 'Vendu')
+            : (w.min_price ? `Min: ${Number(w.min_price || 0).toLocaleString('fr-FR')}$` : 'Prix minimum libre');
 
         return `
-            <div class="myweapons-item weapon-sale-card ${isSold ? 'mw-sold-row' : 'mw-available-row mw-sale-active dynamic-sale-effect'} ${inProgressCardClass} ${isMine ? 'mw-mine' : ''}">
+            <div class="${cardClass}">
                 ${inProgressWave}
-                ${avatar}
-                <div class="myweapons-item-body">
-                    <div class="myweapons-item-name">
-                        ${escapeHtml(w.weapon_name)}
+                <div class="weapon-card-header">
+                    <div class="weapon-card-title">
+                        <h3>${escapeHtml(w.weapon_name)}</h3>
+                        <div class="weapon-card-meta">
                         ${statusBadge}
-                        ${w.is_crafted ? '<span class="myweapons-tag-crafted">⚒ Craft 21BS</span>' : ''}
-                        <span class="myweapons-tag-stock">${availableQty}/${totalQty}</span>
+                            ${w.is_crafted ? '<span class="weapon-craft-badge">Craft 21BS</span>' : '<span class="weapon-craft-badge external">Externe</span>'}
+                            <span class="weapon-craft-badge">${availableQty}/${totalQty}</span>
+                        </div>
                     </div>
-                    <div class="myweapons-item-meta">
-                        <span class="mw-username">👤 ${escapeHtml(w.user_name)}</span>
-                        ${priceBlock}
-                        <span>📅 ${date}</span>
-                        ${craftDetailsBlock}
+                    <div class="weapon-card-price">
+                        <span class="weapon-price-main">${priceMain}</span>
+                        <span class="weapon-price-min">${priceSub}</span>
                     </div>
                 </div>
-                ${actions}
+                <div class="weapon-card-info">
+                    <div class="weapon-info-item">
+                        <span class="weapon-info-label">Vendeur</span>
+                        <span class="weapon-info-value">${escapeHtml(w.user_name || 'Inconnu')}</span>
+                    </div>
+                    <div class="weapon-info-item">
+                        <span class="weapon-info-label">Série</span>
+                        <span class="weapon-info-value mono">${serialDisplay}${serialMore}</span>
+                    </div>
+                    <div class="weapon-info-item">
+                        <span class="weapon-info-label">Mis en vente</span>
+                        <span class="weapon-info-value">${date}</span>
+                    </div>
+                </div>
+                ${actionButtons ? `<div class="weapon-card-actions">${actionButtons}</div>` : ''}
             </div>
         `;
     }).join('');

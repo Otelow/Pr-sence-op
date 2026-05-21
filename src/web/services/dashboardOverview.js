@@ -1,3 +1,4 @@
+// CCV5 21/05/2026 — palette stricte + cards cliquables + fix
 // COMMAND CENTER v4 20/05/2026 — refonte fidèle mockup
 const { pickReactionPriority } = require('../../shared/presenceReactions');
 const { createConnection } = require('../../shared/database');
@@ -183,6 +184,7 @@ async function buildDashboardOverview({ client, state, now = new Date() }) {
 module.exports = {
     buildDashboardOverview,
     computeWeekPresenceRate,
+    getEligibleRoleMembers,
     getCurrentPresenceLive,
     getMondayBeforeParis,
     getMondayParis,

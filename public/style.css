@@ -1,3 +1,4 @@
+/* // CCV5 21/05/2026 — palette stricte + cards cliquables + fix */
 /* PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026 */
 /* RELANCE ABSENCE + CONTRASTE 19/05/2026 */
 /* // CC PATCH 19/05/2026 — vrais effets visibles */
@@ -110,20 +111,27 @@
 }
 
 :root {
-    --bg-deep: #1a1410;
+    --bg-deep: #0a0805;
     --bg-dark: #111111;
     --bg-card: #161616;
     --bg-elevated: #1c1c1c;
-    --border: #2a2a2a;
-    --border-hover: #404040;
-    --text: #f5f5f5;
-    --text-dim: #b8b8b8;
-    --text-muted: #888;
-    --accent: #ff3333;
-    --accent-glow: rgba(255, 51, 51, 0.4);
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(247,135,0,0.18);
+    --text: #faf8f3;
+    --text-dim: rgba(250, 248, 243, 0.7);
+    --text-muted: rgba(250, 248, 243, 0.45);
+    --accent: #f78700;
+    --accent-bright: #ff9a1f;
+    --accent-soft: rgba(247, 135, 0, 0.1);
+    --accent-glow: rgba(247, 135, 0, 0.35);
+    --accent-hover: rgba(247, 135, 0, 0.18);
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-bg-hover: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.07);
+    --glass-blur: blur(24px) saturate(180%);
     --gold: #d4af37;
     --green: #00ff88;
-    --orange: #ff9500;
+    --orange: #f78700;
     --blue: #5865f2;
     --discord: #5865f2;
     --font-display: 'Bebas Neue', sans-serif;
@@ -4062,15 +4070,15 @@ html, body {
     --text-muted: #888;
 
     /* Accent ORANGE remplace le rouge */
-    --accent: #ff8c00;
-    --accent-hover: #ffa940;
+    --accent: #f78700;
+    --accent-hover: #ff9a1f;
     --accent-glow: rgba(255, 140, 0, 0.45);
     --accent-soft: rgba(255, 140, 0, 0.12);
 
     /* Couleurs secondaires */
-    --gold-light: #ffb84d;
+    --gold-light: #f78700;
     --green: #4ade80;
-    --orange: #ff8c00;
+    --orange: #f78700;
     --red: #ef4444;
     --blue: #60a5fa;
     --discord: #5865f2;
@@ -4927,7 +4935,7 @@ select.craft-org-select option {
 
 select option:checked,
 select option:hover {
-    background: #ff8c00 !important;
+    background: #f78700 !important;
     color: #08080a !important;
 }
 
@@ -4985,7 +4993,7 @@ select option:hover {
 /* ─── ROUGE rare → ORANGE partout ───────────────────────── */
 .accent-color,
 [style*="--accent: #ff3333"] {
-    --accent: #ff8c00 !important;
+    --accent: #f78700 !important;
     --accent-glow: rgba(255, 140, 0, 0.4) !important;
 }
 
@@ -5244,7 +5252,7 @@ select option:hover {
 .cmd-section h2.section-title,
 .section-title,
 h2.section-title {
-    background: linear-gradient(90deg, #ffb84d 0%, #ff8c00 50%, #ff6600 100%) !important;
+    background: linear-gradient(90deg, #f78700 0%, #f78700 50%, #ff6600 100%) !important;
     -webkit-background-clip: text !important;
     background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
@@ -5262,7 +5270,7 @@ h2.section-title {
 /* Les titres "21BS / Centre Contrôle" et autres petits */
 .sidebar-title,
 .sidebar-header h1 {
-    background: linear-gradient(90deg, #ffb84d 0%, #ff8c00 100%) !important;
+    background: linear-gradient(90deg, #f78700 0%, #f78700 100%) !important;
     -webkit-background-clip: text !important;
     background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
@@ -5284,7 +5292,7 @@ h2.section-title {
 .absences-block h3,
 .stats-block h3,
 .cmd-section .comm-title {
-    background: linear-gradient(135deg, var(--text) 30%, #ff8c00 100%) !important;
+    background: linear-gradient(135deg, var(--text) 30%, #f78700 100%) !important;
     -webkit-background-clip: text !important;
     background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
@@ -5601,7 +5609,7 @@ body {
     font-family: var(--font-display);
     font-size: 28px;
     margin: 0;
-    background: linear-gradient(135deg, #ffb84d 0%, #ff8c00 100%);
+    background: linear-gradient(135deg, #f78700 0%, #f78700 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -7706,7 +7714,7 @@ body {
     justify-content: center;
     gap: 8px;
     padding: 12px 16px !important;
-    background: linear-gradient(135deg, #ff8c00, #ff6600) !important;
+    background: linear-gradient(135deg, #f78700, #ff6600) !important;
     border: 0 !important;
     border-radius: 12px !important;
     color: white !important;
@@ -8116,7 +8124,7 @@ body {
     left: 4px;
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, #ff8c00, #ff6600);
+    background: linear-gradient(135deg, #f78700, #ff6600);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -8713,7 +8721,7 @@ body {
     left: 0;
     right: 0;
     z-index: 9999;
-    background: linear-gradient(90deg, #ff8c00 0%, #ff6600 100%);
+    background: linear-gradient(90deg, #f78700 0%, #ff6600 100%);
     color: #0a0a0c;
     font-weight: 700;
     padding: 10px 20px;
@@ -8914,7 +8922,7 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 .mw-avatar-fallback {
-    background: linear-gradient(135deg, #ff8c00, #ff6600);
+    background: linear-gradient(135deg, #f78700, #ff6600);
     color: white;
     display: inline-flex;
     align-items: center;
@@ -10156,7 +10164,7 @@ body:has(#impersonateBanner[style*="flex"]) {
 }
 
 .order-advance-publish-btn {
-    background: linear-gradient(90deg, #ff8a00, #ff5722);
+    background: linear-gradient(90deg, #f78700, #f78700);
     color: white;
     border: none;
     padding: 8px 16px;
@@ -10349,7 +10357,7 @@ body:has(#impersonateBanner[style*="flex"]) {
 
 .audit-action-weapon {
     background: rgba(255, 170, 50, 0.18);
-    color: #ffb84d;
+    color: #f78700;
 }
 
 .audit-action-catalog {
@@ -10844,19 +10852,19 @@ body:has(#impersonateBanner[style*="flex"]) {
    Couche visuelle uniquement : aucune classe/ID JS renommé.
    ========================================== */
 :root {
-    --accent: #ff8a00;
-    --accent-glow: rgba(255, 138, 0, 0.4);
-    --accent-soft: rgba(255, 138, 0, 0.1);
-    --accent-hover: rgba(255, 138, 0, 0.18);
+    --accent: #f78700;
+    --accent-glow: rgba(247, 135, 0, 0.4);
+    --accent-soft: rgba(247, 135, 0, 0.1);
+    --accent-hover: rgba(247, 135, 0, 0.18);
     --gold: #d4af37;
 
     --glass-bg: rgba(255, 255, 255, 0.04);
     --glass-bg-hover: rgba(255, 255, 255, 0.06);
     --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-border-hover: rgba(255, 138, 0, 0.3);
+    --glass-border-hover: rgba(247, 135, 0, 0.3);
     --glass-highlight: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-    --glass-shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 28px rgba(255, 138, 0, 0.15);
+    --glass-shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 28px rgba(247, 135, 0, 0.15);
     --glass-blur: blur(20px) saturate(180%);
     --glass-blur-heavy: blur(28px) saturate(180%);
 
@@ -10871,7 +10879,7 @@ html {
 
 body {
     background:
-        linear-gradient(135deg, rgba(255, 138, 0, 0.06), transparent 28%),
+        linear-gradient(135deg, rgba(247, 135, 0, 0.06), transparent 28%),
         linear-gradient(315deg, rgba(255, 184, 77, 0.045), transparent 34%),
         #0a0805 !important;
     position: relative;
@@ -10890,8 +10898,8 @@ body::after {
 
 body::before {
     background:
-        radial-gradient(ellipse at 10% 8%, rgba(255, 138, 0, 0.10), transparent 34%),
-        radial-gradient(ellipse at 88% 92%, rgba(255, 138, 0, 0.07), transparent 42%);
+        radial-gradient(ellipse at 10% 8%, rgba(247, 135, 0, 0.10), transparent 34%),
+        radial-gradient(ellipse at 88% 92%, rgba(247, 135, 0, 0.07), transparent 42%);
     animation: ambientPulse 14s ease-in-out infinite;
 }
 
@@ -11061,7 +11069,7 @@ main,
 [data-tab]:hover {
     color: #fff !important;
     background: var(--accent-soft) !important;
-    box-shadow: 0 0 20px rgba(255, 138, 0, 0.18);
+    box-shadow: 0 0 20px rgba(247, 135, 0, 0.18);
 }
 
 [class*="-tabs"] > button.active,
@@ -11093,19 +11101,19 @@ button,
 .btn-primary,
 button.btn-primary,
 .comm-tool-btn.active {
-    background: rgba(255, 138, 0, 0.12) !important;
-    border: 1px solid rgba(255, 138, 0, 0.35) !important;
-    color: #ffb84d !important;
+    background: rgba(247, 135, 0, 0.12) !important;
+    border: 1px solid rgba(247, 135, 0, 0.35) !important;
+    color: #f78700 !important;
 }
 
 .btn-primary:hover,
 button.btn-primary:hover,
 .comm-tool-btn:hover {
-    background: rgba(255, 138, 0, 0.22) !important;
-    border-color: rgba(255, 138, 0, 0.55) !important;
+    background: rgba(247, 135, 0, 0.22) !important;
+    border-color: rgba(247, 135, 0, 0.55) !important;
     transform: translateY(-1px);
     box-shadow:
-        0 4px 18px rgba(255, 138, 0, 0.25),
+        0 4px 18px rgba(247, 135, 0, 0.25),
         inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
@@ -11119,7 +11127,7 @@ button.btn-secondary {
 .btn-secondary:hover,
 button.btn-secondary:hover {
     background: rgba(255, 255, 255, 0.075) !important;
-    border-color: rgba(255, 138, 0, 0.32) !important;
+    border-color: rgba(247, 135, 0, 0.32) !important;
     color: #fff !important;
     transform: translateY(-1px);
 }
@@ -11153,10 +11161,10 @@ input:focus,
 select:focus,
 textarea:focus {
     border-color: var(--accent) !important;
-    background: rgba(255, 138, 0, 0.05) !important;
+    background: rgba(247, 135, 0, 0.05) !important;
     box-shadow:
-        0 0 0 3px rgba(255, 138, 0, 0.15),
-        0 0 20px rgba(255, 138, 0, 0.10) !important;
+        0 0 0 3px rgba(247, 135, 0, 0.15),
+        0 0 20px rgba(247, 135, 0, 0.10) !important;
     outline: none !important;
 }
 
@@ -11223,13 +11231,13 @@ header {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 138, 0, 0.28);
+    background: rgba(247, 135, 0, 0.28);
     border: 2px solid rgba(10, 8, 5, 0.7);
     border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 138, 0, 0.48);
+    background: rgba(247, 135, 0, 0.48);
 }
 
 .table-wrap,
@@ -11241,8 +11249,8 @@ table {
 }
 
 th {
-    background: rgba(255, 138, 0, 0.08) !important;
-    color: #ffb84d !important;
+    background: rgba(247, 135, 0, 0.08) !important;
+    color: #f78700 !important;
 }
 
 tr:hover td {
@@ -11330,23 +11338,23 @@ tr:hover td {
    Cockpit 21BS : bento, hero metrics, particules CSS.
    ========================================== */
 :root {
-    --accent: #ff8a00;
-    --accent-bright: #ff9c1a;
-    --accent-deep: #ff5a00;
-    --accent-glow: rgba(255, 138, 0, 0.55);
-    --accent-soft: rgba(255, 138, 0, 0.1);
-    --accent-hover: rgba(255, 138, 0, 0.18);
+    --accent: #f78700;
+    --accent-bright: #f78700;
+    --accent-deep: #f78700;
+    --accent-glow: rgba(247, 135, 0, 0.55);
+    --accent-soft: rgba(247, 135, 0, 0.1);
+    --accent-hover: rgba(247, 135, 0, 0.18);
     --bg-deep: #1a1410;
     --bg-warm: rgba(20, 12, 5, 0.92);
     --glass-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
-    --glass-bg-hover: linear-gradient(180deg, rgba(255, 138, 0, 0.04), rgba(255, 138, 0, 0.01));
+    --glass-bg-hover: linear-gradient(180deg, rgba(247, 135, 0, 0.04), rgba(247, 135, 0, 0.01));
     --glass-border: rgba(255, 255, 255, 0.07);
-    --glass-border-hover: rgba(255, 138, 0, 0.2);
+    --glass-border-hover: rgba(247, 135, 0, 0.2);
     --glass-blur: blur(24px) saturate(180%);
     --liquid-easing: cubic-bezier(0.25, 0.46, 0.45, 0.94);
     --liquid-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
     --shadow-base: 0 4px 16px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    --shadow-hover: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 138, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    --shadow-hover: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 40px rgba(247, 135, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 html {
@@ -11364,7 +11372,7 @@ html::after {
 
 html::before {
     background-image:
-        radial-gradient(circle, rgba(255, 138, 0, 0.58) 0 1px, transparent 2px),
+        radial-gradient(circle, rgba(247, 135, 0, 0.58) 0 1px, transparent 2px),
         radial-gradient(circle, rgba(255, 184, 77, 0.34) 0 1px, transparent 2px),
         radial-gradient(circle, rgba(255, 90, 0, 0.42) 0 1px, transparent 2px);
     background-size: 180px 240px, 260px 310px, 340px 420px;
@@ -11375,8 +11383,8 @@ html::before {
 
 html::after {
     background:
-        linear-gradient(90deg, rgba(255, 138, 0, 0.04) 1px, transparent 1px),
-        linear-gradient(0deg, rgba(255, 138, 0, 0.025) 1px, transparent 1px);
+        linear-gradient(90deg, rgba(247, 135, 0, 0.04) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(247, 135, 0, 0.025) 1px, transparent 1px);
     background-size: 96px 96px;
     mask-image: radial-gradient(circle at 50% 40%, #000 0%, transparent 72%);
     opacity: 0.32;
@@ -11385,9 +11393,9 @@ html::after {
 
 body {
     background:
-        radial-gradient(circle at 12% -8%, rgba(255, 138, 0, 0.18), transparent 34%),
+        radial-gradient(circle at 12% -8%, rgba(247, 135, 0, 0.18), transparent 34%),
         radial-gradient(circle at 94% 100%, rgba(255, 90, 0, 0.13), transparent 42%),
-        linear-gradient(135deg, rgba(255, 138, 0, 0.045), transparent 25%),
+        linear-gradient(135deg, rgba(247, 135, 0, 0.045), transparent 25%),
         var(--bg-deep) !important;
     color: #fff;
     overflow-x: hidden;
@@ -11401,7 +11409,7 @@ body::before {
     left: -150px;
     width: 820px;
     height: 820px;
-    background: radial-gradient(circle, rgba(255, 138, 0, 0.18) 0%, transparent 60%);
+    background: radial-gradient(circle, rgba(247, 135, 0, 0.18) 0%, transparent 60%);
     pointer-events: none;
     z-index: 0;
     animation: ccPulse 10s ease-in-out infinite;
@@ -11555,13 +11563,13 @@ header,
     font-size: clamp(58px, 8vw, 76px) !important;
     font-weight: 800 !important;
     line-height: 0.92 !important;
-    background: linear-gradient(135deg, #fff 0%, #ffb84d 72%, var(--accent) 100%);
+    background: linear-gradient(135deg, #fff 0%, #f78700 72%, var(--accent) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.05em;
     margin-bottom: 8px;
-    text-shadow: 0 0 34px rgba(255, 138, 0, 0.18);
+    text-shadow: 0 0 34px rgba(247, 135, 0, 0.18);
 }
 
 .decroches-card,
@@ -11809,18 +11817,18 @@ button,
 .btn-primary,
 button.btn-primary,
 .comm-tool-btn.active {
-    background: rgba(255, 138, 0, 0.13) !important;
-    border: 1px solid rgba(255, 138, 0, 0.38) !important;
-    color: #ffb84d !important;
+    background: rgba(247, 135, 0, 0.13) !important;
+    border: 1px solid rgba(247, 135, 0, 0.38) !important;
+    color: #f78700 !important;
 }
 
 .btn-primary:hover,
 button.btn-primary:hover,
 .comm-tool-btn:hover {
-    background: rgba(255, 138, 0, 0.24) !important;
-    border-color: rgba(255, 138, 0, 0.58) !important;
+    background: rgba(247, 135, 0, 0.24) !important;
+    border-color: rgba(247, 135, 0, 0.58) !important;
     transform: translateY(-1px);
-    box-shadow: 0 4px 20px rgba(255, 138, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 20px rgba(247, 135, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .comm-input,
@@ -11852,8 +11860,8 @@ input:focus,
 select:focus,
 textarea:focus {
     border-color: var(--accent) !important;
-    background: rgba(255, 138, 0, 0.055) !important;
-    box-shadow: 0 0 0 3px rgba(255, 138, 0, 0.16), 0 0 24px rgba(255, 138, 0, 0.12) !important;
+    background: rgba(247, 135, 0, 0.055) !important;
+    box-shadow: 0 0 0 3px rgba(247, 135, 0, 0.16), 0 0 24px rgba(247, 135, 0, 0.12) !important;
     outline: none !important;
 }
 
@@ -11931,13 +11939,13 @@ textarea.comm-textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 138, 0, 0.32);
+    background: rgba(247, 135, 0, 0.32);
     border: 2px solid rgba(7, 5, 3, 0.76);
     border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 138, 0, 0.56);
+    background: rgba(247, 135, 0, 0.56);
 }
 
 .craft-warning-banner,
@@ -12045,9 +12053,9 @@ textarea.comm-textarea {
     width: 2px;
     height: 2px;
     border-radius: 50%;
-    background: var(--accent, #ff8a00);
+    background: var(--accent, #f78700);
     opacity: 0;
-    box-shadow: 0 0 6px rgba(255, 138, 0, 0.6);
+    box-shadow: 0 0 6px rgba(247, 135, 0, 0.6);
     animation: ccFloat 10s linear infinite;
 }
 
@@ -12116,7 +12124,7 @@ textarea.comm-textarea {
     inset: -1px;
     border-radius: 18px;
     padding: 1px;
-    background: conic-gradient(from 0deg, transparent 0deg, rgba(255, 138, 0, 0.7) 90deg, transparent 180deg, transparent 360deg);
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(247, 135, 0, 0.7) 90deg, transparent 180deg, transparent 360deg);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -12147,7 +12155,7 @@ textarea.comm-textarea {
     left: 20%;
     right: 20%;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 138, 0, 0.8), transparent);
+    background: linear-gradient(90deg, transparent, rgba(247, 135, 0, 0.8), transparent);
     opacity: 0;
     transition: opacity 0.4s;
     pointer-events: none;
@@ -12170,9 +12178,9 @@ textarea.comm-textarea {
 .mw-section:hover,
 .mw-form-section:hover {
     transform: translateY(-4px) scale(1.005);
-    background: linear-gradient(180deg, rgba(255, 138, 0, 0.05), rgba(255, 138, 0, 0.012)) !important;
-    border-color: rgba(255, 138, 0, 0.25) !important;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 138, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+    background: linear-gradient(180deg, rgba(247, 135, 0, 0.05), rgba(247, 135, 0, 0.012)) !important;
+    border-color: rgba(247, 135, 0, 0.25) !important;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 40px rgba(247, 135, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
 }
 
 .stat-card:hover::before,
@@ -12233,7 +12241,7 @@ textarea.comm-textarea {
     font-weight: 700 !important;
     line-height: 0.95 !important;
     letter-spacing: -0.04em !important;
-    background: linear-gradient(135deg, #fff 0%, #ffb84d 80%, #ff8a00 100%) !important;
+    background: linear-gradient(135deg, #fff 0%, #f78700 80%, #f78700 100%) !important;
     -webkit-background-clip: text !important;
     background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
@@ -12279,7 +12287,7 @@ textarea.comm-textarea {
     inset: -3px;
     border-radius: inherit;
     padding: 2px;
-    background: conic-gradient(from 0deg, transparent 0deg, #ff8a00 90deg, transparent 180deg);
+    background: conic-gradient(from 0deg, transparent 0deg, #f78700 90deg, transparent 180deg);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -12330,7 +12338,7 @@ body::before {
     left: -150px;
     width: 900px;
     height: 900px;
-    background: radial-gradient(circle, rgba(255, 138, 0, 0.25) 0%, transparent 60%);
+    background: radial-gradient(circle, rgba(247, 135, 0, 0.25) 0%, transparent 60%);
     pointer-events: none;
     z-index: 0;
     animation: ccPulseGlow 12s ease-in-out infinite;
@@ -12389,21 +12397,21 @@ body::after {
    Objectif : effets visibles immédiatement, même sans hover.
    ========================================== */
 :root {
-    --cc-hot-glow: rgba(255, 138, 0, 0.38);
-    --cc-hot-border: rgba(255, 138, 0, 0.32);
+    --cc-hot-glow: rgba(247, 135, 0, 0.38);
+    --cc-hot-border: rgba(247, 135, 0, 0.32);
 }
 
 body {
     background:
-        radial-gradient(circle at 8% 6%, rgba(255, 138, 0, 0.34), transparent 30%),
+        radial-gradient(circle at 8% 6%, rgba(247, 135, 0, 0.34), transparent 30%),
         radial-gradient(circle at 88% 96%, rgba(255, 90, 0, 0.24), transparent 38%),
-        radial-gradient(circle at 50% 55%, rgba(255, 138, 0, 0.08), transparent 52%),
+        radial-gradient(circle at 50% 55%, rgba(247, 135, 0, 0.08), transparent 52%),
         var(--bg-deep) !important;
 }
 
 html::before {
     background-image:
-        radial-gradient(circle, rgba(255, 138, 0, 0.95) 0 2px, transparent 3px),
+        radial-gradient(circle, rgba(247, 135, 0, 0.95) 0 2px, transparent 3px),
         radial-gradient(circle, rgba(255, 184, 77, 0.62) 0 1.5px, transparent 3px),
         radial-gradient(circle, rgba(255, 90, 0, 0.70) 0 2px, transparent 4px) !important;
     opacity: 0.72 !important;
@@ -12412,10 +12420,10 @@ html::before {
 .cc-particle {
     width: 4px !important;
     height: 4px !important;
-    background: #ff9c1a !important;
+    background: #f78700 !important;
     box-shadow:
-        0 0 8px rgba(255, 138, 0, 0.95),
-        0 0 22px rgba(255, 138, 0, 0.42) !important;
+        0 0 8px rgba(247, 135, 0, 0.95),
+        0 0 22px rgba(247, 135, 0, 0.42) !important;
     animation-duration: 8s !important;
 }
 
@@ -12425,7 +12433,7 @@ html::before {
 }
 
 .cc-particle:nth-child(4n) {
-    background: #ff5a00 !important;
+    background: #f78700 !important;
 }
 
 .stat-card,
@@ -12447,7 +12455,7 @@ html::before {
     border-color: var(--cc-hot-border) !important;
     box-shadow:
         0 8px 26px rgba(0, 0, 0, 0.48),
-        0 0 26px rgba(255, 138, 0, 0.10),
+        0 0 26px rgba(247, 135, 0, 0.10),
         inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
 }
 
@@ -12473,12 +12481,12 @@ html::before {
 .stat-card[data-bento="hero"] {
     min-height: 300px !important;
     background:
-        radial-gradient(circle at 8% 18%, rgba(255, 138, 0, 0.34), transparent 42%),
-        linear-gradient(180deg, rgba(255, 138, 0, 0.12), rgba(255, 138, 0, 0.025)) !important;
-    border-color: rgba(255, 138, 0, 0.48) !important;
+        radial-gradient(circle at 8% 18%, rgba(247, 135, 0, 0.34), transparent 42%),
+        linear-gradient(180deg, rgba(247, 135, 0, 0.12), rgba(247, 135, 0, 0.025)) !important;
+    border-color: rgba(247, 135, 0, 0.48) !important;
     box-shadow:
         0 18px 54px rgba(0, 0, 0, 0.62),
-        0 0 58px rgba(255, 138, 0, 0.26),
+        0 0 58px rgba(247, 135, 0, 0.26),
         inset 0 1px 0 rgba(255, 255, 255, 0.14) !important;
 }
 
@@ -12486,8 +12494,8 @@ html::before {
     font-size: clamp(88px, 8.8vw, 132px) !important;
     line-height: 0.82 !important;
     text-shadow:
-        0 0 18px rgba(255, 138, 0, 0.35),
-        0 0 54px rgba(255, 138, 0, 0.22) !important;
+        0 0 18px rgba(247, 135, 0, 0.35),
+        0 0 54px rgba(247, 135, 0, 0.22) !important;
 }
 
 .stat-card[data-bento="hero"] .stat-label {
@@ -12504,12 +12512,12 @@ html::before {
 header {
     box-shadow:
         0 16px 44px rgba(0, 0, 0, 0.62),
-        0 0 60px rgba(255, 138, 0, 0.16),
+        0 0 60px rgba(247, 135, 0, 0.16),
         inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
 }
 
 body::before {
-    background: radial-gradient(circle, rgba(255, 138, 0, 0.38) 0%, transparent 58%) !important;
+    background: radial-gradient(circle, rgba(247, 135, 0, 0.38) 0%, transparent 58%) !important;
 }
 
 body::after {
@@ -12524,7 +12532,7 @@ body::after {
 
 .history-day-card:hover,
 .history-day-card:focus-visible {
-    border-color: rgba(255, 138, 0, 0.3) !important;
+    border-color: rgba(247, 135, 0, 0.3) !important;
     transform: translateY(-2px);
     outline: none;
 }
@@ -12565,7 +12573,7 @@ body::after {
 }
 
 .modal-close:hover {
-    border-color: rgba(255, 138, 0, 0.35);
+    border-color: rgba(247, 135, 0, 0.35);
     color: #ffaa44;
 }
 
@@ -12640,7 +12648,7 @@ body::after {
     margin: 0 0 4px;
     font-size: 22px;
     font-weight: 700;
-    background: linear-gradient(135deg, #fff 0%, #ffb84d 100%);
+    background: linear-gradient(135deg, #fff 0%, #f78700 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -12703,8 +12711,8 @@ body::after {
 }
 
 .cc-refresh-btn:hover {
-    background: rgba(255,138,0,0.15);
-    border-color: rgba(255,138,0,0.35);
+    background: rgba(247, 135, 0,0.15);
+    border-color: rgba(247, 135, 0,0.35);
     transform: rotate(180deg);
 }
 
@@ -12735,7 +12743,7 @@ body::after {
     inset: -1px;
     border-radius: 18px;
     padding: 1px;
-    background: conic-gradient(from 0deg, transparent 0deg, rgba(255,138,0,0.7) 90deg, transparent 180deg);
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(247, 135, 0,0.7) 90deg, transparent 180deg);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
             mask-composite: exclude;
@@ -12746,9 +12754,9 @@ body::after {
 
 .cc-bento-card:hover {
     transform: translateY(-4px);
-    border-color: rgba(255,138,0,0.25) !important;
+    border-color: rgba(247, 135, 0,0.25) !important;
     background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.018)) !important;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 36px rgba(255,138,0,0.15), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 36px rgba(247, 135, 0,0.15), inset 0 1px 0 rgba(255,255,255,0.1) !important;
 }
 
 .cc-bento-card:hover::before {
@@ -12782,7 +12790,7 @@ body::after {
     font-size: 76px;
     font-weight: 700;
     line-height: 0.95;
-    background: linear-gradient(135deg, #fff 0%, #ffb84d 80%, #ff8a00 100%);
+    background: linear-gradient(135deg, #fff 0%, #f78700 80%, #f78700 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -12860,7 +12868,7 @@ body::after {
     white-space: nowrap;
 }
 
-.cc-pill-orange { background: rgba(255,138,0,0.1); border: 1px solid rgba(255,138,0,0.25); color: #ffb84d; }
+.cc-pill-orange { background: rgba(247, 135, 0,0.1); border: 1px solid rgba(247, 135, 0,0.25); color: #f78700; }
 .cc-pill-green { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: #4ade80; }
 .cc-pill-yellow { background: rgba(250,199,117,0.1); border: 1px solid rgba(250,199,117,0.25); color: #FAC775; }
 .cc-pill-red { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #f87171; }
@@ -12880,13 +12888,13 @@ body::after {
     width: 42px;
     height: 42px;
     border-radius: 12px;
-    background: rgba(255,138,0,0.12);
-    border: 1px solid rgba(255,138,0,0.25);
+    background: rgba(247, 135, 0,0.12);
+    border: 1px solid rgba(247, 135, 0,0.25);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 18px;
-    color: #ffb84d;
+    color: #f78700;
     flex: 0 0 auto;
 }
 
@@ -12913,8 +12921,8 @@ body::after {
     font-weight: 800 !important;
     color: #1a0e00 !important;
     font-size: 16px !important;
-    background: linear-gradient(135deg, #ff9c1a, #ff5a00) !important;
-    box-shadow: 0 0 28px rgba(255,138,0,0.5), inset 0 1px 0 rgba(255,255,255,0.3) !important;
+    background: linear-gradient(135deg, #f78700, #f78700) !important;
+    box-shadow: 0 0 28px rgba(247, 135, 0,0.5), inset 0 1px 0 rgba(255,255,255,0.3) !important;
     position: relative !important;
     overflow: visible !important;
     letter-spacing: 0 !important;
@@ -12930,7 +12938,7 @@ body::after {
     inset: -3px !important;
     border-radius: 14px !important;
     padding: 2px !important;
-    background: conic-gradient(from 0deg, transparent 0deg, #ff8a00 90deg, transparent 180deg) !important;
+    background: conic-gradient(from 0deg, transparent 0deg, #f78700 90deg, transparent 180deg) !important;
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0) !important;
     -webkit-mask-composite: xor !important;
             mask-composite: exclude !important;
@@ -12963,4 +12971,415 @@ body::after {
         justify-content: space-between;
     }
     .cc-wide-stat { text-align: left; }
+}
+
+/* CCV5 21/05/2026 — palette stricte + cards cliquables + fix */
+:root {
+    --bg-deep: #0a0805;
+    --accent: #f78700;
+    --accent-bright: #ff9a1f;
+    --accent-soft: rgba(247, 135, 0, 0.1);
+    --accent-glow: rgba(247, 135, 0, 0.35);
+    --accent-hover: rgba(247, 135, 0, 0.18);
+    --text: #faf8f3;
+    --text-dim: rgba(250, 248, 243, 0.7);
+    --text-muted: rgba(250, 248, 243, 0.45);
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --glass-bg-hover: rgba(255, 255, 255, 0.06);
+    --glass-border: rgba(255, 255, 255, 0.07);
+    --glass-blur: blur(24px) saturate(180%);
+    --orange: #f78700;
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(247,135,0,0.18);
+}
+
+html,
+body {
+    background: var(--bg-deep) !important;
+    color: var(--text) !important;
+}
+
+.topbar {
+    display: none !important;
+}
+
+.page-header,
+.command-center-header {
+    background: var(--glass-bg) !important;
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 16px !important;
+    padding: 18px 24px !important;
+    margin-bottom: 18px !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+}
+
+.page-header h1,
+.command-center-header h1,
+.page-header-title h1 {
+    margin: 0 0 2px !important;
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: var(--accent) !important;
+    background: none !important;
+    -webkit-text-fill-color: var(--accent) !important;
+    letter-spacing: 0.02em !important;
+    text-transform: uppercase !important;
+}
+
+.page-header-sub {
+    margin: 0 !important;
+    font-size: 11px !important;
+    color: var(--text-muted) !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+    font-weight: 500 !important;
+}
+
+.cc-bento-card,
+.stat-card,
+.presence-card,
+.op-panel,
+.cmd-section,
+.crafts-section,
+.myweapons-form-card,
+.stats-block,
+.channel-card {
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
+}
+
+.cc-bento-card {
+    cursor: pointer;
+}
+
+.cc-bento-card:hover,
+.stat-card:hover,
+.presence-card:hover,
+.op-panel:hover,
+.cmd-section:hover,
+.crafts-section:hover,
+.weapon-card-pro:hover {
+    background: var(--glass-bg-hover) !important;
+    border-color: rgba(247,135,0,0.25) !important;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4), 0 0 28px rgba(247,135,0,0.12) !important;
+}
+
+.cc-bento-card::after {
+    content: "↗";
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    color: var(--text-muted);
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+}
+
+.cc-bento-card:hover::after {
+    opacity: 1;
+    color: var(--accent);
+    transform: translate(2px, -2px);
+}
+
+.cc-bento-card::before {
+    background: conic-gradient(from 0deg, transparent 0deg, rgba(247,135,0,0.75) 90deg, transparent 180deg) !important;
+}
+
+.cc-hero-value {
+    background: linear-gradient(135deg, #faf8f3 0%, #f78700 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+}
+
+.cc-card-label,
+.section-title,
+.comm-label,
+.stat-label {
+    color: var(--accent) !important;
+}
+
+.cc-pill-orange,
+.cc-pill-green,
+.cc-pill-yellow,
+.cc-pill-red,
+.history-detail-pill,
+.weapon-craft-badge,
+.weapon-status-badge {
+    background: var(--accent-soft) !important;
+    border: 1px solid rgba(247,135,0,0.28) !important;
+    color: var(--text) !important;
+}
+
+.badge-mini,
+.sidebar-logo,
+.nav-logo,
+[class*="logo"][class*="sidebar"],
+.nav-brand-logo {
+    background: var(--glass-bg) !important;
+    color: var(--accent) !important;
+    border: 1px solid rgba(247,135,0,0.35) !important;
+    box-shadow: 0 0 22px rgba(247,135,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08) !important;
+}
+
+.nav-icon {
+    width: 22px;
+    min-width: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.cmd-grid {
+    padding: 0 !important;
+    margin: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+    gap: 12px !important;
+}
+
+.cmd-btn,
+.comm-tab,
+.crafts-subtab,
+.weapons-filter {
+    color: var(--text-dim) !important;
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 10px !important;
+    box-shadow: none !important;
+}
+
+.cmd-btn:hover,
+.comm-tab:hover,
+.crafts-subtab:hover,
+.weapons-filter:hover {
+    color: var(--text) !important;
+    background: var(--accent-soft) !important;
+    border-color: rgba(247,135,0,0.25) !important;
+}
+
+.comm-tab.active,
+.crafts-subtab.active,
+.weapons-filter.active {
+    color: var(--text) !important;
+    background: var(--accent-soft) !important;
+    border: 1px solid rgba(247,135,0,0.35) !important;
+    box-shadow: 0 0 16px rgba(247,135,0,0.15) !important;
+}
+
+.crafts-subtabs,
+.comm-tabs,
+.weapons-filter-pills,
+.crafts-tab-nav,
+[class*="-subtabs"],
+.sub-tabs {
+    display: flex !important;
+    gap: 4px !important;
+    padding: 5px !important;
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    border-radius: 14px !important;
+    margin-bottom: 16px !important;
+    flex-wrap: wrap;
+}
+
+.op-panel .count,
+.op-panel [class*="-count"],
+.op-panel [class*="-num"],
+.op-categories [class*="-count"],
+.op-categories [class*="-num"] {
+    background: transparent !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+}
+
+.myweapons-toolbar.weapons-toolbar,
+.myweapons-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.weapons-search,
+.myweapons-search-input {
+    min-width: min(100%, 280px);
+    background: var(--glass-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    color: var(--text) !important;
+}
+
+.weapon-card-pro {
+    position: relative;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 14px;
+    transition: all 0.3s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    overflow: hidden;
+}
+
+.weapon-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.weapon-card-title h3 {
+    font-size: 18px;
+    color: var(--text);
+    margin: 0 0 6px;
+    font-weight: 600;
+}
+
+.weapon-card-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.weapon-card-price { text-align: right; }
+
+.weapon-price-main {
+    display: block;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    font-feature-settings: "tnum";
+}
+
+.weapon-price-min {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.weapon-card-info {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.weapon-info-label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+}
+
+.weapon-info-value {
+    display: block;
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.weapon-info-value.mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+}
+
+.weapon-card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-action {
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass-bg);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-edit:hover { background: var(--accent-soft); border-color: rgba(247,135,0,0.35); color: var(--text); }
+.btn-progress { background: rgba(250,199,117,0.1); border-color: rgba(250,199,117,0.3); color: #FAC775; }
+.btn-progress:hover { background: rgba(250,199,117,0.2); }
+.btn-progress.active { background: rgba(250,199,117,0.25); box-shadow: 0 0 16px rgba(250,199,117,0.2); }
+.btn-sold { background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.3); color: #4ade80; }
+.btn-sold:hover { background: rgba(74,222,128,0.2); }
+.btn-delete { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); color: #f87171; }
+
+.cmd-detail-modal {
+    max-width: 760px;
+    max-height: 82vh;
+    overflow-y: auto;
+}
+
+.cmd-detail-list {
+    display: grid;
+    gap: 8px;
+}
+
+.cmd-detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+}
+
+.cmd-detail-row strong {
+    display: block;
+    color: var(--text);
+    font-size: 13px;
+}
+
+.cmd-detail-row span {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.cmd-detail-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.cmd-detail-avatar-fallback {
+    background: var(--accent-soft);
+    border: 1px solid rgba(247,135,0,0.25);
+}
+
+@media (max-width: 720px) {
+    .weapon-card-header,
+    .cc-card-wide {
+        flex-direction: column;
+    }
+    .weapon-card-price {
+        text-align: left;
+    }
+    .weapon-card-info {
+        grid-template-columns: 1fr;
+    }
 }
