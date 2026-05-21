@@ -1,3 +1,4 @@
+// COMMAND CENTER v4 20/05/2026 — refonte fidèle mockup
 // PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // CC PATCH 19/05/2026 — vrais effets visibles
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
@@ -55,7 +56,7 @@
 
 // MODIFIE HOTFIX UI - 14/05/2026 - Vendue par garde l'utilisateur courant
 const PAGE_TITLES = {
-    presence: { title: 'Présence', sub: 'Suivi Présence/Absence' },
+    presence: { title: 'Command Center', sub: "Vue d'ensemble 21BS" },
     commands: { title: 'Commandes', sub: 'Centre de contrôle' },
     channels: { title: 'Salons Discord', sub: 'Historique et navigation' },
     map: { title: 'Carte du Laboratoire', sub: 'Marquage de zones' },
@@ -70,6 +71,8 @@ let refreshTimer = null;
 let refreshAllInFlight = false;
 let realtimeSocket = null;
 let realtimeRefreshTimer = null;
+let dashboardOverviewRefreshTimer = null;
+let dashboardOverviewRealtimeTimer = null;
 let realtimeConnected = false;
 const SITE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 let idleLogoutTimer = null;
@@ -108,6 +111,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     await runInitStep('setupRealtimeSocket', () => setupRealtimeSocket());
     await runInitStep('refreshAll', () => refreshAll());
     refreshTimer = setInterval(refreshAll, 60_000);
+    dashboardOverviewRefreshTimer = setInterval(() => {
+        if (currentTab === 'presence') reloadDashboardOverview();
+    }, 30_000);
 });
 
 async function runInitStep(name, fn) {
@@ -125,6 +131,15 @@ function scheduleRealtimeRefresh(reason = 'realtime') {
         console.debug(`[realtime] refresh ${reason}`);
         refreshAll();
     }, 350);
+}
+
+function scheduleDashboardOverviewReload(reason = 'overview') {
+    if (currentTab !== 'presence') return;
+    clearTimeout(dashboardOverviewRealtimeTimer);
+    dashboardOverviewRealtimeTimer = setTimeout(() => {
+        console.debug(`[command-center] overview refresh ${reason}`);
+        reloadDashboardOverview();
+    }, 1000);
 }
 
 function setupRealtimeSocket() {
@@ -152,8 +167,12 @@ function setupRealtimeSocket() {
 
     const tabEvents = {
         'presence:reaction': ['presence', 'stats'],
+        'presence:update': ['presence', 'stats'],
         'absence:posted': ['presence', 'stats'],
         'craft:status': ['crafts', 'myweapons'],
+        'craft:update': ['crafts', 'myweapons'],
+        'weapon:update': ['crafts', 'myweapons'],
+        'weapon:updated': ['crafts', 'myweapons'],
         'sanction:added': ['sanctions'],
         'reminder:changed': ['commands'],
         'channel:message': ['channels'],
@@ -162,6 +181,9 @@ function setupRealtimeSocket() {
     Object.entries(tabEvents).forEach(([eventName, tabs]) => {
         realtimeSocket.on(eventName, () => {
             if (tabs.includes(currentTab)) scheduleRealtimeRefresh(eventName);
+            if (['presence:reaction', 'presence:update', 'absence:posted', 'craft:status', 'craft:update', 'weapon:update', 'weapon:updated'].includes(eventName)) {
+                scheduleDashboardOverviewReload(eventName);
+            }
         });
     });
 
@@ -513,7 +535,7 @@ async function refreshAll(options = {}) {
             return;
         }
         if (currentTab === 'presence') {
-            await Promise.all([loadStats(), loadPresence({ forceSync }), loadPresenceHistory(), loadPresenceStats()]);
+            await Promise.all([reloadDashboardOverview(), loadStats(), loadPresence({ forceSync }), loadPresenceHistory(), loadPresenceStats()]);
         } else if (currentTab === 'stats') {
             await loadWeekly();
         } else if (currentTab === 'sanctions') {
@@ -561,6 +583,51 @@ async function loadStats() {
     } catch (e) {
         console.error('Stats:', e);
     }
+}
+
+async function reloadDashboardOverview() {
+    try {
+        const res = await fetch('/api/dashboard/overview', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        setText('ccPresencePresents', data.presence?.presents ?? 0);
+        setText('ccPresenceTotal', data.presence?.total ?? 0);
+        setText('ccPresenceTaux', data.presence?.taux ?? 0);
+        setText('ccPresenceRetards', data.presence?.retards ?? 0);
+        setText('ccPresenceJustifies', data.presence?.absentsJustifies ?? 0);
+
+        const trendEl = document.getElementById('ccPresenceTrend');
+        const trend = Number(data.presence?.trendPercent || 0);
+        if (trendEl) {
+            if (trend > 0) {
+                trendEl.innerHTML = `<span class="cc-trend-pill cc-trend-up">↗ +${trend}% vs semaine dernière</span>`;
+            } else if (trend < 0) {
+                trendEl.innerHTML = `<span class="cc-trend-pill cc-trend-down">↘ ${trend}% vs semaine dernière</span>`;
+            } else {
+                trendEl.innerHTML = '';
+            }
+        }
+
+        setText('ccMembresTotal', data.membres?.total ?? 0);
+        setText('ccCraftsOuverts', data.crafts?.ouverts ?? 0);
+        setText('ccArmesEnVente', data.weapons?.onSale ?? 0);
+        setText('ccArmesEnCours', `${data.weapons?.inProgress ?? 0} en cours`);
+        setText('ccAbsencesSemaine', data.absences?.week ?? 0);
+        setText('ccAbsencesConformes', `${data.absences?.conformes ?? 0} conformes`);
+
+        const decroches = Number(data.presence?.decroches || 0);
+        const presents = Number(data.presence?.presents || 0);
+        setText('ccDecrochesNb', decroches);
+        setText('ccDecrochesTaux', `${presents > 0 ? Math.round((decroches / presents) * 100) : 0}%`);
+    } catch (error) {
+        console.error('Erreur reloadDashboardOverview:', error);
+    }
+}
+
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
 }
 
 function renderPresenceMemberList(items, emptyText, showAbsences = false) {
@@ -4783,6 +4850,7 @@ window.openCraftWeaponDetails = openCraftWeaponDetails;
 window.closeCraftWeaponDetails = closeCraftWeaponDetails;
 window.openPresenceStatDetails = openPresenceStatDetails;
 window.closePresenceStatDetails = closePresenceStatDetails;
+window.reloadDashboardOverview = reloadDashboardOverview;
 window.toggleCraftWeaponDropdown = toggleCraftWeaponDropdown;
 window.selectCraftWeapon = selectCraftWeapon;
 window.submitCraftRequest = submitCraftRequest;

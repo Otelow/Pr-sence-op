@@ -5,6 +5,7 @@
 <!-- QUICK WINS 1 18/05/2026 - toasts audit temps reel -->
 <!-- QUICK WINS 4 18/05/2026 - reorganisation onglets dashboard -->
 <!-- ROLES MAP VIEW 18/05/2026 - accès lecture seule carte sans labs armes -->
+<!-- COMMAND CENTER v4 20/05/2026 — refonte fidèle mockup -->
 <!-- DÉCROCHÉS OP 18/05/2026 - section décrochage entre 1ère et 2ème -->
 <!-- TRI CRAFT 16/05/2026 - ordre prêt à vendre, en vente, vendu -->
 <!-- HISTORIQUE CRAFT 16/05/2026 - tableau craft complet et permanent -->
@@ -23,7 +24,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260520-resilient">
+<link rel="stylesheet" href="/style.css?v=20260520-ccv4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -47,7 +48,7 @@
     <nav class="nav" id="dashTabsNav">
         <a href="#" class="nav-item active" data-tab="presence">
             <span class="nav-icon">▣</span>
-            <span>Présence</span>
+            <span>Command Center</span>
         </a>
         <a href="#" class="nav-item" data-tab="commands">
             <span class="nav-icon">⚡</span>
@@ -118,25 +119,90 @@
 
     <!-- TAB: PRÉSENCE -->
     <section class="tab-content active" id="tab-presence">
+        <div class="page-header command-center-header">
+            <div class="page-header-title">
+                <h1>Command Center</h1>
+                <p class="page-header-sub">Vue d'ensemble — 21 Block Savage</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator">
+                    <span class="cc-live-dot"></span>LIVE
+                </div>
+                <button class="cc-refresh-btn" onclick="reloadDashboardOverview()" title="Actualiser">↻</button>
+            </div>
+        </div>
 
-        <div class="stats-grid">
-            <button type="button" class="stat-card stat-card-action" data-bento="hero" onclick="openPresenceStatDetails('members')">
-                <div class="stat-label">Membres total</div>
-                <div class="stat-value" id="statTotal">—</div>
-            </button>
-            <button type="button" class="stat-card stat-card-action stat-info" onclick="openPresenceStatDetails('op')">
-                <div class="stat-label">Inscrits OP</div>
-                <div class="stat-value" id="statInscrits">—</div>
-                <div class="stat-sub">Rôle 21BS</div>
-            </button>
-            <button type="button" class="stat-card stat-card-action" onclick="openPresenceStatDetails('absences')">
-                <div class="stat-label">Absences semaine</div>
-                <div class="stat-value" id="statAbsences">—</div>
-            </button>
-            <button type="button" class="stat-card stat-card-action stat-warning" id="statConsecutiveCard" onclick="openPresenceStatDetails('kp')">
-                <div class="stat-label">Alertes KP</div>
-                <div class="stat-value" id="statConsecutive">—</div>
-            </button>
+        <div class="cc-bento-grid">
+            <div class="cc-bento-card cc-card-hero" data-bento="hero">
+                <div>
+                    <div class="cc-card-label">Présence — 1ère OP</div>
+                    <div class="cc-hero-value">
+                        <span id="ccPresencePresents">—</span><span class="cc-hero-divider">/</span><span id="ccPresenceTotal" class="cc-hero-total">—</span>
+                    </div>
+                    <div class="cc-hero-meta">
+                        <b><span id="ccPresenceTaux">—</span>%</b> de présence ·
+                        <span id="ccPresenceRetards">—</span> retards ·
+                        <span id="ccPresenceJustifies">—</span> absence justifiée
+                    </div>
+                </div>
+                <div class="cc-hero-trend" id="ccPresenceTrend"></div>
+            </div>
+
+            <div class="cc-bento-card cc-card-mini">
+                <div class="cc-card-label">Membres</div>
+                <div class="cc-mini-value" id="ccMembresTotal">—</div>
+                <div class="cc-mini-foot">
+                    <span>Inscrits</span>
+                    <span class="cc-pill cc-pill-orange">21BS</span>
+                </div>
+            </div>
+
+            <div class="cc-bento-card cc-card-mini">
+                <div class="cc-card-label">Crafts ouverts</div>
+                <div class="cc-mini-value" id="ccCraftsOuverts">—</div>
+                <div class="cc-mini-foot">
+                    <span>En cours</span>
+                    <span class="cc-pill cc-pill-green" id="ccCraftsDelta">Live</span>
+                </div>
+            </div>
+
+            <div class="cc-bento-card cc-card-mini">
+                <div class="cc-card-label">Armes en vente</div>
+                <div class="cc-mini-value" id="ccArmesEnVente">—</div>
+                <div class="cc-mini-foot">
+                    <span>Marché actif</span>
+                    <span class="cc-pill cc-pill-yellow" id="ccArmesEnCours">— en cours</span>
+                </div>
+            </div>
+
+            <div class="cc-bento-card cc-card-mini">
+                <div class="cc-card-label">Absences semaine</div>
+                <div class="cc-mini-value" id="ccAbsencesSemaine">—</div>
+                <div class="cc-mini-foot">
+                    <span id="ccAbsencesConformes">— conformes</span>
+                    <span class="cc-pill cc-pill-red">0 KP</span>
+                </div>
+            </div>
+
+            <div class="cc-bento-card cc-card-wide" data-bento="wide">
+                <div class="cc-wide-left">
+                    <div class="cc-wide-icon">⚠</div>
+                    <div>
+                        <div class="cc-wide-title">Décrochés entre 1ère et 2ème OP</div>
+                        <div class="cc-wide-sub">Membres présents à la 1ère mais sans réaction à la 2ème</div>
+                    </div>
+                </div>
+                <div class="cc-wide-stats">
+                    <div class="cc-wide-stat">
+                        <div class="cc-wide-stat-val cc-stat-orange" id="ccDecrochesNb">—</div>
+                        <div class="cc-wide-stat-label">aujourd'hui</div>
+                    </div>
+                    <div class="cc-wide-stat">
+                        <div class="cc-wide-stat-val" id="ccDecrochesTaux">—%</div>
+                        <div class="cc-wide-stat-label">taux décrochage</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="op-grid">
@@ -246,6 +312,15 @@
 
     <!-- TAB: COMMANDES -->
     <section class="tab-content" id="tab-commands">
+        <div class="page-header">
+            <div class="page-header-title">
+                <h1>Commandes</h1>
+                <p class="page-header-sub">Alertes terrain et annonces rapides</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
+            </div>
+        </div>
 
         <div class="cmd-section">
             <h2 class="section-title">🚨 Alertes terrain</h2>
@@ -478,6 +553,15 @@
 
     <!-- TAB: STATS -->
     <section class="tab-content" id="tab-stats">
+        <div class="page-header">
+            <div class="page-header-title">
+                <h1>Statistiques</h1>
+                <p class="page-header-sub">Suivi présence, KP et tendances semaine</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
+            </div>
+        </div>
 
         <div class="stats-overview" id="statsOverview"></div>
 
@@ -502,6 +586,15 @@
 
     <!-- TAB: SANCTIONS -->
     <section class="tab-content" id="tab-sanctions">
+        <div class="page-header">
+            <div class="page-header-title">
+                <h1>Sanctions</h1>
+                <p class="page-header-sub">Historique des avertissements et décisions staff</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
+            </div>
+        </div>
         <h2 class="section-title">⚠ Historique des sanctions / avertissements</h2>
         <div class="sanctions-list" id="sanctionsList">
             <p class="empty">Chargement...</p>
@@ -510,6 +603,15 @@
 
     <!-- TAB: SALONS -->
     <section class="tab-content" id="tab-channels">
+        <div class="page-header">
+            <div class="page-header-title">
+                <h1>Salons</h1>
+                <p class="page-header-sub">Lecture et relais des messages Discord</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
+            </div>
+        </div>
         <div class="channels-toolbar">
             <input type="text" id="channelSearch" placeholder="Rechercher un salon..." class="channel-search">
             <button class="btn-back-channels" id="backToChannelsBtn" style="display:none;" onclick="backToChannels()">← Retour aux salons</button>
@@ -559,6 +661,15 @@
 
     <!-- TAB: MAP -->
     <section class="tab-content" id="tab-map">
+        <div class="page-header">
+            <div class="page-header-title">
+                <h1>Carte</h1>
+                <p class="page-header-sub">Points tactiques Los Santos / 21BS Confidential</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
+            </div>
+        </div>
         <div class="map-toolbar">
             <h2 class="section-title" style="margin:0;">🗺 Carte Los Santos / 21BS Confidential</h2>
             <div class="map-controls">
@@ -679,6 +790,15 @@
 
     <!-- TAB: CRAFTS D'ARMES -->
     <section class="tab-content" id="tab-crafts">
+        <div class="page-header">
+            <div class="page-header-title">
+                <h1>Craft d'armes</h1>
+                <p class="page-header-sub">Catalogue, demandes et tableau de production</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
+            </div>
+        </div>
         <div class="crafts-subtabs">
             <button class="crafts-subtab active" data-subtab="catalog" onclick="switchCraftSubtab('catalog')">📦 Catalogue</button>
             <button class="crafts-subtab" data-subtab="request" onclick="switchCraftSubtab('request')">📝 Faire une demande</button>
@@ -927,6 +1047,15 @@
 
     <!-- TAB: VOS ARMES -->
     <section class="tab-content" id="tab-myweapons">
+        <div class="page-header">
+            <div class="page-header-title">
+                <h1>Vos Armes</h1>
+                <p class="page-header-sub">Suivi des ventes, annonces et historiques craft</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
+            </div>
+        </div>
         <div class="myweapons-banner-shimmer sale-important-warning dynamic-warning-effect craft-warning-banner">
             <span class="shimmer-overlay"></span>
             <span class="shimmer-overlay-2"></span>
@@ -1214,6 +1343,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260520-resilient"></script>
+<script src="/app.js?v=20260520-ccv4"></script>
 </body>
 </html>

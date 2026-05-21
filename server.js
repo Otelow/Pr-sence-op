@@ -63,6 +63,7 @@ const { registerDirectoryRoutes } = require('./src/web/routes/directory');
 const { registerChannelRoutes } = require('./src/web/routes/channels');
 const { registerPresenceStatsRoutes } = require('./src/web/routes/presenceStats');
 const { registerDashboardActionRoutes } = require('./src/web/routes/dashboardActions');
+const { registerDashboardOverviewRoutes } = require('./src/web/routes/dashboardOverview');
 const { registerHealthDetailedRoutes } = require('./src/web/routes/healthDetailed');
 
 const PORT = process.env.PORT || 3000;
@@ -347,6 +348,13 @@ function startServer(client, getState) {
         getBotClient: () => botClient,
         getBotState: () => botState(),
         emitRealtime,
+    });
+
+    registerDashboardOverviewRoutes(app, {
+        requireAuth,
+        requireFullSiteAccess,
+        getBotClient: () => botClient,
+        getBotState: () => botState(),
     });
 
     // ==========================================
