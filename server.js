@@ -30,11 +30,12 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
-const SQLiteStoreFactory = require('connect-sqlite3');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
+const { PermissionFlagsBits } = require('discord.js');
 const config = require('./src/shared/config');
+const { createBetterSqliteSessionStore } = require('./src/web/services/sessionStore');
 const {
     requireAuth,
     requireAdmin,
@@ -68,7 +69,6 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI || `http://localhost:${PORT}/auth/callback`;
 const SESSION_SECRET = process.env.SESSION_SECRET;
-const SQLiteStore = SQLiteStoreFactory(session);
 const ROLE_SESSION_CACHE_TTL_MS = 120 * 1000;
 
 let botClient;
@@ -81,11 +81,11 @@ function startServer(client, getState) {
     const app = express();
     const httpServer = http.createServer(app);
     fs.mkdirSync(config.paths.data, { recursive: true });
-    const sessionStore = new SQLiteStore({
+    const sessionStore = createBetterSqliteSessionStore({
         dir: config.paths.data,
         db: 'sessions.db',
         table: 'sessions',
-        ttl: 7 * 24 * 60 * 60,
+        ttlMs: config.web.sessionMaxAgeMs,
     });
     const roleSessionCache = new Map();
     const authLimiter = rateLimit({
@@ -131,6 +131,10 @@ function startServer(client, getState) {
                 scriptSrcAttr: ["'unsafe-inline'"],
                 styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
                 styleSrcAttr: ["'unsafe-inline'"],
+                objectSrc: ["'none'"],
+                baseUri: ["'self'"],
+                frameAncestors: ["'none'"],
+                formAction: ["'self'", 'https://discord.com'],
                 fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
                 imgSrc: ["'self'", 'data:', 'https://cdn.discordapp.com', 'https://media.discordapp.net'],
                 mediaSrc: ["'self'", 'https://cdn.discordapp.com', 'https://media.discordapp.net'],
@@ -233,13 +237,16 @@ function startServer(client, getState) {
 
     function canRoleViewChannel(channel, role) {
         if (!channel?.permissionsFor || !role) return false;
-        return channel.permissionsFor(role)?.has('ViewChannel') ?? false;
+        return channel.permissionsFor(role)?.has(PermissionFlagsBits.ViewChannel) ?? false;
     }
 
     function userCanViewChannel(channel, user) {
         if (isUserAdmin(user)) return true;
         const guild = getGuild();
         if (!guild || !channel?.permissionsFor) return false;
+        const member = user?.id ? guild.members.cache.get(user.id) : null;
+        const memberPermissions = member ? channel.permissionsFor(member) : null;
+        if (memberPermissions) return memberPermissions.has(PermissionFlagsBits.ViewChannel);
         const roleIds = user?.roles || [];
         const everyoneCanView = guild.roles?.everyone
             ? canRoleViewChannel(channel, guild.roles.everyone)
@@ -253,10 +260,19 @@ function startServer(client, getState) {
         if (isUserAdmin(user)) return true;
         const guild = getGuild();
         if (!guild || !channel?.permissionsFor) return false;
+        const member = user?.id ? guild.members.cache.get(user.id) : null;
+        const memberPermissions = member ? channel.permissionsFor(member) : null;
+        if (memberPermissions) {
+            return memberPermissions.has(PermissionFlagsBits.SendMessages)
+                || memberPermissions.has(PermissionFlagsBits.SendMessagesInThreads);
+        }
         return (user?.roles || []).some(roleId => {
             const role = guild.roles.cache.get(roleId);
             const permissions = role ? channel.permissionsFor(role) : null;
-            return Boolean(permissions?.has('SendMessages') || permissions?.has('SendMessagesInThreads'));
+            return Boolean(
+                permissions?.has(PermissionFlagsBits.SendMessages)
+                || permissions?.has(PermissionFlagsBits.SendMessagesInThreads)
+            );
         });
     }
 
@@ -283,6 +299,7 @@ function startServer(client, getState) {
 
     registerPageRoutes(app, {
         publicDir: path.join(__dirname, 'public'),
+        privateDir: path.join(__dirname, 'private'),
         isUserAdmin,
     });
 

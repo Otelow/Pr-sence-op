@@ -175,6 +175,25 @@ const MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_presence_history_date ON presence_history(date DESC);
         CREATE INDEX IF NOT EXISTS idx_presence_history_user ON presence_history(user_id);
     `) },
+    { name: '052_my_weapons_serial_unique_when_clean', migrate: db => {
+        const duplicate = db.prepare(`
+            SELECT serial_number
+            FROM my_weapons
+            WHERE serial_number IS NOT NULL AND TRIM(serial_number) != ''
+            GROUP BY serial_number
+            HAVING COUNT(*) > 1
+            LIMIT 1
+        `).get();
+        if (!duplicate) {
+            db.exec(`
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_my_weapons_serial_unique
+                ON my_weapons(serial_number)
+                WHERE serial_number IS NOT NULL AND TRIM(serial_number) != '';
+            `);
+        } else {
+            log.warn(`Index unique my_weapons.serial_number ignoré : doublon existant (${duplicate.serial_number})`);
+        }
+    } },
 ];
 
 function markMigrationApplied(name) {
@@ -453,6 +472,7 @@ let getRequest;
 let normalizeCraftRequestType;
 let insertRequest;
 let updateRequestCraft;
+let transitionCraftRequestStatus;
 let updateRequestSale;
 let markRequestPosted;
 let getWeaponSaleStateForCraftRequest;
@@ -540,6 +560,7 @@ const {
     normalizeCraftRequestType,
     insertRequest,
     updateRequestCraft,
+    transitionCraftRequestStatus,
     updateRequestSale,
     markRequestPosted,
     getWeaponSaleStateForCraftRequest,
@@ -724,10 +745,12 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         getWeapon,
         insertRequest,
         updateRequestCraft,
+        transitionCraftRequestStatus,
         invalidateCraftCaches,
         deleteCraftRequestCleanly,
         deleteRequest,
         markRequestPosted,
+        serialAlreadyListed,
     });
 
     registerMyWeaponsRoutes(app, {

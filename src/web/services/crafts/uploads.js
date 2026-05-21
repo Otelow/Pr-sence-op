@@ -3,6 +3,14 @@
 const path = require('path');
 const multer = require('multer');
 
+const ALLOWED_IMAGES = new Map([
+    ['.jpg', new Set(['image/jpeg'])],
+    ['.jpeg', new Set(['image/jpeg'])],
+    ['.png', new Set(['image/png'])],
+    ['.webp', new Set(['image/webp'])],
+    ['.gif', new Set(['image/gif'])],
+]);
+
 function createCraftUploadMiddleware(uploadsDir) {
     const storage = multer.diskStorage({
         destination: (req, file, cb) => cb(null, uploadsDir),
@@ -16,10 +24,13 @@ function createCraftUploadMiddleware(uploadsDir) {
         storage,
         limits: { fileSize: 5 * 1024 * 1024 },
         fileFilter: (req, file, cb) => {
-            const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
             const ext = path.extname(file.originalname).toLowerCase();
-            if (allowed.includes(ext)) cb(null, true);
-            else cb(new Error('Format non supporté'));
+            const allowedMimes = ALLOWED_IMAGES.get(ext);
+            if (!allowedMimes) return cb(new Error('Format non supporté'));
+            if (!allowedMimes.has(String(file.mimetype || '').toLowerCase())) {
+                return cb(new Error('Type MIME incohérent'));
+            }
+            return cb(null, true);
         },
     });
 }

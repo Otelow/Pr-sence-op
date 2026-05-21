@@ -2,6 +2,7 @@
 const log = require('../../shared/logger');
 // FINAL D1 16/05/2026 — fallback picture WebP blackmarket
 // MODIFIE CHANTIER 6 - 14/05/2026 - routes OAuth Discord externalisees
+const crypto = require('crypto');
 
 function registerAuthRoutes(app, deps) {
     const {
@@ -17,7 +18,16 @@ function registerAuthRoutes(app, deps) {
     app.use('/auth', authLimiter);
 
     app.get('/auth/login', (req, res) => {
-        const url = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
+        const state = crypto.randomBytes(24).toString('hex');
+        req.session.oauthState = state;
+        const params = new URLSearchParams({
+            client_id: DISCORD_CLIENT_ID,
+            redirect_uri: DISCORD_REDIRECT_URI,
+            response_type: 'code',
+            scope: 'identify',
+            state,
+        });
+        const url = `https://discord.com/api/oauth2/authorize?${params.toString()}`;
         res.redirect(url);
     });
 
@@ -123,6 +133,13 @@ body.login-body { overflow: hidden; }
 </body></html>`;
         };
 
+        const receivedState = String(req.query.state || '');
+        const expectedState = req.session.oauthState;
+        delete req.session.oauthState;
+        if (!receivedState || !expectedState || receivedState !== expectedState) {
+            return res.status(400).send(errorPage('Session OAuth invalide. Relance la connexion depuis le bouton Discord.'));
+        }
+
         try {
             const tokenRes = await axios.post('https://discord.com/api/oauth2/token',
                 new URLSearchParams({
@@ -159,14 +176,21 @@ body.login-body { overflow: hidden; }
                 ));
             }
 
-            req.session.user = {
+            const sessionUser = {
                 id: user.id,
                 username: member.nickname || user.username,
                 avatar: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : null,
                 roles: [...member.roles.cache.keys()],
             };
 
-            res.redirect('/dashboard#presence');
+            return req.session.regenerate(err => {
+                if (err) {
+                    log.error('❌ Regénération session OAuth:', err.message);
+                    return res.status(500).send(errorPage('Erreur de session. Réessaie.'));
+                }
+                req.session.user = sessionUser;
+                return res.redirect('/dashboard#presence');
+            });
         } catch (e) {
             log.error('❌ OAuth erreur:', e.message);
             res.send(errorPage('Erreur de connexion. Réessaie.'));

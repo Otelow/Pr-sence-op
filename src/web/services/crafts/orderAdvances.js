@@ -290,19 +290,44 @@ function upsertOrderAdvance(payload, id = null) {
 
     const tx = db.transaction(() => {
         let orderId = orderIdForUpdate;
+        const existingParticipants = orderId
+            ? db.prepare('SELECT * FROM order_advance_participants WHERE order_id = ?').all(orderId)
+            : [];
+        const participantByKey = new Map(existingParticipants.map(p => [
+            String(p.user_id || p.user_name || '').trim().toLowerCase(),
+            p,
+        ]));
+        const touchedParticipantIds = new Set();
         if (orderId) {
             db.prepare(`UPDATE order_advances SET title = ?, order_date = ?, total_amount = ?, recovered_amount = ?, remaining_amount = ?, note = ?, status = ?, updated_at = ? WHERE id = ?`)
                 .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, orderId);
-            db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(orderId);
             db.prepare('DELETE FROM order_advance_items WHERE order_id = ?').run(orderId);
         } else {
             const r = db.prepare(`INSERT INTO order_advances (title, order_date, total_amount, recovered_amount, remaining_amount, note, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
                 .run(title, orderDate, totals.total_amount, totals.recovered_amount, totals.remaining_amount, note, status, now, now);
             orderId = r.lastInsertRowid;
         }
-        const stmt = db.prepare(`INSERT INTO order_advance_participants (order_id, user_id, user_name, amount_contributed, amount_recovered, amount_remaining, amount_to_compensate_next_order, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        const insertParticipant = db.prepare(`INSERT INTO order_advance_participants (order_id, user_id, user_name, amount_contributed, amount_recovered, amount_remaining, amount_to_compensate_next_order, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        const updateParticipant = db.prepare(`UPDATE order_advance_participants SET user_id = ?, user_name = ?, amount_contributed = ?, amount_recovered = ?, amount_remaining = ?, amount_to_compensate_next_order = ?, note = ?, updated_at = ? WHERE id = ? AND order_id = ?`);
         for (const p of participants) {
-            stmt.run(orderId, p.user_id, p.user_name, p.amount_contributed, p.amount_recovered, p.amount_remaining, p.amount_to_compensate_next_order, p.note, now, now);
+            const stableKey = String(p.user_id || p.user_name || '').trim().toLowerCase();
+            const existingParticipant = participantByKey.get(stableKey);
+            if (existingParticipant) {
+                updateParticipant.run(p.user_id, p.user_name, p.amount_contributed, p.amount_recovered, p.amount_remaining, p.amount_to_compensate_next_order, p.note, now, existingParticipant.id, orderId);
+                touchedParticipantIds.add(Number(existingParticipant.id));
+            } else {
+                const result = insertParticipant.run(orderId, p.user_id, p.user_name, p.amount_contributed, p.amount_recovered, p.amount_remaining, p.amount_to_compensate_next_order, p.note, now, now);
+                touchedParticipantIds.add(Number(result.lastInsertRowid));
+            }
+        }
+        if (existingParticipants.length) {
+            const repaymentCount = db.prepare('SELECT COUNT(*) as total FROM order_advance_repayments WHERE participant_id = ?');
+            const deleteParticipant = db.prepare('DELETE FROM order_advance_participants WHERE id = ? AND order_id = ?');
+            for (const existingParticipant of existingParticipants) {
+                if (touchedParticipantIds.has(Number(existingParticipant.id))) continue;
+                const hasRepayments = Number(repaymentCount.get(existingParticipant.id)?.total || 0) > 0;
+                if (!hasRepayments) deleteParticipant.run(existingParticipant.id, orderId);
+            }
         }
         const itemStmt = db.prepare(`INSERT INTO order_advance_items (order_id, ingredient_name, unit_price, quantity, line_total, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
         for (const item of items) {

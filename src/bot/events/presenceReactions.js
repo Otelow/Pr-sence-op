@@ -15,9 +15,21 @@ function registerPresenceReactionEvents(client, context) {
     } = context;
 
     const isFirstPresenceOp = op => op === 'op1' || op === 1;
+    const resolveReaction = async reaction => {
+        if (!reaction) return null;
+        const fullReaction = reaction.partial ? await reaction.fetch().catch(() => null) : reaction;
+        if (!fullReaction) return null;
+        if (fullReaction.message?.partial) {
+            const message = await fullReaction.message.fetch().catch(() => null);
+            if (!message) return null;
+        }
+        return fullReaction;
+    };
 
     client.on('messageReactionAdd', async (reaction, user) => {
         if (user.bot) return;
+        reaction = await resolveReaction(reaction);
+        if (!reaction) return;
 
         const msgId = reaction.message.id;
         const map = getReactionMap(msgId);
@@ -41,6 +53,8 @@ function registerPresenceReactionEvents(client, context) {
 
     client.on('messageReactionRemove', async (reaction, user) => {
         if (user.bot) return;
+        reaction = await resolveReaction(reaction);
+        if (!reaction) return;
 
         const msgId = reaction.message.id;
         const map = getReactionMap(msgId);

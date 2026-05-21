@@ -11,6 +11,58 @@ function parseId(v, max = 2_000_000) {
     return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
 }
 
+function parseNonNegativeInteger(value, fallback = null) {
+    if (value === undefined || value === null || value === '') return fallback;
+    const n = parseInt(value, 10);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n;
+}
+
+function safeParseIngredients(value) {
+    if (Array.isArray(value)) return value;
+    if (!value) return [];
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+function normalizeIngredientsPayload(value) {
+    let parsed;
+    try {
+        parsed = typeof value === 'string' ? JSON.parse(value || '[]') : value;
+    } catch {
+        const err = new Error('JSON ingrédients invalide');
+        err.statusCode = 400;
+        throw err;
+    }
+    if (!Array.isArray(parsed)) {
+        const err = new Error('Les ingrédients doivent être un tableau');
+        err.statusCode = 400;
+        throw err;
+    }
+    return parsed.map(item => {
+        const name = String(item?.name || '').trim();
+        const ingredientId = item?.ingredient_id === undefined || item?.ingredient_id === null || item?.ingredient_id === ''
+            ? null
+            : parseId(item.ingredient_id);
+        const quantity = parseNonNegativeInteger(item?.quantity);
+        if ((!name && ingredientId === null) || quantity === null) {
+            const err = new Error('Ingrédient invalide : nom/ID et quantité positive requis');
+            err.statusCode = 400;
+            throw err;
+        }
+        return {
+            ...item,
+            name,
+            ingredient_id: ingredientId,
+            quantity,
+        };
+    });
+}
+
 function registerCraftCatalogRoutes(app, deps) {
     const {
         fs,
@@ -40,6 +92,15 @@ function registerCraftCatalogRoutes(app, deps) {
         insertOrg,
         deleteOrg,
     } = deps;
+
+    function safeDeleteUpload(filename) {
+        if (!filename) return;
+        const safeName = path.basename(String(filename));
+        const target = path.resolve(uploadsDir, safeName);
+        const uploadRoot = path.resolve(uploadsDir);
+        if (!target.startsWith(`${uploadRoot}${path.sep}`)) return;
+        if (fs.existsSync(target)) fs.unlinkSync(target);
+    }
 
     app.get('/api/crafts/stocks', requireAuth, (req, res) => {
         try {
@@ -74,7 +135,7 @@ function registerCraftCatalogRoutes(app, deps) {
             const ingrMap = new Map(allIngredients.map(i => [i.name, i]));
 
             const list = weapons.map(w => {
-                let parsedIngredients = typeof w.ingredients === 'string' ? JSON.parse(w.ingredients || '[]') : (w.ingredients || []);
+                let parsedIngredients = safeParseIngredients(w.ingredients);
                 parsedIngredients = parsedIngredients.map(ing => {
                     const matched = ingrMap.get(ing.name) || (ing.ingredient_id ? allIngredients.find(i => i.id === ing.ingredient_id) : null);
                     return {
@@ -114,14 +175,23 @@ function registerCraftCatalogRoutes(app, deps) {
             if (!name) return res.status(400).json({ error: 'Nom requis' });
             const imagePath = req.files?.image?.[0]?.filename || null;
             const planImagePath = req.files?.plan_image?.[0]?.filename || null;
+            const normalizedIngredients = normalizeIngredientsPayload(ingredients || '[]');
+            const craftTimeValue = parseNonNegativeInteger(craft_time, 0);
+            const craftPriceValue = parseNonNegativeInteger(craft_price, 0);
+            const salePriceValue = parseNonNegativeInteger(sale_price, 0);
+            const maxSalePriceValue = parseNonNegativeInteger(max_sale_price, 0);
+            if ([craftTimeValue, craftPriceValue, salePriceValue, maxSalePriceValue].some(v => v === null)) {
+                return res.status(400).json({ error: 'Valeur numérique invalide' });
+            }
+            const requiresPlanValue = requires_plan === '1' || requires_plan === 'true' || requires_plan === true;
             const id = insertWeapon(
                 name, imagePath, planImagePath,
-                requires_plan === '1' || requires_plan === 'true' || requires_plan === true,
-                parseInt(craft_time) || 0,
-                parseInt(craft_price) || 0,
-                parseInt(sale_price) || 0,
-                parseInt(max_sale_price) || 0,
-                ingredients || '[]'
+                requiresPlanValue,
+                craftTimeValue,
+                craftPriceValue,
+                salePriceValue,
+                maxSalePriceValue,
+                JSON.stringify(normalizedIngredients)
             );
             audit(req.session.user, 'catalog.weapon.create', {
                 target_type: 'catalog_weapon',
@@ -142,24 +212,35 @@ function registerCraftCatalogRoutes(app, deps) {
 
             const newImage = req.files?.image?.[0]?.filename || null;
             const newPlan = req.files?.plan_image?.[0]?.filename || null;
+            const normalizedIngredients = ingredients !== undefined
+                ? normalizeIngredientsPayload(ingredients)
+                : safeParseIngredients(existing.ingredients);
+            const craftTimeValue = parseNonNegativeInteger(craft_time, existing.craft_time || 0);
+            const craftPriceValue = parseNonNegativeInteger(craft_price, existing.craft_price || 0);
+            const salePriceValue = parseNonNegativeInteger(sale_price, existing.sale_price || 0);
+            const maxSalePriceValue = parseNonNegativeInteger(max_sale_price, existing.max_sale_price || 0);
+            if ([craftTimeValue, craftPriceValue, salePriceValue, maxSalePriceValue].some(v => v === null)) {
+                return res.status(400).json({ error: 'Valeur numérique invalide' });
+            }
+            const requiresPlanValue = requires_plan === undefined
+                ? !!existing.requires_plan
+                : (requires_plan === '1' || requires_plan === 'true' || requires_plan === true);
 
             if (newImage && existing.image_path) {
-                const p = path.join(uploadsDir, existing.image_path);
-                if (fs.existsSync(p)) fs.unlinkSync(p);
+                safeDeleteUpload(existing.image_path);
             }
             if (newPlan && existing.plan_image_path) {
-                const p = path.join(uploadsDir, existing.plan_image_path);
-                if (fs.existsSync(p)) fs.unlinkSync(p);
+                safeDeleteUpload(existing.plan_image_path);
             }
 
             updateWeapon(
                 id, name || existing.name, newImage, newPlan,
-                requires_plan === '1' || requires_plan === 'true' || requires_plan === true,
-                parseInt(craft_time) || existing.craft_time || 0,
-                parseInt(craft_price) || existing.craft_price || 0,
-                parseInt(sale_price) || existing.sale_price || 0,
-                max_sale_price !== undefined ? (parseInt(max_sale_price) || 0) : (existing.max_sale_price || 0),
-                ingredients || (typeof existing.ingredients === 'string' ? existing.ingredients : JSON.stringify(existing.ingredients || []))
+                requiresPlanValue,
+                craftTimeValue,
+                craftPriceValue,
+                salePriceValue,
+                maxSalePriceValue,
+                JSON.stringify(normalizedIngredients)
             );
             audit(req.session.user, 'catalog.weapon.update', {
                 target_type: 'catalog_weapon',
@@ -176,12 +257,10 @@ function registerCraftCatalogRoutes(app, deps) {
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const existing = getWeapon(id);
             if (existing && existing.image_path) {
-                const p = path.join(uploadsDir, existing.image_path);
-                if (fs.existsSync(p)) fs.unlinkSync(p);
+                safeDeleteUpload(existing.image_path);
             }
             if (existing && existing.plan_image_path) {
-                const p = path.join(uploadsDir, existing.plan_image_path);
-                if (fs.existsSync(p)) fs.unlinkSync(p);
+                safeDeleteUpload(existing.plan_image_path);
             }
             deleteWeapon(id);
             audit(req.session.user, 'catalog.weapon.delete', {
@@ -227,8 +306,7 @@ function registerCraftCatalogRoutes(app, deps) {
             const existing = getIngredient(id);
             if (!existing) return res.status(404).json({ error: 'Ingrédient introuvable' });
             if (req.file && existing.image_path) {
-                const p = path.join(uploadsDir, existing.image_path);
-                if (fs.existsSync(p)) fs.unlinkSync(p);
+                safeDeleteUpload(existing.image_path);
             }
             updateIngredient(id, name || existing.name, req.file ? req.file.filename : null);
             audit(req.session.user, 'catalog.ingredient.update', {
@@ -246,8 +324,7 @@ function registerCraftCatalogRoutes(app, deps) {
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const existing = getIngredient(id);
             if (existing && existing.image_path) {
-                const p = path.join(uploadsDir, existing.image_path);
-                if (fs.existsSync(p)) fs.unlinkSync(p);
+                safeDeleteUpload(existing.image_path);
             }
             deleteIngredient(id);
             audit(req.session.user, 'catalog.ingredient.delete', {

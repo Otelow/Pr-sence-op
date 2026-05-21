@@ -11,6 +11,12 @@ function createDbProxy(getDb) {
     });
 }
 
+function createStockError(message, statusCode = 400) {
+    const err = new Error(message);
+    err.statusCode = statusCode;
+    return err;
+}
+
 function createCraftRequestService(deps) {
     const {
         getDb,
@@ -61,7 +67,7 @@ function updateRequestCraft(id, crafted, serial, userId, userName) {
     const now = Math.floor(Date.now() / 1000);
     const tx = db.transaction(() => {
         const current = getRequest(id);
-        if (!current) throw createStockError('Demande introuvable');
+        if (!current) throw createStockError('Demande introuvable', 404);
 
         if (!current.is_test && crafted && !current.stock_consumed_at) {
             consumeStockForCraftRequest(current, now);
@@ -73,6 +79,75 @@ function updateRequestCraft(id, crafted, serial, userId, userName) {
             .run(crafted ? 1 : 0, serial || null, crafted ? now : null, userId, userName, crafted ? 1 : 0, id);
     });
     tx();
+    invalidateCraftCaches();
+}
+
+const VALID_CRAFT_STATUSES = new Set(['pending', 'waiting_materials', 'in_progress', 'crafted', 'completed', 'rejected']);
+const STATUS_ROLLBACK_TARGETS = new Set(['pending', 'waiting_materials', 'in_progress', 'rejected']);
+
+function transitionCraftRequestStatus(id, targetStatus, options = {}) {
+    const status = String(targetStatus || '').trim();
+    if (!VALID_CRAFT_STATUSES.has(status)) throw createStockError('Statut invalide', 400);
+    const now = Math.floor(Date.now() / 1000);
+
+    const tx = db.transaction(() => {
+        const current = getRequest(id);
+        if (!current) throw createStockError('Demande introuvable', 404);
+        if (current.status === status) return { previous: current, updated: current, changed: false };
+        if (current.status === 'completed' && status !== 'completed') {
+            throw createStockError('Craft finalisé : transition arrière interdite depuis le dashboard', 409);
+        }
+
+        const linkedWeapons = getLinkedMyWeaponsForRequest(current);
+        const hasPermanentWeapon = linkedWeapons.some(w =>
+            w.is_sold === 1 || w.is_sold === true || w.is_sold === '1' ||
+            w.sale_discord_message_id || w.weapons_log_message_id
+        );
+        if (hasPermanentWeapon && STATUS_ROLLBACK_TARGETS.has(status)) {
+            throw createStockError('Transition interdite : arme vendue ou loguée liée à cette demande', 409);
+        }
+
+        if (current.stock_consumed_at && STATUS_ROLLBACK_TARGETS.has(status)) {
+            restoreStockForCraftRequest(current, now);
+        }
+
+        if (linkedWeapons.length && STATUS_ROLLBACK_TARGETS.has(status)) {
+            const deleteWeapon = db.prepare('DELETE FROM my_weapons WHERE id = ?');
+            linkedWeapons.forEach(w => deleteWeapon.run(w.id));
+        }
+
+        const rollbackCraftFields = STATUS_ROLLBACK_TARGETS.has(status);
+        db.prepare(`
+            UPDATE craft_requests
+            SET status = ?,
+                refusal_reason = CASE WHEN ? = 'rejected' THEN ? ELSE NULL END,
+                crafted = CASE WHEN ? THEN 0 ELSE crafted END,
+                serial_number = CASE WHEN ? THEN NULL ELSE serial_number END,
+                craft_date = CASE WHEN ? THEN NULL ELSE craft_date END,
+                stock_consumed_at = CASE WHEN ? THEN NULL ELSE stock_consumed_at END,
+                crafted_by_id = CASE WHEN ? THEN NULL ELSE crafted_by_id END,
+                crafted_by_name = CASE WHEN ? THEN NULL ELSE crafted_by_name END,
+                completed_by_id = CASE WHEN ? = 'completed' THEN completed_by_id ELSE NULL END,
+                completed_by_name = CASE WHEN ? = 'completed' THEN completed_by_name ELSE NULL END
+            WHERE id = ?
+        `).run(
+            status,
+            status, options.reason || null,
+            rollbackCraftFields ? 1 : 0,
+            rollbackCraftFields ? 1 : 0,
+            rollbackCraftFields ? 1 : 0,
+            rollbackCraftFields ? 1 : 0,
+            rollbackCraftFields ? 1 : 0,
+            rollbackCraftFields ? 1 : 0,
+            status,
+            status,
+            id
+        );
+        invalidateCraftCaches();
+        return { previous: current, updated: getRequest(id), changed: true };
+    });
+
+    return tx();
 }
 
 function updateRequestSale(id, buyer_org, sale_price, sale_date, userId, userName) {
@@ -176,6 +251,7 @@ function deleteCraftRequestCleanly(id) {
         normalizeCraftRequestType,
         insertRequest,
         updateRequestCraft,
+        transitionCraftRequestStatus,
         updateRequestSale,
         markRequestPosted,
         getWeaponSaleStateForCraftRequest,
@@ -189,4 +265,5 @@ function deleteCraftRequestCleanly(id) {
 
 module.exports = {
     createCraftRequestService,
+    createStockError,
 };

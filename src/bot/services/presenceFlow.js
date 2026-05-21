@@ -3,6 +3,7 @@
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
+const { collectNoReactionMembers } = require('./presenceNoReaction');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - flux presence OP externalise
 
@@ -54,6 +55,56 @@ function createPresenceFlowService(deps) {
     const presenceData = createStateProxy(getPresenceData);
     const presence2Data = createStateProxy(getPresence2Data);
     const absenceTracking = getAbsenceTracking();
+    const ABSENCE_FETCH_LIMIT = 500;
+    const ABSENCE_FETCH_TIMEOUT_MS = 15_000;
+
+async function fetchRecentAbsenceMessages(channel) {
+    const collected = new Map();
+    let before;
+    while (collected.size < ABSENCE_FETCH_LIMIT) {
+        const limit = Math.min(100, ABSENCE_FETCH_LIMIT - collected.size);
+        const options = before ? { limit, before } : { limit };
+        const batch = await channel.messages.fetch(options);
+        if (!batch?.size) break;
+        for (const [id, message] of batch) collected.set(id, message);
+        before = batch.last()?.id;
+        if (!before || batch.size < limit) break;
+    }
+    return collected;
+}
+
+function dateOnly(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function dateFromDayMonthNearTarget(day, month, targetDate) {
+    const target = dateOnly(targetDate);
+    let candidate = new Date(target.getFullYear(), month - 1, day);
+    const halfYearMs = 183 * 24 * 60 * 60 * 1000;
+    if (candidate.getTime() - target.getTime() > halfYearMs) {
+        candidate = new Date(target.getFullYear() - 1, month - 1, day);
+    } else if (target.getTime() - candidate.getTime() > halfYearMs) {
+        candidate = new Date(target.getFullYear() + 1, month - 1, day);
+    }
+    return candidate;
+}
+
+function isSameAbsenceDay(day, month, targetDate) {
+    const candidate = dateFromDayMonthNearTarget(day, month, targetDate);
+    const target = dateOnly(targetDate);
+    return candidate.getTime() === target.getTime();
+}
+
+function isTargetInAbsenceRange(startDay, startMonth, endDay, endMonth, targetDate) {
+    const target = dateOnly(targetDate);
+    let start = new Date(target.getFullYear(), startMonth - 1, startDay);
+    let end = new Date(target.getFullYear(), endMonth - 1, endDay);
+    if (end < start) {
+        if (target <= end) start = new Date(target.getFullYear() - 1, startMonth - 1, startDay);
+        else end = new Date(target.getFullYear() + 1, endMonth - 1, endDay);
+    }
+    return target >= start && target <= end;
+}
 
 function resetPresenceStateForNewFirstOp(todayKey) {
     if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
@@ -334,14 +385,13 @@ async function getAbsentUsersToday(targetDate = new Date()) {
     if (!ch) return { validAbsences, invalidAbsences, validAbsenceNames, invalidAbsenceNames };
 
     try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10_000);
+        let timeoutId;
         const msgs = await Promise.race([
-            ch.messages.fetch({ limit: 100, signal: controller.signal }),
+            fetchRecentAbsenceMessages(ch),
             new Promise((_, reject) => {
-                controller.signal.addEventListener('abort', () => reject(new Error('timeout fetch salon absences')), { once: true });
+                timeoutId = setTimeout(() => reject(new Error('timeout fetch salon absences')), ABSENCE_FETCH_TIMEOUT_MS);
             }),
-        ]).finally(() => clearTimeout(timeout));
+        ]).finally(() => clearTimeout(timeoutId));
         const today = targetDate instanceof Date ? targetDate : new Date();
         const td = today.getDate();
         const tm = today.getMonth() + 1;
@@ -366,8 +416,7 @@ async function getAbsentUsersToday(targetDate = new Date()) {
 
             const rng = ds.match(/(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})/);
             if (rng) {
-                const y = today.getFullYear();
-                if (new Date(y, tm - 1, td) >= new Date(y, +rng[2] - 1, +rng[1]) && new Date(y, tm - 1, td) <= new Date(y, +rng[4] - 1, +rng[3])) {
+                if (isTargetInAbsenceRange(+rng[1], +rng[2], +rng[3], +rng[4], today)) {
                     validAbsences.add(m.author.id);
                     validAbsenceNames.push(displayName);
                 }
@@ -375,7 +424,7 @@ async function getAbsentUsersToday(targetDate = new Date()) {
             }
 
             const sm = ds.match(/(\d{1,2})\/(\d{1,2})/);
-            if (sm && +sm[1] === td && +sm[2] === tm) {
+            if (sm && isSameAbsenceDay(+sm[1], +sm[2], today)) {
                 validAbsences.add(m.author.id);
                 validAbsenceNames.push(displayName);
             }
@@ -439,21 +488,13 @@ async function sendPresenceWarnings(presenceChannel) {
 
         // Utiliser les Maps de réaction (pas d'appel API)
         function processOP(opName, reactionMap) {
-            if (!reactionMap || reactionMap.size === 0) return { noReact: [], reacted: new Set() };
-
-            const reacted = new Set(reactionMap.keys());
-            const noReact = [];
-
-            for (const [, member] of role.members) {
-                if (member.user.bot) continue;
-                if (member.roles.cache.has(CONFIG.ROLES.EXCLUDED_ROLE)) continue;
-                if (reacted.has(member.id)) continue;
-                if (validAbsences.has(member.id)) continue;
-                if (invalidAbsences.has(member.id)) continue;
-                noReact.push(member);
-            }
-
-            return { noReact, reacted };
+            return collectNoReactionMembers({
+                role,
+                reactionMap,
+                validAbsences,
+                invalidAbsences,
+                excludedRoleId: CONFIG.ROLES.EXCLUDED_ROLE,
+            });
         }
 
         // === 1ère OP ===

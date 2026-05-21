@@ -75,6 +75,7 @@ const { createPanelService } = require('./services/panel');
 const { createPresencePanelService } = require('./services/presencePanel');
 const { createPresenceFlowService } = require('./services/presenceFlow');
 const { createAbsencePanelService } = require('./services/absencePanel');
+const { validateDiscordConfig } = require('./services/configValidation');
 const {
     registerAbsenceReminder,
     startRemindUserAbsence,
@@ -659,6 +660,7 @@ registerReadyEvent({
     snapshotPresenceDay,
     expirePresenceAtMidnight,
     initAbsenceReminder,
+    validateDiscordConfig,
 });
 
 registerGuildMemberEvents(client,

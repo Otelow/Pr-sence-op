@@ -44,6 +44,7 @@ function registerReadyEvent(deps) {
         snapshotPresenceDay,
         expirePresenceAtMidnight,
         initAbsenceReminder,
+        validateDiscordConfig,
     } = deps;
 
 function getYesterdayParisKey() {
@@ -110,6 +111,7 @@ client.once('ready', async () => {
         if (guild) {
             await guild.members.fetch();
             log.info(`👥 ${guild.members.cache.size} membres mis en cache`);
+            validateDiscordConfig?.(client, CONFIG, log);
 
             // Vérifier les auto-rôles
             for (const [userId, roleId] of Object.entries(CONFIG.AUTO_ROLE_USERS)) {

@@ -12,7 +12,8 @@ Node 24, Discord.js v14, Express 4, better-sqlite3, Socket.IO, Pino, Helmet, mul
 - `src/bot/` : code Discord (`commands`, `events`, `services`, `utils`)
 - `src/web/` : serveur web (`routes`, `services`, `middlewares`)
 - `src/shared/` : modules communs (`config`, `logger`, `database`, `auditLog`, Supabase, etc.)
-- `public/` : front statique (dashboard, admin, assets)
+- `public/` : assets publics (JS/CSS/images/login)
+- `private/` : pages HTML servies uniquement via routes authentifiées (`/dashboard`, `/admin`)
 - `scripts/` : utilitaires CLI (`smoke-test`, `convert-assets`)
 - `data/` : SQLite DBs + backups (volume Railway)
 
@@ -33,6 +34,7 @@ npm start
 ```
 
 Remplis les valeurs Discord et session dans `.env` avant de démarrer.
+En CI/prod, utilise `npm ci` pour reconstruire `node_modules` sur la plateforme cible.
 
 ## Variables d'environnement requises
 
@@ -53,12 +55,22 @@ Remplis les valeurs Discord et session dans `.env` avant de démarrer.
 ## Scripts
 
 - `npm start` : démarrer le bot Discord + le serveur web
-- `npm run smoke <url>` : smoke test post-déploiement
+- `npm run syntax` : vérifier la syntaxe JS avec `node --check`
+- `npm test` : lancer les tests Node intégrés
+- `npm run audit:high` : audit npm production niveau high
+- `npm run smoke -- <url>` : smoke test post-déploiement ou contre un serveur local déjà démarré
 - `npm run convert-assets` : générer les `.webp` depuis les images sources
 
 ## Déploiement
 
 Push sur `main` → Railway redéploie automatiquement.
+
+Déploiement propre :
+
+- Déployer depuis GitHub/Railway, pas depuis un ZIP brut du dossier local.
+- Ne jamais envoyer `node_modules`, `.git`, `.env`, `data/*.db`, `data/*.db-shm`, `data/*.db-wal`.
+- Si une archive est nécessaire, utiliser `git archive` depuis un commit propre.
+- Laisser Railway exécuter `npm ci` afin de compiler `better-sqlite3` pour Linux et éviter les erreurs `invalid ELF header`.
 
 - Healthcheck : `/healthz`
 - Monitoring admin : `/admin` onglet `Monitoring`

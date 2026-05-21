@@ -799,7 +799,7 @@ function renderPresenceHistory(history) {
     }
 
     container.innerHTML = history.map(day => `
-        <div class="history-day-card" role="button" tabindex="0" onclick="openHistoryDayModal('${escapeJsArg(day.date)}')" onkeydown="if(event.key==='Enter'||event.key===' ') openHistoryDayModal('${escapeJsArg(day.date)}')">
+        <div class="history-day-card js-history-day-card" role="button" tabindex="0" data-date="${escapeHtml(day.date)}">
             <div class="history-day-header">
                 <h4>📆 ${formatPresenceHistoryDateFR(day.date)}</h4>
             </div>
@@ -880,6 +880,20 @@ function renderHistoryDayDetails(container, data) {
 
 window.openHistoryDayModal = openHistoryDayModal;
 window.closeHistoryDayModal = closeHistoryDayModal;
+
+document.addEventListener('click', event => {
+    const card = event.target.closest?.('.js-history-day-card');
+    if (!card) return;
+    openHistoryDayModal(card.dataset.date);
+});
+
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const card = event.target.closest?.('.js-history-day-card');
+    if (!card) return;
+    event.preventDefault();
+    openHistoryDayModal(card.dataset.date);
+});
 
 async function loadPresenceStats() {
     const period = document.getElementById('presenceStatsPeriod')?.value || '30';

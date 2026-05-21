@@ -568,6 +568,21 @@ function registerMyWeaponsRoutes(app, deps) {
             if (!canManageAny && existing.is_sold) {
                 return res.status(403).json({ error: 'Une annonce vendue ne peut etre modifiee que par un haut grade' });
             }
+            const forbiddenSaleFields = [
+                'is_sold',
+                'sold_to',
+                'sold_price',
+                'sold_at',
+                'sold_by_id',
+                'sold_by_name',
+                'sale_discord_message_id',
+                'weapons_log_message_id',
+                'discord_message_id',
+            ];
+            const forbiddenField = forbiddenSaleFields.find(field => Object.prototype.hasOwnProperty.call(req.body, field));
+            if (forbiddenField) {
+                return res.status(400).json({ error: `Champ de vente interdit sur cette route (${forbiddenField}). Utilise Marquer vendu.` });
+            }
 
             const weaponName = String(req.body.weapon_name || '').trim();
             if (!weaponName) return res.status(400).json({ error: "Nom de l'arme requis" });
@@ -592,22 +607,6 @@ function registerMyWeaponsRoutes(app, deps) {
                 minPrice,
             });
             if (priceLimitError) return res.status(400).json({ error: priceLimitError });
-            const nextIsSold = req.body.is_sold === true || req.body.is_sold === 1 || req.body.is_sold === '1' || req.body.is_sold === 'true';
-            if (nextIsSold && !canManageAny) {
-                return res.status(403).json({ error: 'Utilise le bouton Marquer vendu pour declarer une vente' });
-            }
-            const soldTo = nextIsSold ? String(req.body.sold_to || '').trim() : null;
-            const soldPrice = nextIsSold ? parseOptionalAmount(req.body.sold_price) : null;
-            let soldAt = null;
-            if (nextIsSold) {
-                if (!soldTo || soldPrice === null) return res.status(400).json({ error: 'Acheteur et prix vendu requis' });
-                const rawSoldAt = String(req.body.sold_at || '').trim();
-                soldAt = rawSoldAt
-                    ? Math.floor(new Date(`${rawSoldAt}T12:00:00+01:00`).getTime() / 1000)
-                    : (existing.sold_at || Math.floor(Date.now() / 1000));
-                if (!Number.isFinite(soldAt)) return res.status(400).json({ error: 'Date de vente invalide' });
-            }
-
             let ownerId = existing.user_id;
             let ownerName = existing.user_name;
             let ownerAvatar = existing.user_avatar || null;
@@ -631,15 +630,9 @@ function registerMyWeaponsRoutes(app, deps) {
                 db.prepare(`
                     UPDATE my_weapons
                     SET user_id = ?, user_name = ?, user_avatar = ?, weapon_name = ?, is_crafted = ?,
-                        serial_number = ?, asking_price = ?, min_price = ?, is_sold = ?,
-                        sold_to = ?, sold_price = ?, sold_at = ?
+                        serial_number = ?, asking_price = ?, min_price = ?
                     WHERE id = ?
-                `).run(ownerId, ownerName, ownerAvatar, weaponName, isCrafted ? 1 : 0, serial || null, askingPrice, minPrice, nextIsSold ? 1 : 0, soldTo, soldPrice, soldAt, id);
-
-
-            if (nextIsSold) {
-                db.prepare('UPDATE my_weapons SET is_in_progress = 0, in_progress_at = NULL, in_progress_by = NULL WHERE id = ?').run(id);
-            }
+                `).run(ownerId, ownerName, ownerAvatar, weaponName, isCrafted ? 1 : 0, serial || null, askingPrice, minPrice, id);
             const updatedWeapon = getMyWeaponById(id);
             emitRealtime('craft:status', { requestId: updatedWeapon?.craft_request_id || null, myWeaponId: id, status: updatedWeapon?.is_sold ? 'sold' : 'listed', action: 'myweapon-updated' });
             audit(req.session.user, 'weapon.update', {
@@ -649,9 +642,6 @@ function registerMyWeaponsRoutes(app, deps) {
                     weapon_name: weaponName,
                     serial_number: serial || null,
                     owner: ownerName,
-                    is_sold: nextIsSold,
-                    sold_to: soldTo,
-                    sold_price: soldPrice,
                 },
             });
             queueArmesBoardRefresh('weapon.update');
@@ -692,9 +682,29 @@ function registerMyWeaponsRoutes(app, deps) {
             const soldByName = String(sold_by_name || '').trim();
             if (!soldById) return res.status(400).json({ error: 'Vendeur obligatoire' });
 
-                            db.prepare(`UPDATE my_weapons SET is_sold = 1, is_in_progress = 0, in_progress_at = NULL, in_progress_by = NULL, sold_to = ?, sold_price = ?, sold_at = ?, sold_by_id = ?, sold_by_name = ? WHERE id = ?`)
+            let autoFilledCraft = null;
+            let matchedRequestForLog = null;
+            const markSoldTx = db.transaction(() => {
+                db.prepare(`UPDATE my_weapons SET is_sold = 1, is_in_progress = 0, in_progress_at = NULL, in_progress_by = NULL, sold_to = ?, sold_price = ?, sold_at = ?, sold_by_id = ?, sold_by_name = ? WHERE id = ?`)
                     .run(soldTo, soldPrice, now, soldById, soldByName, id);
 
+                if (existing.is_crafted && existing.serial_number) {
+                    const matchedRequest = db.prepare(`
+                        SELECT r.*, w.name as weapon_name FROM craft_requests r
+                        JOIN weapons w ON r.weapon_id = w.id
+                        WHERE r.user_id = ? AND r.serial_number = ? AND r.status != 'completed'
+                        ORDER BY r.created_at DESC LIMIT 1
+                    `).get(existing.user_id, existing.serial_number);
+
+                    if (matchedRequest) {
+                        matchedRequestForLog = matchedRequest;
+                        db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
+                            .run(soldTo, soldPrice, now, soldById, soldByName || soldById, matchedRequest.id);
+                        autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
+                    }
+                }
+            });
+            markSoldTx();
 
             // Mettre à jour le message Discord (édit ou nouveau message)
             try {
@@ -706,7 +716,7 @@ function registerMyWeaponsRoutes(app, deps) {
                         .setDescription('Transaction confirmée. L’annonce est verrouillée.')
                         .setColor(0x4ade80)
                         .addFields(
-                            { name: 'Vendeur', value: `<@${existing.user_id}>`, inline: true },
+                            { name: 'Vendeur', value: soldById !== 'former-21bs' ? `<@${soldById}>` : (soldByName || existing.user_name), inline: true },
                             { name: 'Acheteur', value: soldTo, inline: true },
                             { name: 'Prix final', value: moneyLabel(soldPrice), inline: true },
                         )
@@ -741,32 +751,6 @@ function registerMyWeaponsRoutes(app, deps) {
             try {
                 await updateMyWeaponsDiscordBatch(existing);
             } catch (e) { log.error('Erreur update Discord lot myweapons:', e.message); }
-
-            let autoFilledCraft = null;
-            let matchedRequestForLog = null;
-            if (existing.is_crafted && existing.serial_number) {
-                try {
-                    let matchedRequest;
-                                            // Chercher demande par : user_id + N°Série + status (crafted/in_progress/pending)
-                        matchedRequest = db.prepare(`
-                            SELECT r.*, w.name as weapon_name FROM craft_requests r
-                            JOIN weapons w ON r.weapon_id = w.id
-                            WHERE r.user_id = ? AND r.serial_number = ? AND r.status != 'completed'
-                            ORDER BY r.created_at DESC LIMIT 1
-                        `).get(existing.user_id, existing.serial_number);
-
-
-                    if (matchedRequest) {
-                        matchedRequestForLog = matchedRequest;
-                        // Compléter la demande craft avec les infos de vente
-                                                    db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
-                                .run(soldTo, soldPrice, now, userId, existing.user_name, matchedRequest.id);
-
-                        autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
-
-                    }
-                } catch (e) { log.error('Erreur auto-fill craft:', e.message); }
-            }
 
             try {
                 const soldWeaponForLog = db.prepare('SELECT * FROM my_weapons WHERE id = ?').get(id);
@@ -819,6 +803,22 @@ function registerMyWeaponsRoutes(app, deps) {
             // Le vendeur peut supprimer sa propre annonce, OU super admin
             if (existing.user_id !== userId && !canDeleteMyWeapons(req.session.user)) {
                 return res.status(403).json({ error: 'Action non autorisée' });
+            }
+            const loggedRow = existing.batch_id
+                ? db.prepare(`
+                    SELECT id FROM my_weapons
+                    WHERE batch_id = ?
+                      AND (is_sold = 1 OR sale_discord_message_id IS NOT NULL OR weapons_log_message_id IS NOT NULL OR discord_message_id IS NOT NULL)
+                    LIMIT 1
+                `).get(existing.batch_id)
+                : db.prepare(`
+                    SELECT id FROM my_weapons
+                    WHERE id = ?
+                      AND (is_sold = 1 OR sale_discord_message_id IS NOT NULL OR weapons_log_message_id IS NOT NULL OR discord_message_id IS NOT NULL)
+                    LIMIT 1
+                `).get(id);
+            if (loggedRow) {
+                return res.status(409).json({ error: 'Arme vendue ou loguée : suppression physique refusée pour préserver l’historique' });
             }
             if (existing.discord_message_id) {
                 try {

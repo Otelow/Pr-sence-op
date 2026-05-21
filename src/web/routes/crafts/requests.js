@@ -50,10 +50,12 @@ function registerCraftRequestRoutes(app, deps) {
         getWeapon,
         insertRequest,
         updateRequestCraft,
+        transitionCraftRequestStatus,
         invalidateCraftCaches,
         deleteCraftRequestCleanly,
         deleteRequest,
         markRequestPosted,
+        serialAlreadyListed,
     } = deps;
 
     async function fetchDiscordChannel(channelId, label) {
@@ -422,8 +424,10 @@ function registerCraftRequestRoutes(app, deps) {
             if (!weapon) return res.status(404).json({ error: 'Arme introuvable' });
             if (!serial_number || !String(serial_number).trim()) return res.status(400).json({ error: 'N° de série obligatoire' });
             if (!craft_date) return res.status(400).json({ error: 'Date craft obligatoire' });
-            if (is_sold && !buyer_org) return res.status(400).json({ error: 'Organisation acheteuse obligatoire si vendu' });
-            if (is_sold && !sale_date) return res.status(400).json({ error: 'Date de vente obligatoire si vendu' });
+            const sold = is_sold === true || is_sold === 1 || is_sold === '1' || is_sold === 'true';
+            const buyerOrg = String(buyer_org || '').trim();
+            if (sold && !buyerOrg) return res.status(400).json({ error: 'Organisation acheteuse obligatoire si vendu' });
+            if (sold && !sale_date) return res.status(400).json({ error: 'Date de vente obligatoire si vendu' });
             const authorizedCrafter = resolveAuthorizedCrafter(crafted_by_id, crafted_by_name);
             if (!authorizedCrafter) return res.status(400).json({ error: 'Armurier obligatoire : Otelow, Ney ou Le H' });
 
@@ -433,19 +437,35 @@ function registerCraftRequestRoutes(app, deps) {
             const soldById = String(sold_by_id || '').trim();
             const soldByName = String(sold_by_name || '').trim();
             const serial = String(serial_number).trim();
+            if (typeof serialAlreadyListed === 'function' && serialAlreadyListed(serial)) {
+                return res.status(409).json({ error: `Le N° de série ${serial} est déjà en vente ou vendu` });
+            }
             const craftTimestamp = Math.floor(new Date(`${craft_date}T12:00:00+01:00`).getTime() / 1000);
             if (!Number.isFinite(craftTimestamp)) return res.status(400).json({ error: 'Date craft invalide' });
-            const sold = !!is_sold;
             if (sold && !soldById) return res.status(400).json({ error: 'Vendeur obligatoire si vendu' });
             const now = Math.floor(Date.now() / 1000);
             const saleTimestamp = sold ? Math.floor(new Date(`${sale_date}T12:00:00+01:00`).getTime() / 1000) : null;
             if (sold && !Number.isFinite(saleTimestamp)) return res.status(400).json({ error: 'Date de vente invalide' });
-            const soldPrice = free_sale ? 0 : (parseInt(sale_price) || null);
+            const freeSale = free_sale === true || free_sale === 1 || free_sale === '1' || free_sale === 'true';
+            let soldPrice = null;
+            if (sold) {
+                if (freeSale) {
+                    soldPrice = 0;
+                } else {
+                    const rawPrice = String(sale_price ?? '').trim();
+                    if (!rawPrice) return res.status(400).json({ error: 'Prix de vente obligatoire si vente non gratuite' });
+                    soldPrice = parseInt(rawPrice, 10);
+                    if (!Number.isFinite(soldPrice) || soldPrice < 0) {
+                        return res.status(400).json({ error: 'Prix de vente invalide' });
+                    }
+                }
+            }
             const status = sold ? 'completed' : 'crafted';
             let requestId;
             let myWeaponId;
 
-                            const r = db.prepare(`
+            const createManualCraft = db.transaction(() => {
+                const r = db.prepare(`
                     INSERT INTO craft_requests (
                         user_id, user_name, weapon_id, has_plan, has_money, status, crafted,
                         serial_number, craft_date, crafted_by_id, crafted_by_name,
@@ -453,23 +473,25 @@ function registerCraftRequestRoutes(app, deps) {
                     ) VALUES (?, ?, ?, 1, 1, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `).run(
                     userId, userName, weapon.id, status, serial, craftTimestamp,
-                    authorizedCrafter.id, authorizedCrafter.name, sold ? buyer_org : null, soldPrice,
+                    authorizedCrafter.id, authorizedCrafter.name, sold ? buyerOrg : null, soldPrice,
                     sold ? saleTimestamp : null, sold ? soldById : null, sold ? soldByName : null
                 );
                 requestId = r.lastInsertRowid;
 
                 const mw = db.prepare(`
                     INSERT INTO my_weapons (
-                        user_id, user_name, user_avatar, weapon_name, is_crafted, serial_number,
+                        user_id, user_name, user_avatar, weapon_name, craft_request_id, is_crafted, serial_number,
                         asking_price, min_price, is_sold, sold_to, sold_price, sold_at,
                         crafted_by_id, crafted_by_name, sold_by_id, sold_by_name
-                    ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `).run(
-                    userId, userName, userAvatar, weapon.name, serial, soldPrice, null,
-                    sold ? 1 : 0, sold ? buyer_org : null, soldPrice, sold ? saleTimestamp : null,
+                    userId, userName, userAvatar, weapon.name, requestId, serial, soldPrice, null,
+                    sold ? 1 : 0, sold ? buyerOrg : null, soldPrice, sold ? saleTimestamp : null,
                     authorizedCrafter.id, authorizedCrafter.name, sold ? soldById : null, sold ? soldByName : null
                 );
                 myWeaponId = mw.lastInsertRowid;
+            });
+            createManualCraft();
 
 
             if (sold) {
@@ -564,11 +586,11 @@ function registerCraftRequestRoutes(app, deps) {
             const { status } = req.body;
             const allowed = ['pending', 'waiting_materials', 'in_progress', 'rejected'];
             if (!allowed.includes(status)) return res.status(400).json({ error: 'Statut invalide' });
-            const existing = getRequest(id);
-
-                            db.prepare('UPDATE craft_requests SET status = ? WHERE id = ?').run(status, id);
-
-            invalidateCraftCaches();
+            const result = transitionCraftRequestStatus(id, status, {
+                actor: req.session.user,
+                reason: req.body.reason || req.body.refusal_reason || null,
+            });
+            const existing = result.previous;
 
             const updatedForDiscord = getRequest(id);
             if (!updatedForDiscord?.is_test) {
@@ -590,7 +612,7 @@ function registerCraftRequestRoutes(app, deps) {
                 },
             });
             res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { res.status(e.statusCode || 500).json({ error: e.message }); }
     });
 
     app.patch('/api/crafts/requests/:id/sale', requireAuth, async (req, res) => {
