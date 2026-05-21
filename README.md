@@ -58,7 +58,8 @@ En CI/prod, utilise `npm ci` pour reconstruire `node_modules` sur la plateforme 
 - `npm run syntax` : vérifier la syntaxe JS avec `node --check`
 - `npm test` : lancer les tests Node intégrés
 - `npm run audit:high` : audit npm production niveau high
-- `npm run smoke -- <url>` : smoke test post-déploiement ou contre un serveur local déjà démarré
+- `npm run smoke:remote -- <url>` : smoke test contre une instance déjà démarrée (Railway ou serveur local lancé à part)
+- `npm run smoke -- <url>` : alias explicite de `smoke:remote`, échoue volontairement si aucune URL n’est fournie
 - `npm run convert-assets` : générer les `.webp` depuis les images sources
 
 ## Déploiement

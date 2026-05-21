@@ -5,6 +5,7 @@ const log = require('../../../shared/logger');
 
 // AUDIT HOOKS 16/05/2026 — catalogue craft/admin tracé dans audit_log
 const { audit } = require('../../../shared/auditLog');
+const { safeDeleteUploadedFile } = require('../../services/crafts/uploads');
 
 function parseId(v, max = 2_000_000) {
     const n = parseInt(v, 10);
@@ -94,12 +95,7 @@ function registerCraftCatalogRoutes(app, deps) {
     } = deps;
 
     function safeDeleteUpload(filename) {
-        if (!filename) return;
-        const safeName = path.basename(String(filename));
-        const target = path.resolve(uploadsDir, safeName);
-        const uploadRoot = path.resolve(uploadsDir);
-        if (!target.startsWith(`${uploadRoot}${path.sep}`)) return;
-        if (fs.existsSync(target)) fs.unlinkSync(target);
+        safeDeleteUploadedFile(uploadsDir, filename);
     }
 
     app.get('/api/crafts/stocks', requireAuth, (req, res) => {

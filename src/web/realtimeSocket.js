@@ -9,7 +9,7 @@ const {
     canViewMap,
 } = require('./middlewares/auth');
 
-function roomsForUser(user) {
+function getSocketRoomsForUser(user) {
     const rooms = ['authenticated'];
     if (isUserAdmin(user)) rooms.push('admin');
     if (hasFullSiteAccess(user)) rooms.push('full');
@@ -19,7 +19,7 @@ function roomsForUser(user) {
     return rooms;
 }
 
-function roomForRealtimeEvent(type) {
+function getRealtimeRoomForEvent(type) {
     if (!type) return null;
     if (type.startsWith('audit:')) return 'admin';
     if (type.startsWith('admin:') || type.startsWith('sanction:')) return 'admin';
@@ -42,11 +42,11 @@ function attachRealtimeSocket(httpServer, sessionMiddleware) {
     });
     io.on('connection', socket => {
         const user = socket.request.session.user;
-        for (const room of roomsForUser(user)) socket.join(room);
+        for (const room of getSocketRoomsForUser(user)) socket.join(room);
         socket.emit('dashboard:ready', { ts: Date.now() });
     });
     realtimeEvents.on('event', ({ type, payload }) => {
-        const room = roomForRealtimeEvent(type);
+        const room = getRealtimeRoomForEvent(type);
         if (room) io.to(room).emit(type, payload);
         else io.emit(type, payload);
     });
@@ -54,4 +54,8 @@ function attachRealtimeSocket(httpServer, sessionMiddleware) {
     return io;
 }
 
-module.exports = { attachRealtimeSocket };
+module.exports = {
+    attachRealtimeSocket,
+    getSocketRoomsForUser,
+    getRealtimeRoomForEvent,
+};

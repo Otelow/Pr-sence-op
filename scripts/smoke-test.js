@@ -1,8 +1,13 @@
 #!/usr/bin/env node
-// FINAL POST-STAB E 17/05/2026 ? smoke test ?tendu charset/assets
-// STABILISATION FINALE 15/05/2026 — smoke test post-déploiement
+// Smoke test remote : charset/assets et routes publiques critiques.
 
-const url = process.argv[2] || 'http://localhost:3000';
+const url = process.argv[2] || process.env.SMOKE_URL;
+
+if (!url) {
+    console.error('Usage: npm run smoke:remote -- https://ton-app.example ou SMOKE_URL=https://ton-app.example npm run smoke:remote');
+    console.error('Ce smoke teste une instance deja demarree ; il ne lance pas le serveur local.');
+    process.exit(2);
+}
 
 const checks = [
     {
@@ -77,10 +82,10 @@ const checks = [
         try {
             await c.test();
             ok += 1;
-            console.log(`✅ ${c.name}`);
+            console.log(`[OK] ${c.name}`);
         } catch (e) {
             fails.push({ name: c.name, error: e.message });
-            console.log(`❌ ${c.name}: ${e.message}`);
+            console.log(`[FAIL] ${c.name}: ${e.message}`);
         }
     }
     console.log(`\n${ok}/${checks.length} OK`);

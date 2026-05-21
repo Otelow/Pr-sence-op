@@ -473,6 +473,7 @@ let normalizeCraftRequestType;
 let insertRequest;
 let updateRequestCraft;
 let transitionCraftRequestStatus;
+let applyCraftRequestStatusTransition;
 let updateRequestSale;
 let markRequestPosted;
 let getWeaponSaleStateForCraftRequest;
@@ -561,6 +562,7 @@ const {
     insertRequest,
     updateRequestCraft,
     transitionCraftRequestStatus,
+    applyCraftRequestStatusTransition,
     updateRequestSale,
     markRequestPosted,
     getWeaponSaleStateForCraftRequest,
@@ -665,11 +667,13 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
     }
 
     function markRequestsRejectedForAbsentMember(userId) {
-        const now = Math.floor(Date.now() / 1000);
         const reason = 'Membre plus présent sur le Discord';
-        db.prepare(`UPDATE craft_requests SET status = 'rejected', refusal_reason = ? WHERE user_id = ? AND status IN (${ABSENT_MEMBER_CHECK_STATUSES.map(() => '?').join(',')})`)
-            .run(reason, userId, ...ABSENT_MEMBER_CHECK_STATUSES);
-        invalidateCraftCaches();
+        const requests = getRequests('all')
+            .filter(r => String(r.user_id) === String(userId))
+            .filter(r => ABSENT_MEMBER_CHECK_STATUSES.includes(r.status));
+        for (const request of requests) {
+            transitionCraftRequestStatus(request.id, 'rejected', { reason });
+        }
     }
 
     async function sweepRequestsForMissingMembers() {
@@ -769,6 +773,8 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         getRequest,
         getWeaponSaleStateForCraftRequest,
         serialAlreadyListed,
+        applyCraftRequestStatusTransition,
+        invalidateCraftCaches,
         markRequestPosted,
         emitRealtime,
         moneyLabel,

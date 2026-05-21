@@ -112,6 +112,10 @@ function escapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function escapeAttr(value) {
+    return escapeHtml(value);
+}
+
 function escapeJsArg(value) {
     return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
 }
@@ -638,7 +642,7 @@ function renderImpersonateDropdown() {
         const color = safeColor(role.color);
         const colorDot = `<span class="role-color-dot" style="background:${color};"></span>`;
         return `
-            <div class="custom-dropdown-item" data-role-name="${escapeHtml(role.name).toLowerCase()}" onclick="selectImpersonateRole('${escapeJsArg(role.id)}', '${escapeJsArg(role.name)}', '${color}')">
+            <div class="custom-dropdown-item js-impersonate-role-option" data-role-name="${escapeAttr(String(role.name || '').toLowerCase())}" data-role-id="${escapeAttr(role.id)}" data-role-label="${escapeAttr(role.name)}" data-role-color="${color}">
                 ${colorDot}
                 <span class="custom-dropdown-item-label" style="color:${color};">@${escapeHtml(role.name)}</span>
                 <span class="custom-dropdown-item-count">${role.memberCount || 0}</span>
@@ -657,6 +661,16 @@ function renderImpersonateDropdown() {
         };
     }
 }
+
+document.addEventListener('click', event => {
+    const roleOption = event.target.closest?.('.js-impersonate-role-option');
+    if (!roleOption) return;
+    selectImpersonateRole(
+        roleOption.dataset.roleId || '',
+        roleOption.dataset.roleLabel || '',
+        roleOption.dataset.roleColor || ''
+    );
+});
 
 function toggleImpersonateDropdown(event) {
     if (event) event.stopPropagation();

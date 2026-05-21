@@ -895,6 +895,53 @@ document.addEventListener('keydown', event => {
     openHistoryDayModal(card.dataset.date);
 });
 
+document.addEventListener('click', event => {
+    const craftWeaponOption = event.target.closest?.('.js-craft-weapon-option');
+    if (craftWeaponOption) {
+        selectCraftWeapon(
+            Number(craftWeaponOption.dataset.weaponId) || 0,
+            craftWeaponOption.dataset.weaponName || '',
+            craftWeaponOption.dataset.imageUrl || ''
+        );
+        return;
+    }
+
+    const markSoldBuyerOption = event.target.closest?.('.js-mark-sold-buyer-option');
+    if (markSoldBuyerOption) {
+        selectMarkSoldBuyer(markSoldBuyerOption.dataset.orgName || '');
+        return;
+    }
+
+    const roleOption = event.target.closest?.('.js-role-option');
+    if (roleOption) {
+        selectRole(
+            roleOption.dataset.roleType || '',
+            roleOption.dataset.roleId || '',
+            roleOption.dataset.roleName || '',
+            roleOption.dataset.roleColor || '',
+            Number(roleOption.dataset.roleCount) || 0
+        );
+        return;
+    }
+
+    const sanctionUserOption = event.target.closest?.('.js-sanction-user-option');
+    if (sanctionUserOption) {
+        selectSanctionUserCustom(
+            sanctionUserOption.dataset.userId || '',
+            sanctionUserOption.dataset.userName || '',
+            sanctionUserOption.dataset.userAvatar || '',
+            sanctionUserOption.dataset.userColor || ''
+        );
+        return;
+    }
+
+    const mentionOption = event.target.closest?.('.js-mention-option');
+    if (mentionOption) {
+        const member = mentionResults[Number(mentionOption.dataset.mentionIndex)];
+        if (member) selectMention(member);
+    }
+});
+
 async function loadPresenceStats() {
     const period = document.getElementById('presenceStatsPeriod')?.value || '30';
     try {
@@ -1792,6 +1839,10 @@ function escapeHtml(s) {
     return d.innerHTML;
 }
 
+function escapeAttr(value) {
+    return escapeHtml(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function escapeJsArg(value) {
     return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, ' ');
 }
@@ -2447,7 +2498,7 @@ function renderRoleDropdown(type) {
             ? `<span class="role-color-dot" style="background:${color};"></span>`
             : `<span class="role-color-dot" style="background:#888;"></span>`;
         return `
-            <div class="custom-dropdown-item" data-role-id="${escapeHtml(role.id)}" data-role-name="${escapeHtml(role.name)}" data-role-color="${color}" onclick="selectRole('${type}', '${escapeJsArg(role.id)}', '${escapeJsArg(role.name)}', '${color}', ${role.memberCount})">
+            <div class="custom-dropdown-item js-role-option" data-role-type="${escapeAttr(type)}" data-role-id="${escapeAttr(role.id)}" data-role-name="${escapeAttr(role.name)}" data-role-color="${escapeAttr(color || '')}" data-role-count="${Number(role.memberCount) || 0}">
                 ${colorDot}
                 <span class="custom-dropdown-item-label" style="${color ? `color:${color};` : ''}">@${escapeHtml(role.name)}</span>
                 <span class="custom-dropdown-item-count">${role.memberCount}</span>
@@ -2874,8 +2925,8 @@ function renderMentionDropdown() {
     if (!dropdown) return;
 
     dropdown.innerHTML = mentionResults.map((m, i) => `
-        <div class="mention-item ${i === mentionSelectedIndex ? 'selected' : ''}" onclick="selectMention(${JSON.stringify(m).replace(/"/g, '&quot;')})">
-            ${m.avatar ? `<img class="mention-avatar" src="${m.avatar}" alt="">` : '<div class="mention-avatar-placeholder"></div>'}
+        <div class="mention-item js-mention-option ${i === mentionSelectedIndex ? 'selected' : ''}" data-mention-index="${i}">
+            ${safeImageUrl(m.avatar) ? `<img class="mention-avatar" src="${safeImageUrl(m.avatar)}" alt="">` : '<div class="mention-avatar-placeholder"></div>'}
             <span class="mention-name">${escapeHtml(m.name)}</span>
         </div>
     `).join('');
@@ -3040,7 +3091,7 @@ async function setupSanctionUserPicker() {
         const color = safeColor(m.color);
         const colorStyle = color ? `color:${color};` : '';
         return `
-            <div class="custom-dropdown-item user-item" data-name="${escapeHtml(m.name).toLowerCase()}" onclick="selectSanctionUserCustom('${escapeJsArg(m.id)}', '${escapeJsArg(m.name)}', '${escapeJsArg(avatar)}', '${color}')">
+            <div class="custom-dropdown-item user-item js-sanction-user-option" data-name="${escapeAttr(String(m.name || '').toLowerCase())}" data-user-id="${escapeAttr(m.id)}" data-user-name="${escapeAttr(m.name)}" data-user-avatar="${escapeAttr(avatar)}" data-user-color="${escapeAttr(color || '')}">
                 <img class="user-item-avatar" src="${avatar}" alt="">
                 <div class="user-item-info">
                     <div class="user-item-name" style="${colorStyle}">${escapeHtml(m.name)}</div>
@@ -3091,7 +3142,7 @@ function selectSanctionUserCustom(id, name, avatar, color) {
     const preview = document.getElementById('sanctionUserPreview');
     if (preview) {
         document.getElementById('sanctionPreviewName').textContent = name;
-        document.getElementById('sanctionPreviewName').style.color = color || '';
+        document.getElementById('sanctionPreviewName').style.color = safeColor(color) || '';
         document.getElementById('sanctionPreviewId').textContent = `ID : ${id}`;
         document.getElementById('sanctionPreviewAvatar').src = avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23262626'/></svg>`;
         preview.style.display = 'flex';
@@ -3585,7 +3636,7 @@ function renderCraftWeaponDropdown() {
     list.innerHTML = [...weaponsCache].sort(compareWeaponsBySalePrice).map(w => {
         const imageUrl = safeImageUrl(w.image_url);
         return `
-        <div class="custom-dropdown-item" data-name="${escapeHtml(w.name).toLowerCase()}" onclick="selectCraftWeapon(${w.id}, '${escapeJsArg(w.name)}', '${escapeJsArg(imageUrl)}')">
+        <div class="custom-dropdown-item js-craft-weapon-option" data-name="${escapeAttr(String(w.name || '').toLowerCase())}" data-weapon-id="${Number(w.id) || 0}" data-weapon-name="${escapeAttr(w.name)}" data-image-url="${escapeAttr(imageUrl)}">
             ${imageUrl ? `<img class="craft-dropdown-image" src="${imageUrl}" alt="">` : '<span class="craft-weapon-placeholder">Arme</span>'}
             <span class="custom-dropdown-item-label">${escapeHtml(w.name)}</span>
         </div>
@@ -5701,7 +5752,7 @@ function renderMarkSoldBuyerDropdown() {
     const list = document.getElementById('markSoldBuyerList');
     if (!list) return;
     list.innerHTML = (organizationsCache || []).map(o => `
-        <div class="custom-dropdown-item" data-name="${escapeHtml(o.name).toLowerCase()}" onclick="selectMarkSoldBuyer('${escapeJsArg(o.name)}')">
+        <div class="custom-dropdown-item js-mark-sold-buyer-option" data-name="${escapeAttr(String(o.name || '').toLowerCase())}" data-org-name="${escapeAttr(o.name)}">
             <span class="custom-dropdown-item-label">🏢 ${escapeHtml(o.name)}</span>
         </div>
     `).join('');

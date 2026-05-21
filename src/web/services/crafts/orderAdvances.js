@@ -341,21 +341,25 @@ function upsertOrderAdvance(payload, id = null) {
 }
 
 function deleteOrderAdvance(id) {
-            db.prepare('DELETE FROM order_advance_repayments WHERE order_id = ?').run(id);
+    const tx = db.transaction(() => {
+        db.prepare('DELETE FROM order_advance_repayments WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advance_participants WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advance_items WHERE order_id = ?').run(id);
         db.prepare('DELETE FROM order_advances WHERE id = ?').run(id);
-        return;
+    });
+    tx();
 }
 
 function settleOrderAdvance(id) {
     const now = Math.floor(Date.now() / 1000);
-            const order = db.prepare('SELECT * FROM order_advances WHERE id = ?').get(id);
+    const tx = db.transaction(() => {
+        const order = db.prepare('SELECT * FROM order_advances WHERE id = ?').get(id);
         if (!order) throw new Error('Commande introuvable');
         db.prepare(`UPDATE order_advances SET recovered_amount = total_amount, remaining_amount = 0, status = 'settled', updated_at = ? WHERE id = ?`).run(now, id);
         db.prepare(`UPDATE order_advance_participants SET amount_recovered = amount_contributed, amount_remaining = 0, updated_at = ? WHERE order_id = ?`).run(now, id);
-        refreshOrderDiscordMessageInBackground(id);
-        return;
+    });
+    tx();
+    refreshOrderDiscordMessageInBackground(id);
 }
 
 function normalizeOrderAdvanceRepayment(orderId, payload) {
@@ -367,8 +371,7 @@ function normalizeOrderAdvanceRepayment(orderId, payload) {
     if (!amount) throw new Error('Montant récupéré obligatoire');
     if (!repaymentDate) throw new Error('Date de remboursement obligatoire');
 
-    let participant;
-            participant = db.prepare('SELECT * FROM order_advance_participants WHERE id = ? AND order_id = ?').get(participantId, orderId);
+    const participant = db.prepare('SELECT * FROM order_advance_participants WHERE id = ? AND order_id = ?').get(participantId, orderId);
 
     if (!participant) throw new Error('Participant introuvable pour cette commande');
 
@@ -385,27 +388,29 @@ function normalizeOrderAdvanceRepayment(orderId, payload) {
 }
 
 function saveOrderAdvanceRepayment(orderId, payload, repaymentId = null) {
-    const normalized = normalizeOrderAdvanceRepayment(orderId, payload);
     const now = Math.floor(Date.now() / 1000);
-            if (repaymentId) {
+    const tx = db.transaction(() => {
+        const normalized = normalizeOrderAdvanceRepayment(orderId, payload);
+        if (repaymentId) {
             const existing = db.prepare('SELECT * FROM order_advance_repayments WHERE id = ? AND order_id = ?').get(repaymentId, orderId);
             if (!existing) throw new Error('Remboursement introuvable');
             db.prepare(`UPDATE order_advance_repayments SET participant_id = ?, user_id = ?, user_name = ?, amount = ?, reason = ?, weapon_name = ?, repayment_date = ?, updated_at = ? WHERE id = ? AND order_id = ?`)
                 .run(normalized.participant_id, normalized.user_id, normalized.user_name, normalized.amount, normalized.reason, normalized.weapon_name, normalized.repayment_date, now, repaymentId, orderId);
-            refreshOrderDiscordMessageInBackground(orderId);
             return repaymentId;
         }
         const result = db.prepare(`INSERT INTO order_advance_repayments (order_id, participant_id, user_id, user_name, amount, reason, weapon_name, repayment_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
             .run(orderId, normalized.participant_id, normalized.user_id, normalized.user_name, normalized.amount, normalized.reason, normalized.weapon_name, normalized.repayment_date, now, now);
-        refreshOrderDiscordMessageInBackground(orderId);
         return result.lastInsertRowid;
+    });
+    const savedId = tx();
+    refreshOrderDiscordMessageInBackground(orderId);
+    return savedId;
 }
 
 function deleteOrderAdvanceRepayment(orderId, repaymentId) {
-            const result = db.prepare('DELETE FROM order_advance_repayments WHERE id = ? AND order_id = ?').run(repaymentId, orderId);
-        if (!result.changes) throw new Error('Remboursement introuvable');
-        refreshOrderDiscordMessageInBackground(orderId);
-        return;
+    const result = db.prepare('DELETE FROM order_advance_repayments WHERE id = ? AND order_id = ?').run(repaymentId, orderId);
+    if (!result.changes) throw new Error('Remboursement introuvable');
+    refreshOrderDiscordMessageInBackground(orderId);
 }
 
 

@@ -36,6 +36,7 @@ const fs = require('fs');
 const { PermissionFlagsBits } = require('discord.js');
 const config = require('./src/shared/config');
 const { createBetterSqliteSessionStore } = require('./src/web/services/sessionStore');
+const { memberCanSendToChannel, memberCanViewChannel } = require('./src/web/services/discordPermissions');
 const {
     requireAuth,
     requireAdmin,
@@ -127,6 +128,8 @@ function startServer(client, getState) {
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
+                // TODO audit-hardening: unsafe-inline reste temporaire pour les anciens handlers inline du dashboard/admin.
+                // Les zones craft/org/admin les plus risquées sont migrées progressivement vers data-* + addEventListener.
                 scriptSrc: ["'self'", "'unsafe-inline'"],
                 scriptSrcAttr: ["'unsafe-inline'"],
                 styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
@@ -245,8 +248,7 @@ function startServer(client, getState) {
         const guild = getGuild();
         if (!guild || !channel?.permissionsFor) return false;
         const member = user?.id ? guild.members.cache.get(user.id) : null;
-        const memberPermissions = member ? channel.permissionsFor(member) : null;
-        if (memberPermissions) return memberPermissions.has(PermissionFlagsBits.ViewChannel);
+        if (member) return memberCanViewChannel(channel, member);
         const roleIds = user?.roles || [];
         const everyoneCanView = guild.roles?.everyone
             ? canRoleViewChannel(channel, guild.roles.everyone)
@@ -261,11 +263,7 @@ function startServer(client, getState) {
         const guild = getGuild();
         if (!guild || !channel?.permissionsFor) return false;
         const member = user?.id ? guild.members.cache.get(user.id) : null;
-        const memberPermissions = member ? channel.permissionsFor(member) : null;
-        if (memberPermissions) {
-            return memberPermissions.has(PermissionFlagsBits.SendMessages)
-                || memberPermissions.has(PermissionFlagsBits.SendMessagesInThreads);
-        }
+        if (member) return memberCanSendToChannel(channel, member);
         return (user?.roles || []).some(roleId => {
             const role = guild.roles.cache.get(roleId);
             const permissions = role ? channel.permissionsFor(role) : null;

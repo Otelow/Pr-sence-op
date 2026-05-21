@@ -30,6 +30,8 @@ function registerMyWeaponsRoutes(app, deps) {
         getRequest,
         getWeaponSaleStateForCraftRequest,
         serialAlreadyListed,
+        applyCraftRequestStatusTransition,
+        invalidateCraftCaches,
         markRequestPosted,
         emitRealtime,
         moneyLabel,
@@ -698,13 +700,19 @@ function registerMyWeaponsRoutes(app, deps) {
 
                     if (matchedRequest) {
                         matchedRequestForLog = matchedRequest;
-                        db.prepare(`UPDATE craft_requests SET buyer_org = ?, sale_price = ?, sale_date = ?, completed_by_id = ?, completed_by_name = ?, status = 'completed' WHERE id = ?`)
-                            .run(soldTo, soldPrice, now, soldById, soldByName || soldById, matchedRequest.id);
+                        applyCraftRequestStatusTransition(matchedRequest.id, 'completed', {
+                            buyerOrg: soldTo,
+                            salePrice: soldPrice,
+                            saleDate: now,
+                            completedById: soldById,
+                            completedByName: soldByName || soldById,
+                        });
                         autoFilledCraft = { id: matchedRequest.id, weapon_name: matchedRequest.weapon_name };
                     }
                 }
             });
             markSoldTx();
+            invalidateCraftCaches?.();
 
             // Mettre à jour le message Discord (édit ou nouveau message)
             try {
@@ -806,15 +814,29 @@ function registerMyWeaponsRoutes(app, deps) {
             }
             const loggedRow = existing.batch_id
                 ? db.prepare(`
-                    SELECT id FROM my_weapons
-                    WHERE batch_id = ?
-                      AND (is_sold = 1 OR sale_discord_message_id IS NOT NULL OR weapons_log_message_id IS NOT NULL OR discord_message_id IS NOT NULL)
+                    SELECT mw.id FROM my_weapons mw
+                    LEFT JOIN craft_requests cr ON cr.id = mw.craft_request_id
+                    WHERE mw.batch_id = ?
+                      AND (
+                          mw.is_sold = 1
+                          OR mw.sale_discord_message_id IS NOT NULL
+                          OR mw.weapons_log_message_id IS NOT NULL
+                          OR mw.discord_message_id IS NOT NULL
+                          OR cr.status = 'completed'
+                      )
                     LIMIT 1
                 `).get(existing.batch_id)
                 : db.prepare(`
-                    SELECT id FROM my_weapons
-                    WHERE id = ?
-                      AND (is_sold = 1 OR sale_discord_message_id IS NOT NULL OR weapons_log_message_id IS NOT NULL OR discord_message_id IS NOT NULL)
+                    SELECT mw.id FROM my_weapons mw
+                    LEFT JOIN craft_requests cr ON cr.id = mw.craft_request_id
+                    WHERE mw.id = ?
+                      AND (
+                          mw.is_sold = 1
+                          OR mw.sale_discord_message_id IS NOT NULL
+                          OR mw.weapons_log_message_id IS NOT NULL
+                          OR mw.discord_message_id IS NOT NULL
+                          OR cr.status = 'completed'
+                      )
                     LIMIT 1
                 `).get(id);
             if (loggedRow) {

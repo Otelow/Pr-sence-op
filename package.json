@@ -11,7 +11,8 @@
     "syntax": "node scripts/check-js-syntax.js",
     "test": "node --test \"test/**/*.test.js\"",
     "audit:high": "npm audit --omit=dev --audit-level=high",
-    "smoke": "node scripts/smoke-test.js",
+    "smoke": "npm run smoke:remote --",
+    "smoke:remote": "node scripts/smoke-test.js",
     "convert-assets": "node scripts/convert-assets.js"
   },
   "dependencies": {
