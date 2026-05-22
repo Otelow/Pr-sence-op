@@ -1,3 +1,4 @@
+// FIX CARDS ARMES 22/05/2026 — bordure + style vendu
 // CCV5 21/05/2026 — palette stricte + cards cliquables + fix
 // COMMAND CENTER v4 20/05/2026 — refonte fidèle mockup
 // PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
@@ -5749,6 +5750,7 @@ function renderMyWeapons() {
                 <span class="shimmer-overlay-2"></span>` : '';
         const cardClass = [
             'weapon-card-pro',
+            isSold ? 'weapon-sold' : '',
             isSold ? 'mw-sold-row' : 'mw-available-row dynamic-sale-effect',
             isInProgress ? 'weapon-card-in-progress' : '',
             isMine ? 'mw-mine' : '',

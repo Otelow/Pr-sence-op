@@ -1,3 +1,4 @@
+/* // FIX CARDS ARMES 22/05/2026 — bordure + style vendu */
 /* // CCV5 21/05/2026 — palette stricte + cards cliquables + fix */
 /* PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026 */
 /* RELANCE ABSENCE + CONTRASTE 19/05/2026 */
@@ -13382,4 +13383,47 @@ body {
     .weapon-card-info {
         grid-template-columns: 1fr;
     }
+}
+
+/* =============================================
+   FIX CARDS ARMES 22/05/2026 — bordure + style vendu
+   ============================================= */
+
+/* Card arme EN VENTE — bordure verte discrète */
+.weapon-card-pro:not(.weapon-sold) {
+    border: 1px solid rgba(74, 222, 128, 0.25) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 12px rgba(74, 222, 128, 0.06) !important;
+}
+
+.weapon-card-pro:not(.weapon-sold):hover {
+    border-color: rgba(74, 222, 128, 0.4) !important;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(74, 222, 128, 0.12) !important;
+}
+
+/* Card arme VENDUE — rouge + désaturé + léger flou */
+.weapon-card-pro.weapon-sold {
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 12px rgba(239, 68, 68, 0.06) !important;
+    opacity: 0.7;
+    filter: saturate(0.6);
+    position: relative;
+}
+
+.weapon-card-pro.weapon-sold:hover {
+    opacity: 0.9;
+    filter: saturate(0.8);
+    border-color: rgba(239, 68, 68, 0.45) !important;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4), 0 0 20px rgba(239, 68, 68, 0.12) !important;
+}
+
+/* Le prix d'une arme vendue passe en rouge au lieu d'orange */
+.weapon-card-pro.weapon-sold .weapon-price-main {
+    color: #f87171 !important;
+}
+
+/* Badge statut "VENDU" en rouge */
+.weapon-card-pro.weapon-sold .weapon-status-badge {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.35) !important;
+    color: #f87171 !important;
 }
