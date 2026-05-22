@@ -1,3 +1,4 @@
+// FIX DÉCROCHÉS + CARDS 22/05/2026
 // PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
 // HISTORIQUE PRÉSENCE 19/05/2026 — persistance + 7 jours
@@ -9,6 +10,7 @@
 const { getCachedMembers } = require('../services/membersCache');
 const { pickReactionPriority } = require('../../shared/presenceReactions');
 const { createConnection } = require('../../shared/database');
+const { computeDecroches, wasOpLaunched } = require('../services/presenceHelpers');
 
 function avatarUrl(userId, avatar, size = 64) {
     return avatar ? `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png?size=${size}` : null;
@@ -55,6 +57,14 @@ function aggregateCounts(statuses) {
         if (status in counts) counts[status] += 1;
     }
     return counts;
+}
+
+function groupRowsByStatus(rows) {
+    const groups = { present: [], late: [], absentReact: [], absentValid: [], noReaction: [] };
+    for (const row of rows || []) {
+        if (row.status in groups) groups[row.status].push(row);
+    }
+    return groups;
 }
 
 function registerPresenceStatsRoutes(app, deps) {
@@ -126,8 +136,6 @@ function registerPresenceStatsRoutes(app, deps) {
 
         const buildDecroches = () => {
             const op1Started = Boolean(state.presenceData.active && state.presenceData.messageId);
-            const op2Started = Boolean(state.presence2Data.active && state.presence2Data.messageId);
-            const op2HasReaction = Boolean(state.reactionsOP2?.size);
             if (!op1Started) {
                 return {
                     count: 0,
@@ -136,10 +144,11 @@ function registerPresenceStatsRoutes(app, deps) {
                     hidden: true,
                 };
             }
-            if (!op2Started || !op2HasReaction) {
+            if (!wasOpLaunched(op2)) {
                 return {
                     count: null,
                     members: [],
+                    op2Launched: false,
                     message: 'En attente de la 2ème OP',
                 };
             }
@@ -167,6 +176,7 @@ function registerPresenceStatsRoutes(app, deps) {
             return {
                 count: members.length,
                 members,
+                op2Launched: true,
                 message: members.length ? null : 'Aucun décrochage',
             };
         };
@@ -207,16 +217,17 @@ function registerPresenceStatsRoutes(app, deps) {
         }
 
         const history = Object.entries(byDate).map(([date, data]) => {
-            const presents1 = new Set(data.op1.filter(row => row.status === 'present' || row.status === 'late').map(row => row.user_id));
-            const decroches2 = new Set(data.op2.filter(row => row.status === 'noReaction' || row.status === 'absentReact').map(row => row.user_id));
-            const decrocheursIds = [...presents1].filter(userId => decroches2.has(userId));
-            const decrocheursMap = new Map(data.op2.filter(row => decrocheursIds.includes(row.user_id)).map(row => [row.user_id, row]));
+            const op1Groups = groupRowsByStatus(data.op1);
+            const op2Groups = groupRowsByStatus(data.op2);
+            const op2Launched = wasOpLaunched(op2Groups);
+            const decrocheurs = computeDecroches(op1Groups, op2Groups);
 
             return {
                 date,
                 op1: aggregateByStatus(data.op1),
                 op2: aggregateByStatus(data.op2),
-                decroches: [...decrocheursMap.values()].map(row => ({
+                op2Launched,
+                decroches: decrocheurs.map(row => ({
                     user_id: row.user_id,
                     username: row.username,
                     statut_op1: data.op1.find(item => item.user_id === row.user_id)?.status,
@@ -256,16 +267,10 @@ function registerPresenceStatsRoutes(app, deps) {
             }
         }
 
-        const presents1 = new Set([...op1.present, ...op1.late].map(user => user.user_id));
-        const decroches2 = new Map();
-        for (const user of [...op2.noReaction, ...op2.absentReact]) {
-            decroches2.set(user.user_id, user);
-        }
-        const decroches = [...presents1]
-            .filter(userId => decroches2.has(userId))
-            .map(userId => decroches2.get(userId));
+        const op2Launched = wasOpLaunched(op2);
+        const decroches = computeDecroches(op1, op2);
 
-        return res.json({ date, op1, op2, decroches });
+        return res.json({ date, op1, op2, op2Launched, decroches });
     });
 
     app.get('/api/presence/stats', requireAuth, requireFullSiteAccess, (req, res) => {
@@ -312,6 +317,8 @@ function registerPresenceStatsRoutes(app, deps) {
         }
 
         for (const day of Object.values(byDate)) {
+            const op2 = aggregateCounts([...day.op2.values()]);
+            if (!wasOpLaunched(op2)) continue;
             for (const [userId, op1Status] of day.op1) {
                 if (op1Status === 'present' || op1Status === 'late') {
                     const op2Status = day.op2.get(userId);
@@ -326,14 +333,17 @@ function registerPresenceStatsRoutes(app, deps) {
         const daily = Object.entries(byDate).map(([date, day]) => {
             const op1 = aggregateCounts([...day.op1.values()]);
             const op2 = aggregateCounts([...day.op2.values()]);
+            const op2Launched = wasOpLaunched(op2);
             let decroches = 0;
-            for (const [userId, op1Status] of day.op1) {
-                if (op1Status === 'present' || op1Status === 'late') {
-                    const op2Status = day.op2.get(userId);
-                    if (op2Status === 'noReaction' || op2Status === 'absentReact') decroches += 1;
+            if (op2Launched) {
+                for (const [userId, op1Status] of day.op1) {
+                    if (op1Status === 'present' || op1Status === 'late') {
+                        const op2Status = day.op2.get(userId);
+                        if (op2Status === 'noReaction' || op2Status === 'absentReact') decroches += 1;
+                    }
                 }
             }
-            return { date, op1, op2, decroches };
+            return { date, op1, op2, op2Launched, decroches };
         });
 
         const usersArr = [...byUser.values()].map(user => ({

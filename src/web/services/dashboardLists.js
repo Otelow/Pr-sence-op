@@ -1,6 +1,8 @@
+// FIX DÉCROCHÉS + CARDS 22/05/2026
 // CCV5 21/05/2026 — palette stricte + cards cliquables + fix
 const { pickReactionPriority } = require('../../shared/presenceReactions');
 const { getEligibleRoleMembers, getMondayParis } = require('./dashboardOverview');
+const { computeDecroches, wasOpLaunched } = require('./presenceHelpers');
 
 function avatarUrl(userId, avatar, size = 64) {
     return avatar ? `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png?size=${size}` : null;
@@ -124,27 +126,35 @@ function buildPresenceDetail(client, state) {
 function getDecrochesToday(client, state) {
     const roleId = process.env.MEMBER_ROLE_ID || state?.CONFIG?.ROLES?.MEMBRE_1;
     const members = getEligibleRoleMembers(client, state, roleId);
-    const byId = new Map(members.map(member => [member.id, member]));
     const validAbsences = state?.absenceSalonCache?.validAbsences || new Set();
     const reactionsOP1 = state?.reactionsOP1 || new Map();
     const reactionsOP2 = state?.reactionsOP2 || new Map();
-    const op2Started = Boolean(state?.presence2Data?.active || state?.presence2Data?.terminated || state?.presence2Data?.messageId);
-    if (!op2Started) return [];
+    const op1 = { present: [], late: [] };
+    const op2 = { present: [], late: [], absentReact: [], absentValid: [], noReaction: [] };
 
-    const op1PresentIds = [];
     for (const member of members) {
-        if (validAbsences.has(member.id)) continue;
-        const reaction = pickReactionPriority(reactionsOP1.get(member.id));
-        if (reaction === 'check' || reaction === 'retard') op1PresentIds.push(member.id);
+        const item = summarizeMember(member);
+        const reaction1 = pickReactionPriority(reactionsOP1.get(member.id));
+        const reaction2 = pickReactionPriority(reactionsOP2.get(member.id));
+
+        if (!validAbsences.has(member.id)) {
+            if (reaction1 === 'check') op1.present.push(item);
+            else if (reaction1 === 'retard') op1.late.push(item);
+        }
+
+        if (validAbsences.has(member.id)) op2.absentValid.push(item);
+        else if (reaction2 === 'check') op2.present.push(item);
+        else if (reaction2 === 'retard') op2.late.push(item);
+        else if (reaction2 === 'no') op2.absentReact.push(item);
+        else op2.noReaction.push(item);
     }
 
-    return op1PresentIds
-        .filter(userId => {
-            const reaction = pickReactionPriority(reactionsOP2.get(userId));
-            return !reaction || reaction === 'no';
-        })
-        .map(userId => summarizeMember(byId.get(userId)))
-        .sort((a, b) => a.username.localeCompare(b.username, 'fr', { sensitivity: 'base' }));
+    const op2Launched = wasOpLaunched(op2);
+    return {
+        op2Launched,
+        decroches: computeDecroches(op1, op2)
+            .sort((a, b) => a.username.localeCompare(b.username, 'fr', { sensitivity: 'base' })),
+    };
 }
 
 module.exports = {

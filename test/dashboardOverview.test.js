@@ -68,6 +68,39 @@ test('Command Center overview : presence live agrege OP1, absences, exclusions e
         retards: 1,
         absentsJustifies: 1,
         decroches: 1,
+        op2Launched: true,
+    });
+});
+
+test('Command Center overview : aucun decroche si la 2eme OP n a pas de reaction active', () => {
+    const client = makeClient([
+        makeMember('u1'),
+        makeMember('u2'),
+    ]);
+    const state = {
+        CONFIG: {
+            GUILD_ID: 'guild-1',
+            ROLES: {
+                MEMBRE_1: 'member-role',
+                EXCLUDED_ROLE: 'excluded-role',
+            },
+        },
+        absenceSalonCache: { validAbsences: new Set() },
+        reactionsOP1: new Map([
+            ['u1', new Set(['check'])],
+            ['u2', new Set(['retard'])],
+        ]),
+        reactionsOP2: new Map(),
+        presence2Data: { active: true, messageId: 'message-2' },
+    };
+
+    assert.deepEqual(getCurrentPresenceLive(client, state), {
+        total: 2,
+        presents: 1,
+        retards: 1,
+        absentsJustifies: 0,
+        decroches: 0,
+        op2Launched: false,
     });
 });
 

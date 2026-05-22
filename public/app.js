@@ -1,3 +1,4 @@
+// FIX DÉCROCHÉS + CARDS 22/05/2026
 // FIX CARDS ARMES 22/05/2026 — bordure + style vendu
 // CCV5 21/05/2026 — palette stricte + cards cliquables + fix
 // COMMAND CENTER v4 20/05/2026 — refonte fidèle mockup
@@ -618,10 +619,16 @@ async function reloadDashboardOverview() {
         setText('ccAbsencesSemaine', data.absences?.week ?? 0);
         setText('ccAbsencesConformes', `${data.absences?.conformes ?? 0} conformes`);
 
+        const op2Launched = data.presence?.op2Launched !== false;
         const decroches = Number(data.presence?.decroches || 0);
         const presents = Number(data.presence?.presents || 0);
-        setText('ccDecrochesNb', decroches);
-        setText('ccDecrochesTaux', `${presents > 0 ? Math.round((decroches / presents) * 100) : 0}%`);
+        if (!op2Launched) {
+            setText('ccDecrochesNb', '⏳');
+            setText('ccDecrochesTaux', 'En attente');
+        } else {
+            setText('ccDecrochesNb', decroches);
+            setText('ccDecrochesTaux', `${presents > 0 ? Math.round((decroches / presents) * 100) : 0}%`);
+        }
     } catch (error) {
         console.error('Erreur reloadDashboardOverview:', error);
     }
@@ -660,7 +667,7 @@ async function openCommandModal(target) {
         } else if (target === 'decroches-detail') {
             title.textContent = "Décrochés aujourd'hui";
             const data = await fetchJson('/api/dashboard/decroches-today');
-            body.innerHTML = renderDecrochesList(data.decroches || []);
+            body.innerHTML = renderDecrochesList(data.decroches || [], data.op2Launched);
         } else {
             title.textContent = 'Détail présence 1ère OP';
             const data = await fetchJson('/api/dashboard/presence-detail');
@@ -738,7 +745,8 @@ function renderCraftsList(crafts) {
     `).join('')}</div>`;
 }
 
-function renderDecrochesList(decroches) {
+function renderDecrochesList(decroches, op2Launched = true) {
+    if (op2Launched === false) return renderEmptyMini('2ème OP non lancée');
     return renderMembersList(decroches);
 }
 
@@ -893,8 +901,8 @@ function renderDecrochesOP(data) {
     const members = Array.isArray(data.members) ? data.members : [];
     count.textContent = data.count === null || data.count === undefined ? '—' : String(data.count);
 
-    if (data.message === 'En attente de la 2ème OP') {
-        list.innerHTML = '<p class="decroches-pending">⏳ En attente de la 2ème présence OP</p>';
+    if (data.op2Launched === false || data.message === 'En attente de la 2ème OP') {
+        list.innerHTML = '<p class="decroches-pending">⏳ En attente de la 2ème OP</p>';
         return;
     }
 
@@ -993,29 +1001,38 @@ function renderPresenceHistory(history) {
         return;
     }
 
-    container.innerHTML = history.map(day => `
-        <div class="history-day-card js-history-day-card" role="button" tabindex="0" data-date="${escapeHtml(day.date)}">
-            <div class="history-day-header">
-                <h4>📆 ${formatPresenceHistoryDateFR(day.date)}</h4>
+    container.innerHTML = history.map(day => {
+        const op2Launched = day.op2Launched !== false;
+        const decroches = day.decroches || [];
+        const decrochesHtml = !op2Launched
+            ? '<p class="empty-mini">— (2ème OP non lancée)</p>'
+            : (decroches.length === 0
+                ? '<p class="empty-mini">👍 Aucun</p>'
+                : decroches.map(member => `<div class="history-decroche">${escapeHtml(member.username || member.user_id || '?')}</div>`).join(''));
+        const decrochesTitle = op2Launched ? `⚠️ Décrochés (${decroches.length})` : '⚠️ Décrochés';
+
+        return `
+            <div class="history-day-card js-history-day-card" role="button" tabindex="0" data-date="${escapeHtml(day.date)}">
+                <div class="history-day-header">
+                    <h4>📆 ${formatPresenceHistoryDateFR(day.date)}</h4>
+                </div>
+                <div class="history-day-stats">
+                    <div class="history-op-block">
+                        <h5>1ère OP</h5>
+                        ${renderOpStats(day.op1?.counts)}
+                    </div>
+                    <div class="history-op-block">
+                        <h5>2ème OP</h5>
+                        ${renderOpStats(day.op2?.counts)}
+                    </div>
+                    <div class="history-op-block">
+                        <h5>${decrochesTitle}</h5>
+                        ${decrochesHtml}
+                    </div>
+                </div>
             </div>
-            <div class="history-day-stats">
-                <div class="history-op-block">
-                    <h5>1ère OP</h5>
-                    ${renderOpStats(day.op1?.counts)}
-                </div>
-                <div class="history-op-block">
-                    <h5>2ème OP</h5>
-                    ${renderOpStats(day.op2?.counts)}
-                </div>
-                <div class="history-op-block">
-                    <h5>⚠️ Décrochés (${(day.decroches || []).length})</h5>
-                    ${(day.decroches || []).length === 0
-                        ? '<p class="empty-mini">👍 Aucun</p>'
-                        : day.decroches.map(member => `<div class="history-decroche">${escapeHtml(member.username || member.user_id || '?')}</div>`).join('')}
-                </div>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 async function openHistoryDayModal(date) {
@@ -1062,13 +1079,14 @@ function renderHistoryDayDetails(container, data) {
         </div>
     `;
 
+    const op2Launched = data.op2Launched !== false;
     const decroches = data.decroches || [];
     container.innerHTML = `
         ${renderOpSection('1ère OP', data.op1)}
         ${renderOpSection('2ème OP', data.op2)}
         <div class="history-detail-op">
-            <h4>⚠️ Décrochés entre 1ère et 2ème OP (${decroches.length})</h4>
-            ${renderUserList(decroches, '#ffaa44')}
+            <h4>⚠️ Décrochés entre 1ère et 2ème OP${op2Launched ? ` (${decroches.length})` : ''}</h4>
+            ${op2Launched ? renderUserList(decroches, '#ffaa44') : '<p class="empty-mini">— (2ème OP non lancée)</p>'}
         </div>
     `;
 }

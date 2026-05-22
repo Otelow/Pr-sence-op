@@ -1,7 +1,9 @@
+// FIX DÉCROCHÉS + CARDS 22/05/2026
 // CCV5 21/05/2026 — palette stricte + cards cliquables + fix
 // COMMAND CENTER v4 20/05/2026 — refonte fidèle mockup
 const { pickReactionPriority } = require('../../shared/presenceReactions');
 const { createConnection } = require('../../shared/database');
+const { wasOpLaunched } = require('./presenceHelpers');
 
 function getParisDateKey(date = new Date()) {
     return new Intl.DateTimeFormat('en-CA', {
@@ -83,6 +85,7 @@ function getCurrentPresenceLive(client, state) {
         retards: 0,
         absentsJustifies: 0,
         decroches: 0,
+        op2Launched: false,
     };
 
     const op1PresentIds = new Set();
@@ -99,9 +102,18 @@ function getCurrentPresenceLive(client, state) {
         }
     }
 
-    const op2Started = Boolean(state?.presence2Data?.active || state?.presence2Data?.terminated || state?.presence2Data?.messageId);
-    if (op2Started && reactionsOP2.size > 0) {
+    const op2Counts = { present: 0, late: 0, absentReact: 0 };
+    for (const member of members) {
+        const reaction = pickReactionPriority(reactionsOP2.get(member.id));
+        if (reaction === 'check') op2Counts.present += 1;
+        else if (reaction === 'retard') op2Counts.late += 1;
+        else if (reaction === 'no') op2Counts.absentReact += 1;
+    }
+
+    live.op2Launched = wasOpLaunched(op2Counts);
+    if (live.op2Launched) {
         for (const userId of op1PresentIds) {
+            if (validAbsences.has(userId)) continue;
             const reaction = pickReactionPriority(reactionsOP2.get(userId));
             if (!reaction || reaction === 'no') live.decroches += 1;
         }
@@ -147,6 +159,7 @@ async function buildDashboardOverview({ client, state, now = new Date() }) {
                 retards: presenceLive.retards,
                 absentsJustifies: presenceLive.absentsJustifies,
                 decroches: presenceLive.decroches,
+                op2Launched: presenceLive.op2Launched,
                 taux: presenceLive.total > 0 ? Math.round((presenceLive.presents / presenceLive.total) * 100) : 0,
                 trendPercent,
             },

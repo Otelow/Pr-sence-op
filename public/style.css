@@ -1,3 +1,4 @@
+/* // FIX DÉCROCHÉS + CARDS 22/05/2026 */
 /* // FIX CARDS ARMES 22/05/2026 — bordure + style vendu */
 /* // CCV5 21/05/2026 — palette stricte + cards cliquables + fix */
 /* PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026 */
@@ -13426,4 +13427,57 @@ body {
     background: rgba(239, 68, 68, 0.15) !important;
     border-color: rgba(239, 68, 68, 0.35) !important;
     color: #f87171 !important;
+}
+
+/* =============================================
+   FIX DÉCROCHÉS + CARDS 22/05/2026
+   ============================================= */
+
+.weapon-card-pro {
+    padding: 14px 20px !important;
+    margin-bottom: 10px !important;
+}
+
+.weapon-card-header {
+    margin-bottom: 10px !important;
+    padding-bottom: 10px !important;
+}
+
+.weapon-card-info {
+    gap: 10px !important;
+    margin-bottom: 10px !important;
+}
+
+.weapon-card-actions {
+    gap: 6px !important;
+}
+
+.btn-action {
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+}
+
+.weapon-info-label {
+    margin-bottom: 2px !important;
+    font-size: 9px !important;
+}
+
+.weapon-info-value {
+    font-size: 12px !important;
+}
+
+.weapon-card-pro:not(.weapon-sold) {
+    border: 1px solid rgba(74, 222, 128, 0.4) !important;
+    border-left: 3px solid rgba(74, 222, 128, 0.6) !important;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.3), 0 0 10px rgba(74, 222, 128, 0.1) !important;
+}
+
+.weapon-card-pro:not(.weapon-sold):hover {
+    border-color: rgba(74, 222, 128, 0.55) !important;
+    border-left-color: rgba(74, 222, 128, 0.7) !important;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 18px rgba(74, 222, 128, 0.15) !important;
+}
+
+.weapon-card-pro.weapon-sold {
+    border-left: 3px solid rgba(239, 68, 68, 0.6) !important;
 }

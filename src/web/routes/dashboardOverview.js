@@ -1,3 +1,4 @@
+// FIX DÉCROCHÉS + CARDS 22/05/2026
 // CCV5 21/05/2026 — palette stricte + cards cliquables + fix
 // COMMAND CENTER v4 20/05/2026 — refonte fidèle mockup
 const log = require('../../shared/logger');
@@ -69,7 +70,7 @@ function registerDashboardOverviewRoutes(app, deps) {
 
     app.get('/api/dashboard/decroches-today', requireAuth, requireFullSiteAccess, (req, res) => {
         try {
-            res.json({ decroches: getDecrochesToday(getBotClient(), getBotState()) });
+            res.json(getDecrochesToday(getBotClient(), getBotState()));
         } catch (error) {
             log.error('Erreur /api/dashboard/decroches-today:', error.message);
             res.status(500).json({ error: 'Erreur serveur' });
