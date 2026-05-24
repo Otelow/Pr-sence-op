@@ -1,3 +1,4 @@
+// RESET HEBDO 22/05/2026 — dimanche 23h59 au lieu de 22h00
 // PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // RELANCE ABSENCE + CONTRASTE 19/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
@@ -276,7 +277,7 @@ client.once('ready', async () => {
         }
     }, { timezone: 'Europe/Paris' });
 
-    cron.schedule('0 22 * * 0', () => {
+    cron.schedule('59 23 * * 0', () => {
         log.info('📊 RESET HEBDO ABSENCES');
         absenceTracking.clear();
         saveAbsenceTracking();
