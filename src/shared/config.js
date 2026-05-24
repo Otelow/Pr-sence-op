@@ -1,3 +1,4 @@
+// CLIPS BYPASS 22/05/2026 — salon whitelist + user exempt
 // WHITELIST CATEGORIES 18/05/2026 — autoriser liens/vidéos
 // QUICK WINS 5 18/05/2026 — salon stats hebdomadaires configurable
 const path = require('path');
@@ -52,6 +53,16 @@ const config = {
         // Catégories Discord (parentId d'un salon) où les liens/vidéos sont autorisés
         // sans suppression ni rappel automatique.
         allowedCategoryIds: (process.env.CLIPS_ALLOWED_CATEGORY_IDS || '1485642192746971146')
+            .split(',')
+            .map(id => id.trim())
+            .filter(Boolean),
+        // Salons précis où les liens/vidéos sont autorisés, sans dépendre de la catégorie.
+        allowedChannelIds: (process.env.CLIPS_ALLOWED_CHANNEL_IDS || '1486729752479006770')
+            .split(',')
+            .map(id => id.trim())
+            .filter(Boolean),
+        // Utilisateurs jamais modérés par le système clips.
+        bypassUserIds: (process.env.CLIPS_BYPASS_USER_IDS || '952986899667103804')
             .split(',')
             .map(id => id.trim())
             .filter(Boolean)

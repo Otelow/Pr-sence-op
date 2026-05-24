@@ -1,3 +1,4 @@
+// CLIPS BYPASS 22/05/2026 — salon whitelist + user exempt
 // WHITELIST CATEGORIES 18/05/2026 — autoriser liens/vidéos
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
@@ -20,6 +21,17 @@ function isInAllowedCategory(message) {
     return allowedCats.includes(parentId);
 }
 
+function isInAllowedChannel(message) {
+    const allowed = config.clips.allowedChannelIds || [];
+    if (allowed.length === 0) return false;
+    return allowed.includes(String(message.channelId));
+}
+
+function isBypassUser(message) {
+    const bypass = config.clips.bypassUserIds || [];
+    return bypass.includes(String(message.author?.id || ''));
+}
+
 function messageHasClipPayload(message) {
     const hasClipLink = extractClipLinks(message.content).length > 0;
     const hasClipAttachment = message.attachments?.some(attachment => isClipAttachment(attachment));
@@ -28,8 +40,10 @@ function messageHasClipPayload(message) {
 
 async function maybeRemindClipForum(message) {
     if (!message || message.author?.bot) return;
-    if (isClipForumMessage(message)) return;
+    if (isBypassUser(message)) return;
+    if (isInAllowedChannel(message)) return;
     if (isInAllowedCategory(message)) return;
+    if (isClipForumMessage(message)) return;
     if (!messageHasClipPayload(message)) return;
 
     const now = Date.now();
@@ -80,5 +94,7 @@ module.exports = {
     registerClipEvents,
     isClipForumMessage,
     isInAllowedCategory,
+    isInAllowedChannel,
+    isBypassUser,
     maybeRemindClipForum,
 };
