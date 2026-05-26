@@ -25,7 +25,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260526-craftanim">
+<link rel="stylesheet" href="/style.css?v=20260526-grouporders">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -62,6 +62,10 @@
         <a href="#" class="nav-item" data-tab="crafts">
             <span class="nav-icon">⚒</span>
             <span>Craft d'armes</span>
+        </a>
+        <a href="#" class="nav-item" data-tab="groupOrders">
+            <span class="nav-icon">📦</span>
+            <span>Commandes Groupes</span>
         </a>
         <a href="#" class="nav-item" data-tab="myweapons">
             <span class="nav-icon">🔫</span>
@@ -1046,6 +1050,72 @@
         </div>
     </section>
 
+    <!-- TAB: COMMANDES GROUPES -->
+    <section class="tab-content" id="tab-groupOrders">
+        <div class="page-header">
+            <div class="page-header-title">
+                <h1>Commandes Groupes</h1>
+                <p class="page-header-sub">Commandes d'armes par organisation, prix maximal et suivi craft</p>
+            </div>
+            <div class="page-header-actions">
+                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
+            </div>
+        </div>
+
+        <div class="group-orders-layout">
+            <div class="group-order-form-card">
+                <h3 class="section-title">➕ Nouvelle commande groupe</h3>
+                <input type="hidden" id="groupOrderId">
+
+                <div class="craft-field-row">
+                    <div class="comm-field" style="flex:1;">
+                        <label class="comm-label">Organisation *</label>
+                        <select id="groupOrderOrg" class="comm-input"></select>
+                    </div>
+                    <div class="comm-field" style="flex:1;">
+                        <label class="comm-label">Date commande</label>
+                        <input type="date" id="groupOrderDate" class="comm-input">
+                    </div>
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">Réduction (%)</label>
+                    <input type="number" id="groupOrderDiscount" class="comm-input" min="0" max="100" step="0.01" value="0" oninput="renderGroupOrderTotals()">
+                </div>
+
+                <div class="group-order-form-head">
+                    <h4 class="admin-subtitle">Armes demandées</h4>
+                    <button type="button" class="btn-secondary btn-small" onclick="addGroupOrderItem()">+ Ajouter une arme</button>
+                </div>
+                <div id="groupOrderItems"></div>
+
+                <div class="order-advance-total-display" id="groupOrderTotals">
+                    Sous-total : <strong>0 $</strong> · Réduction : <strong>0 $</strong> · Total : <strong>0 $</strong>
+                </div>
+
+                <div class="comm-field">
+                    <label class="comm-label">Note</label>
+                    <textarea id="groupOrderNote" class="comm-input" rows="3" placeholder="Priorité, consignes, livraison..."></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="resetGroupOrderForm()">Réinitialiser</button>
+                    <button type="button" class="btn-primary" onclick="saveGroupOrder()">💾 Enregistrer</button>
+                </div>
+            </div>
+
+            <div class="group-orders-history">
+                <div class="group-orders-history-head">
+                    <h3 class="section-title">📜 Commandes enregistrées</h3>
+                    <button type="button" class="btn-secondary btn-small" onclick="loadGroupOrders()">↻ Actualiser</button>
+                </div>
+                <div id="groupOrdersList">
+                    <p class="empty">Chargement...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- TAB: VOS ARMES -->
     <section class="tab-content" id="tab-myweapons">
         <div class="page-header">
@@ -1358,10 +1428,43 @@
     </div>
 </div>
 
+<!-- Modal craft commande groupe -->
+<div class="modal" id="groupOrderCraftModal" style="display:none;">
+    <div class="modal-backdrop" onclick="closeGroupOrderCraftModal()"></div>
+    <div class="modal-content group-order-craft-modal">
+        <div class="modal-header">
+            <h3 class="modal-title" id="groupOrderCraftModalTitle">Renseigner craft</h3>
+            <button type="button" class="modal-close" onclick="closeGroupOrderCraftModal()" aria-label="Fermer">×</button>
+        </div>
+        <form class="modal-body" id="groupOrderCraftForm" onsubmit="recordGroupOrderCraft(event)">
+            <input type="hidden" id="groupOrderCraftOrderId">
+            <div class="craft-field-row">
+                <div class="comm-field" style="flex:1;">
+                    <label class="comm-label">Date craft</label>
+                    <input type="date" id="groupOrderCraftDate" class="comm-input">
+                </div>
+                <div class="comm-field" style="flex:1;">
+                    <label class="comm-label">Crafté par</label>
+                    <input type="text" id="groupOrderCraftedByName" class="comm-input" placeholder="Nom du crafter">
+                </div>
+            </div>
+            <div id="groupOrderCraftItems"></div>
+            <div class="comm-field">
+                <label class="comm-label">Note</label>
+                <textarea id="groupOrderCraftNote" class="comm-input" rows="3" placeholder="Numéros, détails, livraison..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary" onclick="closeGroupOrderCraftModal()">Annuler</button>
+                <button type="submit" class="btn-primary">✅ Enregistrer le craft</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Toast -->
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260526-craftanim"></script>
+<script src="/app.js?v=20260526-grouporders"></script>
 </body>
 </html>

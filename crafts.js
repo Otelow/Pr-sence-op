@@ -16,6 +16,7 @@
 // STATUT EN COURS 17/05/2026 — colonnes suivi vente en cours
 // FINAL POST-STAB D 17/05/2026 — indexes SQL performance crafts
 // STABILISATION FINALE v2 16/05/2026 — migrations suivies et audit log admin
+// COMMANDES GROUPES 26/05/2026 — module commandes armes organisations
 const path = require('path');
 const fs = require('fs');
 const config = require('./src/shared/config');
@@ -34,10 +35,12 @@ const { createCatalogService } = require('./src/web/services/crafts/catalog');
 const { createCraftUploadMiddleware } = require('./src/web/services/crafts/uploads');
 const { createOrderAdvanceService } = require('./src/web/services/crafts/orderAdvances');
 const { createCraftRequestService } = require('./src/web/services/crafts/requests');
+const { createGroupOrderService } = require('./src/web/services/crafts/groupOrders');
 const { createStockService } = require('./src/web/services/crafts/stock');
 const { registerCraftCatalogRoutes } = require('./src/web/routes/crafts/catalog');
 const { registerOrderAdvanceRoutes } = require('./src/web/routes/crafts/orderAdvances');
 const { registerCraftRequestRoutes } = require('./src/web/routes/crafts/requests');
+const { registerGroupOrderRoutes } = require('./src/web/routes/crafts/groupOrders');
 const { registerMyWeaponsRoutes } = require('./src/web/routes/crafts/myWeapons');
 
 const DATA_DIR = config.paths.data;
@@ -194,6 +197,64 @@ const MIGRATIONS = [
             log.warn(`Index unique my_weapons.serial_number ignoré : doublon existant (${duplicate.serial_number})`);
         }
     } },
+    { name: '060_group_orders', migrate: db => db.exec(`
+        CREATE TABLE IF NOT EXISTS group_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            organization_id INTEGER,
+            organization_name TEXT NOT NULL,
+            order_date TEXT,
+            subtotal_amount INTEGER NOT NULL DEFAULT 0,
+            discount_percent REAL NOT NULL DEFAULT 0,
+            discount_amount INTEGER NOT NULL DEFAULT 0,
+            total_amount INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'open',
+            note TEXT,
+            created_by_id TEXT,
+            created_by_name TEXT,
+            updated_by_id TEXT,
+            updated_by_name TEXT,
+            created_at INTEGER DEFAULT (strftime('%s','now')),
+            updated_at INTEGER DEFAULT (strftime('%s','now')),
+            FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
+        );
+        CREATE TABLE IF NOT EXISTS group_order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            weapon_id INTEGER,
+            weapon_name TEXT NOT NULL,
+            unit_price INTEGER NOT NULL DEFAULT 0,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            line_total INTEGER NOT NULL DEFAULT 0,
+            crafted_quantity INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER DEFAULT (strftime('%s','now')),
+            updated_at INTEGER DEFAULT (strftime('%s','now')),
+            FOREIGN KEY (order_id) REFERENCES group_orders(id) ON DELETE CASCADE,
+            FOREIGN KEY (weapon_id) REFERENCES weapons(id) ON DELETE SET NULL
+        );
+        CREATE TABLE IF NOT EXISTS group_order_crafts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            weapon_id INTEGER,
+            weapon_name TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            serial_numbers TEXT DEFAULT '[]',
+            crafted_by_id TEXT,
+            crafted_by_name TEXT,
+            craft_date TEXT,
+            note TEXT,
+            created_at INTEGER DEFAULT (strftime('%s','now')),
+            FOREIGN KEY (order_id) REFERENCES group_orders(id) ON DELETE CASCADE,
+            FOREIGN KEY (item_id) REFERENCES group_order_items(id) ON DELETE CASCADE,
+            FOREIGN KEY (weapon_id) REFERENCES weapons(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_group_orders_org ON group_orders(organization_id);
+        CREATE INDEX IF NOT EXISTS idx_group_orders_status ON group_orders(status);
+        CREATE INDEX IF NOT EXISTS idx_group_orders_created ON group_orders(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_group_order_items_order ON group_order_items(order_id);
+        CREATE INDEX IF NOT EXISTS idx_group_order_crafts_order ON group_order_crafts(order_id);
+        CREATE INDEX IF NOT EXISTS idx_group_order_crafts_item ON group_order_crafts(item_id);
+    `) },
 ];
 
 function markMigrationApplied(name) {
@@ -373,12 +434,68 @@ function initDB() {
                     FOREIGN KEY (order_id) REFERENCES order_advances(id) ON DELETE CASCADE,
                     FOREIGN KEY (participant_id) REFERENCES order_advance_participants(id) ON DELETE SET NULL
                 );
+                CREATE TABLE IF NOT EXISTS group_orders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    organization_id INTEGER,
+                    organization_name TEXT NOT NULL,
+                    order_date TEXT,
+                    subtotal_amount INTEGER NOT NULL DEFAULT 0,
+                    discount_percent REAL NOT NULL DEFAULT 0,
+                    discount_amount INTEGER NOT NULL DEFAULT 0,
+                    total_amount INTEGER NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'open',
+                    note TEXT,
+                    created_by_id TEXT,
+                    created_by_name TEXT,
+                    updated_by_id TEXT,
+                    updated_by_name TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s','now')),
+                    updated_at INTEGER DEFAULT (strftime('%s','now')),
+                    FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL
+                );
+                CREATE TABLE IF NOT EXISTS group_order_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_id INTEGER NOT NULL,
+                    weapon_id INTEGER,
+                    weapon_name TEXT NOT NULL,
+                    unit_price INTEGER NOT NULL DEFAULT 0,
+                    quantity INTEGER NOT NULL DEFAULT 0,
+                    line_total INTEGER NOT NULL DEFAULT 0,
+                    crafted_quantity INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER DEFAULT (strftime('%s','now')),
+                    updated_at INTEGER DEFAULT (strftime('%s','now')),
+                    FOREIGN KEY (order_id) REFERENCES group_orders(id) ON DELETE CASCADE,
+                    FOREIGN KEY (weapon_id) REFERENCES weapons(id) ON DELETE SET NULL
+                );
+                CREATE TABLE IF NOT EXISTS group_order_crafts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_id INTEGER NOT NULL,
+                    item_id INTEGER NOT NULL,
+                    weapon_id INTEGER,
+                    weapon_name TEXT NOT NULL,
+                    quantity INTEGER NOT NULL DEFAULT 0,
+                    serial_numbers TEXT DEFAULT '[]',
+                    crafted_by_id TEXT,
+                    crafted_by_name TEXT,
+                    craft_date TEXT,
+                    note TEXT,
+                    created_at INTEGER DEFAULT (strftime('%s','now')),
+                    FOREIGN KEY (order_id) REFERENCES group_orders(id) ON DELETE CASCADE,
+                    FOREIGN KEY (item_id) REFERENCES group_order_items(id) ON DELETE CASCADE,
+                    FOREIGN KEY (weapon_id) REFERENCES weapons(id) ON DELETE SET NULL
+                );
                 CREATE INDEX IF NOT EXISTS idx_requests_status ON craft_requests(status);
                 CREATE INDEX IF NOT EXISTS idx_requests_user ON craft_requests(user_id);
                 CREATE INDEX IF NOT EXISTS idx_myweapons_user ON my_weapons(user_id);
                 CREATE INDEX IF NOT EXISTS idx_stock_materials_ingredient ON stock_materials(ingredient_id);
                 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_advance_items(order_id);
                 CREATE INDEX IF NOT EXISTS idx_order_repayments_order ON order_advance_repayments(order_id);
+                CREATE INDEX IF NOT EXISTS idx_group_orders_org ON group_orders(organization_id);
+                CREATE INDEX IF NOT EXISTS idx_group_orders_status ON group_orders(status);
+                CREATE INDEX IF NOT EXISTS idx_group_orders_created ON group_orders(created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_group_order_items_order ON group_order_items(order_id);
+                CREATE INDEX IF NOT EXISTS idx_group_order_crafts_order ON group_order_crafts(order_id);
+                CREATE INDEX IF NOT EXISTS idx_group_order_crafts_item ON group_order_crafts(item_id);
             `);
 
             applyMigrations();
@@ -482,6 +599,13 @@ let serialAlreadyListed;
 let getMyWeaponById;
 let deleteRequest;
 let deleteCraftRequestCleanly;
+let getGroupOrderCatalog;
+let getGroupOrders;
+let getGroupOrder;
+let upsertGroupOrder;
+let recordGroupOrderCraft;
+let cancelGroupOrder;
+let deleteGroupOrder;
 
 const {
     invalidateCraftCaches,
@@ -554,6 +678,21 @@ const {
     getBotClient: () => orderAdvancesBotClient,
     catalog: ORDER_INGREDIENTS_CATALOG,
 });
+
+({
+    getGroupOrderCatalog,
+    getGroupOrders,
+    getGroupOrder,
+    upsertGroupOrder,
+    recordGroupOrderCraft,
+    cancelGroupOrder,
+    deleteGroupOrder,
+} = createGroupOrderService({
+    getDb: () => db,
+    getAllOrgs: (...args) => getAllOrgs(...args),
+    getAllMyWeaponNamesWithPriceLimits: (...args) => getAllMyWeaponNamesWithPriceLimits(...args),
+    getWeaponByName: (...args) => getWeaponByName(...args),
+}));
 
 ({
     getRequests,
@@ -733,6 +872,18 @@ function registerCraftEndpoints(app, requireAuth, requireAdmin, botClient, botSt
         getOrderAdvanceCatalog,
         publishOrderAdvance,
         refreshOrderDiscordMessage,
+    });
+
+    registerGroupOrderRoutes(app, {
+        requireAuth,
+        canValidateCraft,
+        getGroupOrderCatalog,
+        getGroupOrders,
+        getGroupOrder,
+        upsertGroupOrder,
+        recordGroupOrderCraft,
+        cancelGroupOrder,
+        deleteGroupOrder,
     });
 
     registerCraftRequestRoutes(app, {

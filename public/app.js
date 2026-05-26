@@ -1,3 +1,4 @@
+// COMMANDES GROUPES 26/05/2026 — commandes armes organisations
 // CRAFT STATUS ANIMATIONS 26/05/2026 — retour animation changement statut
 // FIX DÉCROCHÉS + CARDS 22/05/2026
 // FIX CARDS ARMES 22/05/2026 — bordure + style vendu
@@ -67,6 +68,7 @@ const PAGE_TITLES = {
     stats: { title: 'Statistiques', sub: 'Suivi hebdomadaire' },
     sanctions: { title: 'Sanctions', sub: 'Historique des avertissements' },
     crafts: { title: "Craft d'armes", sub: 'Gestion des demandes & production' },
+    groupOrders: { title: 'Commandes Groupes', sub: "Commandes d'armes par organisation" },
     myweapons: { title: 'Vos Armes', sub: 'Tes armes à vendre' },
 };
 
@@ -175,6 +177,7 @@ function setupRealtimeSocket() {
         'absence:posted': ['presence', 'stats'],
         'craft:status': ['crafts', 'myweapons'],
         'craft:update': ['crafts', 'myweapons'],
+        'groupOrder:updated': ['groupOrders'],
         'weapon:update': ['crafts', 'myweapons'],
         'weapon:updated': ['crafts', 'myweapons'],
         'sanction:added': ['sanctions'],
@@ -467,6 +470,10 @@ function canAccessMyWeaponsTab() {
     return checkUserAccess() || hasLimitedCraftAccess();
 }
 
+function canAccessGroupOrdersTab() {
+    return checkUserAccess();
+}
+
 function canViewMapTab() {
     if (!window.currentUser) return false;
     const impersonateRole = localStorage.getItem('impersonate_role');
@@ -479,6 +486,7 @@ function canViewMapTab() {
 function canAccessDashboardTab(tabName) {
     if (tabName === 'crafts') return canAccessCraftsTab();
     if (tabName === 'myweapons') return canAccessMyWeaponsTab();
+    if (tabName === 'groupOrders') return canAccessGroupOrdersTab();
     if (tabName === 'map') return canViewMapTab();
     return checkUserAccess();
 }
@@ -552,6 +560,8 @@ async function refreshAll(options = {}) {
             if (!commandsLoaded) await initCommandsTab();
         } else if (currentTab === 'crafts') {
             await refreshCraftsTab();
+        } else if (currentTab === 'groupOrders') {
+            await initGroupOrdersTab();
         } else if (currentTab === 'myweapons') {
             await initMyWeaponsTab();
         }
@@ -5218,6 +5228,403 @@ function setupAdminSlide() {
     handle.addEventListener('touchstart', e => { e.preventDefault(); startDrag(e.touches[0].clientX); }, { passive: false });
     window.addEventListener('touchmove', e => moveDrag(e.touches[0].clientX), { passive: true });
     window.addEventListener('touchend', endDrag);
+}
+
+// ============================================================
+// COMMANDES GROUPES
+// ============================================================
+let groupOrdersLoaded = false;
+let groupOrderCatalog = { organizations: [], weapons: [] };
+let groupOrdersCache = [];
+let groupOrderItemsDraft = [];
+let groupOrderCraftDraft = [];
+
+function groupOrderToday() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+function formatGroupOrderMoney(value) {
+    return `${Number(value || 0).toLocaleString('fr-FR')}$`;
+}
+
+function groupOrderStatusLabel(status) {
+    const labels = {
+        open: 'Ouverte',
+        partial: 'Partielle',
+        crafted: 'Craftée',
+        cancelled: 'Annulée',
+    };
+    return labels[status] || status || 'Ouverte';
+}
+
+function groupOrderStatusClass(status) {
+    if (status === 'crafted') return 'group-order-status-crafted';
+    if (status === 'partial') return 'group-order-status-partial';
+    if (status === 'cancelled') return 'group-order-status-cancelled';
+    return 'group-order-status-open';
+}
+
+async function initGroupOrdersTab() {
+    if (!groupOrdersLoaded) {
+        await loadGroupOrderCatalog();
+        resetGroupOrderForm();
+        groupOrdersLoaded = true;
+    }
+    await loadGroupOrders();
+}
+
+async function loadGroupOrderCatalog() {
+    const res = await fetch('/api/crafts/group-orders/catalog');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Catalogue commandes groupes indisponible');
+    groupOrderCatalog = {
+        organizations: Array.isArray(data.organizations) ? data.organizations : [],
+        weapons: Array.isArray(data.weapons) ? data.weapons : [],
+    };
+    renderGroupOrderOrgSelect();
+    renderGroupOrderItemRows();
+    return groupOrderCatalog;
+}
+
+async function loadGroupOrders() {
+    const list = document.getElementById('groupOrdersList');
+    if (list) list.innerHTML = '<p class="empty">Chargement...</p>';
+    try {
+        const res = await fetch('/api/crafts/group-orders');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Chargement impossible');
+        groupOrdersCache = Array.isArray(data.orders) ? data.orders : [];
+        renderGroupOrdersList();
+    } catch (error) {
+        if (list) list.innerHTML = `<p class="error">Erreur : ${escapeHtml(error.message)}</p>`;
+    }
+}
+
+function renderGroupOrderOrgSelect(selectedId = '') {
+    const select = document.getElementById('groupOrderOrg');
+    if (!select) return;
+    const options = groupOrderCatalog.organizations
+        .map(org => `<option value="${escapeAttr(org.id)}">${escapeHtml(org.name)}</option>`)
+        .join('');
+    select.innerHTML = `<option value="">— Choisir une organisation —</option>${options}`;
+    if (selectedId) select.value = String(selectedId);
+}
+
+function groupOrderWeaponOptions(selectedName = '') {
+    return groupOrderCatalog.weapons.map(weapon => {
+        const name = String(weapon.name || '');
+        const selected = name === selectedName ? 'selected' : '';
+        const disabled = Number(weapon.max_sale_price || 0) > 0 ? '' : 'disabled';
+        const label = Number(weapon.max_sale_price || 0) > 0
+            ? `${name} — ${formatGroupOrderMoney(weapon.max_sale_price)}`
+            : `${name} — prix maximal manquant`;
+        return `<option value="${escapeAttr(name)}" data-max-sale-price="${Number(weapon.max_sale_price) || 0}" ${selected} ${disabled}>${escapeHtml(label)}</option>`;
+    }).join('');
+}
+
+function addGroupOrderItem() {
+    groupOrderItemsDraft.push({ weapon_name: '', quantity: 1 });
+    renderGroupOrderItemRows();
+}
+
+function removeGroupOrderItem(index) {
+    if (groupOrderItemsDraft.length <= 1) {
+        toast('Garde au moins une arme dans la commande', 'error');
+        return;
+    }
+    groupOrderItemsDraft.splice(index, 1);
+    renderGroupOrderItemRows();
+}
+
+function updateGroupOrderItem(index, field, value) {
+    const item = groupOrderItemsDraft[index];
+    if (!item) return;
+    if (field === 'quantity') item.quantity = Math.max(1, parseInt(value, 10) || 1);
+    else item[field] = value;
+    renderGroupOrderTotals();
+}
+
+function renderGroupOrderItemRows() {
+    const container = document.getElementById('groupOrderItems');
+    if (!container) return;
+    if (!groupOrderItemsDraft.length) groupOrderItemsDraft = [{ weapon_name: '', quantity: 1 }];
+    container.innerHTML = groupOrderItemsDraft.map((item, index) => {
+        const selectedWeapon = groupOrderCatalog.weapons.find(w => String(w.name || '') === String(item.weapon_name || ''));
+        const unitPrice = Number(selectedWeapon?.max_sale_price || item.unit_price || 0);
+        return `
+            <div class="group-order-item-row">
+                <div class="comm-field group-order-item-weapon">
+                    <label class="comm-label">Arme</label>
+                    <select class="comm-input" onchange="updateGroupOrderItem(${index}, 'weapon_name', this.value)">
+                        <option value="">— Choisir une arme —</option>
+                        ${groupOrderWeaponOptions(item.weapon_name)}
+                    </select>
+                    ${unitPrice > 0 ? `<span class="group-order-price-hint">Prix max : ${formatGroupOrderMoney(unitPrice)}</span>` : ''}
+                </div>
+                <div class="comm-field group-order-item-quantity">
+                    <label class="comm-label">Qté</label>
+                    <input type="number" class="comm-input" min="1" value="${Number(item.quantity) || 1}" onchange="updateGroupOrderItem(${index}, 'quantity', this.value)" oninput="updateGroupOrderItem(${index}, 'quantity', this.value)">
+                </div>
+                <button type="button" class="btn-secondary group-order-remove-btn" onclick="removeGroupOrderItem(${index})">×</button>
+            </div>
+        `;
+    }).join('');
+    renderGroupOrderTotals();
+}
+
+function renderGroupOrderTotals() {
+    const discountInput = document.getElementById('groupOrderDiscount');
+    const discountPercent = Math.min(100, Math.max(0, Number(String(discountInput?.value || 0).replace(',', '.')) || 0));
+    let subtotal = 0;
+    for (const item of groupOrderItemsDraft) {
+        const weapon = groupOrderCatalog.weapons.find(w => String(w.name || '') === String(item.weapon_name || ''));
+        subtotal += (Number(weapon?.max_sale_price || item.unit_price || 0) || 0) * (Number(item.quantity) || 0);
+    }
+    const discount = Math.round(subtotal * discountPercent / 100);
+    const total = Math.max(0, subtotal - discount);
+    const el = document.getElementById('groupOrderTotals');
+    if (el) {
+        el.innerHTML = `Sous-total : <strong>${formatGroupOrderMoney(subtotal)}</strong> · Réduction : <strong>${formatGroupOrderMoney(discount)}</strong> · Total : <strong>${formatGroupOrderMoney(total)}</strong>`;
+    }
+}
+
+function collectGroupOrderPayload() {
+    const organizationId = parseInt(document.getElementById('groupOrderOrg')?.value || '', 10);
+    if (!Number.isFinite(organizationId) || organizationId <= 0) throw new Error('Choisis une organisation');
+    const items = groupOrderItemsDraft
+        .filter(item => String(item.weapon_name || '').trim())
+        .map(item => ({
+            id: item.id || null,
+            weapon_name: item.weapon_name,
+            quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
+        }));
+    if (!items.length) throw new Error('Ajoute au moins une arme');
+    return {
+        organization_id: organizationId,
+        order_date: document.getElementById('groupOrderDate')?.value || groupOrderToday(),
+        discount_percent: document.getElementById('groupOrderDiscount')?.value || 0,
+        note: document.getElementById('groupOrderNote')?.value || '',
+        items,
+    };
+}
+
+async function saveGroupOrder() {
+    try {
+        const id = document.getElementById('groupOrderId')?.value || '';
+        const payload = collectGroupOrderPayload();
+        const res = await fetch(id ? `/api/crafts/group-orders/${id}` : '/api/crafts/group-orders', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Enregistrement impossible');
+        groupOrdersCache = Array.isArray(data.orders) ? data.orders : groupOrdersCache;
+        toast(id ? '✅ Commande groupe modifiée' : '✅ Commande groupe créée');
+        resetGroupOrderForm();
+        renderGroupOrdersList();
+    } catch (error) {
+        toast(`❌ ${error.message}`, 'error');
+    }
+}
+
+function resetGroupOrderForm() {
+    const idInput = document.getElementById('groupOrderId');
+    const dateInput = document.getElementById('groupOrderDate');
+    const discountInput = document.getElementById('groupOrderDiscount');
+    const noteInput = document.getElementById('groupOrderNote');
+    if (idInput) idInput.value = '';
+    if (dateInput) dateInput.value = groupOrderToday();
+    if (discountInput) discountInput.value = '0';
+    if (noteInput) noteInput.value = '';
+    renderGroupOrderOrgSelect();
+    groupOrderItemsDraft = [{ weapon_name: '', quantity: 1 }];
+    renderGroupOrderItemRows();
+}
+
+async function editGroupOrder(id) {
+    const order = groupOrdersCache.find(o => Number(o.id) === Number(id));
+    if (!order) return;
+    if (order.status === 'cancelled') {
+        toast('Commande annulée : modification bloquée', 'error');
+        return;
+    }
+    document.getElementById('groupOrderId').value = order.id;
+    renderGroupOrderOrgSelect(order.organization_id);
+    document.getElementById('groupOrderDate').value = order.order_date || groupOrderToday();
+    document.getElementById('groupOrderDiscount').value = Number(order.discount_percent || 0);
+    document.getElementById('groupOrderNote').value = order.note || '';
+    groupOrderItemsDraft = (order.items || []).map(item => ({
+        id: item.id,
+        weapon_name: item.weapon_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+    }));
+    renderGroupOrderItemRows();
+    document.getElementById('tab-groupOrders')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function cancelGroupOrder(id) {
+    const ok = await confirmAction({
+        title: 'Annuler la commande groupe',
+        message: 'La commande restera dans l’historique avec le statut annulé.',
+        confirmText: 'Annuler la commande',
+        danger: true,
+    });
+    if (!ok) return;
+    try {
+        const res = await fetch(`/api/crafts/group-orders/${id}/cancel`, { method: 'PATCH' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Annulation impossible');
+        groupOrdersCache = Array.isArray(data.orders) ? data.orders : groupOrdersCache;
+        toast('✅ Commande annulée');
+        renderGroupOrdersList();
+    } catch (error) {
+        toast(`❌ ${error.message}`, 'error');
+    }
+}
+
+function openGroupOrderCraftModal(id) {
+    const order = groupOrdersCache.find(o => Number(o.id) === Number(id));
+    if (!order) return;
+    if (order.status === 'cancelled') {
+        toast('Commande annulée : craft bloqué', 'error');
+        return;
+    }
+    groupOrderCraftDraft = (order.items || [])
+        .map(item => ({
+            item_id: item.id,
+            weapon_name: item.weapon_name,
+            remaining: Math.max(0, Number(item.quantity || 0) - Number(item.crafted_quantity || 0)),
+            quantity: 0,
+            serial_numbers: '',
+        }))
+        .filter(item => item.remaining > 0);
+    if (!groupOrderCraftDraft.length) {
+        toast('Tout est déjà crafté pour cette commande', 'info');
+        return;
+    }
+    document.getElementById('groupOrderCraftOrderId').value = order.id;
+    document.getElementById('groupOrderCraftDate').value = groupOrderToday();
+    document.getElementById('groupOrderCraftedByName').value = window.currentUser?.username || window.currentUser?.name || '';
+    document.getElementById('groupOrderCraftNote').value = '';
+    document.getElementById('groupOrderCraftModalTitle').textContent = `Renseigner craft — ${order.organization_name}`;
+    renderGroupOrderCraftRows();
+    document.getElementById('groupOrderCraftModal').style.display = 'block';
+}
+
+function closeGroupOrderCraftModal() {
+    const modal = document.getElementById('groupOrderCraftModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function updateGroupOrderCraftItem(index, field, value) {
+    const item = groupOrderCraftDraft[index];
+    if (!item) return;
+    if (field === 'quantity') item.quantity = Math.max(0, Math.min(item.remaining, parseInt(value, 10) || 0));
+    else item[field] = value;
+}
+
+function renderGroupOrderCraftRows() {
+    const container = document.getElementById('groupOrderCraftItems');
+    if (!container) return;
+    container.innerHTML = groupOrderCraftDraft.map((item, index) => `
+        <div class="group-order-craft-row">
+            <div>
+                <strong>${escapeHtml(item.weapon_name)}</strong>
+                <span>Restant : ${Number(item.remaining).toLocaleString('fr-FR')}</span>
+            </div>
+            <input type="number" class="comm-input" min="0" max="${Number(item.remaining)}" value="${Number(item.quantity) || 0}" oninput="updateGroupOrderCraftItem(${index}, 'quantity', this.value)">
+            <input type="text" class="comm-input" placeholder="N° série séparés par virgules" oninput="updateGroupOrderCraftItem(${index}, 'serial_numbers', this.value)">
+        </div>
+    `).join('');
+}
+
+async function recordGroupOrderCraft(event) {
+    event?.preventDefault?.();
+    const orderId = document.getElementById('groupOrderCraftOrderId')?.value;
+    const items = groupOrderCraftDraft
+        .filter(item => Number(item.quantity) > 0)
+        .map(item => ({
+            item_id: item.item_id,
+            quantity: Number(item.quantity),
+            serial_numbers: String(item.serial_numbers || '').split(/[\n,;]+/).map(s => s.trim()).filter(Boolean),
+        }));
+    if (!items.length) {
+        toast('Renseigne au moins une quantité craftée', 'error');
+        return;
+    }
+    try {
+        const res = await fetch(`/api/crafts/group-orders/${orderId}/crafts`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                craft_date: document.getElementById('groupOrderCraftDate')?.value || groupOrderToday(),
+                crafted_by_id: window.currentUser?.id || '',
+                crafted_by_name: document.getElementById('groupOrderCraftedByName')?.value || window.currentUser?.username || '',
+                note: document.getElementById('groupOrderCraftNote')?.value || '',
+                items,
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Craft impossible');
+        groupOrdersCache = Array.isArray(data.orders) ? data.orders : groupOrdersCache;
+        closeGroupOrderCraftModal();
+        toast('✅ Craft commande groupe enregistré');
+        renderGroupOrdersList();
+    } catch (error) {
+        toast(`❌ ${error.message}`, 'error');
+    }
+}
+
+function renderGroupOrdersList() {
+    const list = document.getElementById('groupOrdersList');
+    if (!list) return;
+    if (!groupOrdersCache.length) {
+        list.innerHTML = '<p class="empty">Aucune commande groupe enregistrée.</p>';
+        return;
+    }
+    list.innerHTML = groupOrdersCache.map(order => {
+        const progress = order.progress || {};
+        const percent = Number(progress.percent || 0);
+        const itemsHtml = (order.items || []).map(item => {
+            const remaining = Math.max(0, Number(item.quantity || 0) - Number(item.crafted_quantity || 0));
+            return `
+                <div class="group-order-card-item">
+                    <span>${escapeHtml(item.weapon_name)}</span>
+                    <b>${Number(item.crafted_quantity || 0)}/${Number(item.quantity || 0)}</b>
+                    <em>${formatGroupOrderMoney(item.unit_price)} · reste ${remaining}</em>
+                </div>
+            `;
+        }).join('');
+        return `
+            <div class="group-order-card">
+                <div class="group-order-card-head">
+                    <div>
+                        <h3>${escapeHtml(order.organization_name)}</h3>
+                        <p>${escapeHtml(order.order_date || 'Sans date')} · ${Number(order.items?.length || 0)} arme(s)</p>
+                    </div>
+                    <span class="group-order-status ${groupOrderStatusClass(order.status)}">${escapeHtml(groupOrderStatusLabel(order.status))}</span>
+                </div>
+                <div class="group-order-money-line">
+                    <span>Sous-total <b>${formatGroupOrderMoney(order.subtotal_amount)}</b></span>
+                    <span>Réduction <b>${Number(order.discount_percent || 0).toLocaleString('fr-FR')}% (${formatGroupOrderMoney(order.discount_amount)})</b></span>
+                    <span>Total <b>${formatGroupOrderMoney(order.total_amount)}</b></span>
+                </div>
+                <div class="group-order-progress">
+                    <div class="group-order-progress-track"><span style="width:${Math.max(0, Math.min(100, percent))}%"></span></div>
+                    <small>${Number(progress.crafted || 0)} craftée(s) / ${Number(progress.ordered || 0)} commandée(s) · ${Number(progress.remaining || 0)} restante(s)</small>
+                </div>
+                <div class="group-order-card-items">${itemsHtml}</div>
+                ${order.note ? `<p class="group-order-note">${escapeHtml(order.note)}</p>` : ''}
+                <div class="group-order-actions">
+                    <button type="button" class="btn-secondary" onclick="editGroupOrder(${Number(order.id)})">Modifier</button>
+                    <button type="button" class="btn-primary" onclick="openGroupOrderCraftModal(${Number(order.id)})">Renseigner craft</button>
+                    <button type="button" class="btn-danger" onclick="cancelGroupOrder(${Number(order.id)})">Annuler</button>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // ============================================================
