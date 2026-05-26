@@ -25,7 +25,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260526-grouporders-ui">
+<link rel="stylesheet" href="/style.css?v=20260526-live-cleanup">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -130,7 +130,7 @@
                 <p class="page-header-sub">Vue d'ensemble — 21 Block Savage</p>
             </div>
             <div class="page-header-actions">
-                <div class="cc-live-indicator">
+                <div class="cc-live-indicator" role="status" aria-label="Rafraîchissement temps réel actif" title="Rafraîchissement temps réel actif">
                     <span class="cc-live-dot"></span>LIVE
                 </div>
                 <button class="cc-refresh-btn" onclick="reloadDashboardOverview()" title="Actualiser">↻</button>
@@ -321,9 +321,6 @@
             <div class="page-header-title">
                 <h1>Commandes</h1>
                 <p class="page-header-sub">Alertes terrain et annonces rapides</p>
-            </div>
-            <div class="page-header-actions">
-                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
             </div>
         </div>
 
@@ -563,9 +560,6 @@
                 <h1>Statistiques</h1>
                 <p class="page-header-sub">Suivi présence, KP et tendances semaine</p>
             </div>
-            <div class="page-header-actions">
-                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
-            </div>
         </div>
 
         <div class="stats-overview" id="statsOverview"></div>
@@ -596,9 +590,6 @@
                 <h1>Sanctions</h1>
                 <p class="page-header-sub">Historique des avertissements et décisions staff</p>
             </div>
-            <div class="page-header-actions">
-                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
-            </div>
         </div>
         <h2 class="section-title">⚠ Historique des sanctions / avertissements</h2>
         <div class="sanctions-list" id="sanctionsList">
@@ -612,9 +603,6 @@
             <div class="page-header-title">
                 <h1>Salons</h1>
                 <p class="page-header-sub">Lecture et relais des messages Discord</p>
-            </div>
-            <div class="page-header-actions">
-                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
             </div>
         </div>
         <div class="channels-toolbar">
@@ -670,9 +658,6 @@
             <div class="page-header-title">
                 <h1>Carte</h1>
                 <p class="page-header-sub">Points tactiques Los Santos / 21BS Confidential</p>
-            </div>
-            <div class="page-header-actions">
-                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
             </div>
         </div>
         <div class="map-toolbar">
@@ -799,9 +784,6 @@
             <div class="page-header-title">
                 <h1>Craft d'armes</h1>
                 <p class="page-header-sub">Catalogue, demandes et tableau de production</p>
-            </div>
-            <div class="page-header-actions">
-                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
             </div>
         </div>
         <div class="crafts-subtabs">
@@ -1057,9 +1039,6 @@
                 <h1>Commandes Groupes</h1>
                 <p class="page-header-sub">Commandes d'armes par organisation, prix maximal et suivi craft</p>
             </div>
-            <div class="page-header-actions">
-                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
-            </div>
         </div>
 
         <div class="group-orders-layout">
@@ -1122,9 +1101,6 @@
             <div class="page-header-title">
                 <h1>Vos Armes</h1>
                 <p class="page-header-sub">Suivi des ventes, annonces et historiques craft</p>
-            </div>
-            <div class="page-header-actions">
-                <div class="cc-live-indicator"><span class="cc-live-dot"></span>LIVE</div>
             </div>
         </div>
         <div class="myweapons-banner-shimmer sale-important-warning dynamic-warning-effect craft-warning-banner">
@@ -1465,6 +1441,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260526-grouporders-ui"></script>
+<script src="/app.js?v=20260526-live-cleanup"></script>
 </body>
 </html>
