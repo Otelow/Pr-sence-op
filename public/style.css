@@ -1,3 +1,4 @@
+/* // CRAFT STATUS ANIMATIONS 26/05/2026 — retour animation changement statut */
 /* // FIX DÉCROCHÉS + CARDS 22/05/2026 */
 /* // FIX CARDS ARMES 22/05/2026 — bordure + style vendu */
 /* // CCV5 21/05/2026 — palette stricte + cards cliquables + fix */
@@ -7021,6 +7022,78 @@ body {
     18% { opacity: 1; }
     58% { transform: translateX(120%); opacity: 0.85; }
     100% { transform: translateX(120%); opacity: 0; }
+}
+
+/* Animation courte jouée juste après un changement de statut craft */
+.craft-request-item.craft-status-just-changed,
+.craft-board-table tbody tr.craft-status-just-changed {
+    animation: craftStatusChangedPulse 1.6s ease-out 1 !important;
+    outline: 1px solid var(--request-accent);
+    outline-offset: 2px;
+}
+
+.craft-request-item.craft-status-just-changed .craft-status-badge,
+.craft-board-table tbody tr.craft-status-just-changed .craft-sale-state {
+    animation: craftStatusBadgePop 1.15s ease-out 1 !important;
+}
+
+.craft-status-just-changed-pending {
+    --request-accent: rgba(250, 248, 243, 0.82);
+    --request-glow: rgba(250, 248, 243, 0.16);
+}
+
+.craft-status-just-changed-materials {
+    --request-accent: #ff9f1a;
+    --request-glow: rgba(255, 159, 26, 0.24);
+}
+
+.craft-status-just-changed-in-progress {
+    --request-accent: #60a5fa;
+    --request-glow: rgba(96, 165, 250, 0.24);
+}
+
+.craft-status-just-changed-crafted,
+.craft-status-just-changed-completed {
+    --request-accent: #4ade80;
+    --request-glow: rgba(74, 222, 128, 0.22);
+}
+
+.craft-status-just-changed-refused {
+    --request-accent: #f87171;
+    --request-glow: rgba(248, 113, 113, 0.24);
+}
+
+@keyframes craftStatusChangedPulse {
+    0% {
+        transform: scale(0.995);
+        filter: brightness(1);
+        box-shadow:
+            inset 4px 0 0 var(--request-accent),
+            0 0 0 0 rgba(255,255,255,0),
+            0 10px 28px var(--request-glow);
+    }
+    28% {
+        transform: scale(1.012);
+        filter: brightness(1.24);
+        box-shadow:
+            inset 5px 0 0 var(--request-accent),
+            0 0 0 4px var(--request-glow),
+            0 0 34px var(--request-glow);
+    }
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+        box-shadow:
+            inset 4px 0 0 var(--request-accent),
+            0 0 0 0 rgba(255,255,255,0),
+            0 12px 32px var(--request-glow);
+    }
+}
+
+@keyframes craftStatusBadgePop {
+    0% { transform: scale(0.92); filter: brightness(1); }
+    34% { transform: scale(1.08); filter: brightness(1.28); }
+    100% { transform: scale(1); filter: brightness(1); }
 }
 
 .craft-request-image {

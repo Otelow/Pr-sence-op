@@ -1,3 +1,4 @@
+// CRAFT STATUS ANIMATIONS 26/05/2026 — retour animation changement statut
 // FIX DÉCROCHÉS + CARDS 22/05/2026
 // FIX CARDS ARMES 22/05/2026 — bordure + style vendu
 // CCV5 21/05/2026 — palette stricte + cards cliquables + fix
@@ -3383,6 +3384,7 @@ let craftRequestsLoadPromise = null;
 let craftRequestSubmitInFlight = false;
 const craftStatusActionLocks = new Set();
 const craftDeleteActionLocks = new Set();
+const craftStatusAnimationTimers = new Map();
 let craftCatalogFilters = {
     search: '',
     stock: 'all',
@@ -4191,7 +4193,7 @@ function renderCraftRequestsList() {
         const requestDetails = renderCraftRequestDetails(r);
 
         return `
-            <div class="craft-request-item${rejectedClass}${statusRowClass}">
+            <div class="craft-request-item${rejectedClass}${statusRowClass}" data-request-id="${Number(r.id) || 0}">
                 ${weaponImageUrl ? `<img class="craft-request-image" src="${weaponImageUrl}" alt="">` : '<span class="craft-weapon-placeholder">🔫</span>'}
                 <div class="craft-request-body">
                     <div class="craft-request-name">${escapeHtml(r.weapon_name)}</div>
@@ -4261,6 +4263,54 @@ function canAdminManageMyWeaponsClient() {
     return canDeleteMyWeaponsClient() || canValidateCraftClient();
 }
 
+function playCraftStatusChangeAnimation(requestId, status) {
+    const id = Number(requestId);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    const tone = getCraftStatusTone({
+        status,
+        crafted: status === 'crafted',
+    });
+    const selector = `.craft-request-item[data-request-id="${id}"], .craft-board-table tbody tr[data-request-id="${id}"]`;
+    const nodes = document.querySelectorAll(selector);
+    if (!nodes.length) return;
+
+    const timerKey = String(id);
+    if (craftStatusAnimationTimers.has(timerKey)) {
+        clearTimeout(craftStatusAnimationTimers.get(timerKey));
+        craftStatusAnimationTimers.delete(timerKey);
+    }
+
+    nodes.forEach(node => {
+        node.classList.remove(
+            'craft-status-just-changed',
+            'craft-status-just-changed-pending',
+            'craft-status-just-changed-materials',
+            'craft-status-just-changed-in-progress',
+            'craft-status-just-changed-crafted',
+            'craft-status-just-changed-completed',
+            'craft-status-just-changed-refused'
+        );
+        void node.offsetWidth;
+        node.classList.add('craft-status-just-changed', `craft-status-just-changed-${tone}`);
+    });
+
+    craftStatusAnimationTimers.set(timerKey, setTimeout(() => {
+        document.querySelectorAll(selector).forEach(node => {
+            node.classList.remove(
+                'craft-status-just-changed',
+                'craft-status-just-changed-pending',
+                'craft-status-just-changed-materials',
+                'craft-status-just-changed-in-progress',
+                'craft-status-just-changed-crafted',
+                'craft-status-just-changed-completed',
+                'craft-status-just-changed-refused'
+            );
+        });
+        craftStatusAnimationTimers.delete(timerKey);
+    }, 1800));
+}
+
 function syncCraftPermissionUI() {
     const canManageCraft = canValidateCraftClient();
     const testField = document.getElementById('craftTestField');
@@ -4294,6 +4344,7 @@ async function updateRequestStatus(requestId, status) {
             await Promise.all([loadCraftRequests(), loadWeaponsCatalog()]);
             renderCraftRequestsList();
             renderCraftBoard();
+            requestAnimationFrame(() => playCraftStatusChangeAnimation(requestId, status));
         } else {
             toast(`❌ ${data.error}`, 'error');
         }
