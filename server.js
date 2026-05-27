@@ -1,4 +1,5 @@
 // QUICK WINS 3 18/05/2026 — erreurs 500 tracées pour monitoring
+// EXPORT DB TEMPORAIRE 28/05/2026 — téléchargement protégé Railway
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('./src/shared/logger');
@@ -400,6 +401,14 @@ function startServer(client, getState) {
         requireMapViewAccess,
         isUserAdmin,
         canEditMapUser,
+    });
+
+    app.get('/admin/export-db', (req, res) => {
+        const token = process.env.EXPORT_TOKEN;
+        if (!token || req.query.token !== token) {
+            return res.status(403).send('Forbidden');
+        }
+        return res.download('/data/crafts.db', 'crafts.db');
     });
 
     app.use((err, req, res, next) => {
