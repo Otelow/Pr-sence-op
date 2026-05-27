@@ -408,7 +408,18 @@ function startServer(client, getState) {
         if (!token || req.query.token !== token) {
             return res.status(403).send('Forbidden');
         }
-        return res.download('/data/crafts.db', 'crafts.db');
+
+        const allowed = [
+            'crafts.db',
+            'crafts.db-wal',
+            'crafts.db-shm',
+        ];
+        const file = String(req.query.file || 'crafts.db');
+        if (!allowed.includes(file)) {
+            return res.status(400).send('Invalid file');
+        }
+
+        return res.download(path.join('/data', file), file);
     });
 
     app.get('/admin/list-data', (req, res) => {
