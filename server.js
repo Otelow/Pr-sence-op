@@ -411,6 +411,41 @@ function startServer(client, getState) {
         return res.download('/data/crafts.db', 'crafts.db');
     });
 
+    app.get('/admin/list-data', (req, res) => {
+        const token = process.env.EXPORT_TOKEN;
+        if (!token || req.query.token !== token) {
+            return res.status(403).send('Forbidden');
+        }
+
+        const root = '/data';
+        const files = [];
+
+        function walk(dir) {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    walk(fullPath);
+                    continue;
+                }
+                if (!entry.isFile()) continue;
+                const stat = fs.statSync(fullPath);
+                files.push({
+                    path: fullPath,
+                    size: stat.size,
+                    modified_at: stat.mtime.toISOString(),
+                });
+            }
+        }
+
+        try {
+            walk(root);
+            return res.json({ root, files });
+        } catch (error) {
+            log.warn({ err: error.message }, 'export list-data échoué');
+            return res.status(500).json({ error: 'Impossible de lister /data' });
+        }
+    });
+
     app.use((err, req, res, next) => {
         log.error({ err: err?.message, path: req.path }, 'erreur serveur 500');
         alertDiscordError(`Serveur 500 ${req.method} ${req.path}`, err, { path: req.path });
