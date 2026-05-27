@@ -1,6 +1,6 @@
 {
   "name": "21-block-savage-bot",
-  "version": "3.6.6",
+  "version": "3.6.7",
   "description": "Bot Discord 21 Block Savage + Dashboard Web",
   "main": "index.js",
   "engines": {
@@ -16,6 +16,7 @@
     "convert-assets": "node scripts/convert-assets.js"
   },
   "dependencies": {
+    "archiver": "^8.0.0",
     "axios": "^1.7.7",
     "better-sqlite3": "^12.9.0",
     "compression": "^1.8.1",

@@ -1,5 +1,6 @@
 // QUICK WINS 3 18/05/2026 — erreurs 500 tracées pour monitoring
 // EXPORT DB TEMPORAIRE 28/05/2026 — téléchargement protégé Railway
+// EXPORT IMAGES CRAFT TEMPORAIRE 28/05/2026 — ZIP protégé Railway
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('./src/shared/logger');
@@ -32,6 +33,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const axios = require('axios');
+const archiver = require('archiver');
 const path = require('path');
 const fs = require('fs');
 const { PermissionFlagsBits } = require('discord.js');
@@ -455,6 +457,31 @@ function startServer(client, getState) {
             log.warn({ err: error.message }, 'export list-data échoué');
             return res.status(500).json({ error: 'Impossible de lister /data' });
         }
+    });
+
+    app.get('/admin/export-crafts-images', (req, res) => {
+        const token = process.env.EXPORT_TOKEN;
+        if (!token || req.query.token !== token) {
+            return res.status(403).send('Forbidden');
+        }
+
+        const craftsDir = '/data/crafts';
+        if (!fs.existsSync(craftsDir)) {
+            return res.status(404).send('Crafts images folder not found');
+        }
+
+        res.attachment('crafts-images.zip');
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        archive.on('error', error => {
+            log.warn({ err: error.message }, 'export crafts images zip échoué');
+            if (!res.headersSent) return res.status(500).send('ZIP export failed');
+            return res.destroy(error);
+        });
+
+        archive.pipe(res);
+        archive.directory(craftsDir, false);
+        return archive.finalize();
     });
 
     app.use((err, req, res, next) => {
