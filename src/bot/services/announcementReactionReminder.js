@@ -3,6 +3,7 @@ const log = require('../../shared/logger');
 
 const ANNOUNCER_USER_ID = '952986899667103804';
 const ANNOUNCEMENT_CHANNEL_ID = '1485636555480502404';
+const REMINDER_CHANNEL_ID = '1485651067860680915';
 const TARGET_ROLE_ID = '1485270431291277383';
 const EXCLUDED_ROLE_ID = '1490361524408291459';
 const REMINDER_DELETE_DELAY_MS = 3 * 60 * 1000;
@@ -140,6 +141,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
     const logger = context.logger || log;
     const options = {
         channelId: context.channelId || ANNOUNCEMENT_CHANNEL_ID,
+        reminderChannelId: context.reminderChannelId || REMINDER_CHANNEL_ID,
         announcerUserId: context.announcerUserId || ANNOUNCER_USER_ID,
         targetRoleId: context.targetRoleId || TARGET_ROLE_ID,
         excludedRoleId: context.excludedRoleId || EXCLUDED_ROLE_ID,
@@ -191,15 +193,25 @@ function registerAnnouncementReactionReminder(client, context = {}) {
 
             await deleteReminderMessage(client, entry);
 
+            const reminderChannel = toId(options.reminderChannelId) === toId(entry.channelId)
+                ? channel
+                : await client.channels.fetch(options.reminderChannelId).catch(() => null);
+
+            if (!reminderChannel?.send) {
+                logger.warn?.(`[annonces] salon de relance ${options.reminderChannelId} introuvable`);
+                scheduleNextReminder(entry, options.reminderRepeatDelayMs);
+                return;
+            }
+
             const userIds = nonReactors.map(member => getMemberId(member)).filter(Boolean);
             const mentions = userIds.map(userId => `<@${userId}>`).join(' ');
-            const reminder = await channel.send({
+            const reminder = await reminderChannel.send({
                 content: `${mentions} Merci de lire et de réagir à l'annonce (<#${options.channelId}>) On ne fait pas d'annonce pour le plaisir ${options.attentionEmoji}`,
                 allowedMentions: { users: userIds },
             });
 
             entry.lastReminderMessageId = reminder.id;
-            entry.lastReminderChannelId = reminder.channelId || channel.id;
+            entry.lastReminderChannelId = reminder.channelId || reminderChannel.id;
 
             if (entry.deleteTimerId) clearTimeout(entry.deleteTimerId);
             entry.deleteTimerId = unrefTimer(setTimeout(() => {
@@ -254,6 +266,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
 module.exports = {
     ANNOUNCER_USER_ID,
     ANNOUNCEMENT_CHANNEL_ID,
+    REMINDER_CHANNEL_ID,
     TARGET_ROLE_ID,
     EXCLUDED_ROLE_ID,
     REMINDER_DELETE_DELAY_MS,
