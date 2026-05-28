@@ -24,6 +24,27 @@ function dateFromKey(dateStr) {
     return new Date(year, month - 1, day, 12, 0, 0);
 }
 
+function getParisDateKeyFromValue(value) {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return getParisDateKey(date);
+}
+
+function isPresenceDataForDate(opData, reactionMap, dateStr) {
+    const hasData = Boolean(
+        opData?.messageId ||
+        opData?.active ||
+        opData?.terminated ||
+        reactionMap?.size
+    );
+    if (!hasData) return false;
+
+    const startedDate = getParisDateKeyFromValue(opData?.startedAt);
+    if (!startedDate) return true;
+    return startedDate === dateStr;
+}
+
 function serializeReactionMap(map) {
     const out = {};
     if (!map || typeof map.entries !== 'function') return out;
@@ -73,9 +94,15 @@ function createPresenceStatePersistence(deps) {
         getAbsentUsersToday,
     } = deps;
 
-    function hasPresenceDataToSnapshot() {
+    function hasPresenceDataToSnapshot(dateStr = null) {
         const presenceData = getPresenceData();
         const presence2Data = getPresence2Data();
+        if (dateStr) {
+            return Boolean(
+                isPresenceDataForDate(presenceData, reactionsOP1, dateStr) ||
+                isPresenceDataForDate(presence2Data, reactionsOP2, dateStr)
+            );
+        }
         return Boolean(
             presenceData?.messageId ||
             presence2Data?.messageId ||
@@ -128,7 +155,7 @@ function createPresenceStatePersistence(deps) {
     }
 
     async function snapshotPresenceDay(dateStr, options = {}) {
-        if (!dateStr || !hasPresenceDataToSnapshot()) return false;
+        if (!dateStr || !hasPresenceDataToSnapshot(dateStr)) return false;
         const { only = null } = options;
 
         const guild = client.guilds.cache.get(CONFIG.GUILD_ID);
@@ -137,12 +164,17 @@ function createPresenceStatePersistence(deps) {
 
         const absData = await getAbsentUsersToday(dateFromKey(dateStr));
         const validAbsences = absData.validAbsences || new Set();
-        const op1Entries = only === 'op2' ? new Map() : collectPresenceHistoryEntries(getPresenceData(), reactionsOP1, validAbsences, role);
-        const op2Entries = only === 'op1' ? new Map() : collectPresenceHistoryEntries(getPresence2Data(), reactionsOP2, validAbsences, role);
+        const presenceData = getPresenceData();
+        const presence2Data = getPresence2Data();
+        const op1ForDate = isPresenceDataForDate(presenceData, reactionsOP1, dateStr);
+        const op2ForDate = isPresenceDataForDate(presence2Data, reactionsOP2, dateStr);
+        const op1Entries = only === 'op2' || !op1ForDate ? new Map() : collectPresenceHistoryEntries(presenceData, reactionsOP1, validAbsences, role);
+        const op2Entries = only === 'op1' || !op2ForDate ? new Map() : collectPresenceHistoryEntries(presence2Data, reactionsOP2, validAbsences, role);
 
         const db = createConnection();
         ensurePresenceHistoryTable(db);
         const recordedAt = Math.floor(Date.now() / 1000);
+        const deleteStmt = db.prepare('DELETE FROM presence_history WHERE date = ? AND op_number = ?');
         const stmt = db.prepare(`
             INSERT OR REPLACE INTO presence_history
             (date, op_number, user_id, username, status, recorded_at)
@@ -151,6 +183,7 @@ function createPresenceStatePersistence(deps) {
 
         const tx = db.transaction((ops) => {
             for (const op of ops) {
+                deleteStmt.run(dateStr, op.num);
                 for (const [userId, entry] of op.entries) {
                     stmt.run(dateStr, op.num, userId, entry.username, entry.status, recordedAt);
                 }
@@ -229,4 +262,5 @@ module.exports = {
     createPresenceStatePersistence,
     serializeReactionMap,
     deserializeReactionMap,
+    isPresenceDataForDate,
 };
