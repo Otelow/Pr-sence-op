@@ -519,6 +519,7 @@ async function syncPresenceReactions() {
     clearAbsencePanelState: () => clearAbsencePanelState(),
     getConsecutiveDays: data => getConsecutiveDays(data),
     stopAllReminders,
+    refreshAbsenceSalonCache: reason => updateAbsenceSalonCache?.({ force: true, reason }),
 }));
 
 ({

@@ -50,6 +50,7 @@ function createPresenceFlowService(deps) {
         clearAbsencePanelState,
         getConsecutiveDays,
         stopAllReminders,
+        refreshAbsenceSalonCache,
     } = deps;
 
     const presenceData = createStateProxy(getPresenceData);
@@ -126,8 +127,21 @@ async function preparePresenceDayForFirstOp() {
     resetPresenceStateForNewFirstOp(todayKey);
 }
 
+async function refreshAbsencesBeforePresence(reason) {
+    if (typeof refreshAbsenceSalonCache !== 'function') return null;
+    try {
+        const cache = await refreshAbsenceSalonCache(reason);
+        log.info(`📋 Cache absences relu avant ${reason}`);
+        return cache;
+    } catch (e) {
+        log.warn(`⚠️ Relecture absences avant ${reason} échouée:`, e.message);
+        return null;
+    }
+}
+
 async function sendPresence2Message(channelOverride) {
     if (!channelOverride && presence2Data.active) return false;
+    await refreshAbsencesBeforePresence('presence-op2');
     const channelId = channelOverride || CONFIG.CHANNELS.PRESENCE;
     const channel = client.channels.cache.get(channelId);
     if (!channel) return;
@@ -166,7 +180,7 @@ async function sendPresence2Message(channelOverride) {
         await refreshAbsencePanel();
 
         // Suppression auto après 30 minutes
-        setTimeout(async () => {
+        const deletePresence2Timer = setTimeout(async () => {
             try {
                 const oldMsg = await channel.messages.fetch(msg.id);
                 await oldMsg.delete();
@@ -177,6 +191,7 @@ async function sendPresence2Message(channelOverride) {
             savePresenceState();
             await refreshAbsencePanel();
         }, 30 * 60 * 1000);
+        deletePresence2Timer.unref?.();
     } catch (error) {
         log.error('❌ Erreur 2ème OP:', error);
     }
@@ -194,6 +209,7 @@ function setupPresenceCron() {
 async function sendPresenceMessage(channelOverride) {
     await preparePresenceDayForFirstOp();
     if (presenceData.active) return;
+    await refreshAbsencesBeforePresence('presence-op1');
     presenceData.active = true;
     presenceData.terminated = false;
 
