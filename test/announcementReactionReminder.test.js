@@ -200,6 +200,101 @@ test('annonce reactions : envoie les relances dans le salon dedie', async () => 
     assert.match(sent[0].content, new RegExp(`<#${ANNOUNCEMENT_CHANNEL_ID}>`));
 });
 
+test('annonce reactions : force le refresh Discord avant de lire les reactions', async () => {
+    const shouldPing = makeMember('user-ping', [TARGET_ROLE_ID]);
+    const alreadyReacted = makeMember('user-reacted', [TARGET_ROLE_ID]);
+    const members = new Map([
+        [shouldPing.id, shouldPing],
+        [alreadyReacted.id, alreadyReacted],
+    ]);
+    const guild = {
+        members: {
+            cache: members,
+            async fetch() {
+                return members;
+            },
+        },
+    };
+    const staleAnnouncement = {
+        id: 'announcement-refresh',
+        guild,
+        reactions: { cache: new Map() },
+    };
+    const freshAnnouncement = {
+        id: 'announcement-refresh',
+        guild,
+        reactions: {
+            cache: new Map([
+                ['check', {
+                    users: {
+                        async fetch() {
+                            return makeReactionUsers(['user-reacted']);
+                        },
+                    },
+                }],
+            ]),
+        },
+    };
+
+    const sent = [];
+    const announcementChannel = {
+        id: ANNOUNCEMENT_CHANNEL_ID,
+        guild,
+        messages: {
+            async fetch(arg) {
+                if (arg && typeof arg === 'object' && arg.force === true) return freshAnnouncement;
+                return staleAnnouncement;
+            },
+        },
+    };
+    const reminderChannel = {
+        id: REMINDER_CHANNEL_ID,
+        guild,
+        messages: {
+            async fetch() {
+                return null;
+            },
+        },
+        async send(payload) {
+            sent.push(payload);
+            return { id: 'refresh-reminder', channelId: REMINDER_CHANNEL_ID, delete: async () => {} };
+        },
+    };
+    const channels = new Map([
+        [ANNOUNCEMENT_CHANNEL_ID, announcementChannel],
+        [REMINDER_CHANNEL_ID, reminderChannel],
+    ]);
+    const client = {
+        on() {},
+        channels: {
+            async fetch(id) {
+                return channels.get(id) || null;
+            },
+        },
+    };
+
+    const service = registerAnnouncementReactionReminder(client, {
+        logger: { info() {}, warn() {}, error() {} },
+        attentionEmoji: ':attention:',
+        initialReminderDelayMs: 60_000,
+        reminderDeleteDelayMs: 60_000,
+        reminderRepeatDelayMs: 60_000,
+    });
+
+    service.startAnnouncementReminder({
+        id: staleAnnouncement.id,
+        channelId: ANNOUNCEMENT_CHANNEL_ID,
+        author: { id: ANNOUNCER_USER_ID, bot: false },
+    });
+
+    await service.checkAndRemind(staleAnnouncement.id);
+    await service.stopAnnouncementReminder(staleAnnouncement.id);
+
+    assert.equal(sent.length, 1);
+    assert.deepEqual(sent[0].allowedMentions, { users: ['user-ping'] });
+    assert.doesNotMatch(sent[0].content, /user-reacted/);
+});
+
 test('annonce reactions : reprend le suivi apres redemarrage', async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'announcement-reminders-'));
     const stateFile = path.join(tmpDir, 'state.json');
@@ -357,6 +452,7 @@ test('annonce reactions : reprend une annonce existante depuis l historique du s
         messages: {
             async fetch(arg) {
                 if (typeof arg === 'string') return arg === announcementId ? announcement : null;
+                if (arg?.force === true) return announcement;
                 return new Map([[announcementId, announcement]]);
             },
         },

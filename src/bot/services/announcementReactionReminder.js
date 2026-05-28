@@ -127,10 +127,16 @@ async function getReactedUserIds(message) {
     const reactions = getCollectionValues(message?.reactions?.cache || message?.reactions);
 
     for (const reaction of reactions) {
-        let users = reaction?.users?.cache || reaction?.users;
+        let fullReaction = reaction;
 
-        if (typeof reaction?.users?.fetch === 'function') {
-            users = await reaction.users.fetch();
+        if (reaction?.partial && typeof reaction.fetch === 'function') {
+            fullReaction = await reaction.fetch().catch(() => reaction);
+        }
+
+        let users = fullReaction?.users?.cache || fullReaction?.users;
+
+        if (typeof fullReaction?.users?.fetch === 'function') {
+            users = await fullReaction.users.fetch({ limit: 100 });
         }
 
         for (const user of getCollectionValues(users)) {
@@ -141,6 +147,26 @@ async function getReactedUserIds(message) {
     }
 
     return reacted;
+}
+
+async function fetchFreshMessage(channel, messageId) {
+    if (!channel?.messages?.fetch) return null;
+
+    let message = await channel.messages.fetch({
+        message: toId(messageId),
+        force: true,
+        cache: true,
+    }).catch(() => null);
+
+    if (!message) {
+        message = await channel.messages.fetch(toId(messageId)).catch(() => null);
+    }
+
+    if (message?.partial && typeof message.fetch === 'function') {
+        message = await message.fetch().catch(() => message);
+    }
+
+    return message;
 }
 
 async function getAnnouncementNonReactors(guild, message, options = {}) {
@@ -304,7 +330,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
 
         try {
             const channel = await client.channels.fetch(entry.channelId).catch(() => null);
-            const announcement = await channel?.messages?.fetch(entry.messageId).catch(() => null);
+            const announcement = await fetchFreshMessage(channel, entry.messageId);
 
             if (!channel || !announcement) {
                 logger.info?.(`[annonces] annonce ${entry.messageId} introuvable, relance arretee`);
