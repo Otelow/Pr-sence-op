@@ -33,6 +33,9 @@ function createPresenceCommandHandlers(deps) {
     }
 
     async function handlePresence2(interaction) {
+        if (getPresence2Data().active) {
+            return interaction.reply({ content: '⚠️ La 2ème Présence OP est déjà active.', ephemeral: true });
+        }
         await interaction.reply({ content: '📋 Envoi de la 2ème présence OP...', ephemeral: true });
         await sendPresence2Message();
     }

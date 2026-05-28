@@ -86,6 +86,24 @@ let userPermissions = { canEditMap: false };
 let presenceStatsCache = null;
 let presenceEvolutionChart = null;
 
+window.CSRF_TOKEN = window.CSRF_TOKEN || null;
+(function installCsrfFetchWrapper() {
+    if (window.__csrfFetchInstalled) return;
+    window.__csrfFetchInstalled = true;
+    const nativeFetch = window.fetch.bind(window);
+    const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
+    window.fetch = (input, init = {}) => {
+        const requestMethod = init.method || (input instanceof Request ? input.method : 'GET');
+        const method = String(requestMethod || 'GET').toUpperCase();
+        if (!safeMethods.has(method) && window.CSRF_TOKEN) {
+            const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+            headers.set('X-CSRF-Token', window.CSRF_TOKEN);
+            return nativeFetch(input, { ...init, headers });
+        }
+        return nativeFetch(input, init);
+    };
+})();
+
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
     await runInitStep('moveRootModals', () => {
@@ -232,6 +250,7 @@ async function loadUser() {
         const user = await res.json();
         window.currentUser = user;
         window.currentUserId = user.id;
+        window.CSRF_TOKEN = user.csrfToken || window.CSRF_TOKEN;
         document.getElementById('userName').textContent = user.username;
         if (user.avatar) document.getElementById('userAvatar').src = user.avatar;
         return true;

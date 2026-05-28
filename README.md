@@ -71,6 +71,7 @@ Déploiement propre :
 - Déployer depuis GitHub/Railway, pas depuis un ZIP brut du dossier local.
 - Ne jamais envoyer `node_modules`, `.git`, `.env`, `data/*.db`, `data/*.db-shm`, `data/*.db-wal`.
 - Si une archive est nécessaire, utiliser `git archive` depuis un commit propre.
+- Pour générer une archive propre localement : `npm run package:clean`.
 - Laisser Railway exécuter `npm ci` afin de compiler `better-sqlite3` pour Linux et éviter les erreurs `invalid ELF header`.
 
 - Healthcheck : `/healthz`

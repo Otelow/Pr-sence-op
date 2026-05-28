@@ -10,6 +10,7 @@ const {
     MY_WEAPONS_DELETE_ROLE,
     canViewMap,
 } = require('../../shared/permissions');
+const { ensureCsrfToken } = require('../middlewares/csrf');
 
 function registerConfigRoutes(app, deps) {
     const {
@@ -25,6 +26,7 @@ function registerConfigRoutes(app, deps) {
     app.get('/api/me', requireAuth, (req, res) => {
         const user = {
             ...req.session.user,
+            csrfToken: ensureCsrfToken(req),
             isAdmin: isUserAdmin(req.session.user),
             hasFullSiteAccess: hasFullSiteAccess(req.session.user),
             hasLimitedCraftAccess: hasLimitedCraftAccess(req.session.user),
@@ -49,6 +51,7 @@ function registerConfigRoutes(app, deps) {
 
     app.get('/api/me/permissions', requireAuth, (req, res) => {
         res.json({
+            csrfToken: ensureCsrfToken(req),
             canEditMap: canEditMapUser(req.session.user),
             isAdmin: isUserAdmin(req.session.user),
             hasFullSiteAccess: hasFullSiteAccess(req.session.user),
@@ -60,7 +63,11 @@ function registerConfigRoutes(app, deps) {
     });
 
     app.get('/api/admin/check', requireAuth, (req, res) => {
-        res.json({ isAdmin: isUserAdmin(req.session.user) });
+        res.json({ isAdmin: isUserAdmin(req.session.user), csrfToken: ensureCsrfToken(req) });
+    });
+
+    app.get('/api/csrf', requireAuth, (req, res) => {
+        res.json({ csrfToken: ensureCsrfToken(req) });
     });
 }
 

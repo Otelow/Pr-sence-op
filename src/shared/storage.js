@@ -16,6 +16,15 @@ function safeName(name) {
         .slice(0, 140) || 'upload';
 }
 
+function resolveInside(baseDir, relativePath) {
+    const base = path.resolve(baseDir);
+    const target = path.resolve(base, relativePath);
+    if (target !== base && !target.startsWith(base + path.sep)) {
+        throw new Error('Chemin fichier invalide');
+    }
+    return target;
+}
+
 async function uploadLocalFile(file, options = {}) {
     const validation = validateFile(file, options);
     if (!validation.ok) throw new Error(validation.error);
@@ -61,7 +70,7 @@ async function deleteFile(fileRef, options = {}) {
 
     const relativePath = typeof fileRef === 'string' ? fileRef : fileRef.path;
     if (!relativePath) return false;
-    const absolutePath = path.join(config.paths.uploads, relativePath);
+    const absolutePath = resolveInside(config.paths.uploads, relativePath);
     await fs.rm(absolutePath, { force: true });
     return true;
 }
@@ -81,5 +90,6 @@ module.exports = {
     uploadFile,
     deleteFile,
     getPublicUrl,
-    validateFile
+    validateFile,
+    resolveInside,
 };

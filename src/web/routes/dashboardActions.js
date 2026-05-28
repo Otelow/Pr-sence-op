@@ -37,6 +37,7 @@ function buildAlertMessages(state) {
         'traitement-weed': `🚨 On va aller sur le traitement de la weed ! Branchez-vous sur la radio ! ${state.CONFIG.EMOJIS.BS21}`,
         yellowjack: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir à côté du Yellow Jack ${state.CONFIG.EMOJIS.BS21}`,
         megamall: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir au parking Mega Mall ${state.CONFIG.EMOJIS.BS21}`,
+        parking5: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de vous rendre au Parking 5 (Madrazo) le plus rapidement possible.`,
         ile: `<@&${state.CONFIG.ROLES.MEMBRE_1}> 🚨 Merci de venir à côté de l'Ile ${state.CONFIG.EMOJIS.BS21}`,
         trash: `🚨 Celui qui trash sera ban sans sommation ! ${state.CONFIG.EMOJIS.BS21}`,
     };
@@ -99,6 +100,7 @@ function registerDashboardActionRoutes(app, deps) {
                 case 'traitement-weed':
                 case 'yellowjack':
                 case 'megamall':
+                case 'parking5':
                 case 'ile':
                 case 'trash': {
                     if (!qgChannel) return res.status(500).json({ error: 'Salon QG introuvable' });
@@ -123,6 +125,7 @@ function registerDashboardActionRoutes(app, deps) {
                 }
 
                 case 'presence2': {
+                    if (state.presence2Data?.active) return res.status(400).json({ error: '2ème Présence OP déjà active' });
                     await state.sendPresence2Message();
                     return res.json({ success: true });
                 }
@@ -246,4 +249,5 @@ function registerDashboardActionRoutes(app, deps) {
 
 module.exports = {
     registerDashboardActionRoutes,
+    buildAlertMessages,
 };

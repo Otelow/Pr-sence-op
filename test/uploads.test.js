@@ -10,6 +10,8 @@ const {
     validateUploadedImages,
     validateImageFileSignature,
 } = require('../src/web/services/crafts/uploads');
+const { deleteFile } = require('../src/shared/storage');
+const config = require('../src/shared/config');
 
 const PNG_1X1 = Buffer.from([
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
@@ -89,5 +91,21 @@ test('middleware magic bytes supprime le fichier temporaire rejete', async () =>
         assert.equal(fs.existsSync(invalidPath), false);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('storage.deleteFile refuse les chemins hors dossier uploads', async () => {
+    const uploadsRoot = fs.mkdtempSync(path.join(os.tmpdir(), '21bs-storage-'));
+    const outside = path.join(os.tmpdir(), `outside-storage-${Date.now()}.txt`);
+    fs.writeFileSync(outside, 'outside');
+    const previousUploads = config.paths.uploads;
+    config.paths.uploads = uploadsRoot;
+    try {
+        await assert.rejects(() => deleteFile('../' + path.basename(outside)), /Chemin fichier invalide/);
+        assert.equal(fs.existsSync(outside), true);
+    } finally {
+        config.paths.uploads = previousUploads;
+        fs.rmSync(uploadsRoot, { recursive: true, force: true });
+        fs.rmSync(outside, { force: true });
     }
 });

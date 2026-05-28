@@ -98,6 +98,24 @@ function registerCraftCatalogRoutes(app, deps) {
         safeDeleteUploadedFile(uploadsDir, filename);
     }
 
+    function uploadedFilesFromReq(req) {
+        if (req.file) return [req.file];
+        if (Array.isArray(req.files)) return req.files;
+        if (req.files && typeof req.files === 'object') return Object.values(req.files).flat();
+        return [];
+    }
+
+    function cleanupUploadedFiles(req) {
+        for (const file of uploadedFilesFromReq(req)) {
+            safeDeleteUpload(file.filename || file.path);
+        }
+    }
+
+    function sendRouteError(res, error) {
+        const status = error.statusCode || 500;
+        return res.status(status).json({ error: error.message });
+    }
+
     app.get('/api/crafts/stocks', requireAuth, (req, res) => {
         try {
             res.json(getCraftableWeapons());
@@ -195,7 +213,7 @@ function registerCraftCatalogRoutes(app, deps) {
                 details: { name, craft_time, craft_price, sale_price, max_sale_price, requires_plan },
             });
             res.json({ success: true, id });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { cleanupUploadedFiles(req); sendRouteError(res, e); }
     });
 
     app.put('/api/crafts/weapons/:id', requireAdmin, upload.fields([{ name: 'image', maxCount: 1 }, { name: 'plan_image', maxCount: 1 }]), (req, res) => {
@@ -222,13 +240,6 @@ function registerCraftCatalogRoutes(app, deps) {
                 ? !!existing.requires_plan
                 : (requires_plan === '1' || requires_plan === 'true' || requires_plan === true);
 
-            if (newImage && existing.image_path) {
-                safeDeleteUpload(existing.image_path);
-            }
-            if (newPlan && existing.plan_image_path) {
-                safeDeleteUpload(existing.plan_image_path);
-            }
-
             updateWeapon(
                 id, name || existing.name, newImage, newPlan,
                 requiresPlanValue,
@@ -238,13 +249,19 @@ function registerCraftCatalogRoutes(app, deps) {
                 maxSalePriceValue,
                 JSON.stringify(normalizedIngredients)
             );
+            if (newImage && existing.image_path) {
+                safeDeleteUpload(existing.image_path);
+            }
+            if (newPlan && existing.plan_image_path) {
+                safeDeleteUpload(existing.plan_image_path);
+            }
             audit(req.session.user, 'catalog.weapon.update', {
                 target_type: 'catalog_weapon',
                 target_id: id,
                 details: { name: name || existing.name, craft_time, craft_price, sale_price, max_sale_price, requires_plan },
             });
             res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { cleanupUploadedFiles(req); sendRouteError(res, e); }
     });
 
     app.delete('/api/crafts/weapons/:id', requireAdmin, (req, res) => {
@@ -252,20 +269,20 @@ function registerCraftCatalogRoutes(app, deps) {
             const id = parseId(req.params.id);
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const existing = getWeapon(id);
+            deleteWeapon(id);
             if (existing && existing.image_path) {
                 safeDeleteUpload(existing.image_path);
             }
             if (existing && existing.plan_image_path) {
                 safeDeleteUpload(existing.plan_image_path);
             }
-            deleteWeapon(id);
             audit(req.session.user, 'catalog.weapon.delete', {
                 target_type: 'catalog_weapon',
                 target_id: id,
                 details: { name: existing?.name || null },
             });
             res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { cleanupUploadedFiles(req); sendRouteError(res, e); }
     });
 
     // ─── INGREDIENTS ─────────────
@@ -291,7 +308,7 @@ function registerCraftCatalogRoutes(app, deps) {
                 details: { name: name.trim(), imagePath },
             });
             res.json({ success: true, id });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { cleanupUploadedFiles(req); sendRouteError(res, e); }
     });
 
     app.put('/api/crafts/ingredients/:id', requireAdmin, upload.single('image'), (req, res) => {
@@ -301,17 +318,17 @@ function registerCraftCatalogRoutes(app, deps) {
             const { name } = req.body;
             const existing = getIngredient(id);
             if (!existing) return res.status(404).json({ error: 'Ingrédient introuvable' });
+            updateIngredient(id, name || existing.name, req.file ? req.file.filename : null);
             if (req.file && existing.image_path) {
                 safeDeleteUpload(existing.image_path);
             }
-            updateIngredient(id, name || existing.name, req.file ? req.file.filename : null);
             audit(req.session.user, 'catalog.ingredient.update', {
                 target_type: 'catalog_ingredient',
                 target_id: id,
                 details: { name: name || existing.name, imagePath: req.file ? req.file.filename : null },
             });
             res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { cleanupUploadedFiles(req); sendRouteError(res, e); }
     });
 
     app.delete('/api/crafts/ingredients/:id', requireAdmin, (req, res) => {
@@ -319,17 +336,17 @@ function registerCraftCatalogRoutes(app, deps) {
             const id = parseId(req.params.id);
             if (id === null) return res.status(400).json({ error: 'ID invalide' });
             const existing = getIngredient(id);
+            deleteIngredient(id);
             if (existing && existing.image_path) {
                 safeDeleteUpload(existing.image_path);
             }
-            deleteIngredient(id);
             audit(req.session.user, 'catalog.ingredient.delete', {
                 target_type: 'catalog_ingredient',
                 target_id: id,
                 details: { name: existing?.name || null },
             });
             res.json({ success: true });
-        } catch (e) { res.status(500).json({ error: e.message }); }
+        } catch (e) { sendRouteError(res, e); }
     });
 
     app.get('/api/crafts/myweapon-names', requireAuth, (req, res) => {

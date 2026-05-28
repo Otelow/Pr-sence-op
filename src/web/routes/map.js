@@ -9,6 +9,17 @@ const {
 const mapPoints = require('../services/mapPoints');
 const { audit } = require('../../shared/auditLog');
 
+function isFiniteNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value);
+}
+
+function normalizeIdArray(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map(v => (typeof v === 'string' ? v.trim() : ''))
+        .filter(v => /^\d{15,25}$/.test(v));
+}
+
 function registerMapRoutes(app, deps) {
     const {
         requireAuth,
@@ -64,7 +75,7 @@ function registerMapRoutes(app, deps) {
         if (!canEditMap(req)) return res.status(403).json({ error: 'Permissions insuffisantes pour modifier la carte' });
 
         const { x, y, label, type, allowedRoles, allowedUsers, code } = req.body;
-        if (typeof x !== 'number' || typeof y !== 'number') {
+        if (!isFiniteNumber(x) || !isFiniteNumber(y)) {
             return res.status(400).json({ error: 'Coordonnées invalides' });
         }
 
@@ -75,8 +86,8 @@ function registerMapRoutes(app, deps) {
             label: label || 'Point',
             type: type || 'weed',
             code: ['lab', 'weapon-lab'].includes(type) ? (code || '').trim().slice(0, 50) : null,
-            allowedRoles: Array.isArray(allowedRoles) ? allowedRoles : [],
-            allowedUsers: Array.isArray(allowedUsers) ? allowedUsers : [],
+            allowedRoles: normalizeIdArray(allowedRoles),
+            allowedUsers: normalizeIdArray(allowedUsers),
             createdBy: req.session.user.username,
             createdById: req.session.user.id,
             createdAt: Date.now(),
@@ -106,23 +117,30 @@ function registerMapRoutes(app, deps) {
         const point = mapPoints.listAll().find(p => p.id === req.params.id);
         if (!point) return res.status(404).json({ error: 'Point introuvable' });
 
-        const { x, y, label, type, color, code, allowedRoles } = req.body;
-        if (typeof x === 'number') point.x = x;
-        if (typeof y === 'number') point.y = y;
+        const { x, y, label, type, color, code, allowedRoles, allowedUsers } = req.body;
+        if (x !== undefined) {
+            if (!isFiniteNumber(x)) return res.status(400).json({ error: 'Coordonnée x invalide' });
+            point.x = x;
+        }
+        if (y !== undefined) {
+            if (!isFiniteNumber(y)) return res.status(400).json({ error: 'Coordonnée y invalide' });
+            point.y = y;
+        }
         if (label !== undefined) point.label = label;
         if (type !== undefined) point.type = type;
         if (color !== undefined) point.color = color;
         if (code !== undefined && ['lab', 'weapon-lab'].includes(point.type)) {
             point.code = (code || '').trim().slice(0, 50);
         }
-        if (Array.isArray(allowedRoles)) point.allowedRoles = allowedRoles;
+        if (Array.isArray(allowedRoles)) point.allowedRoles = normalizeIdArray(allowedRoles);
+        if (Array.isArray(allowedUsers)) point.allowedUsers = normalizeIdArray(allowedUsers);
         point.updatedBy = req.session.user.username;
 
         const updatedPoint = mapPoints.update(req.params.id, point);
         audit(req.session.user, 'mapPoint.update', {
             target_type: 'map_point',
             target_id: req.params.id,
-            details: { x, y, label, type, color, allowedRoles },
+            details: { x, y, label, type, color, allowedRoles: point.allowedRoles, allowedUsers: point.allowedUsers },
         });
         res.json({ success: true, point: updatedPoint });
     });
@@ -130,4 +148,6 @@ function registerMapRoutes(app, deps) {
 
 module.exports = {
     registerMapRoutes,
+    isFiniteNumber,
+    normalizeIdArray,
 };

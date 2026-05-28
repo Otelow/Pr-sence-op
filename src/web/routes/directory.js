@@ -15,6 +15,7 @@ const COMMANDS = [
     { id: 'traitement-weed', icon: '⚗', name: 'Traitement', desc: 'Traitement de la weed', category: 'alert' },
     { id: 'yellowjack', icon: '🟡', name: 'Yellow Jack', desc: 'Rassemblement Yellow Jack', category: 'alert' },
     { id: 'megamall', icon: '🅿', name: 'Mega Mall', desc: 'Parking Mega Mall', category: 'alert' },
+    { id: 'parking5', icon: 'P5', name: 'Parking 5', desc: 'Rassemblement Parking 5 Madrazo', category: 'alert', danger: true },
     { id: 'ile', icon: '🏝', name: 'Ile', desc: 'Rassemblement près de l’Ile', category: 'alert' },
     { id: 'trash', icon: '🚫', name: 'Anti-Trash', desc: 'Avertissement trash', category: 'alert' },
     // Communications
@@ -133,4 +134,5 @@ function registerDirectoryRoutes(app, deps) {
 
 module.exports = {
     registerDirectoryRoutes,
+    COMMANDS,
 };

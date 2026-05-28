@@ -60,6 +60,9 @@ function insertIngredient(name, image_path) {
             const r = db.prepare('INSERT OR IGNORE INTO ingredients (name, image_path) VALUES (?, ?)').run(name, image_path);
         if (isStockMaterialName(name)) seedStockMaterials();
         else invalidateCraftCaches();
+        if (!r.changes) {
+            return db.prepare('SELECT id FROM ingredients WHERE LOWER(name) = ? LIMIT 1').get(String(name || '').trim().toLowerCase())?.id || null;
+        }
         return r.lastInsertRowid;
 }
 
@@ -109,6 +112,7 @@ function insertMyWeaponName(name, sale_price = 0, max_sale_price = 0) {
             const r = db.prepare('INSERT OR IGNORE INTO my_weapon_names (name, sale_price, max_sale_price) VALUES (?, ?, ?)').run(clean, salePrice, maxSalePrice);
         if (!r.changes) {
             db.prepare('UPDATE my_weapon_names SET sale_price = ?, max_sale_price = ? WHERE LOWER(name) = ?').run(salePrice, maxSalePrice, clean.toLowerCase());
+            return db.prepare('SELECT id FROM my_weapon_names WHERE LOWER(name) = ? LIMIT 1').get(clean.toLowerCase())?.id || null;
         }
         return r.lastInsertRowid;
 }
@@ -131,6 +135,9 @@ function getAllOrgs() {
 
 function insertOrg(name) {
     const r = db.prepare('INSERT OR IGNORE INTO organizations (name) VALUES (?)').run(name);
+    if (!r.changes) {
+        return db.prepare('SELECT id FROM organizations WHERE LOWER(name) = ? LIMIT 1').get(String(name || '').trim().toLowerCase())?.id || null;
+    }
     return r.lastInsertRowid || null;
 }
 

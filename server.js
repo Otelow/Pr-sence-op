@@ -1,6 +1,4 @@
 // QUICK WINS 3 18/05/2026 — erreurs 500 tracées pour monitoring
-// EXPORT DB TEMPORAIRE 28/05/2026 — téléchargement protégé Railway
-// EXPORT IMAGES CRAFT TEMPORAIRE 28/05/2026 — tar.gz protégé Railway
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('./src/shared/logger');
@@ -35,7 +33,6 @@ const session = require('express-session');
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
 const { PermissionFlagsBits } = require('discord.js');
 const config = require('./src/shared/config');
 const { createBetterSqliteSessionStore } = require('./src/web/services/sessionStore');
@@ -52,6 +49,7 @@ const {
     canAccessMyWeapons,
     canEditMapUser,
 } = require('./src/web/middlewares/auth');
+const { attachCsrfToken, requireCsrf } = require('./src/web/middlewares/csrf');
 const { perfLog } = require('./src/web/middlewares/perfLog');
 const { initDB, registerCraftEndpoints } = require('./crafts');
 const { emitRealtime } = require('./src/shared/realtime');
@@ -152,7 +150,7 @@ function startServer(client, getState) {
         },
     }));
     app.use(compression());
-    app.use(express.json());
+    app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '100kb' }));
     app.use(express.static(path.join(__dirname, 'public'), {
         maxAge: config.isProduction || config.isRailway ? '1h' : 0,
         setHeaders: (res, filePath) => {
@@ -171,6 +169,8 @@ function startServer(client, getState) {
         },
     }));
     app.use(sessionMiddleware);
+    app.use(attachCsrfToken);
+    app.use(requireCsrf);
     app.use(perfLog);
     app.use((req, res, next) => {
         res.on('finish', () => {
@@ -403,94 +403,6 @@ function startServer(client, getState) {
         requireMapViewAccess,
         isUserAdmin,
         canEditMapUser,
-    });
-
-    app.get('/admin/export-db', (req, res) => {
-        const token = process.env.EXPORT_TOKEN;
-        if (!token || req.query.token !== token) {
-            return res.status(403).send('Forbidden');
-        }
-
-        const allowed = [
-            'crafts.db',
-            'crafts.db-wal',
-            'crafts.db-shm',
-        ];
-        const file = String(req.query.file || 'crafts.db');
-        if (!allowed.includes(file)) {
-            return res.status(400).send('Invalid file');
-        }
-
-        return res.download(path.join('/data', file), file);
-    });
-
-    app.get('/admin/list-data', (req, res) => {
-        const token = process.env.EXPORT_TOKEN;
-        if (!token || req.query.token !== token) {
-            return res.status(403).send('Forbidden');
-        }
-
-        const root = '/data';
-        const files = [];
-
-        function walk(dir) {
-            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-                const fullPath = path.join(dir, entry.name);
-                if (entry.isDirectory()) {
-                    walk(fullPath);
-                    continue;
-                }
-                if (!entry.isFile()) continue;
-                const stat = fs.statSync(fullPath);
-                files.push({
-                    path: fullPath,
-                    size: stat.size,
-                    modified_at: stat.mtime.toISOString(),
-                });
-            }
-        }
-
-        try {
-            walk(root);
-            return res.json({ root, files });
-        } catch (error) {
-            log.warn({ err: error.message }, 'export list-data échoué');
-            return res.status(500).json({ error: 'Impossible de lister /data' });
-        }
-    });
-
-    app.get('/admin/export-crafts-images', (req, res) => {
-        const token = process.env.EXPORT_TOKEN;
-        if (!token || req.query.token !== token) {
-            return res.status(403).send('Forbidden');
-        }
-
-        const craftsDir = '/data/crafts';
-        if (!fs.existsSync(craftsDir)) {
-            return res.status(404).send('Crafts images folder not found');
-        }
-
-        res.setHeader('Content-Type', 'application/gzip');
-        res.setHeader('Content-Disposition', 'attachment; filename="crafts-images.tar.gz"');
-
-        const tar = spawn('tar', ['-czf', '-', '-C', '/data', 'crafts']);
-        tar.stdout.pipe(res);
-
-        tar.stderr.on('data', data => {
-            log.warn({ err: data.toString() }, 'export-crafts-images tar stderr');
-        });
-
-        tar.on('error', error => {
-            log.warn({ err: error.message }, 'export-crafts-images spawn error');
-            if (!res.headersSent) return res.status(500).send('Export error');
-            return res.destroy(error);
-        });
-
-        tar.on('close', code => {
-            if (code !== 0) {
-                log.warn({ code }, 'export-crafts-images tar exited');
-            }
-        });
     });
 
     app.use((err, req, res, next) => {

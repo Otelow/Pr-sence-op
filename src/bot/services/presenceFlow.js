@@ -127,6 +127,7 @@ async function preparePresenceDayForFirstOp() {
 }
 
 async function sendPresence2Message(channelOverride) {
+    if (!channelOverride && presence2Data.active) return false;
     const channelId = channelOverride || CONFIG.CHANNELS.PRESENCE;
     const channel = client.channels.cache.get(channelId);
     if (!channel) return;

@@ -8,6 +8,7 @@ data/*.db-shm
 data/*.db-wal
 uploads/
 logs/
+releases/
 dist/
 build/
 *.zip

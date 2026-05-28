@@ -13,11 +13,13 @@
     "audit:high": "npm audit --omit=dev --audit-level=high",
     "smoke": "npm run smoke:remote --",
     "smoke:remote": "node scripts/smoke-test.js",
-    "convert-assets": "node scripts/convert-assets.js"
+    "convert-assets": "node scripts/convert-assets.js",
+    "package:clean": "node scripts/package-clean.js"
   },
   "dependencies": {
     "axios": "^1.7.7",
     "better-sqlite3": "^12.9.0",
+    "chart.js": "^4.4.0",
     "compression": "^1.8.1",
     "discord.js": "^14.26.4",
     "dotenv": "^16.4.5",
@@ -26,7 +28,7 @@
     "express-session": "^1.18.0",
     "helmet": "^7.2.0",
     "multer": "^2.1.1",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.2.1",
     "pino": "^9.5.0",
     "socket.io": "^4.8.1"
   },
