@@ -8,8 +8,12 @@ const {
     ANNOUNCER_USER_ID,
     EXCLUDED_ROLE_ID,
     REMINDER_CHANNEL_ID,
+    REMINDER_REPEAT_DELAY_MS,
     TARGET_ROLE_ID,
+    TRACKING_START_DATE,
+    TRACKING_START_TIMESTAMP_MS,
     getAnnouncementNonReactors,
+    isAnnouncementInTrackingWindow,
     isAnnouncementTrigger,
     memberHasRole,
     registerAnnouncementReactionReminder,
@@ -53,6 +57,17 @@ test('annonce reactions : lecture des roles Discord', () => {
     const member = makeMember('user-1', [TARGET_ROLE_ID]);
     assert.equal(memberHasRole(member, TARGET_ROLE_ID), true);
     assert.equal(memberHasRole(member, EXCLUDED_ROLE_ID), false);
+});
+
+test('annonce reactions : relance toutes les 10 minutes et ignore avant le 28/05/2026', () => {
+    assert.equal(REMINDER_REPEAT_DELAY_MS, 10 * 60 * 1000);
+    assert.equal(TRACKING_START_DATE, '2026-05-28');
+    assert.equal(isAnnouncementInTrackingWindow({
+        createdAt: new Date(TRACKING_START_TIMESTAMP_MS - 1).toISOString(),
+    }), false);
+    assert.equal(isAnnouncementInTrackingWindow({
+        createdAt: new Date(TRACKING_START_TIMESTAMP_MS).toISOString(),
+    }), true);
 });
 
 test('annonce reactions : calcule uniquement les membres a relancer', async () => {
@@ -268,6 +283,46 @@ test('annonce reactions : reprend le suivi apres redemarrage', async () => {
 
     assert.equal(sent.length, 1);
     assert.deepEqual(sent[0].allowedMentions, { users: ['user-restart'] });
+
+    const persisted = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    assert.deepEqual(persisted.announcements, []);
+});
+
+test('annonce reactions : ne restaure pas les annonces avant le 28/05/2026', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'announcement-reminders-old-'));
+    const stateFile = path.join(tmpDir, 'state.json');
+    fs.writeFileSync(stateFile, JSON.stringify({
+        announcements: [{
+            messageId: 'announcement-old',
+            channelId: ANNOUNCEMENT_CHANNEL_ID,
+            createdAt: new Date(TRACKING_START_TIMESTAMP_MS - 1).toISOString(),
+        }],
+    }));
+
+    let readyHandler = null;
+    const client = {
+        on() {},
+        once(event, handler) {
+            if (event === 'ready') readyHandler = handler;
+        },
+        channels: {
+            async fetch() {
+                throw new Error('Une annonce trop ancienne ne doit pas etre refetch');
+            },
+        },
+    };
+
+    registerAnnouncementReactionReminder(client, {
+        stateFile,
+        logger: { info() {}, warn() {}, error() {} },
+        attentionEmoji: ':attention:',
+        initialReminderDelayMs: 60_000,
+        reminderDeleteDelayMs: 60_000,
+        reminderRepeatDelayMs: 60_000,
+    });
+
+    assert.equal(typeof readyHandler, 'function');
+    assert.equal(readyHandler(), 0);
 
     const persisted = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
     assert.deepEqual(persisted.announcements, []);

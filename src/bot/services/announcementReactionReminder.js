@@ -10,8 +10,10 @@ const REMINDER_CHANNEL_ID = '1485651067860680915';
 const TARGET_ROLE_ID = '1485270431291277383';
 const EXCLUDED_ROLE_ID = '1490361524408291459';
 const REMINDER_DELETE_DELAY_MS = 3 * 60 * 1000;
-const REMINDER_REPEAT_DELAY_MS = 3 * 60 * 1000;
+const REMINDER_REPEAT_DELAY_MS = 10 * 60 * 1000;
 const INITIAL_REMINDER_DELAY_MS = 1000;
+const TRACKING_START_DATE = '2026-05-28';
+const TRACKING_START_TIMESTAMP_MS = Date.UTC(2026, 4, 27, 22, 0, 0);
 const DEFAULT_STATE_FILE = path.join(config.paths.data, 'announcement_reaction_reminders.json');
 
 const trackedAnnouncements = new Map();
@@ -61,6 +63,48 @@ function isAnnouncementTrigger(message, options = {}) {
         && toId(message.channelId) === channelId
         && toId(message.author?.id) === authorId
     );
+}
+
+function snowflakeTimestampMs(id) {
+    try {
+        const snowflake = BigInt(String(id || ''));
+        return Number((snowflake >> 22n) + 1420070400000n);
+    } catch {
+        return null;
+    }
+}
+
+function getTimestampMs(value) {
+    if (!value) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (value instanceof Date) {
+        const timestamp = value.getTime();
+        return Number.isFinite(timestamp) ? timestamp : null;
+    }
+
+    const parsed = Date.parse(String(value));
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getAnnouncementCreatedTimestampMs(messageOrEntry) {
+    return getTimestampMs(messageOrEntry?.createdTimestamp)
+        || getTimestampMs(messageOrEntry?.createdAt)
+        || snowflakeTimestampMs(messageOrEntry?.id || messageOrEntry?.messageId);
+}
+
+function isAnnouncementInTrackingWindow(messageOrEntry, options = {}) {
+    const trackingStartMs = Number.isFinite(options.trackingStartMs)
+        ? options.trackingStartMs
+        : TRACKING_START_TIMESTAMP_MS;
+    const timestamp = getAnnouncementCreatedTimestampMs(messageOrEntry);
+
+    if (!timestamp) return true;
+    return timestamp >= trackingStartMs;
+}
+
+function getAnnouncementCreatedAtIso(message) {
+    const timestamp = getAnnouncementCreatedTimestampMs(message);
+    return timestamp ? new Date(timestamp).toISOString() : new Date().toISOString();
 }
 
 async function fetchGuildMembers(guild, logger = log) {
@@ -202,6 +246,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
         reminderDeleteDelayMs: context.reminderDeleteDelayMs || REMINDER_DELETE_DELAY_MS,
         reminderRepeatDelayMs: context.reminderRepeatDelayMs || REMINDER_REPEAT_DELAY_MS,
         initialReminderDelayMs: context.initialReminderDelayMs || INITIAL_REMINDER_DELAY_MS,
+        trackingStartMs: Number.isFinite(context.trackingStartMs) ? context.trackingStartMs : TRACKING_START_TIMESTAMP_MS,
         stateFile: context.stateFile || DEFAULT_STATE_FILE,
         logger,
     };
@@ -237,6 +282,12 @@ function registerAnnouncementReactionReminder(client, context = {}) {
 
             if (!channel || !announcement) {
                 logger.info?.(`[annonces] annonce ${entry.messageId} introuvable, relance arretee`);
+                await stopAnnouncementReminder(entry.messageId);
+                return;
+            }
+
+            if (!isAnnouncementInTrackingWindow(announcement, options)) {
+                logger.info?.(`[annonces] annonce ${entry.messageId} avant ${TRACKING_START_DATE}, relance ignoree`);
                 await stopAnnouncementReminder(entry.messageId);
                 return;
             }
@@ -287,6 +338,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
 
     function startAnnouncementReminder(message) {
         if (!isAnnouncementTrigger(message, options)) return false;
+        if (!isAnnouncementInTrackingWindow(message, options)) return false;
 
         const messageId = toId(message.id);
         if (!messageId) return false;
@@ -299,7 +351,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
             channelId: toId(message.channelId),
             lastReminderMessageId: null,
             lastReminderChannelId: null,
-            createdAt: new Date().toISOString(),
+            createdAt: getAnnouncementCreatedAtIso(message),
             updatedAt: new Date().toISOString(),
             deleteTimerId: null,
             repeatTimerId: null,
@@ -314,8 +366,13 @@ function registerAnnouncementReactionReminder(client, context = {}) {
     function restoreTrackedAnnouncements() {
         const entries = loadReminderState(options.stateFile, logger);
         let restored = 0;
+        let skipped = 0;
 
         for (const entry of entries) {
+            if (!isAnnouncementInTrackingWindow(entry, options)) {
+                skipped += 1;
+                continue;
+            }
             if (trackedAnnouncements.has(entry.messageId)) continue;
             trackedAnnouncements.set(entry.messageId, entry);
             scheduleNextReminder(entry, options.initialReminderDelayMs);
@@ -324,6 +381,10 @@ function registerAnnouncementReactionReminder(client, context = {}) {
 
         if (restored > 0) {
             logger.info?.(`[annonces] ${restored} annonce(s) restauree(s) apres redemarrage`);
+        }
+        if (skipped > 0) {
+            logger.info?.(`[annonces] ${skipped} annonce(s) avant ${TRACKING_START_DATE} ignoree(s)`);
+            persistState();
         }
 
         return restored;
@@ -359,9 +420,13 @@ module.exports = {
     EXCLUDED_ROLE_ID,
     REMINDER_DELETE_DELAY_MS,
     REMINDER_REPEAT_DELAY_MS,
+    TRACKING_START_DATE,
+    TRACKING_START_TIMESTAMP_MS,
+    getAnnouncementCreatedTimestampMs,
     getAnnouncementNonReactors,
     getReactedUserIds,
     isAnnouncementTrigger,
+    isAnnouncementInTrackingWindow,
     loadReminderState,
     memberHasRole,
     registerAnnouncementReactionReminder,
