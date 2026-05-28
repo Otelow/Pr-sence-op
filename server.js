@@ -1,6 +1,6 @@
 // QUICK WINS 3 18/05/2026 — erreurs 500 tracées pour monitoring
 // EXPORT DB TEMPORAIRE 28/05/2026 — téléchargement protégé Railway
-// EXPORT IMAGES CRAFT TEMPORAIRE 28/05/2026 — ZIP protégé Railway
+// EXPORT IMAGES CRAFT TEMPORAIRE 28/05/2026 — tar.gz protégé Railway
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // FINAL POST-STAB A 17/05/2026 ? pino backend
 const log = require('./src/shared/logger');
@@ -33,9 +33,9 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const axios = require('axios');
-const archiver = require('archiver');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const { PermissionFlagsBits } = require('discord.js');
 const config = require('./src/shared/config');
 const { createBetterSqliteSessionStore } = require('./src/web/services/sessionStore');
@@ -470,18 +470,27 @@ function startServer(client, getState) {
             return res.status(404).send('Crafts images folder not found');
         }
 
-        res.attachment('crafts-images.zip');
-        const archive = archiver('zip', { zlib: { level: 9 } });
+        res.setHeader('Content-Type', 'application/gzip');
+        res.setHeader('Content-Disposition', 'attachment; filename="crafts-images.tar.gz"');
 
-        archive.on('error', error => {
-            log.warn({ err: error.message }, 'export crafts images zip échoué');
-            if (!res.headersSent) return res.status(500).send('ZIP export failed');
+        const tar = spawn('tar', ['-czf', '-', '-C', '/data', 'crafts']);
+        tar.stdout.pipe(res);
+
+        tar.stderr.on('data', data => {
+            log.warn({ err: data.toString() }, 'export-crafts-images tar stderr');
+        });
+
+        tar.on('error', error => {
+            log.warn({ err: error.message }, 'export-crafts-images spawn error');
+            if (!res.headersSent) return res.status(500).send('Export error');
             return res.destroy(error);
         });
 
-        archive.pipe(res);
-        archive.directory(craftsDir, false);
-        return archive.finalize();
+        tar.on('close', code => {
+            if (code !== 0) {
+                log.warn({ code }, 'export-crafts-images tar exited');
+            }
+        });
     });
 
     app.use((err, req, res, next) => {
