@@ -19,6 +19,30 @@ function getUserId(user) {
     return user || null;
 }
 
+function getStatus(user) {
+    if (user && typeof user === 'object') return user.status || '';
+    return String(user || '');
+}
+
+function presenceRowsFingerprint(rows = []) {
+    return asArray(rows)
+        .map(row => {
+            const userId = getUserId(row);
+            if (!userId) return null;
+            return `${userId}:${getStatus(row)}`;
+        })
+        .filter(Boolean)
+        .sort()
+        .join('|');
+}
+
+function isLikelyCopiedOpRows(currentRows = [], previousRows = []) {
+    const current = asArray(currentRows);
+    const previous = asArray(previousRows);
+    if (current.length === 0 || previous.length === 0) return false;
+    return presenceRowsFingerprint(current) === presenceRowsFingerprint(previous);
+}
+
 function wasOpLaunched(opCounts = {}) {
     const present = countStatus(opCounts.present);
     const late = countStatus(opCounts.late);
@@ -49,5 +73,7 @@ function computeDecroches(op1 = {}, op2 = {}) {
 module.exports = {
     asArray,
     computeDecroches,
+    isLikelyCopiedOpRows,
+    presenceRowsFingerprint,
     wasOpLaunched,
 };

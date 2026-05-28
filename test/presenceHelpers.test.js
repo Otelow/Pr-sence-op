@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { computeDecroches, wasOpLaunched } = require('../src/web/services/presenceHelpers');
+const { computeDecroches, isLikelyCopiedOpRows, wasOpLaunched } = require('../src/web/services/presenceHelpers');
 
 test('wasOpLaunched ignore absentValid et noReaction seuls', () => {
     assert.equal(wasOpLaunched({
@@ -47,4 +47,18 @@ test('computeDecroches calcule normalement quand la 2eme OP a une reaction activ
     );
 
     assert.deepEqual(decroches.map(user => user.user_id), ['u1', 'u2']);
+});
+
+test('isLikelyCopiedOpRows détecte une OP copiée exactement depuis la veille', () => {
+    const previousRows = [
+        { user_id: 'u1', status: 'present' },
+        { user_id: 'u2', status: 'noReaction' },
+    ];
+    const currentRows = [
+        { user_id: 'u2', status: 'noReaction' },
+        { user_id: 'u1', status: 'present' },
+    ];
+
+    assert.equal(isLikelyCopiedOpRows(currentRows, previousRows), true);
+    assert.equal(isLikelyCopiedOpRows([{ user_id: 'u1', status: 'late' }], previousRows), false);
 });

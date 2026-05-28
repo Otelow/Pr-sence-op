@@ -10,7 +10,7 @@
 const { getCachedMembers } = require('../services/membersCache');
 const { pickReactionPriority } = require('../../shared/presenceReactions');
 const { createConnection } = require('../../shared/database');
-const { computeDecroches, wasOpLaunched } = require('../services/presenceHelpers');
+const { computeDecroches, isLikelyCopiedOpRows, wasOpLaunched } = require('../services/presenceHelpers');
 
 function avatarUrl(userId, avatar, size = 64) {
     return avatar ? `https://cdn.discordapp.com/avatars/${userId}/${avatar}.png?size=${size}` : null;
@@ -65,6 +65,50 @@ function groupRowsByStatus(rows) {
         if (row.status in groups) groups[row.status].push(row);
     }
     return groups;
+}
+
+function previousDateKey(dateStr) {
+    const [year, month, day] = String(dateStr || '').split('-').map(Number);
+    if (!year || !month || !day) return null;
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    date.setUTCDate(date.getUTCDate() - 1);
+    return date.toISOString().slice(0, 10);
+}
+
+function buildPresenceRowsByDate(rows) {
+    const byDate = {};
+    for (const row of rows) {
+        if (!byDate[row.date]) byDate[row.date] = { op1: [], op2: [] };
+        const key = `op${row.op_number}`;
+        if (!byDate[row.date][key]) byDate[row.date][key] = [];
+        byDate[row.date][key].push(row);
+    }
+    return byDate;
+}
+
+function repairCopiedOp2Rows(db, byDate, dates) {
+    const repaired = [];
+    const deleteOp2 = db.prepare('DELETE FROM presence_history WHERE date = ? AND op_number = 2');
+
+    for (const date of dates) {
+        const previousDate = previousDateKey(date);
+        if (!previousDate || !byDate[date] || !byDate[previousDate]) continue;
+        const currentOp2 = byDate[date].op2 || [];
+        const previousOp2 = byDate[previousDate].op2 || [];
+        if (!isLikelyCopiedOpRows(currentOp2, previousOp2)) continue;
+
+        deleteOp2.run(date);
+        byDate[date].op2 = [];
+        repaired.push(date);
+    }
+
+    return repaired;
+}
+
+function flattenPresenceRows(byDate, sinceStr = null) {
+    return Object.entries(byDate)
+        .filter(([date]) => !sinceStr || date >= sinceStr)
+        .flatMap(([, data]) => [...(data.op1 || []), ...(data.op2 || [])]);
 }
 
 function registerPresenceStatsRoutes(app, deps) {
@@ -198,6 +242,9 @@ function registerPresenceStatsRoutes(app, deps) {
         const sinceDate = new Date();
         sinceDate.setDate(sinceDate.getDate() - days);
         const sinceStr = sinceDate.toISOString().slice(0, 10);
+        const repairSinceDate = new Date(sinceDate);
+        repairSinceDate.setDate(repairSinceDate.getDate() - 1);
+        const repairSinceStr = repairSinceDate.toISOString().slice(0, 10);
 
         const db = createConnection();
         ensurePresenceHistoryTable(db);
@@ -206,17 +253,12 @@ function registerPresenceStatsRoutes(app, deps) {
             FROM presence_history
             WHERE date >= ?
             ORDER BY date DESC, op_number ASC, username COLLATE NOCASE ASC
-        `).all(sinceStr);
+        `).all(repairSinceStr);
 
-        const byDate = {};
-        for (const row of rows) {
-            if (!byDate[row.date]) byDate[row.date] = { op1: [], op2: [] };
-            const key = `op${row.op_number}`;
-            if (!byDate[row.date][key]) byDate[row.date][key] = [];
-            byDate[row.date][key].push(row);
-        }
+        const byDate = buildPresenceRowsByDate(rows);
+        repairCopiedOp2Rows(db, byDate, Object.keys(byDate).filter(date => date >= sinceStr));
 
-        const history = Object.entries(byDate).map(([date, data]) => {
+        const history = Object.entries(byDate).filter(([date]) => date >= sinceStr).map(([date, data]) => {
             const op1Groups = groupRowsByStatus(data.op1);
             const op2Groups = groupRowsByStatus(data.op2);
             const op2Launched = wasOpLaunched(op2Groups);
@@ -247,17 +289,21 @@ function registerPresenceStatsRoutes(app, deps) {
 
         const db = createConnection();
         ensurePresenceHistoryTable(db);
+        const previousDate = previousDateKey(date);
         const rows = db.prepare(`
-            SELECT op_number, user_id, username, status, recorded_at
+            SELECT date, op_number, user_id, username, status, recorded_at
             FROM presence_history
-            WHERE date = ?
-            ORDER BY op_number ASC, status ASC, username COLLATE NOCASE ASC
-        `).all(date);
+            WHERE date IN (?, ?)
+            ORDER BY date ASC, op_number ASC, status ASC, username COLLATE NOCASE ASC
+        `).all(previousDate || date, date);
+        const byDate = buildPresenceRowsByDate(rows);
+        repairCopiedOp2Rows(db, byDate, [date]);
+        const dayRows = flattenPresenceRows(byDate, date).filter(row => row.date === date);
 
         const makeOp = () => ({ present: [], late: [], absentReact: [], absentValid: [], noReaction: [] });
         const op1 = makeOp();
         const op2 = makeOp();
-        for (const row of rows) {
+        for (const row of dayRows) {
             const target = Number(row.op_number) === 1 ? op1 : op2;
             if (row.status in target) {
                 target[row.status].push({
@@ -279,15 +325,21 @@ function registerPresenceStatsRoutes(app, deps) {
         const sinceDate = new Date();
         sinceDate.setDate(sinceDate.getDate() - days);
         const sinceStr = sinceDate.toISOString().slice(0, 10);
+        const repairSinceDate = new Date(sinceDate);
+        repairSinceDate.setDate(repairSinceDate.getDate() - 1);
+        const repairSinceStr = repairSinceDate.toISOString().slice(0, 10);
 
         const db = createConnection();
         ensurePresenceHistoryTable(db);
-        const rows = db.prepare(`
+        const rawRows = db.prepare(`
             SELECT date, op_number, user_id, username, status, recorded_at
             FROM presence_history
             WHERE date >= ?
             ORDER BY date ASC, op_number ASC, username COLLATE NOCASE ASC
-        `).all(sinceStr);
+        `).all(repairSinceStr);
+        const byDate = buildPresenceRowsByDate(rawRows);
+        repairCopiedOp2Rows(db, byDate, Object.keys(byDate).filter(date => date >= sinceStr));
+        const rows = flattenPresenceRows(byDate, sinceStr);
 
         const byUser = new Map();
         for (const row of rows) {
@@ -310,13 +362,13 @@ function registerPresenceStatsRoutes(app, deps) {
             if (row.username && !user.username) user.username = row.username;
         }
 
-        const byDate = {};
+        const byDateStatus = {};
         for (const row of rows) {
-            if (!byDate[row.date]) byDate[row.date] = { op1: new Map(), op2: new Map() };
-            byDate[row.date][`op${row.op_number}`].set(row.user_id, row.status);
+            if (!byDateStatus[row.date]) byDateStatus[row.date] = { op1: new Map(), op2: new Map() };
+            byDateStatus[row.date][`op${row.op_number}`].set(row.user_id, row.status);
         }
 
-        for (const day of Object.values(byDate)) {
+        for (const day of Object.values(byDateStatus)) {
             const op2 = aggregateCounts([...day.op2.values()]);
             if (!wasOpLaunched(op2)) continue;
             for (const [userId, op1Status] of day.op1) {
@@ -330,7 +382,7 @@ function registerPresenceStatsRoutes(app, deps) {
             }
         }
 
-        const daily = Object.entries(byDate).map(([date, day]) => {
+        const daily = Object.entries(byDateStatus).map(([date, day]) => {
             const op1 = aggregateCounts([...day.op1.values()]);
             const op2 = aggregateCounts([...day.op2.values()]);
             const op2Launched = wasOpLaunched(op2);
