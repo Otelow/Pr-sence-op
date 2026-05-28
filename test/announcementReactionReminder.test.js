@@ -276,7 +276,7 @@ test('annonce reactions : reprend le suivi apres redemarrage', async () => {
     });
 
     assert.equal(typeof readyHandler, 'function');
-    assert.equal(readyHandler(), 1);
+    assert.deepEqual(await service.bootstrapTracking(), { restored: 1, backfilled: 0 });
 
     await service.checkAndRemind(announcement.id);
     await service.stopAnnouncementReminder(announcement.id);
@@ -312,7 +312,7 @@ test('annonce reactions : ne restaure pas les annonces avant le 28/05/2026', asy
         },
     };
 
-    registerAnnouncementReactionReminder(client, {
+    const service = registerAnnouncementReactionReminder(client, {
         stateFile,
         logger: { info() {}, warn() {}, error() {} },
         attentionEmoji: ':attention:',
@@ -322,8 +322,89 @@ test('annonce reactions : ne restaure pas les annonces avant le 28/05/2026', asy
     });
 
     assert.equal(typeof readyHandler, 'function');
-    assert.equal(readyHandler(), 0);
+    assert.deepEqual(await service.bootstrapTracking(), { restored: 0, backfilled: 0 });
 
     const persisted = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
     assert.deepEqual(persisted.announcements, []);
+});
+
+test('annonce reactions : reprend une annonce existante depuis l historique du salon', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'announcement-reminders-backfill-'));
+    const stateFile = path.join(tmpDir, 'state.json');
+    const announcementId = '1509643000505176124';
+    const shouldPing = makeMember('user-backfill', [TARGET_ROLE_ID]);
+    const members = new Map([[shouldPing.id, shouldPing]]);
+    const guild = {
+        members: {
+            cache: members,
+            async fetch() {
+                return members;
+            },
+        },
+    };
+    const announcement = {
+        id: announcementId,
+        channelId: ANNOUNCEMENT_CHANNEL_ID,
+        author: { id: ANNOUNCER_USER_ID, bot: false },
+        guild,
+        reactions: { cache: new Map() },
+    };
+
+    const sent = [];
+    const announcementChannel = {
+        id: ANNOUNCEMENT_CHANNEL_ID,
+        guild,
+        messages: {
+            async fetch(arg) {
+                if (typeof arg === 'string') return arg === announcementId ? announcement : null;
+                return new Map([[announcementId, announcement]]);
+            },
+        },
+    };
+    const reminderChannel = {
+        id: REMINDER_CHANNEL_ID,
+        guild,
+        messages: {
+            async fetch() {
+                return null;
+            },
+        },
+        async send(payload) {
+            sent.push(payload);
+            return { id: 'backfill-reminder', channelId: REMINDER_CHANNEL_ID, delete: async () => {} };
+        },
+    };
+    const channels = new Map([
+        [ANNOUNCEMENT_CHANNEL_ID, announcementChannel],
+        [REMINDER_CHANNEL_ID, reminderChannel],
+    ]);
+    const client = {
+        on() {},
+        channels: {
+            async fetch(id) {
+                return channels.get(id) || null;
+            },
+        },
+    };
+
+    const service = registerAnnouncementReactionReminder(client, {
+        stateFile,
+        logger: { info() {}, warn() {}, error() {} },
+        attentionEmoji: ':attention:',
+        initialReminderDelayMs: 60_000,
+        reminderDeleteDelayMs: 60_000,
+        reminderRepeatDelayMs: 60_000,
+        backfillMaxMessages: 10,
+    });
+
+    assert.equal(await service.backfillAnnouncementMessages(), 1);
+
+    const persistedAfterBackfill = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    assert.equal(persistedAfterBackfill.announcements[0].messageId, announcementId);
+
+    await service.checkAndRemind(announcementId);
+    await service.stopAnnouncementReminder(announcementId);
+
+    assert.equal(sent.length, 1);
+    assert.deepEqual(sent[0].allowedMentions, { users: ['user-backfill'] });
 });

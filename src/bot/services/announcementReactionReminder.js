@@ -14,6 +14,7 @@ const REMINDER_REPEAT_DELAY_MS = 10 * 60 * 1000;
 const INITIAL_REMINDER_DELAY_MS = 1000;
 const TRACKING_START_DATE = '2026-05-28';
 const TRACKING_START_TIMESTAMP_MS = Date.UTC(2026, 4, 27, 22, 0, 0);
+const BACKFILL_MAX_MESSAGES = 500;
 const DEFAULT_STATE_FILE = path.join(config.paths.data, 'announcement_reaction_reminders.json');
 
 const trackedAnnouncements = new Map();
@@ -247,6 +248,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
         reminderRepeatDelayMs: context.reminderRepeatDelayMs || REMINDER_REPEAT_DELAY_MS,
         initialReminderDelayMs: context.initialReminderDelayMs || INITIAL_REMINDER_DELAY_MS,
         trackingStartMs: Number.isFinite(context.trackingStartMs) ? context.trackingStartMs : TRACKING_START_TIMESTAMP_MS,
+        backfillMaxMessages: Number.isFinite(context.backfillMaxMessages) ? context.backfillMaxMessages : BACKFILL_MAX_MESSAGES,
         stateFile: context.stateFile || DEFAULT_STATE_FILE,
         logger,
     };
@@ -270,6 +272,30 @@ function registerAnnouncementReactionReminder(client, context = {}) {
         entry.repeatTimerId = unrefTimer(setTimeout(() => {
             void checkAndRemind(entry.messageId);
         }, delayMs));
+    }
+
+    function trackAnnouncementMessage(message, delayMs = options.initialReminderDelayMs) {
+        if (!isAnnouncementTrigger(message, options)) return false;
+        if (!isAnnouncementInTrackingWindow(message, options)) return false;
+
+        const messageId = toId(message.id);
+        if (!messageId || trackedAnnouncements.has(messageId)) return false;
+
+        const entry = {
+            messageId,
+            channelId: toId(message.channelId),
+            lastReminderMessageId: null,
+            lastReminderChannelId: null,
+            createdAt: getAnnouncementCreatedAtIso(message),
+            updatedAt: new Date().toISOString(),
+            deleteTimerId: null,
+            repeatTimerId: null,
+        };
+
+        trackedAnnouncements.set(messageId, entry);
+        persistState();
+        scheduleNextReminder(entry, delayMs);
+        return true;
     }
 
     async function checkAndRemind(messageId) {
@@ -337,30 +363,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
     }
 
     function startAnnouncementReminder(message) {
-        if (!isAnnouncementTrigger(message, options)) return false;
-        if (!isAnnouncementInTrackingWindow(message, options)) return false;
-
-        const messageId = toId(message.id);
-        if (!messageId) return false;
-
-        const existing = trackedAnnouncements.get(messageId);
-        if (existing) clearEntryTimers(existing);
-
-        const entry = {
-            messageId,
-            channelId: toId(message.channelId),
-            lastReminderMessageId: null,
-            lastReminderChannelId: null,
-            createdAt: getAnnouncementCreatedAtIso(message),
-            updatedAt: new Date().toISOString(),
-            deleteTimerId: null,
-            repeatTimerId: null,
-        };
-
-        trackedAnnouncements.set(messageId, entry);
-        persistState();
-        scheduleNextReminder(entry, options.initialReminderDelayMs);
-        return true;
+        return trackAnnouncementMessage(message, options.initialReminderDelayMs);
     }
 
     function restoreTrackedAnnouncements() {
@@ -390,6 +393,72 @@ function registerAnnouncementReactionReminder(client, context = {}) {
         return restored;
     }
 
+    async function backfillAnnouncementMessages() {
+        const channel = await client.channels.fetch(options.channelId).catch(() => null);
+
+        if (!channel?.messages?.fetch) {
+            logger.warn?.(`[annonces] salon annonce ${options.channelId} introuvable pour reprise historique`);
+            return 0;
+        }
+
+        let backfilled = 0;
+        let scanned = 0;
+        let before = null;
+        let reachedBeforeStart = false;
+
+        while (scanned < options.backfillMaxMessages && !reachedBeforeStart) {
+            const limit = Math.min(100, options.backfillMaxMessages - scanned);
+            const query = before ? { limit, before } : { limit };
+            const batch = await channel.messages.fetch(query).catch(e => {
+                logger.warn?.(`[annonces] lecture historique annonces impossible: ${e.message}`);
+                return null;
+            });
+            const messages = getCollectionValues(batch);
+
+            if (messages.length === 0) break;
+
+            messages.sort((a, b) => {
+                return (getAnnouncementCreatedTimestampMs(b) || 0) - (getAnnouncementCreatedTimestampMs(a) || 0);
+            });
+
+            for (const message of messages) {
+                scanned += 1;
+                const timestamp = getAnnouncementCreatedTimestampMs(message);
+
+                if (timestamp && timestamp < options.trackingStartMs) {
+                    reachedBeforeStart = true;
+                    continue;
+                }
+
+                if (trackAnnouncementMessage(message, options.initialReminderDelayMs)) {
+                    backfilled += 1;
+                }
+            }
+
+            before = toId(messages[messages.length - 1]?.id);
+            if (!before || messages.length < limit) break;
+        }
+
+        if (backfilled > 0) {
+            logger.info?.(`[annonces] ${backfilled} annonce(s) reprise(s) depuis l'historique`);
+        }
+
+        return backfilled;
+    }
+
+    async function bootstrapTracking() {
+        const restored = restoreTrackedAnnouncements();
+        let backfilled = 0;
+
+        try {
+            backfilled = await backfillAnnouncementMessages();
+        } catch (e) {
+            logger.error?.(`[annonces] reprise historique echouee: ${e.message}`);
+        }
+
+        return { restored, backfilled };
+    }
+
     client.on('messageCreate', message => {
         try {
             startAnnouncementReminder(message);
@@ -399,12 +468,16 @@ function registerAnnouncementReactionReminder(client, context = {}) {
     });
 
     if (typeof client.isReady === 'function' && client.isReady()) {
-        restoreTrackedAnnouncements();
+        void bootstrapTracking();
     } else if (typeof client.once === 'function') {
-        client.once('ready', () => restoreTrackedAnnouncements());
+        client.once('ready', () => {
+            void bootstrapTracking();
+        });
     }
 
     return {
+        backfillAnnouncementMessages,
+        bootstrapTracking,
         restoreTrackedAnnouncements,
         startAnnouncementReminder,
         stopAnnouncementReminder,
@@ -415,6 +488,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
 module.exports = {
     ANNOUNCER_USER_ID,
     ANNOUNCEMENT_CHANNEL_ID,
+    BACKFILL_MAX_MESSAGES,
     REMINDER_CHANNEL_ID,
     TARGET_ROLE_ID,
     EXCLUDED_ROLE_ID,
