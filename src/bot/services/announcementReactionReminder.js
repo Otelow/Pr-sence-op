@@ -1,5 +1,8 @@
 // ANNONCES 28/05/2026 - relance lecture annonces par reaction
+const fs = require('fs');
+const path = require('path');
 const log = require('../../shared/logger');
+const config = require('../../shared/config');
 
 const ANNOUNCER_USER_ID = '952986899667103804';
 const ANNOUNCEMENT_CHANNEL_ID = '1485636555480502404';
@@ -9,6 +12,7 @@ const EXCLUDED_ROLE_ID = '1490361524408291459';
 const REMINDER_DELETE_DELAY_MS = 3 * 60 * 1000;
 const REMINDER_REPEAT_DELAY_MS = 3 * 60 * 1000;
 const INITIAL_REMINDER_DELAY_MS = 1000;
+const DEFAULT_STATE_FILE = path.join(config.paths.data, 'announcement_reaction_reminders.json');
 
 const trackedAnnouncements = new Map();
 
@@ -122,6 +126,55 @@ function unrefTimer(timer) {
     return timer;
 }
 
+function serializeEntry(entry) {
+    return {
+        messageId: toId(entry?.messageId),
+        channelId: toId(entry?.channelId),
+        lastReminderMessageId: toId(entry?.lastReminderMessageId),
+        lastReminderChannelId: toId(entry?.lastReminderChannelId),
+        createdAt: entry?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+}
+
+function loadReminderState(stateFile = DEFAULT_STATE_FILE, logger = log) {
+    try {
+        if (!fs.existsSync(stateFile)) return [];
+        const raw = fs.readFileSync(stateFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed?.announcements)) return [];
+
+        return parsed.announcements
+            .map(item => ({
+                messageId: toId(item?.messageId),
+                channelId: toId(item?.channelId),
+                lastReminderMessageId: toId(item?.lastReminderMessageId),
+                lastReminderChannelId: toId(item?.lastReminderChannelId),
+                createdAt: item?.createdAt || null,
+                updatedAt: item?.updatedAt || null,
+                deleteTimerId: null,
+                repeatTimerId: null,
+            }))
+            .filter(item => item.messageId && item.channelId);
+    } catch (e) {
+        logger.warn?.(`[annonces] lecture suivi annonces impossible: ${e.message}`);
+        return [];
+    }
+}
+
+function saveReminderState(stateFile = DEFAULT_STATE_FILE, logger = log) {
+    try {
+        fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+        const state = {
+            savedAt: new Date().toISOString(),
+            announcements: [...trackedAnnouncements.values()].map(serializeEntry),
+        };
+        fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+    } catch (e) {
+        logger.warn?.(`[annonces] sauvegarde suivi annonces impossible: ${e.message}`);
+    }
+}
+
 async function deleteReminderMessage(client, entry) {
     if (!entry?.lastReminderMessageId || !entry.lastReminderChannelId) return;
 
@@ -149,8 +202,13 @@ function registerAnnouncementReactionReminder(client, context = {}) {
         reminderDeleteDelayMs: context.reminderDeleteDelayMs || REMINDER_DELETE_DELAY_MS,
         reminderRepeatDelayMs: context.reminderRepeatDelayMs || REMINDER_REPEAT_DELAY_MS,
         initialReminderDelayMs: context.initialReminderDelayMs || INITIAL_REMINDER_DELAY_MS,
+        stateFile: context.stateFile || DEFAULT_STATE_FILE,
         logger,
     };
+
+    function persistState() {
+        saveReminderState(options.stateFile, logger);
+    }
 
     async function stopAnnouncementReminder(messageId) {
         const entry = trackedAnnouncements.get(toId(messageId));
@@ -158,6 +216,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
         clearEntryTimers(entry);
         trackedAnnouncements.delete(toId(messageId));
         await deleteReminderMessage(client, entry);
+        persistState();
     }
 
     function scheduleNextReminder(entry, delayMs) {
@@ -212,6 +271,7 @@ function registerAnnouncementReactionReminder(client, context = {}) {
 
             entry.lastReminderMessageId = reminder.id;
             entry.lastReminderChannelId = reminder.channelId || reminderChannel.id;
+            persistState();
 
             if (entry.deleteTimerId) clearTimeout(entry.deleteTimerId);
             entry.deleteTimerId = unrefTimer(setTimeout(() => {
@@ -239,13 +299,34 @@ function registerAnnouncementReactionReminder(client, context = {}) {
             channelId: toId(message.channelId),
             lastReminderMessageId: null,
             lastReminderChannelId: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
             deleteTimerId: null,
             repeatTimerId: null,
         };
 
         trackedAnnouncements.set(messageId, entry);
+        persistState();
         scheduleNextReminder(entry, options.initialReminderDelayMs);
         return true;
+    }
+
+    function restoreTrackedAnnouncements() {
+        const entries = loadReminderState(options.stateFile, logger);
+        let restored = 0;
+
+        for (const entry of entries) {
+            if (trackedAnnouncements.has(entry.messageId)) continue;
+            trackedAnnouncements.set(entry.messageId, entry);
+            scheduleNextReminder(entry, options.initialReminderDelayMs);
+            restored += 1;
+        }
+
+        if (restored > 0) {
+            logger.info?.(`[annonces] ${restored} annonce(s) restauree(s) apres redemarrage`);
+        }
+
+        return restored;
     }
 
     client.on('messageCreate', message => {
@@ -256,7 +337,14 @@ function registerAnnouncementReactionReminder(client, context = {}) {
         }
     });
 
+    if (typeof client.isReady === 'function' && client.isReady()) {
+        restoreTrackedAnnouncements();
+    } else if (typeof client.once === 'function') {
+        client.once('ready', () => restoreTrackedAnnouncements());
+    }
+
     return {
+        restoreTrackedAnnouncements,
         startAnnouncementReminder,
         stopAnnouncementReminder,
         checkAndRemind,
@@ -274,6 +362,8 @@ module.exports = {
     getAnnouncementNonReactors,
     getReactedUserIds,
     isAnnouncementTrigger,
+    loadReminderState,
     memberHasRole,
     registerAnnouncementReactionReminder,
+    saveReminderState,
 };

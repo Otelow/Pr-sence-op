@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const {
     ANNOUNCEMENT_CHANNEL_ID,
     ANNOUNCER_USER_ID,
@@ -180,4 +183,92 @@ test('annonce reactions : envoie les relances dans le salon dedie', async () => 
     assert.equal(sent.length, 1);
     assert.deepEqual(sent[0].allowedMentions, { users: ['user-ping'] });
     assert.match(sent[0].content, new RegExp(`<#${ANNOUNCEMENT_CHANNEL_ID}>`));
+});
+
+test('annonce reactions : reprend le suivi apres redemarrage', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'announcement-reminders-'));
+    const stateFile = path.join(tmpDir, 'state.json');
+    fs.writeFileSync(stateFile, JSON.stringify({
+        announcements: [{
+            messageId: 'announcement-restart',
+            channelId: ANNOUNCEMENT_CHANNEL_ID,
+            createdAt: '2026-05-28T18:00:00.000Z',
+        }],
+    }));
+
+    const shouldPing = makeMember('user-restart', [TARGET_ROLE_ID]);
+    const members = new Map([[shouldPing.id, shouldPing]]);
+    const guild = {
+        members: {
+            cache: members,
+            async fetch() {
+                return members;
+            },
+        },
+    };
+    const announcement = {
+        id: 'announcement-restart',
+        guild,
+        reactions: { cache: new Map() },
+    };
+
+    const sent = [];
+    const channels = new Map([
+        [ANNOUNCEMENT_CHANNEL_ID, {
+            id: ANNOUNCEMENT_CHANNEL_ID,
+            guild,
+            messages: {
+                async fetch(id) {
+                    return id === announcement.id ? announcement : null;
+                },
+            },
+        }],
+        [REMINDER_CHANNEL_ID, {
+            id: REMINDER_CHANNEL_ID,
+            guild,
+            messages: {
+                async fetch() {
+                    return null;
+                },
+            },
+            async send(payload) {
+                sent.push(payload);
+                return { id: 'restart-reminder', channelId: REMINDER_CHANNEL_ID, delete: async () => {} };
+            },
+        }],
+    ]);
+
+    let readyHandler = null;
+    const client = {
+        on() {},
+        once(event, handler) {
+            if (event === 'ready') readyHandler = handler;
+        },
+        channels: {
+            async fetch(id) {
+                return channels.get(id) || null;
+            },
+        },
+    };
+
+    const service = registerAnnouncementReactionReminder(client, {
+        stateFile,
+        logger: { info() {}, warn() {}, error() {} },
+        attentionEmoji: ':attention:',
+        initialReminderDelayMs: 60_000,
+        reminderDeleteDelayMs: 60_000,
+        reminderRepeatDelayMs: 60_000,
+    });
+
+    assert.equal(typeof readyHandler, 'function');
+    assert.equal(readyHandler(), 1);
+
+    await service.checkAndRemind(announcement.id);
+    await service.stopAnnouncementReminder(announcement.id);
+
+    assert.equal(sent.length, 1);
+    assert.deepEqual(sent[0].allowedMentions, { users: ['user-restart'] });
+
+    const persisted = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    assert.deepEqual(persisted.announcements, []);
 });
