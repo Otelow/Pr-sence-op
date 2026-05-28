@@ -77,6 +77,7 @@ const { createPresencePanelService } = require('./services/presencePanel');
 const { createPresenceFlowService } = require('./services/presenceFlow');
 const { createAbsencePanelService } = require('./services/absencePanel');
 const { validateDiscordConfig } = require('./services/configValidation');
+const { registerAnnouncementReactionReminder } = require('./services/announcementReactionReminder');
 const {
     registerAbsenceReminder,
     startRemindUserAbsence,
@@ -711,6 +712,10 @@ registerInteractionEvents(client, {
 // ==========================================
 
 registerClipEvents(client);
+registerAnnouncementReactionReminder(client, {
+    logger: log,
+    attentionEmoji: CONFIG.EMOJIS.ATTENTION,
+});
 registerAbsenceValidatorEvent(client, { CONFIG, scheduleAbsenceSalonCacheUpdate, stopRemindUserAbsence });
 
 // ==========================================
