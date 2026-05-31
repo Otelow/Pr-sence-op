@@ -1,7 +1,7 @@
 // FIX DÉCROCHÉS + CARDS 22/05/2026
 // CCV5 21/05/2026 — palette stricte + cards cliquables + fix
 const { pickReactionPriority } = require('../../shared/presenceReactions');
-const { getEligibleRoleMembers, getMondayParis } = require('./dashboardOverview');
+const { getEligibleRoleMembers, getMondayParis, getPresenceMemberRoleId } = require('./dashboardOverview');
 const { computeDecroches, wasOpLaunched } = require('./presenceHelpers');
 
 function avatarUrl(userId, avatar, size = 64) {
@@ -36,7 +36,7 @@ function summarizeMember(member) {
 }
 
 function getMembersList(client, state) {
-    const roleId = process.env.MEMBER_ROLE_ID || state?.CONFIG?.ROLES?.MEMBRE_1;
+    const roleId = getPresenceMemberRoleId(state);
     return getEligibleRoleMembers(client, state, roleId)
         .map(summarizeMember)
         .sort((a, b) => a.username.localeCompare(b.username, 'fr', { sensitivity: 'base' }));
@@ -98,7 +98,7 @@ function getCraftsOpen(db) {
 }
 
 function buildPresenceDetail(client, state) {
-    const roleId = process.env.MEMBER_ROLE_ID || state?.CONFIG?.ROLES?.MEMBRE_1;
+    const roleId = getPresenceMemberRoleId(state);
     const members = getEligibleRoleMembers(client, state, roleId);
     const validAbsences = state?.absenceSalonCache?.validAbsences || new Set();
     const reactionsOP1 = state?.reactionsOP1 || new Map();
@@ -124,7 +124,7 @@ function buildPresenceDetail(client, state) {
 }
 
 function getDecrochesToday(client, state) {
-    const roleId = process.env.MEMBER_ROLE_ID || state?.CONFIG?.ROLES?.MEMBRE_1;
+    const roleId = getPresenceMemberRoleId(state);
     const members = getEligibleRoleMembers(client, state, roleId);
     const validAbsences = state?.absenceSalonCache?.validAbsences || new Set();
     const reactionsOP1 = state?.reactionsOP1 || new Map();

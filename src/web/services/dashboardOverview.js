@@ -72,8 +72,12 @@ async function getRoleMembersCount(client, state, roleId) {
     return getEligibleRoleMembers(client, state, roleId).length;
 }
 
+function getPresenceMemberRoleId(state) {
+    return state?.CONFIG?.ROLES?.MEMBRE_1;
+}
+
 function getCurrentPresenceLive(client, state) {
-    const memberRoleId = process.env.MEMBER_ROLE_ID || state?.CONFIG?.ROLES?.MEMBRE_1;
+    const memberRoleId = getPresenceMemberRoleId(state);
     const members = getEligibleRoleMembers(client, state, memberRoleId);
     const validAbsences = state?.absenceSalonCache?.validAbsences || new Set();
     const reactionsOP1 = state?.reactionsOP1 || new Map();
@@ -141,7 +145,7 @@ async function buildDashboardOverview({ client, state, now = new Date() }) {
     const db = createConnection();
     try {
         ensurePresenceHistoryTable(db);
-        const memberRoleId = process.env.MEMBER_ROLE_ID || state?.CONFIG?.ROLES?.MEMBRE_1;
+        const memberRoleId = getPresenceMemberRoleId(state);
         const presenceLive = getCurrentPresenceLive(client, state);
         const membersTotal = await getRoleMembersCount(client, state, memberRoleId);
         const monday = getMondayParis(now);
@@ -201,5 +205,6 @@ module.exports = {
     getCurrentPresenceLive,
     getMondayBeforeParis,
     getMondayParis,
+    getPresenceMemberRoleId,
     getRoleMembersCount,
 };

@@ -34,6 +34,46 @@ function makeClient(members) {
     };
 }
 
+test('Command Center overview : ignore MEMBER_ROLE_ID et utilise seulement le role presence OP', () => {
+    const previousMemberRoleId = process.env.MEMBER_ROLE_ID;
+    process.env.MEMBER_ROLE_ID = 'wrong-role';
+    try {
+        const presenceMembers = [makeMember('op1'), makeMember('op2')];
+        const wrongRoleMembers = [makeMember('w1'), makeMember('w2'), makeMember('w3')];
+        const client = {
+            guilds: {
+                cache: new Map([
+                    ['guild-1', {
+                        roles: {
+                            cache: new Map([
+                                ['member-role', { members: new Map(presenceMembers.map(member => [member.id, member])) }],
+                                ['wrong-role', { members: new Map(wrongRoleMembers.map(member => [member.id, member])) }],
+                            ]),
+                        },
+                    }],
+                ]),
+            },
+        };
+        const state = {
+            CONFIG: {
+                GUILD_ID: 'guild-1',
+                ROLES: {
+                    MEMBRE_1: 'member-role',
+                    EXCLUDED_ROLE: 'excluded-role',
+                },
+            },
+            absenceSalonCache: { validAbsences: new Set() },
+            reactionsOP1: new Map([['op1', new Set(['check'])]]),
+            reactionsOP2: new Map(),
+        };
+
+        assert.equal(getCurrentPresenceLive(client, state).total, 2);
+    } finally {
+        if (previousMemberRoleId === undefined) delete process.env.MEMBER_ROLE_ID;
+        else process.env.MEMBER_ROLE_ID = previousMemberRoleId;
+    }
+});
+
 test('Command Center overview : presence live agrege OP1, absences, exclusions et decroches', () => {
     const client = makeClient([
         makeMember('u1'),
