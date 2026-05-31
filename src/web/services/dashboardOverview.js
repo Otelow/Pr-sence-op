@@ -97,6 +97,8 @@ function getCurrentPresenceLive(client, state) {
         const reaction = pickReactionPriority(reactionsOP1.get(member.id));
         if (validAbsences.has(member.id)) {
             live.absentsJustifies += 1;
+        } else if (reaction === 'absenceValid') {
+            live.absentsJustifies += 1;
         } else if (reaction === 'check') {
             live.presents += 1;
             op1PresentIds.add(member.id);
@@ -119,6 +121,7 @@ function getCurrentPresenceLive(client, state) {
         for (const userId of op1PresentIds) {
             if (validAbsences.has(userId)) continue;
             const reaction = pickReactionPriority(reactionsOP2.get(userId));
+            if (reaction === 'absenceValid') continue;
             if (!reaction || reaction === 'no') live.decroches += 1;
         }
     }

@@ -131,6 +131,7 @@ function createPresencePanelService(deps) {
             else if (reaction === 'check') present.push(name);
             else if (reaction === 'retard') late.push(name);
             else if (reaction === 'no') absentReact.push(name);
+            else if (reaction === 'absenceValid') absentValid.push(name);
             else noReaction.push(name);
         }
 

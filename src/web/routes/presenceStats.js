@@ -75,6 +75,23 @@ function previousDateKey(dateStr) {
     return date.toISOString().slice(0, 10);
 }
 
+function getParisDateKey(date = new Date()) {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Paris',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(date);
+}
+
+function reactionToPresenceStatus(reaction) {
+    if (reaction === 'check') return 'present';
+    if (reaction === 'retard') return 'late';
+    if (reaction === 'no') return 'absentReact';
+    if (reaction === 'absenceValid') return 'absentValid';
+    return 'noReaction';
+}
+
 function buildPresenceRowsByDate(rows) {
     const byDate = {};
     for (const row of rows) {
@@ -171,7 +188,8 @@ function registerPresenceStatsRoutes(app, deps) {
                 item.reaction = hasManualOverride ? (reaction || 'none') : (hasValidAbsence ? 'absenceValid' : (reaction || 'none'));
                 item.manualOverride = hasManualOverride;
 
-                if (!hasManualOverride && hasValidAbsence) result.absentValid.push(item);
+                if (hasManualOverride && reaction === 'absenceValid') result.absentValid.push(item);
+                else if (!hasManualOverride && hasValidAbsence) result.absentValid.push(item);
                 else if (reaction === 'check') result.present.push(item);
                 else if (reaction === 'retard') result.late.push(item);
                 else if (reaction === 'no') result.absentReact.push(item);
@@ -265,7 +283,10 @@ function registerPresenceStatsRoutes(app, deps) {
         }
 
         const previousReaction = pickReactionPriority(manualOverrideMap?.get(String(userId)) || reactionMap.get(String(userId))) || 'none';
-        if (normalizedReaction === 'absenceValid') state.clearManualPresenceReaction?.(normalizedOp, String(userId));
+        if (normalizedReaction === 'absenceValid' && state.absenceSalonCache?.validAbsences?.has(String(userId))) {
+            state.clearManualPresenceReaction?.(normalizedOp, String(userId));
+        }
+        else if (normalizedReaction === 'absenceValid') state.setManualPresenceReaction?.(normalizedOp, String(userId), 'absenceValid');
         else state.setManualPresenceReaction?.(normalizedOp, String(userId), normalizedReaction);
         state.savePresenceState?.();
         await state.refreshAbsencePanel?.();
@@ -295,6 +316,64 @@ function registerPresenceStatsRoutes(app, deps) {
             userId: String(userId),
             previousReaction,
             reaction: normalizedReaction,
+        });
+    });
+
+    app.patch('/api/presence/history/:date/reaction', requireAuth, requireFullSiteAccess, async (req, res) => {
+        const date = req.params.date;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: 'Format date invalide (YYYY-MM-DD)' });
+        }
+        if (date !== getParisDateKey()) {
+            return res.status(403).json({ error: 'Modification autorisée uniquement pour le jour J' });
+        }
+
+        const { op, userId, reaction } = req.body || {};
+        const normalizedOp = op === 'op2' ? 'op2' : op === 'op1' ? 'op1' : null;
+        const normalizedReaction = reaction || 'none';
+        const allowedReactions = new Set(['absenceValid', 'none', 'check', 'retard', 'no']);
+        if (!normalizedOp) return res.status(400).json({ error: 'OP invalide' });
+        if (!/^\d{15,25}$/.test(String(userId || ''))) return res.status(400).json({ error: 'Utilisateur invalide' });
+        if (!allowedReactions.has(normalizedReaction)) return res.status(400).json({ error: 'Réaction invalide' });
+
+        const state = getBotState();
+        const guild = getBotClient().guilds.cache.get(state.CONFIG.GUILD_ID);
+        const member = await guild?.members.fetch(String(userId)).catch(() => null);
+        if (!member || member.user?.bot) return res.status(404).json({ error: 'Membre introuvable' });
+        if (member.roles?.cache?.has(state.CONFIG.ROLES.EXCLUDED_ROLE)) {
+            return res.status(400).json({ error: 'Membre exclu de la présence OP' });
+        }
+
+        const opNumber = normalizedOp === 'op2' ? 2 : 1;
+        const status = reactionToPresenceStatus(normalizedReaction);
+        const username = member.nickname || member.user.username;
+        const db = createConnection();
+        ensurePresenceHistoryTable(db);
+        db.prepare(`
+            INSERT OR REPLACE INTO presence_history
+            (date, op_number, user_id, username, status, recorded_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).run(date, opNumber, String(userId), username, status, Math.floor(Date.now() / 1000));
+
+        state.setManualPresenceReaction?.(normalizedOp, String(userId), normalizedReaction);
+        state.savePresenceState?.();
+        await state.refreshAbsencePanel?.();
+        emitRealtime('presence:reaction', {
+            op: normalizedOp,
+            userId: String(userId),
+            type: normalizedReaction === 'none' ? null : normalizedReaction,
+            manual: true,
+            history: true,
+        });
+        emitRealtime('presence:update', { manual: true, history: true, op: normalizedOp });
+
+        return res.json({
+            success: true,
+            date,
+            op: normalizedOp,
+            userId: String(userId),
+            reaction: normalizedReaction,
+            status,
         });
     });
 
@@ -378,7 +457,7 @@ function registerPresenceStatsRoutes(app, deps) {
         const op2Launched = wasOpLaunched(op2);
         const decroches = computeDecroches(op1, op2);
 
-        return res.json({ date, op1, op2, op2Launched, decroches });
+        return res.json({ date, editable: date === getParisDateKey(), op1, op2, op2Launched, decroches });
     });
 
     app.get('/api/presence/stats', requireAuth, requireFullSiteAccess, (req, res) => {

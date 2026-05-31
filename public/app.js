@@ -1155,38 +1155,103 @@ function closeHistoryDayModal() {
 }
 
 function renderHistoryDayDetails(container, data) {
-    const renderUserList = (users, color = '#fff') => {
+    const statusToReaction = {
+        present: 'check',
+        late: 'retard',
+        absentReact: 'no',
+        absentValid: 'absenceValid',
+        noReaction: 'none',
+    };
+
+    const renderReactionEditor = (user, op, status) => {
+        const selected = statusToReaction[status] || 'none';
+        return `<select class="history-reaction-editor" data-date="${escapeHtml(data.date)}" data-op="${op}" data-user-id="${escapeHtml(user.user_id || user.id)}" onclick="event.stopPropagation()" onchange="updateHistoryPresenceReaction(this)">
+            <option value="check"${selected === 'check' ? ' selected' : ''}>Présent</option>
+            <option value="retard"${selected === 'retard' ? ' selected' : ''}>Retard</option>
+            <option value="no"${selected === 'no' ? ' selected' : ''}>Absent</option>
+            <option value="absenceValid"${selected === 'absenceValid' ? ' selected' : ''}>Justifié</option>
+            <option value="none"${selected === 'none' ? ' selected' : ''}>Pas réagi</option>
+        </select>`;
+    };
+
+    const renderUserList = (users, color = '#fff', op = 'op1', status = 'noReaction') => {
+        if (!users || users.length === 0) return '<p class="empty-mini">—</p>';
+        if (!data.editable) {
+            return users.map(user => (
+                `<span class="history-detail-pill" style="color:${color}">${escapeHtml(user.username || user.user_id || '?')}</span>`
+            )).join('');
+        }
+        return `<div class="history-edit-list">${users.map(user => `
+            <div class="history-edit-row">
+                <span class="history-detail-pill" style="color:${color}">${escapeHtml(user.username || user.user_id || '?')}</span>
+                ${renderReactionEditor(user, op, status)}
+            </div>
+        `).join('')}</div>`;
+    };
+    const renderReadOnlyUserList = (users, color = '#fff') => {
         if (!users || users.length === 0) return '<p class="empty-mini">—</p>';
         return users.map(user => (
             `<span class="history-detail-pill" style="color:${color}">${escapeHtml(user.username || user.user_id || '?')}</span>`
         )).join('');
     };
 
-    const renderOpSection = (opLabel, op = {}) => `
+    const renderOpSection = (opLabel, op = {}, opKey = 'op1') => `
         <div class="history-detail-op">
             <h4>${opLabel}</h4>
-            <div class="history-detail-cat"><b style="color:#4ade80">✅ Présents (${(op.present || []).length})</b>${renderUserList(op.present, '#4ade80')}</div>
-            <div class="history-detail-cat"><b style="color:#ffaa44">🕐 Retards (${(op.late || []).length})</b>${renderUserList(op.late, '#ffaa44')}</div>
-            <div class="history-detail-cat"><b style="color:#f87171">❌ Non justifiés (${(op.absentReact || []).length})</b>${renderUserList(op.absentReact, '#f87171')}</div>
-            <div class="history-detail-cat"><b style="color:#cbd5e1">📋 Justifiés (${(op.absentValid || []).length})</b>${renderUserList(op.absentValid, '#cbd5e1')}</div>
-            <div class="history-detail-cat"><b style="color:#fcd34d">⚠️ Pas réagi (${(op.noReaction || []).length})</b>${renderUserList(op.noReaction, '#fcd34d')}</div>
+            <div class="history-detail-cat"><b style="color:#4ade80">✅ Présents (${(op.present || []).length})</b>${renderUserList(op.present, '#4ade80', opKey, 'present')}</div>
+            <div class="history-detail-cat"><b style="color:#ffaa44">🕐 Retards (${(op.late || []).length})</b>${renderUserList(op.late, '#ffaa44', opKey, 'late')}</div>
+            <div class="history-detail-cat"><b style="color:#f87171">❌ Non justifiés (${(op.absentReact || []).length})</b>${renderUserList(op.absentReact, '#f87171', opKey, 'absentReact')}</div>
+            <div class="history-detail-cat"><b style="color:#cbd5e1">📋 Justifiés (${(op.absentValid || []).length})</b>${renderUserList(op.absentValid, '#cbd5e1', opKey, 'absentValid')}</div>
+            <div class="history-detail-cat"><b style="color:#fcd34d">⚠️ Pas réagi (${(op.noReaction || []).length})</b>${renderUserList(op.noReaction, '#fcd34d', opKey, 'noReaction')}</div>
         </div>
     `;
 
     const op2Launched = data.op2Launched !== false;
     const decroches = data.decroches || [];
     container.innerHTML = `
-        ${renderOpSection('1ère OP', data.op1)}
-        ${renderOpSection('2ème OP', data.op2)}
+        ${data.editable ? '<p class="history-edit-notice">Correction disponible uniquement pour le jour J.</p>' : ''}
+        ${renderOpSection('1ère OP', data.op1, 'op1')}
+        ${renderOpSection('2ème OP', data.op2, 'op2')}
         <div class="history-detail-op">
             <h4>⚠️ Décrochés entre 1ère et 2ème OP${op2Launched ? ` (${decroches.length})` : ''}</h4>
-            ${op2Launched ? renderUserList(decroches, '#ffaa44') : '<p class="empty-mini">— (2ème OP non lancée)</p>'}
+            ${op2Launched ? renderReadOnlyUserList(decroches, '#ffaa44') : '<p class="empty-mini">— (2ème OP non lancée)</p>'}
         </div>
     `;
 }
 
+async function updateHistoryPresenceReaction(select) {
+    const date = select?.dataset?.date;
+    const op = select?.dataset?.op;
+    const userId = select?.dataset?.userId;
+    const reaction = select?.value || 'none';
+    if (!date || !op || !userId) return;
+
+    select.disabled = true;
+    try {
+        const res = await fetch(`/api/presence/history/${encodeURIComponent(date)}/reaction`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op, userId, reaction }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload.error || `HTTP ${res.status}`);
+
+        const modalBody = document.getElementById('historyDayModalBody');
+        const detailRes = await fetch(`/api/presence/history/${encodeURIComponent(date)}`, { cache: 'no-store' });
+        const detail = await detailRes.json();
+        if (detailRes.ok && modalBody) renderHistoryDayDetails(modalBody, detail);
+        await Promise.allSettled([loadPresenceHistory(), loadPresence(), reloadDashboardOverview()]);
+    } catch (e) {
+        alert(e.message || 'Erreur correction historique');
+        openHistoryDayModal(date);
+    } finally {
+        select.disabled = false;
+    }
+}
+
 window.openHistoryDayModal = openHistoryDayModal;
 window.closeHistoryDayModal = closeHistoryDayModal;
+window.updateHistoryPresenceReaction = updateHistoryPresenceReaction;
 
 document.addEventListener('click', event => {
     const card = event.target.closest?.('.js-history-day-card');

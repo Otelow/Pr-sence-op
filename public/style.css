@@ -12685,6 +12685,45 @@ body::after {
     font-weight: 500;
 }
 
+.history-edit-notice {
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.history-edit-list {
+    display: grid;
+    gap: 6px;
+}
+
+.history-edit-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.history-edit-row .history-detail-pill {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-reaction-editor {
+    width: 126px;
+    padding: 5px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.history-reaction-editor:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
 .history-detail-modal .empty-mini {
     color: var(--text-muted);
     font-size: 12px;

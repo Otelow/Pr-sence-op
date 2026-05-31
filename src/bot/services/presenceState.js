@@ -113,9 +113,9 @@ function createPresenceStatePersistence(deps) {
         );
     }
 
-    function collectPresenceHistoryEntries(opData, reactionMap, validAbsences, role) {
+    function collectPresenceHistoryEntries(opData, reactionMap, validAbsences, role, manualOverrideMap = new Map()) {
         const entries = new Map();
-        if (!opData?.messageId && !opData?.active && !opData?.terminated && (!reactionMap || reactionMap.size === 0)) {
+        if (!opData?.messageId && !opData?.active && !opData?.terminated && (!reactionMap || reactionMap.size === 0) && (!manualOverrideMap || manualOverrideMap.size === 0)) {
             return entries;
         }
 
@@ -124,13 +124,23 @@ function createPresenceStatePersistence(deps) {
             if (member.roles.cache.has(CONFIG.ROLES.EXCLUDED_ROLE)) continue;
 
             let status = 'noReaction';
-            if (validAbsences.has(member.id)) {
+            const hasManualOverride = manualOverrideMap.has(member.id);
+            const reaction = pickReactionPriority(hasManualOverride ? manualOverrideMap.get(member.id) : reactionMap.get(member.id));
+            if (hasManualOverride && reaction === 'absenceValid') {
+                status = 'absentValid';
+            } else if (hasManualOverride && reaction === 'check') {
+                status = 'present';
+            } else if (hasManualOverride && reaction === 'retard') {
+                status = 'late';
+            } else if (hasManualOverride && reaction === 'no') {
+                status = 'absentReact';
+            } else if (validAbsences.has(member.id)) {
                 status = 'absentValid';
             } else {
-                const reaction = pickReactionPriority(reactionMap.get(member.id));
                 if (reaction === 'check') status = 'present';
                 else if (reaction === 'retard') status = 'late';
                 else if (reaction === 'no') status = 'absentReact';
+                else if (reaction === 'absenceValid') status = 'absentValid';
             }
 
             entries.set(member.id, {
@@ -170,8 +180,8 @@ function createPresenceStatePersistence(deps) {
         const presence2Data = getPresence2Data();
         const op1ForDate = isPresenceDataForDate(presenceData, reactionsOP1, dateStr);
         const op2ForDate = isPresenceDataForDate(presence2Data, reactionsOP2, dateStr);
-        const op1Entries = only === 'op2' || !op1ForDate ? new Map() : collectPresenceHistoryEntries(presenceData, reactionsOP1, validAbsences, role);
-        const op2Entries = only === 'op1' || !op2ForDate ? new Map() : collectPresenceHistoryEntries(presence2Data, reactionsOP2, validAbsences, role);
+        const op1Entries = only === 'op2' || !op1ForDate ? new Map() : collectPresenceHistoryEntries(presenceData, reactionsOP1, validAbsences, role, manualPresenceOverridesOP1);
+        const op2Entries = only === 'op1' || !op2ForDate ? new Map() : collectPresenceHistoryEntries(presence2Data, reactionsOP2, validAbsences, role, manualPresenceOverridesOP2);
 
         const db = createConnection();
         ensurePresenceHistoryTable(db);

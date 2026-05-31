@@ -16,6 +16,7 @@ function pickReactionPriority(set) {
     if (reactions.has('check')) return 'check';
     if (reactions.has('retard')) return 'retard';
     if (reactions.has('no')) return 'no';
+    if (reactions.has('absenceValid')) return 'absenceValid';
     return null;
 }
 
