@@ -93,13 +93,41 @@ window.CSRF_TOKEN = window.CSRF_TOKEN || null;
     window.__csrfFetchInstalled = true;
     const nativeFetch = window.fetch.bind(window);
     const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
-    window.fetch = (input, init = {}) => {
+
+    async function refreshCsrfToken() {
+        const res = await nativeFetch('/api/csrf', { cache: 'no-store', credentials: 'same-origin' });
+        if (!res.ok) return window.CSRF_TOKEN;
+        const data = await res.json().catch(() => ({}));
+        if (data.csrfToken) window.CSRF_TOKEN = data.csrfToken;
+        return window.CSRF_TOKEN;
+    }
+
+    function withCsrfHeader(input, init = {}) {
+        const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+        if (window.CSRF_TOKEN) headers.set('X-CSRF-Token', window.CSRF_TOKEN);
+        return { ...init, headers };
+    }
+
+    async function isCsrfFailure(response) {
+        if (response.status !== 403) return false;
+        const data = await response.clone().json().catch(() => ({}));
+        return String(data.error || '').toLowerCase().includes('csrf');
+    }
+
+    window.__refreshCsrfToken = refreshCsrfToken;
+    window.fetch = async (input, init = {}) => {
         const requestMethod = init.method || (input instanceof Request ? input.method : 'GET');
         const method = String(requestMethod || 'GET').toUpperCase();
-        if (!safeMethods.has(method) && window.CSRF_TOKEN) {
-            const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
-            headers.set('X-CSRF-Token', window.CSRF_TOKEN);
-            return nativeFetch(input, { ...init, headers });
+        if (!safeMethods.has(method)) {
+            if (!window.CSRF_TOKEN) await refreshCsrfToken();
+            let securedInit = withCsrfHeader(input, init);
+            const response = await nativeFetch(input, securedInit);
+            if (await isCsrfFailure(response)) {
+                await refreshCsrfToken();
+                securedInit = withCsrfHeader(input, init);
+                return nativeFetch(input, securedInit);
+            }
+            return response;
         }
         return nativeFetch(input, init);
     };
@@ -240,7 +268,10 @@ function applyWaveTextEffects(root = document) {
 async function loadPermissions() {
     try {
         const res = await fetch('/api/me/permissions');
-        if (res.ok) userPermissions = await res.json();
+        if (res.ok) {
+            userPermissions = await res.json();
+            window.CSRF_TOKEN = userPermissions.csrfToken || window.CSRF_TOKEN;
+        }
     } catch {}
 }
 
