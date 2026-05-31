@@ -919,16 +919,18 @@ function renderOP(prefix, op) {
         { icon: '✅', label: 'Présents', list: op.present, reaction: 'check' },
         { icon: '⏰', label: 'Retards', list: op.late, reaction: 'retard' },
         { icon: '❌', label: 'Absents non justifiés', list: op.absentReact, reaction: 'no' },
-        { icon: '📋', label: 'Absents justifiés', list: op.absentValid, reaction: 'none', locked: true },
+        { icon: '📋', label: 'Absents justifiés', list: op.absentValid, reaction: 'absenceValid' },
         { icon: '⚠️', label: 'Pas de réaction', list: op.noReaction, reaction: 'none' },
     ];
 
     const renderMember = (m, category) => {
         const avatar = m.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><rect width='24' height='24' fill='%23262626'/></svg>`;
         const selected = m.reaction || category.reaction || 'none';
-        const editor = category.locked
-            ? '<span class="presence-reaction-locked">Absence salon</span>'
-            : `<select class="presence-reaction-editor" data-op="${prefix}" data-user-id="${escapeHtml(m.id || m.user_id)}" onclick="event.stopPropagation()" onchange="updatePresenceReaction(this)">
+        const absenceOption = (selected === 'absenceValid' || m.hasValidAbsence)
+            ? `<option value="absenceValid"${selected === 'absenceValid' ? ' selected' : ''}>Justifié salon</option>`
+            : '';
+        const editor = `<select class="presence-reaction-editor" data-op="${prefix}" data-user-id="${escapeHtml(m.id || m.user_id)}" onclick="event.stopPropagation()" onchange="updatePresenceReaction(this)">
+                ${absenceOption}
                 <option value="none"${selected === 'none' ? ' selected' : ''}>Pas réagi</option>
                 <option value="check"${selected === 'check' ? ' selected' : ''}>Présent</option>
                 <option value="retard"${selected === 'retard' ? ' selected' : ''}>Retard</option>

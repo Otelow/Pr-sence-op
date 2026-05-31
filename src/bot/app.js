@@ -388,6 +388,14 @@ function setManualPresenceReaction(op, userId, type) {
     savePresenceState?.();
 }
 
+function clearManualPresenceReaction(op, userId) {
+    const overrideMap = op === 'op2' ? manualPresenceOverridesOP2 : manualPresenceOverridesOP1;
+    const reactionMap = op === 'op2' ? reactionsOP2 : reactionsOP1;
+    overrideMap.delete(userId);
+    reactionMap.delete(userId);
+    savePresenceState?.();
+}
+
 // ==========================================
 // PERSISTANCE ÉTAT PRÉSENCE (survie redéploiement)
 // ==========================================
@@ -775,6 +783,7 @@ function getBotState() {
         manualPresenceOverridesOP1,
         manualPresenceOverridesOP2,
         setManualPresenceReaction,
+        clearManualPresenceReaction,
         applyManualPresenceOverrides,
         absenceTracking,
         absenceSalonCache: getAbsenceSalonCache(),

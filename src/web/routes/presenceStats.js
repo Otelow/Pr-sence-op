@@ -135,10 +135,11 @@ function registerPresenceStatsRoutes(app, deps) {
         const role = guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_1);
         if (!role) return res.json({ error: 'Role not found' });
 
-        const collectFromOP = (data, reactionMap) => {
+        const collectFromOP = (data, reactionMap, manualOverrideMap = new Map()) => {
             const result = {
                 active: data.active,
                 terminated: Boolean(data.terminated),
+                editable: Boolean(data.active || data.terminated || data.messageId || reactionMap.size || manualOverrideMap.size),
                 present: [],
                 late: [],
                 absentReact: [],
@@ -146,7 +147,7 @@ function registerPresenceStatsRoutes(app, deps) {
                 noReaction: [],
             };
 
-            if ((!data.active && !data.terminated) || (!data.messageId && reactionMap.size === 0)) return result;
+            if (!result.editable) return result;
 
             for (const [, member] of role.members) {
                 if (member.user.bot) continue;
@@ -163,10 +164,14 @@ function registerPresenceStatsRoutes(app, deps) {
                     color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
                     role_color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
                 };
-                const reaction = pickReactionPriority(reactionMap.get(member.id));
-                item.reaction = reaction || 'none';
+                const hasManualOverride = manualOverrideMap.has(member.id);
+                const reaction = pickReactionPriority(hasManualOverride ? manualOverrideMap.get(member.id) : reactionMap.get(member.id));
+                const hasValidAbsence = state.absenceSalonCache.validAbsences.has(member.id);
+                item.hasValidAbsence = hasValidAbsence;
+                item.reaction = hasManualOverride ? (reaction || 'none') : (hasValidAbsence ? 'absenceValid' : (reaction || 'none'));
+                item.manualOverride = hasManualOverride;
 
-                if (state.absenceSalonCache.validAbsences.has(member.id)) result.absentValid.push(item);
+                if (!hasManualOverride && hasValidAbsence) result.absentValid.push(item);
                 else if (reaction === 'check') result.present.push(item);
                 else if (reaction === 'retard') result.late.push(item);
                 else if (reaction === 'no') result.absentReact.push(item);
@@ -176,8 +181,8 @@ function registerPresenceStatsRoutes(app, deps) {
             return result;
         };
 
-        const op1 = collectFromOP(state.presenceData, state.reactionsOP1);
-        const op2 = collectFromOP(state.presence2Data, state.reactionsOP2);
+        const op1 = collectFromOP(state.presenceData, state.reactionsOP1, state.manualPresenceOverridesOP1);
+        const op2 = collectFromOP(state.presence2Data, state.reactionsOP2, state.manualPresenceOverridesOP2);
 
         const buildDecroches = () => {
             const op1Started = Boolean(state.presenceData.active && state.presenceData.messageId);
@@ -241,7 +246,7 @@ function registerPresenceStatsRoutes(app, deps) {
         const { op, userId, reaction } = req.body || {};
         const normalizedOp = op === 'op2' ? 'op2' : op === 'op1' ? 'op1' : null;
         const normalizedReaction = reaction || 'none';
-        const allowedReactions = new Set(['none', 'check', 'retard', 'no']);
+        const allowedReactions = new Set(['absenceValid', 'none', 'check', 'retard', 'no']);
 
         if (!normalizedOp) return res.status(400).json({ error: 'OP invalide' });
         if (!/^\d{15,25}$/.test(String(userId || ''))) return res.status(400).json({ error: 'Utilisateur invalide' });
@@ -254,12 +259,14 @@ function registerPresenceStatsRoutes(app, deps) {
 
         const data = normalizedOp === 'op2' ? state.presence2Data : state.presenceData;
         const reactionMap = normalizedOp === 'op2' ? state.reactionsOP2 : state.reactionsOP1;
-        if (!data?.messageId && !data?.active && !data?.terminated) {
+        const manualOverrideMap = normalizedOp === 'op2' ? state.manualPresenceOverridesOP2 : state.manualPresenceOverridesOP1;
+        if (!data?.messageId && !data?.active && !data?.terminated && !reactionMap?.size && !manualOverrideMap?.size) {
             return res.status(400).json({ error: 'Présence OP inactive' });
         }
 
-        const previousReaction = pickReactionPriority(reactionMap.get(String(userId))) || 'none';
-        state.setManualPresenceReaction?.(normalizedOp, String(userId), normalizedReaction);
+        const previousReaction = pickReactionPriority(manualOverrideMap?.get(String(userId)) || reactionMap.get(String(userId))) || 'none';
+        if (normalizedReaction === 'absenceValid') state.clearManualPresenceReaction?.(normalizedOp, String(userId));
+        else state.setManualPresenceReaction?.(normalizedOp, String(userId), normalizedReaction);
         state.savePresenceState?.();
         await state.refreshAbsencePanel?.();
 
