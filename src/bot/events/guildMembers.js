@@ -15,6 +15,11 @@ function registerGuildMemberEvents(client, deps) {
         invalidateMembersCache();
         if (member.user.bot) return;
 
+        if (hasProtectedRole(member)) {
+            log.info(`ROLE PROTEGE: ${member.user.tag} a rejoint - accueil ignore`);
+            return;
+        }
+
         // Auto-attribution de rôles spécifiques (pour des utilisateurs précis listés dans AUTO_ROLE_USERS)
         const autoRoleId = CONFIG.AUTO_ROLE_USERS[member.id];
         if (autoRoleId) {
@@ -27,7 +32,6 @@ function registerGuildMemberEvents(client, deps) {
             } catch (e) {
                 log.error(`❌ Erreur auto-rôle ${member.user.tag}:`, e.message);
             }
-            return;
         }
 
         // VIP → rôle direct
@@ -36,16 +40,11 @@ function registerGuildMemberEvents(client, deps) {
                 const role = member.guild.roles.cache.get(CONFIG.ROLES.VIP_ROLE);
                 if (role) await member.roles.add(role);
             } catch {}
-            return;
         }
 
-        if (hasProtectedRole(member)) {
-            log.info(`ROLE PROTEGE: ${member.user.tag} a rejoint - accueil ignore`);
-            return;
-        }
-
-        log.info(`WELCOME: ${member.user.tag} a rejoint - lancement de la procedure d'accueil`);
+        log.info(`WELCOME: ${member.user.tag} a rejoint - attribution directe des roles`);
         await startWelcomeFlow(member);
+        invalidateMembersCache();
     });
 
     client.on('guildMemberUpdate', () => {

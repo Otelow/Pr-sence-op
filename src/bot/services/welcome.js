@@ -24,26 +24,12 @@ function createWelcomeService(deps) {
 
     async function startWelcomeFlow(member) {
         const channel = member.guild.channels.cache.get(CONFIG.CHANNELS.REGLEMENT);
-        if (!channel) return;
 
         const oldState = welcomeState.get(member.id);
         if (oldState && oldState.kickTimer) clearTimeout(oldState.kickTimer);
 
         try {
-            await runWelcomeStep(channel, member.guild, member, 1);
-            setTimeout(async () => {
-                const state = welcomeState.get(member.id);
-                if (state && state.step === 1) {
-                    try {
-                        const ping1 = await channel.send(`${member}`);
-                        await sleep(500);
-                        const ping2 = await channel.send(`${member}`);
-                        await sleep(2_000);
-                        await ping1.delete().catch(() => {});
-                        await ping2.delete().catch(() => {});
-                    } catch {}
-                }
-            }, 60_000);
+            await finalizeWelcomeDirectly(member.guild, member, member.id, channel);
         } catch {}
     }
 
@@ -111,6 +97,28 @@ function createWelcomeService(deps) {
 
         deleteWelcomeState(userId);
         setTimeout(() => welcomeMsg.delete().catch(() => {}), 30_000);
+    }
+
+    async function finalizeWelcomeDirectly(guild, member, userId, channel) {
+        const message = `${member} Bienvenue chez les **21 Block Savage** ! Tes roles viennent d'etre attribues directement. Pense a te renommer dans les 10 minutes ! ${CONFIG.EMOJIS.BS21}`;
+        const welcomeMsg = channel ? await channel.send(message).catch(() => null) : null;
+
+        try {
+            const freshMember = await guild.members.fetch(userId);
+            for (const roleId of [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_2, CONFIG.ROLES.MEMBRE_3]) {
+                const role = guild.roles.cache.get(roleId);
+                if (role && !freshMember.roles.cache.has(roleId)) await freshMember.roles.add(role);
+            }
+
+            const originalName = freshMember.nickname || freshMember.user.username;
+            const renameState = { originalName, guildId: guild.id, createdAt: Date.now() };
+            renameCheckState.set(userId, renameState);
+            saveRenameCheckState?.(userId, renameState);
+            await scheduleRenameCheck(userId);
+        } catch {}
+
+        deleteWelcomeState(userId);
+        if (welcomeMsg) setTimeout(() => welcomeMsg.delete().catch(() => {}), 30_000);
     }
 
     async function runWelcomeStep(channel, guild, member, step) {
@@ -204,12 +212,7 @@ function createWelcomeService(deps) {
             return;
         }
 
-        if (state.step < 4) {
-            await runWelcomeStep(channel, guild, member, state.step + 1);
-            return;
-        }
-
-        await finalizeWelcome(guild, member, userId, channel);
+        await finalizeWelcomeDirectly(guild, member, userId, channel);
     }
 
     return {
