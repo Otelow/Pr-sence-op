@@ -164,6 +164,7 @@ function registerPresenceStatsRoutes(app, deps) {
                     role_color: member.displayHexColor && member.displayHexColor !== '#000000' ? member.displayHexColor : null,
                 };
                 const reaction = pickReactionPriority(reactionMap.get(member.id));
+                item.reaction = reaction || 'none';
 
                 if (state.absenceSalonCache.validAbsences.has(member.id)) result.absentValid.push(item);
                 else if (reaction === 'check') result.present.push(item);
@@ -233,6 +234,60 @@ function registerPresenceStatsRoutes(app, deps) {
                 valid: state.absenceSalonCache.validAbsenceNames || [],
                 invalid: state.absenceSalonCache.invalidAbsenceNames || [],
             },
+        });
+    });
+
+    app.patch('/api/presence/reaction', requireAuth, requireFullSiteAccess, async (req, res) => {
+        const { op, userId, reaction } = req.body || {};
+        const normalizedOp = op === 'op2' ? 'op2' : op === 'op1' ? 'op1' : null;
+        const normalizedReaction = reaction || 'none';
+        const allowedReactions = new Set(['none', 'check', 'retard', 'no']);
+
+        if (!normalizedOp) return res.status(400).json({ error: 'OP invalide' });
+        if (!/^\d{15,25}$/.test(String(userId || ''))) return res.status(400).json({ error: 'Utilisateur invalide' });
+        if (!allowedReactions.has(normalizedReaction)) return res.status(400).json({ error: 'Réaction invalide' });
+
+        const state = getBotState();
+        const guild = getBotClient().guilds.cache.get(state.CONFIG.GUILD_ID);
+        const member = await guild?.members.fetch(String(userId)).catch(() => null);
+        if (!member) return res.status(404).json({ error: 'Membre introuvable' });
+
+        const data = normalizedOp === 'op2' ? state.presence2Data : state.presenceData;
+        const reactionMap = normalizedOp === 'op2' ? state.reactionsOP2 : state.reactionsOP1;
+        if (!data?.messageId && !data?.active && !data?.terminated) {
+            return res.status(400).json({ error: 'Présence OP inactive' });
+        }
+
+        const previousReaction = pickReactionPriority(reactionMap.get(String(userId))) || 'none';
+        state.setManualPresenceReaction?.(normalizedOp, String(userId), normalizedReaction);
+        state.savePresenceState?.();
+        await state.refreshAbsencePanel?.();
+
+        const presenceChannel = getBotClient().channels.cache.get(state.CONFIG.CHANNELS.PRESENCE);
+        if (previousReaction === 'check' && (normalizedReaction === 'retard' || normalizedReaction === 'no') && presenceChannel) {
+            const message = normalizedReaction === 'retard'
+                ? `${member} Tu n'es pas présent alors que tu as signalé ta présence. Merci de mettre une absence dans <#${state.CONFIG.CHANNELS.ABSENCE}> ou de signaler ton retard.`
+                : `${member} Tu as signalé que tu étais présent mais tu ne l'es pas. Merci de mettre une absence dans <#${state.CONFIG.CHANNELS.ABSENCE}> pour que ce soit pris en compte.`;
+            await presenceChannel.send({
+                content: message,
+                allowedMentions: { users: [String(userId)] },
+            }).catch(() => {});
+        }
+
+        emitRealtime('presence:reaction', {
+            op: normalizedOp,
+            userId: String(userId),
+            type: normalizedReaction === 'none' ? null : normalizedReaction,
+            manual: true,
+        });
+        emitRealtime('presence:update', { manual: true, op: normalizedOp });
+
+        res.json({
+            success: true,
+            op: normalizedOp,
+            userId: String(userId),
+            previousReaction,
+            reaction: normalizedReaction,
         });
     });
 

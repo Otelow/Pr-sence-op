@@ -32,6 +32,9 @@ function registerReadyEvent(deps) {
         restoreReactionsFromMessage,
         reactionsOP1,
         reactionsOP2,
+        manualPresenceOverridesOP1 = new Map(),
+        manualPresenceOverridesOP2 = new Map(),
+        applyManualPresenceOverrides,
         presenceData,
         presence2Data,
         savePresenceState,
@@ -70,10 +73,10 @@ async function catchUpYesterdaySnapshot() {
     });
 }
 
-function restoreReactionMapFromDisk(label, savedOp, reactionMap) {
+function restoreReactionMapFromDisk(label, savedOp, reactionMap, field = 'reactions') {
     if (typeof deserializeReactionMap !== 'function') return 0;
-    if (!savedOp?.reactions || typeof savedOp.reactions !== 'object') return 0;
-    deserializeReactionMap(savedOp.reactions, reactionMap);
+    if (!savedOp?.[field] || typeof savedOp[field] !== 'object') return 0;
+    deserializeReactionMap(savedOp[field], reactionMap);
     log.info(`📥 Réactions ${label} restaurées depuis disk : ${reactionMap.size} user(s)`);
     return reactionMap.size;
 }
@@ -143,6 +146,8 @@ client.once('ready', async () => {
     if (savedState) {
         const op1DiskUsers = restoreReactionMapFromDisk('OP1', savedState.op1, reactionsOP1);
         const op2DiskUsers = restoreReactionMapFromDisk('OP2', savedState.op2, reactionsOP2);
+        restoreReactionMapFromDisk('OP1 manuelles', savedState.op1, manualPresenceOverridesOP1, 'manualOverrides');
+        restoreReactionMapFromDisk('OP2 manuelles', savedState.op2, manualPresenceOverridesOP2, 'manualOverrides');
 
         if (savedState.op1 && (savedState.op1.messageId || savedState.op1.active || savedState.op1.terminated || op1DiskUsers > 0)) {
             log.info('🔄 Restauration 1ère Présence OP depuis fichier...');
@@ -150,6 +155,7 @@ client.once('ready', async () => {
             const restored = savedState.op1.messageId
                 ? await restoreReactionsFromMessage(savedState.op1.messageId, reactionsOP1)
                 : false;
+            applyManualPresenceOverrides?.();
             expirePresenceAtMidnight?.();
             op1Restored = Boolean(restored || op1DiskUsers > 0);
             log.info(restored
@@ -170,6 +176,7 @@ client.once('ready', async () => {
             const restored = savedState.op2.messageId
                 ? await restoreReactionsFromMessage(savedState.op2.messageId, reactionsOP2)
                 : false;
+            applyManualPresenceOverrides?.();
             expirePresenceAtMidnight?.();
             op2Restored = Boolean(restored || op2DiskUsers > 0);
             log.info(restored
@@ -206,6 +213,7 @@ client.once('ready', async () => {
                                 presenceData.active = true;
                                 presenceData.terminated = false;
                                 presenceData.startedAt = new Date(msg.createdTimestamp || Date.now()).toISOString();
+                                applyManualPresenceOverrides?.();
                                 expirePresenceAtMidnight?.();
                                 op1Restored = true;
                                 savePresenceState();
@@ -223,6 +231,7 @@ client.once('ready', async () => {
                                 presence2Data.active = true;
                                 presence2Data.terminated = false;
                                 presence2Data.startedAt = new Date(msg.createdTimestamp || Date.now()).toISOString();
+                                applyManualPresenceOverrides?.();
                                 expirePresenceAtMidnight?.();
                                 op2Restored = true;
                                 savePresenceState();

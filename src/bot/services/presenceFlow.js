@@ -4,6 +4,7 @@
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
 const { collectNoReactionMembers } = require('./presenceNoReaction');
+const { pickReactionPriority } = require('../../shared/presenceReactions');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - flux presence OP externalise
 
@@ -17,6 +18,25 @@ function createStateProxy(getter) {
             return true;
         },
     });
+}
+
+function isIslandPresenceDay(date) {
+    const day = date.getDay();
+    return day === 3 || day === 5 || day === 6; // mercredi, vendredi, samedi
+}
+
+function buildPresenceOp1Message({ CONFIG, date, dateStr, itemsList }) {
+    const roleMention = `<@&${CONFIG.ROLES.MEMBRE_1}>`;
+    const absenceMention = `<#${CONFIG.CHANNELS.ABSENCE}>`;
+    const isIsland = isIslandPresenceDay(date);
+    const title = isIsland
+        ? `**Présence OP** du ${dateStr} à **21H00** pour l'Ile ${CONFIG.EMOJIS.ATTENTION}`
+        : `**Présence OP** du ${dateStr} à **21H00**`;
+    const locationLine = isIsland
+        ? `Soyez présent à **21H15** à côté du **Ponton**`
+        : `Soyez présent à **21H00** au QG`;
+
+    return `${roleMention}\n\n${title}\n${locationLine}\n\n${itemsList}\n\nAucun oubli toléré ${CONFIG.EMOJIS.ATTENTION}\n\nAfin d'être prêt à partir en convoi une fois l'appel effectué.\nRéaction obligatoire : ${CONFIG.EMOJIS.CHECK} Présent ${CONFIG.EMOJIS.RETARD} Retard ${CONFIG.EMOJIS.NO} Absent\n\nMerci de mettre une absence dans le salon ${absenceMention} si vous n'êtes pas présent. Respecter la Template c'est **important** ${CONFIG.EMOJIS.ATTENTION}`;
 }
 
 function createPresenceFlowService(deps) {
@@ -33,6 +53,8 @@ function createPresenceFlowService(deps) {
         addPresenceReactions,
         reactionsOP1,
         reactionsOP2,
+        manualPresenceOverridesOP1,
+        manualPresenceOverridesOP2,
         getPresenceData,
         setPresenceData,
         getPresence2Data,
@@ -107,12 +129,14 @@ function isTargetInAbsenceRange(startDay, startMonth, endDay, endMonth, targetDa
     return target >= start && target <= end;
 }
 
-function resetPresenceStateForNewFirstOp(todayKey) {
-    if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
-    stopAllReminders?.('new_op_started');
-    reactionsOP1.clear();
-    reactionsOP2.clear();
-    setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false, startedAt: null });
+    function resetPresenceStateForNewFirstOp(todayKey) {
+        if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+        stopAllReminders?.('new_op_started');
+        reactionsOP1.clear();
+        reactionsOP2.clear();
+        manualPresenceOverridesOP1?.clear();
+        manualPresenceOverridesOP2?.clear();
+        setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false, startedAt: null });
     setPresence2Data({ messageId: null, active: false, terminated: false, startedAt: null });
     if (saveState) saveState('presence_current_day', todayKey);
     savePresenceState();
@@ -179,19 +203,7 @@ async function sendPresence2Message(channelOverride) {
         log.info(`📋 2ème Présence OP envoyée (${dateStr} ${timeStr})`);
         await refreshAbsencePanel();
 
-        // Suppression auto après 30 minutes
-        const deletePresence2Timer = setTimeout(async () => {
-            try {
-                const oldMsg = await channel.messages.fetch(msg.id);
-                await oldMsg.delete();
-                log.info('🗑️ 2ème Présence OP supprimée (30min)');
-            } catch {}
-            presence2Data.active = false;
-            presence2Data.terminated = true;
-            savePresenceState();
-            await refreshAbsencePanel();
-        }, 30 * 60 * 1000);
-        deletePresence2Timer.unref?.();
+        // Le message Discord reste visible jusqu'au cleanup quotidien de 22h00.
     } catch (error) {
         log.error('❌ Erreur 2ème OP:', error);
     }
@@ -228,7 +240,7 @@ async function sendPresenceMessage(channelOverride) {
             .replace('{date}', dateStr)
             .replace('{emojis}', `${CONFIG.EMOJIS.CHECK} Présent ${CONFIG.EMOJIS.RETARD} Retard ${CONFIG.EMOJIS.NO} Absent`);
     } else {
-        text = `<@&${CONFIG.ROLES.MEMBRE_1}>\n\n**Présence OP** du ${dateStr} à **21H00**\nSoyez présent à **20H45.**\n\n${itemsList}\n\nAucun oubli toléré ${CONFIG.EMOJIS.ATTENTION}\n\nAfin d'être prêt à partir en convoi une fois l'appel effectué.\nRéaction obligatoire : ${CONFIG.EMOJIS.CHECK} Présent ${CONFIG.EMOJIS.RETARD} Retard ${CONFIG.EMOJIS.NO} Absent\n\nMerci de mettre une absence dans le salon <#${CONFIG.CHANNELS.ABSENCE}> si vous n'êtes pas présent. Respecter la Template c'est **important** ${CONFIG.EMOJIS.ATTENTION}`;
+        text = buildPresenceOp1Message({ CONFIG, date: now, dateStr, itemsList });
     }
 
     try {
@@ -300,16 +312,6 @@ async function startPresenceReminders(channel, presenceMsg) {
                 await refreshAbsencePanel();
             });
 
-            // 21h20 — Suppression message 1ère OP
-            replacePresenceCron('delete-op1:21h20', '20 21 * * *', async () => {
-                if (!presenceData.messageId) return;
-                log.info('🗑️ 21h20 : Suppression 1ère présence OP');
-                try {
-                    const msg = await channel.messages.fetch(presenceData.messageId);
-                    await msg.delete();
-                } catch {}
-            });
-
             // 22h00 — Nettoyage des messages Discord (présence reste visible sur le site)
             replacePresenceCron('cleanup:22h00', '0 22 * * *', async () => {
                 if (!presenceData.active && !presence2Data.active) return;
@@ -346,7 +348,7 @@ async function startPresenceReminders(channel, presenceMsg) {
                 savePresenceState();
                 try { await refreshAbsencePanel(); } catch {}
             });
-            log.info('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, suppression 21h20, cleanup messages 22h, expiration 00h');
+            log.info('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, cleanup messages 22h, expiration 00h');
         }
 
         // Mode TEST/TURBO : on lance des crons * * * * * temporaires
@@ -366,7 +368,9 @@ async function mentionNonReactors(channel, presenceMsg) {
     const mentionMsgs = [];
     try {
         // Utiliser la Map cachée au lieu de fetch les réactions API
-        const reacted = new Set(reactionsOP1.keys());
+        const reacted = new Set([...reactionsOP1.entries()]
+            .filter(([, set]) => pickReactionPriority(set))
+            .map(([userId]) => userId));
 
         // Refetch absences salon pour avoir les plus récentes
         const { validAbsences } = await getAbsentUsersToday();
@@ -655,4 +659,6 @@ async function sendPresenceWarnings(presenceChannel) {
 
 module.exports = {
     createPresenceFlowService,
+    buildPresenceOp1Message,
+    isIslandPresenceDay,
 };

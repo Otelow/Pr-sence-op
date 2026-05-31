@@ -354,6 +354,8 @@ let presence2Data = {
 
 const reactionsOP1 = new Map(); // Map<userId, Set<reactionType>>
 const reactionsOP2 = new Map(); // Map<userId, Set<reactionType>>
+const manualPresenceOverridesOP1 = new Map(); // Map<userId, Set<reactionType|'none'>>
+const manualPresenceOverridesOP2 = new Map(); // Map<userId, Set<reactionType|'none'>>
 
 function getReactionMap(messageId) {
     if (presenceData.messageId === messageId) return reactionsOP1;
@@ -365,6 +367,21 @@ function getPresenceOpForMessageId(messageId) {
     if (presenceData.messageId === messageId) return 'op1';
     if (presence2Data.messageId === messageId) return 'op2';
     return null;
+}
+
+function applyManualPresenceOverrides() {
+    for (const [userId, set] of manualPresenceOverridesOP1) reactionsOP1.set(userId, new Set(set));
+    for (const [userId, set] of manualPresenceOverridesOP2) reactionsOP2.set(userId, new Set(set));
+}
+
+function setManualPresenceReaction(op, userId, type) {
+    const normalizedType = type || 'none';
+    const overrideMap = op === 'op2' ? manualPresenceOverridesOP2 : manualPresenceOverridesOP1;
+    const reactionMap = op === 'op2' ? reactionsOP2 : reactionsOP1;
+    const set = new Set([normalizedType]);
+    overrideMap.set(userId, set);
+    reactionMap.set(userId, new Set(set));
+    savePresenceState?.();
 }
 
 // ==========================================
@@ -386,6 +403,8 @@ const {
     client,
     reactionsOP1,
     reactionsOP2,
+    manualPresenceOverridesOP1,
+    manualPresenceOverridesOP2,
     getPresenceData: () => presenceData,
     getPresence2Data: () => presence2Data,
     getAbsentUsersToday: targetDate => getAbsentUsersToday(targetDate),
@@ -471,7 +490,10 @@ async function syncPresenceReactions() {
         if (presenceData.messageId) jobs.push(restoreReactionsFromMessage(presenceData.messageId, reactionsOP1));
         if (presence2Data.messageId) jobs.push(restoreReactionsFromMessage(presence2Data.messageId, reactionsOP2));
         if (jobs.length === 0) return [];
-        return Promise.allSettled(jobs);
+        const result = await Promise.allSettled(jobs);
+        applyManualPresenceOverrides();
+        savePresenceState?.();
+        return result;
     })().finally(() => {
         presenceReactionSyncPromise = null;
     });
@@ -498,6 +520,8 @@ async function syncPresenceReactions() {
     addPresenceReactions,
     reactionsOP1,
     reactionsOP2,
+    manualPresenceOverridesOP1,
+    manualPresenceOverridesOP2,
     getPresenceData: () => presenceData,
     setPresenceData: value => {
         presenceData = value;
@@ -650,6 +674,9 @@ registerReadyEvent({
     restoreReactionsFromMessage,
     reactionsOP1,
     reactionsOP2,
+    manualPresenceOverridesOP1,
+    manualPresenceOverridesOP2,
+    applyManualPresenceOverrides,
     presenceData,
     presence2Data,
     savePresenceState,
@@ -740,6 +767,10 @@ function getBotState() {
         presence2Data,
         reactionsOP1,
         reactionsOP2,
+        manualPresenceOverridesOP1,
+        manualPresenceOverridesOP2,
+        setManualPresenceReaction,
+        applyManualPresenceOverrides,
         absenceTracking,
         absenceSalonCache: getAbsenceSalonCache(),
         sendPresenceMessage,
@@ -747,6 +778,8 @@ function getBotState() {
         getAbsentUsersToday,
         updateAbsenceSalonCache,
         syncPresenceReactions,
+        savePresenceState,
+        refreshAbsencePanel,
         getConsecutiveDays,
         saveAbsenceTracking,
     };

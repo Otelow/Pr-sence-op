@@ -1,7 +1,13 @@
 // AUDIT HARDENING 21/05/2026 — calcul OP sans réaction testable
+const { pickReactionPriority } = require('../../shared/presenceReactions');
 
 function toSet(value) {
     if (value instanceof Set) return value;
+    if (value && typeof value.entries === 'function') {
+        return new Set([...value.entries()]
+            .filter(([, set]) => pickReactionPriority(set))
+            .map(([userId]) => userId));
+    }
     if (value && typeof value.keys === 'function') return new Set(value.keys());
     return new Set();
 }

@@ -713,8 +713,8 @@ function closeCommandModal() {
     if (modal) modal.style.display = 'none';
 }
 
-async function fetchJson(url) {
-    const res = await fetch(url, { cache: 'no-store' });
+async function fetchJson(url, options = {}) {
+    const res = await fetch(url, { cache: 'no-store', ...options });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     return data;
@@ -885,16 +885,25 @@ function renderOP(prefix, op) {
     const total = op.present.length + op.late.length + op.absentReact.length + op.absentValid.length + op.noReaction.length;
 
     const categories = [
-        { icon: '✅', label: 'Présents', list: op.present },
-        { icon: '⏰', label: 'Retards', list: op.late },
-        { icon: '❌', label: 'Absents non justifiés', list: op.absentReact },
-        { icon: '📋', label: 'Absents justifiés', list: op.absentValid },
-        { icon: '⚠️', label: 'Pas de réaction', list: op.noReaction },
+        { icon: '✅', label: 'Présents', list: op.present, reaction: 'check' },
+        { icon: '⏰', label: 'Retards', list: op.late, reaction: 'retard' },
+        { icon: '❌', label: 'Absents non justifiés', list: op.absentReact, reaction: 'no' },
+        { icon: '📋', label: 'Absents justifiés', list: op.absentValid, reaction: 'none', locked: true },
+        { icon: '⚠️', label: 'Pas de réaction', list: op.noReaction, reaction: 'none' },
     ];
 
-    const renderMember = (m) => {
+    const renderMember = (m, category) => {
         const avatar = m.avatar || `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><rect width='24' height='24' fill='%23262626'/></svg>`;
-        return `<div class="member"><img class="member-avatar-mini" src="${avatar}" alt=""><span class="member-name">${escapeHtml(m.name)}</span></div>`;
+        const selected = m.reaction || category.reaction || 'none';
+        const editor = category.locked
+            ? '<span class="presence-reaction-locked">Absence salon</span>'
+            : `<select class="presence-reaction-editor" data-op="${prefix}" data-user-id="${escapeHtml(m.id || m.user_id)}" onclick="event.stopPropagation()" onchange="updatePresenceReaction(this)">
+                <option value="none"${selected === 'none' ? ' selected' : ''}>Pas réagi</option>
+                <option value="check"${selected === 'check' ? ' selected' : ''}>Présent</option>
+                <option value="retard"${selected === 'retard' ? ' selected' : ''}>Retard</option>
+                <option value="no"${selected === 'no' ? ' selected' : ''}>Absent</option>
+            </select>`;
+        return `<div class="member"><img class="member-avatar-mini" src="${avatar}" alt=""><span class="member-name">${escapeHtml(m.name)}</span>${editor}</div>`;
     };
 
     cats.innerHTML = `
@@ -910,10 +919,32 @@ function renderOP(prefix, op) {
             <div class="op-cat-list">
                 ${c.list.length === 0
                     ? '<div class="empty-cat">Aucun</div>'
-                    : c.list.map(renderMember).join('')}
+                    : c.list.map(member => renderMember(member, c)).join('')}
             </div>
         </div>
     `).join('');
+}
+
+async function updatePresenceReaction(select) {
+    const op = select?.dataset?.op;
+    const userId = select?.dataset?.userId;
+    const reaction = select?.value || 'none';
+    if (!op || !userId) return;
+
+    select.disabled = true;
+    try {
+        await fetchJson('/api/presence/reaction', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op, userId, reaction }),
+        });
+        await Promise.all([loadPresence(), reloadDashboardOverview()]);
+    } catch (e) {
+        alert(e.message || 'Erreur correction présence');
+        await loadPresence();
+    } finally {
+        select.disabled = false;
+    }
 }
 
 function renderDecrochesOP(data) {
@@ -5157,6 +5188,7 @@ window.openCraftWeaponDetails = openCraftWeaponDetails;
 window.closeCraftWeaponDetails = closeCraftWeaponDetails;
 window.openPresenceStatDetails = openPresenceStatDetails;
 window.closePresenceStatDetails = closePresenceStatDetails;
+window.updatePresenceReaction = updatePresenceReaction;
 window.reloadDashboardOverview = reloadDashboardOverview;
 window.openCommandModal = openCommandModal;
 window.closeCommandModal = closeCommandModal;

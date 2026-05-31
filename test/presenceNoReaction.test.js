@@ -40,6 +40,19 @@ test('OP sans aucune réaction marque tous les membres éligibles non-réactifs'
     assert.equal(result.reacted.size, 0);
 });
 
+test('OP avec correction manuelle sans réaction reste non-réactive', () => {
+    const role = roleWithMembers(member('u1'), member('u2'));
+    const result = collectNoReactionMembers({
+        role,
+        reactionMap: new Map([['u1', new Set(['none'])], ['u2', new Set(['check'])]]),
+        validAbsences: new Set(),
+        invalidAbsences: new Set(),
+        excludedRoleId: 'excluded-role',
+    });
+    assert.deepEqual(result.noReact.map(m => m.id), ['u1']);
+    assert.deepEqual([...result.reacted], ['u2']);
+});
+
 test('OP respecte absences valides, absences invalides, bots et rôle exclu', () => {
     const role = roleWithMembers(
         member('valid'),
