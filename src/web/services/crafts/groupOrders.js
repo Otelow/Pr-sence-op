@@ -534,6 +534,10 @@ function createGroupOrderService(deps) {
             const order = connection.prepare('SELECT * FROM group_orders WHERE id = ?').get(orderId);
             if (!order) throw createServiceError('Commande groupe introuvable', 404);
             const craftsCount = connection.prepare('SELECT COUNT(*) AS c FROM group_order_crafts WHERE order_id = ?').get(orderId).c;
+            if (String(order.status || '') === 'cancelled') {
+                connection.prepare('DELETE FROM group_orders WHERE id = ?').run(orderId);
+                return 'deleted';
+            }
             if (Number(craftsCount) > 0) {
                 connection.prepare(`
                     UPDATE group_orders

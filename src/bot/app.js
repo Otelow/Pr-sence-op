@@ -1,4 +1,4 @@
-// RESET HEBDO 22/05/2026 — dimanche 23h59 au lieu de 22h00
+// RESET HEBDO 31/05/2026 — dimanche 17h00
 // PRÉSENCE RÉSILIENTE + DÉTAILS 20/05/2026
 // RELANCE ABSENCE + CONTRASTE 19/05/2026
 // STATS PRÉSENCE 19/05/2026 — snapshots minuit + dashboard stats
@@ -318,7 +318,7 @@ let presenceItems = [
 
 let customPresenceMessage = null;
 
-// Suivi des absences hebdomadaire (persistant via volume, reset dimanche 23h59)
+// Suivi des absences hebdomadaire (persistant via volume, reset dimanche 17h00)
 // Map<userId, { count, dates[], username }>
 const TRACKING_FILE = dataFile('absence_tracking.json');
 

@@ -25,7 +25,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260526-live-cleanup">
+<link rel="stylesheet" href="/style.css?v=20260531-presence-archive">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -284,9 +284,15 @@
                 </div>
             </div>
 
-            <div class="stats-chart-container">
-                <h4>📈 Évolution sur la période</h4>
-                <canvas id="presenceEvolutionChart"></canvas>
+            <div class="presence-evolution-grid">
+                <div class="stats-chart-container">
+                    <h4>📈 Évolution sur la période Présence 1</h4>
+                    <canvas id="presenceEvolutionChartOp1"></canvas>
+                </div>
+                <div class="stats-chart-container">
+                    <h4>📈 Évolution sur la période Présence 2</h4>
+                    <canvas id="presenceEvolutionChartOp2"></canvas>
+                </div>
             </div>
         </div>
 
@@ -580,7 +586,7 @@
             </div>
         </div>
 
-        <p class="stats-note">Reset automatique chaque dimanche à 22h00</p>
+        <p class="stats-note">Reset automatique chaque dimanche à 17h00</p>
     </section>
 
     <!-- TAB: SANCTIONS -->
@@ -895,6 +901,7 @@
                         <label class="comm-label" for="craftRequestsStatusFilter">Statut</label>
                         <select id="craftRequestsStatusFilter" class="comm-input craft-board-select" onchange="updateCraftRequestsStatusFilter()">
                             <option value="all">Tous</option>
+                            <option value="archive">Archive</option>
                             <option value="crafted">⚒ Crafté</option>
                             <option value="in_progress">⏳ En cours</option>
                             <option value="waiting_materials">📦 En attente des matières premières</option>
@@ -1441,6 +1448,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260526-live-cleanup"></script>
+<script src="/app.js?v=20260531-presence-archive"></script>
 </body>
 </html>

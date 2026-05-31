@@ -84,7 +84,8 @@ const SITE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 let idleLogoutTimer = null;
 let userPermissions = { canEditMap: false };
 let presenceStatsCache = null;
-let presenceEvolutionChart = null;
+let presenceEvolutionChartOp1 = null;
+let presenceEvolutionChartOp2 = null;
 
 window.CSRF_TOKEN = window.CSRF_TOKEN || null;
 (function installCsrfFetchWrapper() {
@@ -1235,6 +1236,51 @@ function renderTopLists(data) {
 }
 
 function renderEvolutionChart(data) {
+    if (typeof Chart !== 'function') return;
+    const dailyRows = data.daily || [];
+    const chartLabels = dailyRows.map(day => {
+        const [, month, date] = String(day.date || '').split('-');
+        return date && month ? `${date}/${month}` : day.date;
+    });
+    const renderOpChart = (canvasId, existingChart, datasets) => {
+        const targetCanvas = document.getElementById(canvasId);
+        const targetCtx = targetCanvas?.getContext?.('2d');
+        if (!targetCtx) return existingChart;
+        if (existingChart) existingChart.destroy();
+        return new Chart(targetCtx, {
+            type: 'line',
+            data: { labels: chartLabels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { labels: { color: '#ddd', font: { size: 12 } } },
+                    tooltip: { backgroundColor: 'rgba(20,20,20,0.95)', borderColor: '#444', borderWidth: 1 },
+                },
+                scales: {
+                    x: { ticks: { color: '#999' }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                    y: { ticks: { color: '#999' }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true },
+                },
+            },
+        });
+    };
+    const buildOpDatasets = (opKey, withDecroches = false) => {
+        const datasets = [
+            { label: 'Présents', data: dailyRows.map(day => day[opKey]?.present || 0), borderColor: '#00ff88', backgroundColor: 'rgba(0,255,136,0.1)', tension: 0.35, fill: true },
+            { label: 'Retards', data: dailyRows.map(day => day[opKey]?.late || 0), borderColor: '#ffaa44', backgroundColor: 'rgba(255,170,68,0.05)', tension: 0.35 },
+            { label: 'Absents', data: dailyRows.map(day => (day[opKey]?.absentReact || 0) + (day[opKey]?.noReaction || 0)), borderColor: '#ff4466', backgroundColor: 'rgba(255,68,102,0.05)', tension: 0.35 },
+        ];
+        if (withDecroches) {
+            datasets.push({ label: 'Décrochés', data: dailyRows.map(day => day.op2Launched ? (day.decroches || 0) : 0), borderColor: '#ffd700', backgroundColor: 'rgba(255,215,0,0.05)', tension: 0.35, borderDash: [4, 4] });
+        }
+        return datasets;
+    };
+    presenceEvolutionChartOp1 = renderOpChart('presenceEvolutionChartOp1', presenceEvolutionChartOp1, buildOpDatasets('op1'));
+    presenceEvolutionChartOp2 = renderOpChart('presenceEvolutionChartOp2', presenceEvolutionChartOp2, buildOpDatasets('op2', true));
+    return;
+    /*
+
     const canvas = document.getElementById('presenceEvolutionChart');
     const ctx = canvas?.getContext?.('2d');
     if (!ctx || typeof Chart !== 'function') return;
@@ -1280,6 +1326,7 @@ function renderEvolutionChart(data) {
             },
         },
     });
+    */
 }
 
 // ===== WEEKLY (avec calendrier) =====
@@ -3436,6 +3483,7 @@ let craftRequestsListState = {
     userSearch: '',
     statusFilter: 'all',
 };
+const CRAFT_REQUEST_ARCHIVE_AFTER_MS = 3 * 24 * 60 * 60 * 1000;
 const CRAFT_BOARD_VISIBLE_STATUSES = ['materials', 'waiting_materials', 'in_progress', 'crafted', 'completed'];
 let MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
 
@@ -3992,10 +4040,38 @@ function getCraftRequestStatusPriority(request) {
 function craftStatusMatchesFilter(request, filter) {
     const status = String(request?.status || 'pending');
     if (!filter || filter === 'all') return !['completed', 'rejected', 'refused'].includes(status);
+    if (filter === 'archive') return isCraftRequestArchived(request);
     if (filter === 'waiting_materials') return status === 'materials' || status === 'waiting_materials';
     if (filter === 'crafted') return !!request.crafted || status === 'crafted';
     if (filter === 'rejected') return status === 'rejected' || status === 'refused';
     return status === filter;
+}
+
+function normalizeCraftRequestTimestamp(value) {
+    if (value === null || value === undefined || value === '') return 0;
+    if (typeof value === 'number') return value < 10000000000 ? value * 1000 : value;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric < 10000000000 ? numeric * 1000 : numeric;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getCraftArchiveTimestamp(request) {
+    return normalizeCraftRequestTimestamp(
+        request?.craft_date ||
+        request?.crafted_at ||
+        request?.stock_consumed_at ||
+        request?.updated_at ||
+        request?.created_at
+    );
+}
+
+function isCraftRequestArchived(request) {
+    const status = String(request?.status || 'pending');
+    if (!request?.crafted && status !== 'crafted') return false;
+    const archivedFrom = getCraftArchiveTimestamp(request);
+    if (!archivedFrom) return false;
+    return Date.now() - archivedFrom >= CRAFT_REQUEST_ARCHIVE_AFTER_MS;
 }
 
 function compareCraftRequests(a, b) {
@@ -4052,6 +4128,9 @@ function clearCraftRequestsUserSearch() {
 
 function getVisibleCraftRequests() {
     let requests = craftRequestsCache.filter(r => craftStatusMatchesFilter(r, craftRequestsListState.statusFilter));
+    if (craftRequestsListState.statusFilter !== 'archive') {
+        requests = requests.filter(r => !isCraftRequestArchived(r));
+    }
 
     const userSearch = craftRequestsListState.userSearch;
     if (userSearch) {
@@ -4137,6 +4216,7 @@ function normalizeCraftRequestsToolbarLabels() {
     if (title) title.textContent = 'Demandes récentes';
     const statusLabels = {
         all: 'Tous',
+        archive: 'Archive',
         crafted: 'Crafté',
         in_progress: 'En cours',
         waiting_materials: 'En attente des matières premières',
@@ -4186,7 +4266,9 @@ function renderCraftRequestsList() {
     renderCraftRequestsPagination(total, totalPages, start, end);
 
     if (recent.length === 0) {
-        list.innerHTML = '<p class="empty">Aucune demande en cours</p>';
+        list.innerHTML = craftRequestsListState.statusFilter === 'archive'
+            ? '<p class="empty">Aucune demande archivée</p>'
+            : '<p class="empty">Aucune demande en cours</p>';
         return;
     }
 
@@ -5503,6 +5585,26 @@ async function cancelGroupOrder(id) {
     }
 }
 
+async function deleteGroupOrder(id) {
+    const ok = await confirmAction({
+        title: 'Supprimer la commande annulée',
+        message: 'Cette commande groupe annulée sera supprimée définitivement de la liste.',
+        confirmText: 'Supprimer',
+        danger: true,
+    });
+    if (!ok) return;
+    try {
+        const res = await fetch(`/api/crafts/group-orders/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Suppression impossible');
+        groupOrdersCache = Array.isArray(data.orders) ? data.orders : groupOrdersCache;
+        toast('🗑 Commande supprimée');
+        renderGroupOrdersList();
+    } catch (error) {
+        toast(`❌ ${error.message}`, 'error');
+    }
+}
+
 function openGroupOrderCraftModal(id) {
     const order = groupOrdersCache.find(o => Number(o.id) === Number(id));
     if (!order) return;
@@ -5637,9 +5739,13 @@ function renderGroupOrdersList() {
                 <div class="group-order-card-items">${itemsHtml}</div>
                 ${order.note ? `<p class="group-order-note">${escapeHtml(order.note)}</p>` : ''}
                 <div class="group-order-actions">
-                    <button type="button" class="btn-secondary" onclick="editGroupOrder(${Number(order.id)})">Modifier</button>
-                    <button type="button" class="btn-primary" onclick="openGroupOrderCraftModal(${Number(order.id)})">Renseigner craft</button>
-                    <button type="button" class="btn-danger" onclick="cancelGroupOrder(${Number(order.id)})">Annuler</button>
+                    ${order.status === 'cancelled'
+                        ? `<button type="button" class="btn-danger group-order-delete-btn" onclick="deleteGroupOrder(${Number(order.id)})">Supprimer</button>`
+                        : `
+                            <button type="button" class="btn-secondary" onclick="editGroupOrder(${Number(order.id)})">Modifier</button>
+                            <button type="button" class="btn-primary" onclick="openGroupOrderCraftModal(${Number(order.id)})">Renseigner craft</button>
+                            <button type="button" class="btn-danger" onclick="cancelGroupOrder(${Number(order.id)})">Annuler</button>
+                        `}
                 </div>
             </div>
         `;

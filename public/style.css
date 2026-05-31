@@ -13922,3 +13922,162 @@ body {
     border-color: rgba(239, 68, 68, 0.48) !important;
     box-shadow: 0 0 14px rgba(239, 68, 68, 0.12) !important;
 }
+
+/* DASHBOARD FINISH 31/05/2026 — stats OP séparées + commandes propres */
+.presence-evolution-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.presence-evolution-grid .stats-chart-container {
+    min-height: 330px;
+}
+
+#tab-commands .cmd-section {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+}
+
+#tab-commands .section-title,
+#tab-commands .comm-title {
+    margin: 0 0 14px;
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+#tab-commands .cmd-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+}
+
+#tab-commands .cmd-btn {
+    min-height: 94px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.035);
+    color: var(--text);
+    display: grid;
+    grid-template-columns: 38px 1fr;
+    grid-template-areas:
+        "icon name"
+        "icon desc";
+    column-gap: 12px;
+    align-items: center;
+    text-align: left;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+#tab-commands .cmd-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(247, 135, 0, 0.35);
+    background: rgba(247, 135, 0, 0.08);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35), 0 0 18px rgba(247, 135, 0, 0.10);
+}
+
+#tab-commands .cmd-icon {
+    grid-area: icon;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(247, 135, 0, 0.10);
+    border: 1px solid rgba(247, 135, 0, 0.20);
+    font-size: 18px;
+}
+
+#tab-commands .cmd-name {
+    grid-area: name;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+#tab-commands .cmd-desc {
+    grid-area: desc;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.35;
+}
+
+#tab-commands .comm-header {
+    margin-bottom: 14px;
+}
+
+#tab-commands .comm-subtitle {
+    margin: -8px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+#tab-commands .comm-tabs-wrapper {
+    margin-bottom: 14px;
+}
+
+#tab-commands .comm-tabs {
+    display: inline-flex;
+    gap: 5px;
+    padding: 5px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--glass-border);
+}
+
+#tab-commands .comm-tab {
+    border: 0;
+    border-radius: 10px;
+    padding: 9px 14px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+#tab-commands .comm-tab.active,
+#tab-commands .comm-tab:hover {
+    background: rgba(247, 135, 0, 0.12);
+    color: var(--text);
+    box-shadow: inset 0 0 0 1px rgba(247, 135, 0, 0.25);
+}
+
+#tab-commands .comm-card {
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 18px;
+}
+
+#tab-commands .comm-send-btn {
+    border-radius: 12px;
+    padding: 11px 16px;
+    background: rgba(247, 135, 0, 0.12);
+    border: 1px solid rgba(247, 135, 0, 0.32);
+    color: var(--text);
+    box-shadow: 0 0 16px rgba(247, 135, 0, 0.10);
+}
+
+.group-order-delete-btn {
+    min-width: 120px;
+    border-radius: 10px !important;
+}
+
+.craft-requests-toolbar select option[value="archive"] {
+    color: #f78700;
+}
+
+@media (max-width: 900px) {
+    .presence-evolution-grid {
+        grid-template-columns: 1fr;
+    }
+}
