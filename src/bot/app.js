@@ -78,7 +78,6 @@ const { createPresenceFlowService } = require('./services/presenceFlow');
 const { createAbsencePanelService } = require('./services/absencePanel');
 const { validateDiscordConfig } = require('./services/configValidation');
 const { registerAnnouncementReactionReminder } = require('./services/announcementReactionReminder');
-const { registerScheduledRoleKick } = require('./services/scheduledRoleKick');
 const {
     registerAbsenceReminder,
     startRemindUserAbsence,
@@ -716,9 +715,6 @@ registerClipEvents(client);
 registerAnnouncementReactionReminder(client, {
     logger: log,
     attentionEmoji: CONFIG.EMOJIS.ATTENTION,
-});
-registerScheduledRoleKick(client, {
-    logger: log,
 });
 registerAbsenceValidatorEvent(client, { CONFIG, scheduleAbsenceSalonCacheUpdate, stopRemindUserAbsence });
 
