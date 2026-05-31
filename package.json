@@ -1,6 +1,6 @@
 {
   "name": "21-block-savage-bot",
-  "version": "3.6.15",
+  "version": "3.6.16",
   "description": "Bot Discord 21 Block Savage + Dashboard Web",
   "main": "index.js",
   "engines": {
