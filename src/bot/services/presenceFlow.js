@@ -136,11 +136,11 @@ function isTargetInAbsenceRange(startDay, startMonth, endDay, endMonth, targetDa
         reactionsOP2.clear();
         manualPresenceOverridesOP1?.clear();
         manualPresenceOverridesOP2?.clear();
-        setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false, startedAt: null });
-    setPresence2Data({ messageId: null, active: false, terminated: false, startedAt: null });
-    if (saveState) saveState('presence_current_day', todayKey);
-    savePresenceState();
-    log.info(`📅 Nouveau jour présence initialisé : ${todayKey}`);
+        setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, terminated: false, startedAt: null, remindersDisabled: false, launchSource: null });
+        setPresence2Data({ messageId: null, active: false, terminated: false, startedAt: null });
+        if (saveState) saveState('presence_current_day', todayKey);
+        savePresenceState();
+        log.info(`📅 Nouveau jour présence initialisé : ${todayKey}`);
 }
 
 async function preparePresenceDayForFirstOp() {
@@ -218,12 +218,21 @@ function setupPresenceCron() {
     log.info(`⏰ Cron présence: ${PRESENCE_CRON}`);
 }
 
-async function sendPresenceMessage(channelOverride) {
+async function sendPresenceMessage(channelOverride, options = {}) {
+    if (channelOverride && typeof channelOverride === 'object') {
+        options = channelOverride;
+        channelOverride = null;
+    }
+    const skipReminders = Boolean(options.skipReminders);
+    const launchSource = options.source || (skipReminders ? 'dashboard' : 'auto');
+
     await preparePresenceDayForFirstOp();
     if (presenceData.active) return;
     await refreshAbsencesBeforePresence('presence-op1');
     presenceData.active = true;
     presenceData.terminated = false;
+    presenceData.remindersDisabled = skipReminders;
+    presenceData.launchSource = launchSource;
 
     const channelId = channelOverride || CONFIG.CHANNELS.PRESENCE;
     const channel = client.channels.cache.get(channelId);
@@ -257,7 +266,12 @@ async function sendPresenceMessage(channelOverride) {
         savePresenceState();
         log.info(`📋 1ère Présence OP envoyée (${dateStr})`);
 
-        startPresenceReminders(channel, msg);
+        if (skipReminders) {
+            schedulePresenceEndCrons(channel);
+            log.info('🔕 Présence OP lancée depuis le site : relances automatiques désactivées');
+        } else {
+            startPresenceReminders(channel, msg);
+        }
         await refreshAbsencePanel();
     } catch (error) {
         log.error('❌ Erreur présence:', error);
@@ -278,7 +292,51 @@ function replacePresenceCron(key, expression, handler) {
     return job;
 }
 
+function schedulePresenceEndCrons(channel) {
+    // 22h00 — Nettoyage des messages Discord (présence reste visible sur le site)
+    replacePresenceCron('cleanup:22h00', '0 22 * * *', async () => {
+        if (!presenceData.active && !presence2Data.active && !presenceData.messageId && !presence2Data.messageId) return;
+        log.info('🌙 22h — Nettoyage messages Discord (le panel site reste actif jusqu\'au lendemain)');
+        stopAbsencePanelRefresh();
+
+        if (presenceData.messageId) {
+            try { const m = await channel.messages.fetch(presenceData.messageId); await m.delete(); } catch {}
+            if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+            presenceData.reminderInterval = null;
+            presenceData.reminderIds = [];
+        }
+        if (presence2Data.messageId) {
+            try { const m = await channel.messages.fetch(presence2Data.messageId); await m.delete(); } catch {}
+        }
+        presenceData.active = false;
+        presenceData.terminated = true;
+        presence2Data.active = false;
+        presence2Data.terminated = true;
+        savePresenceState();
+        try { await refreshAbsencePanel(); } catch {}
+    });
+
+    // 00h00 Paris: les OP du jour ne sont plus en cours.
+    replacePresenceCron('reset:00h00', '0 0 * * *', async () => {
+        log.info('00h00 Paris - Presence OP basculee en terminee');
+        if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
+        presenceData.reminderInterval = null;
+        presenceData.active = false;
+        presenceData.terminated = Boolean(presenceData.messageId || reactionsOP1.size);
+        presence2Data.active = false;
+        presence2Data.terminated = Boolean(presence2Data.messageId || reactionsOP2.size);
+        savePresenceState();
+        try { await refreshAbsencePanel(); } catch {}
+    });
+}
+
 async function startPresenceReminders(channel, presenceMsg) {
+    if (presenceData.remindersDisabled) {
+        schedulePresenceEndCrons(channel);
+        log.info('🔕 Relances présence non relancées : lancement manuel site');
+        return;
+    }
+
     let stopped = false;
 
     const doReminder = async (isLast) => {
@@ -312,42 +370,7 @@ async function startPresenceReminders(channel, presenceMsg) {
                 await refreshAbsencePanel();
             });
 
-            // 22h00 — Nettoyage des messages Discord (présence reste visible sur le site)
-            replacePresenceCron('cleanup:22h00', '0 22 * * *', async () => {
-                if (!presenceData.active && !presence2Data.active) return;
-                log.info('🌙 22h — Nettoyage messages Discord (le panel site reste actif jusqu\'au lendemain)');
-                stopAbsencePanelRefresh();
-
-                // Supprimer les messages Discord mais garder l'état actif
-                if (presenceData.messageId) {
-                    try { const m = await channel.messages.fetch(presenceData.messageId); await m.delete(); } catch {}
-                    if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
-                    presenceData.reminderInterval = null;
-                    presenceData.reminderIds = [];
-                }
-                if (presence2Data.messageId) {
-                    try { const m = await channel.messages.fetch(presence2Data.messageId); await m.delete(); } catch {}
-                }
-                presenceData.active = false;
-                presenceData.terminated = true;
-                presence2Data.active = false;
-                presence2Data.terminated = true;
-                savePresenceState();
-                try { await refreshAbsencePanel(); } catch {}
-            });
-
-            // 00h00 Paris: les OP du jour ne sont plus en cours.
-            replacePresenceCron('reset:00h00', '0 0 * * *', async () => {
-                log.info('00h00 Paris - Presence OP basculee en terminee');
-                if (presenceData.reminderInterval) clearInterval(presenceData.reminderInterval);
-                presenceData.reminderInterval = null;
-                presenceData.active = false;
-                presenceData.terminated = Boolean(presenceData.messageId || reactionsOP1.size);
-                presence2Data.active = false;
-                presence2Data.terminated = Boolean(presence2Data.messageId || reactionsOP2.size);
-                savePresenceState();
-                try { await refreshAbsencePanel(); } catch {}
-            });
+            schedulePresenceEndCrons(channel);
             log.info('🔔 Crons présence remplacés : rappels 18h-20h45, avertissements 21h05, cleanup messages 22h, expiration 00h');
         }
 
@@ -362,6 +385,21 @@ async function startPresenceReminders(channel, presenceMsg) {
             });
         }
     }
+}
+
+async function stopPresenceMessage(op = 'op1') {
+    const target = op === 'op2' ? presence2Data : presenceData;
+    const reactionMap = op === 'op2' ? reactionsOP2 : reactionsOP1;
+    if (op !== 'op2' && target.reminderInterval) {
+        clearInterval(target.reminderInterval);
+        target.reminderInterval = null;
+    }
+    target.active = false;
+    target.terminated = Boolean(target.messageId || reactionMap.size);
+    if (op !== 'op2') target.reminderIds = [];
+    savePresenceState();
+    await refreshAbsencePanel();
+    return target.terminated;
 }
 
 async function mentionNonReactors(channel, presenceMsg) {
@@ -462,7 +500,7 @@ async function cleanupPresence(channel) {
         if (presenceData.messageId) { try { const m = await channel.messages.fetch(presenceData.messageId); await m.delete(); } catch {} }
         const msgs = await channel.messages.fetch({ limit: 50 });
         for (const [, m] of msgs.filter(m => m.author.id === client.user.id)) { await m.delete().catch(() => {}); await sleep(300); }
-        setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false }); reactionsOP1.clear(); savePresenceState();
+        setPresenceData({ messageId: null, reminderIds: [], reminderInterval: null, active: false, remindersDisabled: false, launchSource: null }); reactionsOP1.clear(); savePresenceState();
     } catch {}
 }
 
@@ -649,6 +687,7 @@ async function sendPresenceWarnings(presenceChannel) {
         setupPresenceCron,
         sendPresence2Message,
         sendPresenceMessage,
+        stopPresenceMessage,
         startPresenceReminders,
         mentionNonReactors,
         getAbsentUsersToday,

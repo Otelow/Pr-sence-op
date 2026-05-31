@@ -209,6 +209,7 @@ let getAbsenceSalonCache;
 let setupPresenceCron;
 let sendPresence2Message;
 let sendPresenceMessage;
+let stopPresenceMessage;
 let startPresenceReminders;
 let getAbsentUsersToday;
 let getParisDateKey;
@@ -343,6 +344,9 @@ let presenceData = {
     reminderInterval: null,
     active: false,
     startedAt: null,
+    terminated: false,
+    remindersDisabled: false,
+    launchSource: null,
 };
 
 // 2ème Présence OP
@@ -505,6 +509,7 @@ async function syncPresenceReactions() {
     setupPresenceCron,
     sendPresence2Message,
     sendPresenceMessage,
+    stopPresenceMessage,
     startPresenceReminders,
     getAbsentUsersToday,
 } = createPresenceFlowService({
@@ -775,6 +780,7 @@ function getBotState() {
         absenceSalonCache: getAbsenceSalonCache(),
         sendPresenceMessage,
         sendPresence2Message,
+        stopPresenceMessage,
         getAbsentUsersToday,
         updateAbsenceSalonCache,
         syncPresenceReactions,

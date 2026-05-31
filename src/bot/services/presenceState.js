@@ -212,6 +212,8 @@ function createPresenceStatePersistence(deps) {
                     active: presenceData.active,
                     terminated: Boolean(presenceData.terminated),
                     startedAt: presenceData.startedAt || null,
+                    remindersDisabled: Boolean(presenceData.remindersDisabled),
+                    launchSource: presenceData.launchSource || null,
                     reactions: serializeReactionMap(reactionsOP1),
                     manualOverrides: serializeReactionMap(manualPresenceOverridesOP1),
                 },

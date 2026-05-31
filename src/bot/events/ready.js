@@ -87,6 +87,8 @@ function applySavedPresenceData(target, savedOp) {
     target.active = Boolean(savedOp.active);
     target.terminated = Boolean(savedOp.terminated);
     target.startedAt = savedOp.startedAt || target.startedAt || null;
+    target.remindersDisabled = Boolean(savedOp.remindersDisabled);
+    target.launchSource = savedOp.launchSource || target.launchSource || null;
 }
 
 client.once('ready', async () => {
@@ -213,6 +215,8 @@ client.once('ready', async () => {
                                 presenceData.active = true;
                                 presenceData.terminated = false;
                                 presenceData.startedAt = new Date(msg.createdTimestamp || Date.now()).toISOString();
+                                presenceData.remindersDisabled = false;
+                                presenceData.launchSource = presenceData.launchSource || 'restore-scan';
                                 applyManualPresenceOverrides?.();
                                 expirePresenceAtMidnight?.();
                                 op1Restored = true;

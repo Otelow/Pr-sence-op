@@ -39,7 +39,7 @@ function createServiceHarness() {
         TEST_MODE: false,
         TURBO_MODE: false,
         client: { channels: { cache: { get: () => channel } }, guilds: { cache: { get: () => null } }, user: { id: 'bot' } },
-        cron: { schedule: () => ({ stop() {} }) },
+        cron: { schedule: expression => { sequence.push(`cron:${expression}`); return { stop() {} }; } },
         sleep: async () => {},
         addPresenceReactions: async () => sequence.push('reactions'),
         reactionsOP1: new Map(),
@@ -67,7 +67,7 @@ function createServiceHarness() {
         },
     });
 
-    return { service, sequence };
+    return { service, sequence, getPresenceData: () => presenceData };
 }
 
 test('presence OP1 relit le salon absence avant de poster le message', async () => {
@@ -84,4 +84,16 @@ test('presence OP2 relit le salon absence avant de poster le message', async () 
     await service.sendPresence2Message();
 
     assert.deepEqual(sequence.slice(0, 3), ['refresh:presence-op2', 'send', 'reactions']);
+});
+
+test('presence OP1 lancée depuis le site ne programme pas les relances auto', async () => {
+    const { service, sequence, getPresenceData } = createServiceHarness();
+
+    await service.sendPresenceMessage(null, { skipReminders: true, source: 'dashboard' });
+
+    assert.equal(getPresenceData().remindersDisabled, true);
+    assert.equal(sequence.includes('cron:0 18 * * *'), false);
+    assert.equal(sequence.includes('cron:5 21 * * *'), false);
+    assert.equal(sequence.includes('cron:0 22 * * *'), true);
+    assert.equal(sequence.includes('cron:0 0 * * *'), true);
 });

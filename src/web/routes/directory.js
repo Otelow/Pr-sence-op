@@ -20,8 +20,10 @@ const COMMANDS = [
     { id: 'trash', icon: '🚫', name: 'Anti-Trash', desc: 'Avertissement trash', category: 'alert' },
     // Communications
     { id: 'radio', icon: '📻', name: 'Nouvelle Radio', desc: 'Fréquence aléatoire', category: 'comm', info: true },
-    { id: 'presence', icon: '📋', name: '1ère Présence OP', desc: 'Lancer la présence', category: 'comm', info: true },
+    { id: 'presence', icon: '📋', name: '1ère Présence OP', desc: 'Lancer sans relances auto', category: 'comm', info: true },
+    { id: 'presence-stop', icon: '⏹', name: 'Stop 1ère Présence OP', desc: 'Arrêter le suivi actif', category: 'comm', danger: true },
     { id: 'presence2', icon: '📋', name: '2ème Présence OP', desc: 'Sans relances', category: 'comm', info: true },
+    { id: 'presence2-stop', icon: '⏹', name: 'Stop 2ème Présence OP', desc: 'Arrêter le suivi actif', category: 'comm', danger: true },
 ];
 
 function getGuild(getBotClient, getBotState) {

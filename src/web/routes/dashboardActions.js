@@ -120,14 +120,32 @@ function registerDashboardActionRoutes(app, deps) {
 
                 case 'presence': {
                     if (state.presenceData.active) return res.status(400).json({ error: 'Présence OP déjà active' });
-                    await state.sendPresenceMessage();
-                    return res.json({ success: true });
+                    await state.sendPresenceMessage(null, { skipReminders: true, source: 'dashboard' });
+                    return res.json({ success: true, remindersDisabled: true });
+                }
+
+                case 'presence-stop': {
+                    if (!state.presenceData?.active && !state.presenceData?.messageId && !state.reactionsOP1?.size) {
+                        return res.status(400).json({ error: 'Aucune 1ère Présence OP à arrêter' });
+                    }
+                    await state.stopPresenceMessage?.('op1');
+                    emitRealtime('presence:update', { stopped: true, op: 'op1' });
+                    return res.json({ success: true, stopped: true });
                 }
 
                 case 'presence2': {
                     if (state.presence2Data?.active) return res.status(400).json({ error: '2ème Présence OP déjà active' });
                     await state.sendPresence2Message();
                     return res.json({ success: true });
+                }
+
+                case 'presence2-stop': {
+                    if (!state.presence2Data?.active && !state.presence2Data?.messageId && !state.reactionsOP2?.size) {
+                        return res.status(400).json({ error: 'Aucune 2ème Présence OP à arrêter' });
+                    }
+                    await state.stopPresenceMessage?.('op2');
+                    emitRealtime('presence:update', { stopped: true, op: 'op2' });
+                    return res.json({ success: true, stopped: true });
                 }
 
                 case 'annonce': {

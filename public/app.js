@@ -1535,10 +1535,18 @@ async function loadSanctions() {
 
 // ===== COMMANDES =====
 async function runCmd(command) {
+    const commandLabels = {
+        presence: '1ère Présence OP',
+        'presence-stop': 'Stop 1ère Présence OP',
+        presence2: '2ème Présence OP',
+        'presence2-stop': 'Stop 2ème Présence OP',
+    };
+    const label = commandLabels[command] || command;
+    const isStop = command.endsWith('-stop');
     if (!await confirmAction({
-        title: 'Lancer la commande',
-        message: `Lancer la commande "${command}" ?`,
-        confirmText: 'Lancer',
+        title: isStop ? 'Arrêter la présence' : 'Lancer la commande',
+        message: `${isStop ? 'Arrêter' : 'Lancer'} "${label}" ?`,
+        confirmText: isStop ? 'Arrêter' : 'Lancer',
     })) return;
 
     try {
@@ -1550,9 +1558,11 @@ async function runCmd(command) {
         const data = await res.json();
 
         if (res.ok) {
-            toast(data.frequency
+            toast(data.stopped
+                ? `⏹ ${label} arrêtée`
+                : data.frequency
                 ? `📻 Radio envoyée : ${data.frequency}`
-                : `✅ Commande "${command}" lancée`);
+                : `✅ Commande "${label}" lancée`);
         } else {
             toast(`❌ ${data.error || 'Erreur'}`, 'error');
         }
