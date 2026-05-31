@@ -6340,6 +6340,10 @@ function renderMyWeapons() {
             : (isInProgress
                 ? '<span class="weapon-status-badge weapon-status-progress">En cours</span>'
                 : '<span class="weapon-status-badge weapon-status-onsale"><span class="wave-text-effect sale-badge-wave">' + renderWaveTextSpans('En vente') + '</span></span>');
+        const originBadge = w.is_crafted
+            ? '<span class="weapon-meta-badge weapon-origin-badge crafted">Craft 21BS</span>'
+            : '<span class="weapon-meta-badge weapon-origin-badge external">Externe</span>';
+        const quantityBadge = `<span class="weapon-meta-badge weapon-qty-badge">${availableQty}/${totalQty}</span>`;
         const actionButtons = [
             canEditWeapon ? `<button class="btn-action btn-edit" onclick="openEditMyWeaponModal(${w.id})">✏ Modifier</button>` : '',
             canToggleInProgress ? `<button class="btn-action btn-progress ${isInProgress ? 'active' : ''}" onclick="toggleWeaponInProgress(${w.id}, ${isInProgress ? 'false' : 'true'})">${isInProgress ? 'Annuler en cours' : '🟡 En cours de vente'}</button>` : '',
@@ -6371,8 +6375,8 @@ function renderMyWeapons() {
                         <h3>${escapeHtml(w.weapon_name)}</h3>
                         <div class="weapon-card-meta">
                         ${statusBadge}
-                            ${w.is_crafted ? '<span class="weapon-craft-badge">Craft 21BS</span>' : '<span class="weapon-craft-badge external">Externe</span>'}
-                            <span class="weapon-craft-badge">${availableQty}/${totalQty}</span>
+                            ${originBadge}
+                            ${quantityBadge}
                         </div>
                     </div>
                     <div class="weapon-card-price">
@@ -6659,11 +6663,14 @@ async function deleteMyWeapon(id) {
     if (!await confirmAction({ title: 'Supprimer l’annonce', message: 'Supprimer cette annonce de vente ?', confirmText: 'Supprimer', danger: true })) return;
     try {
         const res = await fetch(`/api/crafts/myweapons/${id}`, { method: 'DELETE' });
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
             toast('🗑 Supprimée');
             await loadMyWeapons();
             renderMyWeapons();
+            return;
         }
+        toast(`❌ ${data.error || 'Suppression impossible'}`, 'error');
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
 }
 

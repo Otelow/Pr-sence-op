@@ -821,7 +821,6 @@ function registerMyWeaponsRoutes(app, deps) {
                           mw.is_sold = 1
                           OR mw.sale_discord_message_id IS NOT NULL
                           OR mw.weapons_log_message_id IS NOT NULL
-                          OR mw.discord_message_id IS NOT NULL
                           OR cr.status = 'completed'
                       )
                     LIMIT 1
@@ -834,7 +833,6 @@ function registerMyWeaponsRoutes(app, deps) {
                           mw.is_sold = 1
                           OR mw.sale_discord_message_id IS NOT NULL
                           OR mw.weapons_log_message_id IS NOT NULL
-                          OR mw.discord_message_id IS NOT NULL
                           OR cr.status = 'completed'
                       )
                     LIMIT 1

@@ -14081,3 +14081,195 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* WEAPONS + COMMANDES POLISH 31/05/2026 */
+.weapon-card-meta {
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.weapon-card-meta .weapon-status-badge,
+.weapon-card-meta .weapon-meta-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 29px !important;
+    padding: 6px 10px !important;
+    border-radius: 8px !important;
+    font-family: var(--font-display) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+    box-shadow: 0 0 10px rgba(247, 135, 0, 0.08) !important;
+}
+
+.weapon-card-meta .weapon-status-onsale {
+    background: rgba(74, 222, 128, 0.12) !important;
+    border: 1px solid rgba(74, 222, 128, 0.38) !important;
+    color: #dcfce7 !important;
+}
+
+.weapon-card-meta .weapon-status-progress {
+    background: rgba(250, 199, 117, 0.12) !important;
+    border: 1px solid rgba(250, 199, 117, 0.38) !important;
+    color: #fde68a !important;
+}
+
+.weapon-card-meta .weapon-status-sold {
+    background: rgba(239, 68, 68, 0.14) !important;
+    border: 1px solid rgba(239, 68, 68, 0.42) !important;
+    color: #fca5a5 !important;
+}
+
+.weapon-card-meta .weapon-origin-badge,
+.weapon-card-meta .weapon-qty-badge {
+    background: rgba(255, 255, 255, 0.055) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: var(--text-dim) !important;
+}
+
+.weapon-card-meta .weapon-origin-badge.crafted {
+    background: rgba(247, 135, 0, 0.10) !important;
+    border-color: rgba(247, 135, 0, 0.30) !important;
+    color: var(--text) !important;
+}
+
+.weapon-card-meta .weapon-origin-badge.external {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.13) !important;
+}
+
+.weapon-card-meta .weapon-qty-badge {
+    min-width: 42px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 12px !important;
+    letter-spacing: 0.02em !important;
+}
+
+.btn-action.btn-delete {
+    min-width: 34px !important;
+    border-radius: 9px !important;
+    cursor: pointer !important;
+}
+
+#tab-commands .cmd-section {
+    background: rgba(255, 255, 255, 0.035) !important;
+    border: 1px solid rgba(255, 255, 255, 0.075) !important;
+    border-radius: 18px !important;
+    padding: 22px !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.34) !important;
+}
+
+#tab-commands .cmd-section:hover {
+    transform: none !important;
+    background: rgba(255, 255, 255, 0.045) !important;
+    border-color: rgba(247, 135, 0, 0.18) !important;
+}
+
+#tab-commands .cmd-section-communications {
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+#tab-commands .cmd-section-communications .comm-header {
+    margin: 0 !important;
+    padding: 22px 24px 14px !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+#tab-commands .cmd-section-communications .comm-tabs-wrapper {
+    margin: 0 !important;
+    padding: 16px 20px 0 !important;
+}
+
+#tab-commands .cmd-section-communications .comm-tabs {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    gap: 6px !important;
+    margin: 0 !important;
+    padding: 6px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    border-radius: 14px !important;
+}
+
+#tab-commands .cmd-section-communications .comm-tab {
+    min-height: 48px !important;
+    justify-content: center !important;
+    border: 1px solid transparent !important;
+    border-radius: 10px !important;
+    margin: 0 !important;
+    padding: 10px 14px !important;
+    background: transparent !important;
+    color: var(--text-dim) !important;
+    box-shadow: none !important;
+}
+
+#tab-commands .cmd-section-communications .comm-tab::after {
+    display: none !important;
+}
+
+#tab-commands .cmd-section-communications .comm-tab:hover {
+    background: rgba(247, 135, 0, 0.08) !important;
+    color: var(--text) !important;
+}
+
+#tab-commands .cmd-section-communications .comm-tab.active {
+    background: rgba(247, 135, 0, 0.13) !important;
+    border-color: rgba(247, 135, 0, 0.34) !important;
+    color: var(--text) !important;
+    box-shadow: 0 0 18px rgba(247, 135, 0, 0.10) !important;
+}
+
+#tab-commands .cmd-section-communications .comm-panel {
+    background: transparent !important;
+    border: 0 !important;
+    padding: 18px 20px 22px !important;
+    border-radius: 0 !important;
+}
+
+#tab-commands .cmd-section-communications .comm-card {
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+#tab-commands .cmd-section-communications .comm-card::before,
+#tab-commands .cmd-section-communications .comm-card::after {
+    display: none !important;
+}
+
+#tab-commands .cmd-section-communications .comm-card:hover {
+    transform: none !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+}
+
+#tab-commands .cmd-section-communications .comm-textarea,
+#tab-commands .cmd-section-communications .custom-dropdown-trigger,
+#tab-commands .cmd-section-communications .custom-dropdown-search {
+    background: rgba(255, 255, 255, 0.045) !important;
+    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border-radius: 12px !important;
+}
+
+#tab-commands .cmd-section-communications .comm-send-btn {
+    width: auto !important;
+    min-width: 210px !important;
+    justify-content: center !important;
+}
+
+@media (max-width: 700px) {
+    #tab-commands .cmd-section-communications .comm-tabs {
+        grid-template-columns: 1fr !important;
+    }
+}
