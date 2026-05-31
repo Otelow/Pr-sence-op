@@ -476,9 +476,7 @@ function registerPresenceStatsRoutes(app, deps) {
         if (guild) {
             const counted = new Set();
             const role1 = guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_1);
-            const role2 = guild.roles.cache.get(state.CONFIG.ROLES.MEMBRE_2);
             if (role1) for (const [id, member] of role1.members) if (!member.user.bot) counted.add(id);
-            if (role2) for (const [id, member] of role2.members) if (!member.user.bot) counted.add(id);
             totalMembers = counted.size;
             totalMembersList = [...counted]
                 .map(id => membersCache?.get?.(id) || guild.members.cache.get(id))

@@ -1,4 +1,4 @@
-// FIX REGRESSION 18/05/2026 — restaurer 2 rôles dans LIMITED_CRAFT_ACCESS
+// ROLE CLEANUP 31/05/2026 — role obsolete retire des permissions
 // ROLES MAP VIEW 18/05/2026 — accès lecture seule carte (sans labs armes)
 // MODIFIÉ CHANTIER 4 — 14/05/2026 — constantes permissions centralisées
 
@@ -13,15 +13,13 @@ const FULL_ACCESS_ROLES = [
 
 const LIMITED_CRAFT_ACCESS_ROLES = [
     '1495448653945634987', // Accès limité Craft/Vos Armes
-    '1485636099853516982', // MEMBRE_2
     '1485270431291277383', // MEMBRE_1
 ];
 
 // Rôles autorisés à VOIR la carte (lecture seule, sans les labs armes).
-// Inclut les hauts gradés + 2 rôles spécifiques restreints à la carte.
+// Inclut les hauts gradés + le rôle présence OP.
 const MAP_VIEW_ROLES = [
     ...FULL_ACCESS_ROLES,
-    '1485636099853516982',
     '1485270431291277383',
 ];
 

@@ -444,7 +444,6 @@ let LIMITED_CRAFT_ACCESS_ROLES = [
 ];
 let MAP_VIEW_ROLES = [
     ...FULL_ACCESS_ROLES,
-    '1485636099853516982',
     '1485270431291277383',
 ];
 let userHasFullAccess = false;

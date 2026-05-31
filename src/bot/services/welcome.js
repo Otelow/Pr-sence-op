@@ -83,7 +83,7 @@ function createWelcomeService(deps) {
 
         try {
             const freshMember = await guild.members.fetch(userId);
-            for (const roleId of [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_2, CONFIG.ROLES.MEMBRE_3]) {
+            for (const roleId of [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_3]) {
                 const role = guild.roles.cache.get(roleId);
                 if (role) await freshMember.roles.add(role);
             }
@@ -105,7 +105,7 @@ function createWelcomeService(deps) {
 
         try {
             const freshMember = await guild.members.fetch(userId);
-            for (const roleId of [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_2, CONFIG.ROLES.MEMBRE_3]) {
+            for (const roleId of [CONFIG.ROLES.MEMBRE_1, CONFIG.ROLES.MEMBRE_3]) {
                 const role = guild.roles.cache.get(roleId);
                 if (role && !freshMember.roles.cache.has(roleId)) await freshMember.roles.add(role);
             }
