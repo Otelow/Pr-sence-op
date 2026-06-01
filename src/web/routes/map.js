@@ -3,8 +3,7 @@
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — routes carte isolées
 // AUDIT HOOKS 16/05/2026 — points carte tracés dans audit_log
 const {
-    FULL_ACCESS_ROLES,
-    LAB_VISIBLE_USERS,
+    canSeeMapLabs,
 } = require('../../shared/permissions');
 const mapPoints = require('../services/mapPoints');
 const { audit } = require('../../shared/auditLog');
@@ -43,11 +42,8 @@ function registerMapRoutes(app, deps) {
         const effectiveRoles = isImpersonating ? [impersonateRole] : userRoles;
 
         const canSeeLab = isImpersonating
-            ? FULL_ACCESS_ROLES.includes(impersonateRole)
-            : (
-                LAB_VISIBLE_USERS.includes(userId) ||
-                FULL_ACCESS_ROLES.some(r => userRoles.includes(r))
-            );
+            ? canSeeMapLabs({ id: '__impersonate__', roles: [impersonateRole] })
+            : canSeeMapLabs({ id: userId, roles: userRoles });
 
         const visiblePoints = mapPoints.listAll().filter(p => {
             if (p.type === 'weapon-lab') return canSeeLab;
@@ -68,7 +64,7 @@ function registerMapRoutes(app, deps) {
             return false;
         });
 
-        res.json({ points: visiblePoints, impersonating: isImpersonating });
+        res.json({ points: visiblePoints, impersonating: isImpersonating, canSeeMapLabs: canSeeLab });
     });
 
     app.post('/api/map/points', requireAuth, (req, res) => {

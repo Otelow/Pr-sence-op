@@ -64,7 +64,7 @@ const PAGE_TITLES = {
     presence: { title: 'Command Center', sub: "Vue d'ensemble 21BS" },
     commands: { title: 'Commandes', sub: 'Centre de contrôle' },
     channels: { title: 'Salons Discord', sub: 'Historique et navigation' },
-    map: { title: 'Carte du Laboratoire', sub: 'Marquage de zones' },
+    map: { title: 'Carte', sub: 'Points tactiques visibles' },
     stats: { title: 'Statistiques', sub: 'Suivi hebdomadaire' },
     sanctions: { title: 'Sanctions', sub: 'Historique des avertissements' },
     crafts: { title: "Craft d'armes", sub: 'Gestion des demandes & production' },
@@ -82,7 +82,7 @@ let dashboardOverviewRealtimeTimer = null;
 let realtimeConnected = false;
 const SITE_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 let idleLogoutTimer = null;
-let userPermissions = { canEditMap: false };
+let userPermissions = { canEditMap: false, canSeeMapLabs: false };
 let presenceStatsCache = null;
 let presenceEvolutionChartOp1 = null;
 let presenceEvolutionChartOp2 = null;
@@ -541,10 +541,26 @@ function canAccessDashboardTab(tabName) {
     return checkUserAccess();
 }
 
+function getFirstAccessibleTab() {
+    return Object.keys(PAGE_TITLES).find(tabName => canAccessDashboardTab(tabName)) || 'presence';
+}
+
 function applyPermissionsUI() {
     userHasFullAccess = checkUserAccess();
     Object.keys(PAGE_TITLES).forEach(tabName => {
         const sec = document.getElementById(`tab-${tabName}`);
+        const navItem = document.querySelector(`.nav-item[data-tab="${tabName}"]`);
+        const allowed = canAccessDashboardTab(tabName);
+        if (navItem) navItem.style.display = allowed ? '' : 'none';
+        if (!allowed) {
+            if (sec) {
+                sec.hidden = true;
+                sec.classList.remove('active', 'access-locked');
+                sec.querySelector('.access-locked-overlay')?.remove();
+            }
+            return;
+        }
+        if (sec) sec.hidden = false;
         if (!sec) return;
         if (canAccessDashboardTab(tabName)) {
             sec.classList.remove('access-locked');
@@ -555,7 +571,7 @@ function applyPermissionsUI() {
             overlay.innerHTML = `
                 <div class="danger-lock-panel">
                     <span class="danger-lock-kicker">CONNEXION INTERROMPUE</span>
-                    <span class="confidential-text">CONFIDENCIAL</span>
+                    <span class="danger-lock-sub">ACCES NON AUTORISE</span>
                     <span class="danger-lock-sub">ZONE CHIFFRÉE 21BS • ACCÈS NON AUTORISÉ</span>
                 </div>
             `;
@@ -571,6 +587,9 @@ function applyPermissionsUI() {
     if (!userPermissions.canEditMap && ['add', 'delete'].includes(mapMode)) setMapMode('view');
 }
 function switchTab(tab) {
+    if (!canAccessDashboardTab(tab)) {
+        tab = getFirstAccessibleTab();
+    }
     currentTab = tab;
     // Persister dans localStorage pour survivre au refresh
     try { localStorage.setItem('lastTab', tab); } catch {}
@@ -2359,6 +2378,7 @@ function setupMap() {
     // Click sur la carte (mode add) — détection click vs drag
     canvas.addEventListener('click', async (e) => {
         if (mapMode !== 'add') return;
+        if (!userPermissions.canEditMap) return;
         if (e.target.closest('.map-point')) return;
         if (mapDragMoved) return;
 
@@ -2544,6 +2564,10 @@ function mapZoomReset() {
 }
 
 function setMapMode(mode) {
+    if ((mode === 'add' || mode === 'delete') && !userPermissions.canEditMap) {
+        toast('âŒ Tu n\'as pas les permissions pour modifier la carte', 'error');
+        mode = 'view';
+    }
     mapMode = mode;
     document.querySelectorAll('.map-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
     const container = document.getElementById('mapContainer');
@@ -2567,7 +2591,10 @@ async function loadMapPoints() {
         const url = impersonateRole ? `/api/map/points?impersonate=${impersonateRole}` : '/api/map/points';
         const res = await fetch(url);
         const data = await res.json();
-        mapPoints = data.points || [];
+        if (typeof data.canSeeMapLabs === 'boolean') {
+            userPermissions.canSeeMapLabs = data.canSeeMapLabs;
+        }
+        mapPoints = (data.points || []).filter(p => userPermissions.canSeeMapLabs || p.type !== 'weapon-lab');
         renderMapPoints();
 
         // Bandeau impersonate
@@ -2663,6 +2690,7 @@ function renderMapPoints() {
     layer.innerHTML = '';
 
     for (const p of mapPoints) {
+        if (p.type === 'weapon-lab' && !userPermissions.canSeeMapLabs) continue;
         const color = getPointTypeColor(p.type);
         const icon = getPointTypeIcon(p.type);
         const label = getPointTypeLabel(p.type);
@@ -2742,6 +2770,11 @@ function onPointTypeChange() {
 }
 
 async function confirmAddPoint() {
+    if (!userPermissions.canEditMap) {
+        toast('âŒ Tu n\'as pas les permissions pour modifier la carte', 'error');
+        closePointModal();
+        return;
+    }
     if (!pendingPoint) return;
     const label = document.getElementById('pointLabel').value.trim() || 'Point sans nom';
     const type = document.getElementById('pointType').value;
@@ -2778,6 +2811,10 @@ function closePointModal() {
 }
 
 async function deletePoint(id) {
+    if (!userPermissions.canEditMap) {
+        toast('âŒ Tu n\'as pas les permissions pour modifier la carte', 'error');
+        return;
+    }
     if (!await confirmAction({
         title: 'Supprimer le point',
         message: 'Supprimer ce point de la carte ?',
@@ -4782,7 +4819,7 @@ function renderCraftBoard() {
                 <td colspan="7">
                     <div class="danger-lock-panel craft-board-confidential">
                         <span class="danger-lock-kicker">ACCÈS PRODUCTION BLOQUÉ</span>
-                        <span class="confidential-text">CONFIDENTIAL</span>
+                        <span class="danger-lock-sub">ACCES NON AUTORISE</span>
                         <span class="danger-lock-sub">TABLEAU CRAFT RÉSERVÉ AUX HAUTS GRADÉS</span>
                     </div>
                 </td>

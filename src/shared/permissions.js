@@ -37,6 +37,13 @@ const LAB_VISIBLE_USERS = [
     '769670622380294265',
 ];
 
+function canSeeMapLabs(user) {
+    if (!user) return false;
+    if (LAB_VISIBLE_USERS.includes(user.id)) return true;
+    const roles = user.roles || [];
+    return FULL_ACCESS_ROLES.some(r => roles.includes(r));
+}
+
 const MY_WEAPONS_DELETE_ROLE = '1490361524408291459';
 
 module.exports = {
@@ -49,4 +56,5 @@ module.exports = {
     LAB_VISIBLE_USERS,
     MY_WEAPONS_DELETE_ROLE,
     canViewMap,
+    canSeeMapLabs,
 };

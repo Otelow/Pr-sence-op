@@ -6,6 +6,7 @@ const {
     FULL_ACCESS_ROLES,
     LIMITED_CRAFT_ACCESS_ROLES,
     canViewMap,
+    canSeeMapLabs,
 } = require('../../shared/permissions');
 
 function requireAuth(req, res, next) {
@@ -75,4 +76,5 @@ module.exports = {
     canAccessMyWeapons,
     canEditMapUser,
     canViewMap,
+    canSeeMapLabs,
 };

@@ -6,9 +6,9 @@ const {
     FULL_ACCESS_ROLES,
     LIMITED_CRAFT_ACCESS_ROLES,
     MAP_VIEW_ROLES,
-    LAB_VISIBLE_USERS,
     MY_WEAPONS_DELETE_ROLE,
     canViewMap,
+    canSeeMapLabs,
 } = require('../../shared/permissions');
 const { ensureCsrfToken } = require('../middlewares/csrf');
 
@@ -33,6 +33,7 @@ function registerConfigRoutes(app, deps) {
             canAccessCrafts: canAccessCrafts(req.session.user),
             canAccessMyWeapons: canAccessMyWeapons(req.session.user),
             canViewMap: canViewMap(req.session.user),
+            canSeeMapLabs: canSeeMapLabs(req.session.user),
         };
         res.json(user);
     });
@@ -44,7 +45,6 @@ function registerConfigRoutes(app, deps) {
             fullAccessRoles: FULL_ACCESS_ROLES,
             limitedCraftAccessRoles: LIMITED_CRAFT_ACCESS_ROLES,
             mapViewRoles: MAP_VIEW_ROLES,
-            labVisibleUsers: LAB_VISIBLE_USERS,
             myWeaponsDeleteRole: MY_WEAPONS_DELETE_ROLE,
         });
     });
@@ -59,6 +59,7 @@ function registerConfigRoutes(app, deps) {
             canAccessCrafts: canAccessCrafts(req.session.user),
             canAccessMyWeapons: canAccessMyWeapons(req.session.user),
             canViewMap: canViewMap(req.session.user),
+            canSeeMapLabs: canSeeMapLabs(req.session.user),
         });
     });
 
