@@ -74,9 +74,6 @@ function registerCraftRequestRoutes(app, deps) {
     }
     app.get('/api/crafts/requests', requireAuth, (req, res) => {
         try {
-            if (req.query.view === 'board' && !isCraftManager(req.session.user)) {
-                return res.status(403).json({ requests: [], error: 'Accès réservé aux hauts gradés' });
-            }
             sweepRequestsForMissingMembers().catch(e => log.error('[craft] vérification membres absents:', e.message));
             const requests = getRequests(req.query.status, {
                 productionOnly: req.query.view === 'board',

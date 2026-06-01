@@ -41,12 +41,11 @@ function getMemberAvatar(member, size = 32) {
 function registerDirectoryRoutes(app, deps) {
     const {
         requireAuth,
-        requireFullSiteAccess,
         getBotClient,
         getBotState,
     } = deps;
 
-    app.get('/api/members/search', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/members/search', requireAuth, async (req, res) => {
         const query = (req.query.q || '').toLowerCase().trim();
         if (query.length < 1) return res.json({ members: [] });
 
@@ -70,7 +69,7 @@ function registerDirectoryRoutes(app, deps) {
         res.json({ members });
     });
 
-    app.get('/api/members/all', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/members/all', requireAuth, async (req, res) => {
         const guild = getGuild(getBotClient, getBotState);
         if (!guild) return res.json({ members: [] });
 
@@ -94,11 +93,11 @@ function registerDirectoryRoutes(app, deps) {
         }
     });
 
-    app.get('/api/commands', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/commands', requireAuth, (req, res) => {
         res.json({ commands: COMMANDS });
     });
 
-    app.get('/api/roles', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/roles', requireAuth, (req, res) => {
         const guild = getGuild(getBotClient, getBotState);
         if (!guild) return res.json({ roles: [] });
 
@@ -118,7 +117,7 @@ function registerDirectoryRoutes(app, deps) {
         res.json({ roles });
     });
 
-    app.get('/api/emojis', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/emojis', requireAuth, (req, res) => {
         const guild = getGuild(getBotClient, getBotState);
         if (!guild) return res.json({ emojis: [] });
 

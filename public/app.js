@@ -550,26 +550,11 @@ function applyPermissionsUI() {
     Object.keys(PAGE_TITLES).forEach(tabName => {
         const sec = document.getElementById(`tab-${tabName}`);
         const navItem = document.querySelector(`.nav-item[data-tab="${tabName}"]`);
-        const allowed = canAccessDashboardTab(tabName);
         if (navItem) navItem.style.display = '';
         if (sec) sec.hidden = false;
         if (!sec) return;
-        if (allowed) {
-            sec.classList.remove('access-locked');
-            sec.querySelector('.access-locked-overlay')?.remove();
-        } else if (!sec.querySelector('.access-locked-overlay')) {
-            const overlay = document.createElement('div');
-            overlay.className = 'access-locked-overlay';
-            overlay.innerHTML = `
-                <div class="danger-lock-panel">
-                    <span class="danger-lock-kicker">CONNEXION INTERROMPUE</span>
-                    <span class="danger-lock-sub">ACCES NON AUTORISE</span>
-                    <span class="danger-lock-sub">ZONE CHIFFRÉE 21BS • ACCÈS NON AUTORISÉ</span>
-                </div>
-            `;
-            sec.appendChild(overlay);
-            sec.classList.add('access-locked');
-        }
+        sec.classList.remove('access-locked');
+        sec.querySelector('.access-locked-overlay')?.remove();
     });
 
     ['mapAddBtn', 'mapDeleteBtn'].forEach(id => {
@@ -577,6 +562,13 @@ function applyPermissionsUI() {
         if (btn) btn.style.display = userPermissions.canEditMap ? '' : 'none';
     });
     if (!userPermissions.canEditMap && ['add', 'delete'].includes(mapMode)) setMapMode('view');
+
+    document.querySelectorAll('#tab-commands .cmd-btn, #tab-commands .comm-send-btn').forEach(btn => {
+        btn.disabled = !userHasFullAccess;
+        btn.title = userHasFullAccess ? '' : 'Lecture seule';
+    });
+    const groupOrderForm = document.querySelector('.group-order-form-card');
+    if (groupOrderForm) groupOrderForm.style.display = userHasFullAccess ? '' : 'none';
 }
 function switchTab(tab) {
     currentTab = tab;
@@ -600,10 +592,6 @@ async function refreshAll(options = {}) {
     refreshAllInFlight = true;
     const forceSync = Boolean(options.forceSync);
     try {
-        if (!canAccessDashboardTab(currentTab)) {
-            applyPermissionsUI();
-            return;
-        }
         if (currentTab === 'presence') {
             await Promise.all([reloadDashboardOverview(), loadStats(), loadPresence({ forceSync }), loadPresenceHistory(), loadPresenceStats()]);
         } else if (currentTab === 'stats') {
@@ -1184,7 +1172,7 @@ function renderHistoryDayDetails(container, data) {
 
     const renderUserList = (users, color = '#fff', op = 'op1', status = 'noReaction') => {
         if (!users || users.length === 0) return '<p class="empty-mini">—</p>';
-        if (!data.editable) {
+        if (!data.editable || !checkUserAccess()) {
             return users.map(user => (
                 `<span class="history-detail-pill" style="color:${color}">${escapeHtml(user.username || user.user_id || '?')}</span>`
             )).join('');
@@ -1217,7 +1205,7 @@ function renderHistoryDayDetails(container, data) {
     const op2Launched = data.op2Launched !== false;
     const decroches = data.decroches || [];
     container.innerHTML = `
-        ${data.editable ? '<p class="history-edit-notice">Correction disponible uniquement pour le jour J.</p>' : ''}
+        ${data.editable && checkUserAccess() ? '<p class="history-edit-notice">Correction disponible uniquement pour le jour J.</p>' : ''}
         ${renderOpSection('1ère OP', data.op1, 'op1')}
         ${renderOpSection('2ème OP', data.op2, 'op2')}
         <div class="history-detail-op">
@@ -1641,6 +1629,10 @@ async function loadSanctions() {
 
 // ===== COMMANDES =====
 async function runCmd(command) {
+    if (!checkUserAccess()) {
+        toast('Lecture seule : action non autorisÃ©e', 'error');
+        return;
+    }
     const commandLabels = {
         presence: '1ère Présence OP',
         'presence-stop': 'Stop 1ère Présence OP',
@@ -1949,7 +1941,7 @@ async function selectChannel(ch) {
     // Afficher la zone d'envoi sur les salons texte/announcement
     const inputArea = document.getElementById('messageInputArea');
     if (inputArea) {
-        if (ch.type === 0 || ch.type === 5) {
+        if ((ch.type === 0 || ch.type === 5) && checkUserAccess()) {
             inputArea.style.display = 'block';
             const input = document.getElementById('messageInput');
             if (input) {
@@ -3151,6 +3143,10 @@ function insertEmoji(code) {
 }
 
 async function sendAnnonce() {
+    if (!checkUserAccess()) {
+        toast('Lecture seule : action non autorisÃ©e', 'error');
+        return;
+    }
     const roleId = document.getElementById('annonceRole').value;
     const message = document.getElementById('annonceMessage').value;
 
@@ -3182,6 +3178,10 @@ async function sendAnnonce() {
 }
 
 async function sendRappel() {
+    if (!checkUserAccess()) {
+        toast('Lecture seule : action non autorisÃ©e', 'error');
+        return;
+    }
     const roleId = document.getElementById('rappelRole').value;
     const message = document.getElementById('rappelMessage').value;
 
@@ -3213,6 +3213,10 @@ async function sendRappel() {
 }
 
 async function sendSanction() {
+    if (!checkUserAccess()) {
+        toast('Lecture seule : action non autorisÃ©e', 'error');
+        return;
+    }
     const userId = document.getElementById('sanctionUser').value.trim();
     const raison = document.getElementById('sanctionRaison').value;
 
@@ -4797,26 +4801,6 @@ function renderCraftBoard() {
     syncCraftPermissionUI();
 
     const boardSection = document.getElementById('craftSection-board');
-    if (!canValidateCraftClient()) {
-        document.getElementById('craftBoardInProgressBanner')?.remove();
-        const pagination = document.getElementById('craftBoardPagination');
-        if (pagination) pagination.innerHTML = '';
-        const stockPanel = document.getElementById('craftBoardStockPanel');
-        if (stockPanel) stockPanel.innerHTML = '';
-        tbody.innerHTML = `
-            <tr class="craft-board-empty">
-                <td colspan="7">
-                    <div class="danger-lock-panel craft-board-confidential">
-                        <span class="danger-lock-kicker">ACCÈS PRODUCTION BLOQUÉ</span>
-                        <span class="danger-lock-sub">ACCES NON AUTORISE</span>
-                        <span class="danger-lock-sub">TABLEAU CRAFT RÉSERVÉ AUX HAUTS GRADÉS</span>
-                    </div>
-                </td>
-            </tr>
-        `;
-        boardSection?.classList.add('craft-board-locked');
-        return;
-    }
     boardSection?.classList.remove('craft-board-locked');
     renderCraftStockState();
 
@@ -5873,6 +5857,17 @@ function renderGroupOrdersList() {
     list.innerHTML = groupOrdersCache.map(order => {
         const progress = order.progress || {};
         const percent = Number(progress.percent || 0);
+        const actionsHtml = checkUserAccess()
+            ? `<div class="group-order-actions">
+                    ${order.status === 'cancelled'
+                        ? `<button type="button" class="btn-danger group-order-delete-btn" onclick="deleteGroupOrder(${Number(order.id)})">Supprimer</button>`
+                        : `
+                            <button type="button" class="btn-secondary" onclick="editGroupOrder(${Number(order.id)})">Modifier</button>
+                            <button type="button" class="btn-primary" onclick="openGroupOrderCraftModal(${Number(order.id)})">Renseigner craft</button>
+                            <button type="button" class="btn-danger" onclick="cancelGroupOrder(${Number(order.id)})">Annuler</button>
+                        `}
+                </div>`
+            : '';
         const itemsHtml = (order.items || []).map(item => {
             const remaining = Math.max(0, Number(item.quantity || 0) - Number(item.crafted_quantity || 0));
             return `
@@ -5903,15 +5898,7 @@ function renderGroupOrdersList() {
                 </div>
                 <div class="group-order-card-items">${itemsHtml}</div>
                 ${order.note ? `<p class="group-order-note">${escapeHtml(order.note)}</p>` : ''}
-                <div class="group-order-actions">
-                    ${order.status === 'cancelled'
-                        ? `<button type="button" class="btn-danger group-order-delete-btn" onclick="deleteGroupOrder(${Number(order.id)})">Supprimer</button>`
-                        : `
-                            <button type="button" class="btn-secondary" onclick="editGroupOrder(${Number(order.id)})">Modifier</button>
-                            <button type="button" class="btn-primary" onclick="openGroupOrderCraftModal(${Number(order.id)})">Renseigner craft</button>
-                            <button type="button" class="btn-danger" onclick="cancelGroupOrder(${Number(order.id)})">Annuler</button>
-                        `}
-                </div>
+                ${actionsHtml}
             </div>
         `;
     }).join('');

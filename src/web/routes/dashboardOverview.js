@@ -16,7 +16,6 @@ const {
 function registerDashboardOverviewRoutes(app, deps) {
     const {
         requireAuth,
-        requireFullSiteAccess,
         getBotClient,
         getBotState,
     } = deps;
@@ -34,7 +33,7 @@ function registerDashboardOverviewRoutes(app, deps) {
         }
     }
 
-    app.get('/api/dashboard/overview', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/dashboard/overview', requireAuth, async (req, res) => {
         try {
             const data = await buildDashboardOverview({
                 client: getBotClient(),
@@ -47,7 +46,7 @@ function registerDashboardOverviewRoutes(app, deps) {
         }
     });
 
-    app.get('/api/dashboard/members-list', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/dashboard/members-list', requireAuth, async (req, res) => {
         try {
             res.json({ members: getMembersList(getBotClient(), getBotState()) });
         } catch (error) {
@@ -56,19 +55,19 @@ function registerDashboardOverviewRoutes(app, deps) {
         }
     });
 
-    app.get('/api/dashboard/weapons-on-sale', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/dashboard/weapons-on-sale', requireAuth, (req, res) => {
         withDb(res, db => ({ weapons: getWeaponsOnSale(db) }), 'Erreur /api/dashboard/weapons-on-sale');
     });
 
-    app.get('/api/dashboard/absences-week', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/dashboard/absences-week', requireAuth, (req, res) => {
         withDb(res, db => ({ absences: getAbsencesWeek(db) }), 'Erreur /api/dashboard/absences-week');
     });
 
-    app.get('/api/dashboard/crafts-open', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/dashboard/crafts-open', requireAuth, (req, res) => {
         withDb(res, db => ({ crafts: getCraftsOpen(db) }), 'Erreur /api/dashboard/crafts-open');
     });
 
-    app.get('/api/dashboard/decroches-today', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/dashboard/decroches-today', requireAuth, (req, res) => {
         try {
             res.json(getDecrochesToday(getBotClient(), getBotState()));
         } catch (error) {
@@ -77,7 +76,7 @@ function registerDashboardOverviewRoutes(app, deps) {
         }
     });
 
-    app.get('/api/dashboard/presence-detail', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/dashboard/presence-detail', requireAuth, (req, res) => {
         try {
             res.json(buildPresenceDetail(getBotClient(), getBotState()));
         } catch (error) {

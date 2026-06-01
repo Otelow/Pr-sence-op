@@ -136,7 +136,7 @@ function registerChannelRoutes(app, deps) {
         hasFullSiteAccess,
     } = deps;
 
-    app.get('/api/channels', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/channels', requireAuth, async (req, res) => {
         const state = getBotState();
         const guild = getBotClient().guilds.cache.get(state.CONFIG.GUILD_ID);
         if (!guild) return res.json({ categories: [] });
@@ -205,7 +205,7 @@ function registerChannelRoutes(app, deps) {
         }
     });
 
-    app.get('/api/channel/:id/messages', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/channel/:id/messages', requireAuth, async (req, res) => {
         const channelId = req.params.id;
         const before = req.query.before;
         const after = req.query.after;
@@ -317,7 +317,7 @@ function registerChannelRoutes(app, deps) {
         }
     });
 
-    app.get('/api/channel/:id/pinned', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/channel/:id/pinned', requireAuth, async (req, res) => {
         try {
             const channel = await fetchDiscordChannel(req.params.id);
             if (!channel) return res.status(404).json({ error: 'Salon introuvable' });

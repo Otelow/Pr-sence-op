@@ -193,7 +193,7 @@ function registerDashboardActionRoutes(app, deps) {
         }
     });
 
-    app.get('/api/sanctions', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/sanctions', requireAuth, async (req, res) => {
         const state = getBotState();
         const client = getBotClient();
         try {

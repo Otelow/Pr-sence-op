@@ -32,9 +32,10 @@ function registerGroupOrderRoutes(app, deps) {
         return next();
     }
 
-    const guards = [requireAuth, requireGroupOrderAccess];
+    const readGuards = [requireAuth];
+    const writeGuards = [requireAuth, requireGroupOrderAccess];
 
-    app.get('/api/crafts/group-orders/catalog', ...guards, (req, res) => {
+    app.get('/api/crafts/group-orders/catalog', ...readGuards, (req, res) => {
         try {
             res.json(getGroupOrderCatalog());
         } catch (error) {
@@ -42,7 +43,7 @@ function registerGroupOrderRoutes(app, deps) {
         }
     });
 
-    app.get('/api/crafts/group-orders', ...guards, (req, res) => {
+    app.get('/api/crafts/group-orders', ...readGuards, (req, res) => {
         try {
             res.json({ orders: getGroupOrders() });
         } catch (error) {
@@ -50,7 +51,7 @@ function registerGroupOrderRoutes(app, deps) {
         }
     });
 
-    app.get('/api/crafts/group-orders/:id', ...guards, (req, res) => {
+    app.get('/api/crafts/group-orders/:id', ...readGuards, (req, res) => {
         try {
             const id = parseId(req.params.id);
             if (!id) return res.status(400).json({ error: 'ID invalide' });
@@ -60,7 +61,7 @@ function registerGroupOrderRoutes(app, deps) {
         }
     });
 
-    app.post('/api/crafts/group-orders', ...guards, (req, res) => {
+    app.post('/api/crafts/group-orders', ...writeGuards, (req, res) => {
         try {
             const order = upsertGroupOrder(req.body || {}, req.session.user);
             audit(req.session.user, 'groupOrder.create', {
@@ -79,7 +80,7 @@ function registerGroupOrderRoutes(app, deps) {
         }
     });
 
-    app.put('/api/crafts/group-orders/:id', ...guards, (req, res) => {
+    app.put('/api/crafts/group-orders/:id', ...writeGuards, (req, res) => {
         try {
             const id = parseId(req.params.id);
             if (!id) return res.status(400).json({ error: 'ID invalide' });
@@ -100,7 +101,7 @@ function registerGroupOrderRoutes(app, deps) {
         }
     });
 
-    app.post('/api/crafts/group-orders/:id/crafts', ...guards, (req, res) => {
+    app.post('/api/crafts/group-orders/:id/crafts', ...writeGuards, (req, res) => {
         try {
             const id = parseId(req.params.id);
             if (!id) return res.status(400).json({ error: 'ID invalide' });
@@ -121,7 +122,7 @@ function registerGroupOrderRoutes(app, deps) {
         }
     });
 
-    app.patch('/api/crafts/group-orders/:id/cancel', ...guards, (req, res) => {
+    app.patch('/api/crafts/group-orders/:id/cancel', ...writeGuards, (req, res) => {
         try {
             const id = parseId(req.params.id);
             if (!id) return res.status(400).json({ error: 'ID invalide' });
@@ -139,7 +140,7 @@ function registerGroupOrderRoutes(app, deps) {
     });
 
     if (typeof deleteGroupOrder === 'function') {
-        app.delete('/api/crafts/group-orders/:id', ...guards, (req, res) => {
+        app.delete('/api/crafts/group-orders/:id', ...writeGuards, (req, res) => {
             try {
                 const id = parseId(req.params.id);
                 if (!id) return res.status(400).json({ error: 'ID invalide' });

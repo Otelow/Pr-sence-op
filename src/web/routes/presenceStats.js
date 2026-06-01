@@ -137,7 +137,7 @@ function registerPresenceStatsRoutes(app, deps) {
         emitRealtime,
     } = deps;
 
-    app.get('/api/presence', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/presence', requireAuth, async (req, res) => {
         const state = getBotState();
         if (req.query.sync === '1' || req.query.sync === 'true') {
             await Promise.allSettled([
@@ -377,7 +377,7 @@ function registerPresenceStatsRoutes(app, deps) {
         });
     });
 
-    app.get('/api/presence/history', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/presence/history', requireAuth, (req, res) => {
         const rawDays = parseInt(req.query.days || '7', 10);
         const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 7, 1), 30);
         const sinceDate = new Date();
@@ -422,7 +422,7 @@ function registerPresenceStatsRoutes(app, deps) {
         res.json({ days, history });
     });
 
-    app.get('/api/presence/history/:date', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/presence/history/:date', requireAuth, (req, res) => {
         const date = req.params.date;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
             return res.status(400).json({ error: 'Format date invalide (YYYY-MM-DD)' });
@@ -460,7 +460,7 @@ function registerPresenceStatsRoutes(app, deps) {
         return res.json({ date, editable: date === getParisDateKey(), op1, op2, op2Launched, decroches });
     });
 
-    app.get('/api/presence/stats', requireAuth, requireFullSiteAccess, (req, res) => {
+    app.get('/api/presence/stats', requireAuth, (req, res) => {
         const rawDays = parseInt(req.query.days || '30', 10);
         const days = Math.min(Math.max(Number.isFinite(rawDays) ? rawDays : 30, 1), 90);
         const sinceDate = new Date();
@@ -572,7 +572,7 @@ function registerPresenceStatsRoutes(app, deps) {
         });
     });
 
-    app.get('/api/weekly', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/weekly', requireAuth, async (req, res) => {
         const state = getBotState();
         const guild = getBotClient().guilds.cache.get(state.CONFIG.GUILD_ID);
         const membersCache = guild ? await getCachedMembers(guild).catch(() => guild.members.cache) : null;
@@ -607,7 +607,7 @@ function registerPresenceStatsRoutes(app, deps) {
         res.status(404).json({ error: 'User not in tracking' });
     });
 
-    app.get('/api/stats', requireAuth, requireFullSiteAccess, async (req, res) => {
+    app.get('/api/stats', requireAuth, async (req, res) => {
         const state = getBotState();
         const guild = getBotClient().guilds.cache.get(state.CONFIG.GUILD_ID);
         const membersCache = guild ? await getCachedMembers(guild).catch(() => guild.members.cache) : null;
