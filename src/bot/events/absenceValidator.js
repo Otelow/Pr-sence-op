@@ -2,6 +2,7 @@
 // FIX PRÉSENCE 18/05/2026 — 3 bugs classification corrigés
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
+const { absenceDateTextHasRecognizedDate, getAbsenceTemplateState } = require('../services/absenceParsing');
 // MODIFIÉ CHANTIER 6 — 14/05/2026 — validateur messages absence isolé
 
 function triggerAbsenceCacheRefresh(scheduleAbsenceSalonCacheUpdate, reason) {
@@ -40,6 +41,7 @@ async function warnInvalidDate(message, CONFIG) {
             `${message.author} ${CONFIG.EMOJIS.ATTENTION} Ton format de **date** n'est pas reconnu.\n` +
             `\n**Exemples acceptés :**\n` +
             `• \`Date(s) : 05/04\` (un seul jour)\n` +
+            `• \`Date 05/04 ce soir\` (sans deux-points)\n` +
             `• \`Date(s) : 05/04 - 07/04\` (plage de jours)\n` +
             `\nMerci de corriger ton message ${CONFIG.EMOJIS.BS21}`
         );
@@ -52,32 +54,21 @@ async function validateAbsenceMessage(message, { CONFIG, scheduleAbsenceSalonCac
     if (message.author?.bot) return;
 
     const c = message.content || '';
-    const hasNom = /Nom\s*:/i.test(c);
-    const hasPrenom = /Pr[ée]nom\s*:/i.test(c);
-    const hasDate = /Date\(?s?\)?\s*:/i.test(c);
-    const hasRaison = /Raison\s*:/i.test(c);
-    const isValid = hasNom && hasPrenom && hasDate && hasRaison;
+    const template = getAbsenceTemplateState(c);
 
-    if (!isValid) {
+    if (!template.isTemplateComplete) {
         if (warnOnInvalid) {
             const missing = [];
-            if (!hasNom) missing.push('**Nom**');
-            if (!hasPrenom) missing.push('**Prénom**');
-            if (!hasDate) missing.push('**Date(s)**');
-            if (!hasRaison) missing.push('**Raison**');
+            if (!template.hasNom) missing.push('**Nom**');
+            if (!template.hasPrenom) missing.push('**Prénom**');
+            if (!template.hasDate) missing.push('**Date(s)**');
+            if (!template.hasRaison) missing.push('**Raison**');
             await warnInvalidTemplate(message, CONFIG, missing);
         }
         return;
     }
 
-    const dm = c.match(/Date\(?s?\)?\s*:\s*(.+)/i);
-    if (!dm) return;
-
-    const ds = dm[1].trim();
-    const hasRange = /(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})/.test(ds);
-    const hasSingle = /(\d{1,2})\/(\d{1,2})/.test(ds);
-
-    if (!hasRange && !hasSingle) {
+    if (!absenceDateTextHasRecognizedDate(template.dateText)) {
         if (warnOnInvalid) await warnInvalidDate(message, CONFIG);
         return;
     }

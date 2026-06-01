@@ -4,6 +4,7 @@
 // FINAL D2 16/05/2026 ? logs bot via pino
 const log = require('../../shared/logger');
 const { collectNoReactionMembers } = require('./presenceNoReaction');
+const { absenceDateTextCoversTarget, getAbsenceTemplateState } = require('./absenceParsing');
 const { pickReactionPriority } = require('../../shared/presenceReactions');
 // STABILISATION 15/05/2026 — corrections runtime post-audit
 // MODIFIE CHANTIER 6 - 14/05/2026 - flux presence OP externalise
@@ -458,10 +459,10 @@ async function getAbsentUsersToday(targetDate = new Date()) {
         for (const [, m] of msgs) {
             if (m.author.bot) continue;
             const c = m.content;
-            const valid = /Nom\s*:/i.test(c) && /Pr[ée]nom\s*:/i.test(c) && /Date\(?s?\)?\s*:/i.test(c) && /Raison\s*:/i.test(c);
+            const absenceTemplate = getAbsenceTemplateState(c);
             const displayName = m.member?.nickname || m.author.username;
 
-            if (!valid) {
+            if (!absenceTemplate.isTemplateComplete) {
                 if (m.createdAt.getDate() === td && m.createdAt.getMonth() + 1 === tm) {
                     invalidAbsences.add(m.author.id);
                     invalidAbsenceNames.push(displayName);
@@ -469,21 +470,7 @@ async function getAbsentUsersToday(targetDate = new Date()) {
                 continue;
             }
 
-            const dm = c.match(/Date\(?s?\)?\s*:\s*(.+)/i);
-            if (!dm) continue;
-            const ds = dm[1].trim();
-
-            const rng = ds.match(/(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})/);
-            if (rng) {
-                if (isTargetInAbsenceRange(+rng[1], +rng[2], +rng[3], +rng[4], today)) {
-                    validAbsences.add(m.author.id);
-                    validAbsenceNames.push(displayName);
-                }
-                continue;
-            }
-
-            const sm = ds.match(/(\d{1,2})\/(\d{1,2})/);
-            if (sm && isSameAbsenceDay(+sm[1], +sm[2], today)) {
+            if (absenceDateTextCoversTarget(absenceTemplate.dateText, today)) {
                 validAbsences.add(m.author.id);
                 validAbsenceNames.push(displayName);
             }
