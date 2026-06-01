@@ -4,6 +4,7 @@ const {
     getCurrentPresenceLive,
     getMondayBeforeParis,
     getMondayParis,
+    getPendingCraftRequestCount,
 } = require('../src/web/services/dashboardOverview');
 
 function makeMember(id, { bot = false, excluded = false } = {}) {
@@ -148,4 +149,22 @@ test('Command Center overview : lundi Paris courant et precedent', () => {
     const date = new Date('2026-05-21T10:00:00Z');
     assert.equal(getMondayParis(date), '2026-05-18');
     assert.equal(getMondayBeforeParis(date), '2026-05-11');
+});
+
+test('Command Center overview : crafts ouverts compte uniquement les demandes pending', () => {
+    const sqlCalls = [];
+    const db = {
+        prepare(sql) {
+            sqlCalls.push(sql);
+            return {
+                get() {
+                    const statuses = ['pending', 'crafted', 'completed', 'rejected', 'cancelled', 'sold'];
+                    return { c: statuses.filter(status => status === 'pending').length };
+                },
+            };
+        },
+    };
+
+    assert.equal(getPendingCraftRequestCount(db), 1);
+    assert.match(sqlCalls[0], /WHERE status = 'pending'/);
 });

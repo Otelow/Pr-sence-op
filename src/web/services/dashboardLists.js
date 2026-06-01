@@ -89,7 +89,7 @@ function getCraftsOpen(db) {
                 r.created_at
             FROM craft_requests r
             LEFT JOIN weapons w ON w.id = r.weapon_id
-            WHERE r.status NOT IN ('completed', 'rejected', 'cancelled', 'sold')
+            WHERE r.status = 'pending'
             ORDER BY r.created_at DESC
         `).all();
     } catch {

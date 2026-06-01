@@ -718,7 +718,7 @@ async function openCommandModal(target) {
             const data = await fetchJson('/api/dashboard/absences-week');
             body.innerHTML = renderAbsencesList(data.absences || []);
         } else if (target === 'crafts-list') {
-            title.textContent = 'Crafts en cours';
+            title.textContent = 'Crafts en attente';
             const data = await fetchJson('/api/dashboard/crafts-open');
             body.innerHTML = renderCraftsList(data.crafts || []);
         } else if (target === 'decroches-detail') {
@@ -790,7 +790,7 @@ function renderAbsencesList(absences) {
 }
 
 function renderCraftsList(crafts) {
-    if (!crafts.length) return renderEmptyMini('Aucun craft ouvert');
+    if (!crafts.length) return renderEmptyMini('Aucun craft en attente');
     return `<div class="cmd-detail-list">${crafts.map(craft => `
         <div class="cmd-detail-row">
             <div>

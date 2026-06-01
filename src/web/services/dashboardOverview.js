@@ -57,6 +57,14 @@ function safeCount(db, sql, params = []) {
     }
 }
 
+function getPendingCraftRequestCount(db) {
+    return safeCount(db, `
+        SELECT COUNT(*) as c
+        FROM craft_requests
+        WHERE status = 'pending'
+    `);
+}
+
 function getEligibleRoleMembers(client, state, roleId) {
     const guildId = process.env.GUILD_ID || state?.CONFIG?.GUILD_ID;
     const guild = client?.guilds?.cache?.get(guildId);
@@ -172,11 +180,7 @@ async function buildDashboardOverview({ client, state, now = new Date() }) {
             },
             membres: { total: membersTotal, role: '21BS' },
             crafts: {
-                ouverts: safeCount(db, `
-                    SELECT COUNT(*) as c
-                    FROM craft_requests
-                    WHERE status NOT IN ('completed', 'rejected', 'cancelled', 'sold')
-                `),
+                ouverts: getPendingCraftRequestCount(db),
             },
             weapons: {
                 onSale: safeCount(db, 'SELECT COUNT(*) as c FROM my_weapons WHERE COALESCE(is_sold, 0) = 0'),
@@ -208,6 +212,7 @@ module.exports = {
     getCurrentPresenceLive,
     getMondayBeforeParis,
     getMondayParis,
+    getPendingCraftRequestCount,
     getPresenceMemberRoleId,
     getRoleMembersCount,
 };
