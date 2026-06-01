@@ -551,18 +551,10 @@ function applyPermissionsUI() {
         const sec = document.getElementById(`tab-${tabName}`);
         const navItem = document.querySelector(`.nav-item[data-tab="${tabName}"]`);
         const allowed = canAccessDashboardTab(tabName);
-        if (navItem) navItem.style.display = allowed ? '' : 'none';
-        if (!allowed) {
-            if (sec) {
-                sec.hidden = true;
-                sec.classList.remove('active', 'access-locked');
-                sec.querySelector('.access-locked-overlay')?.remove();
-            }
-            return;
-        }
+        if (navItem) navItem.style.display = '';
         if (sec) sec.hidden = false;
         if (!sec) return;
-        if (canAccessDashboardTab(tabName)) {
+        if (allowed) {
             sec.classList.remove('access-locked');
             sec.querySelector('.access-locked-overlay')?.remove();
         } else if (!sec.querySelector('.access-locked-overlay')) {
@@ -587,9 +579,6 @@ function applyPermissionsUI() {
     if (!userPermissions.canEditMap && ['add', 'delete'].includes(mapMode)) setMapMode('view');
 }
 function switchTab(tab) {
-    if (!canAccessDashboardTab(tab)) {
-        tab = getFirstAccessibleTab();
-    }
     currentTab = tab;
     // Persister dans localStorage pour survivre au refresh
     try { localStorage.setItem('lastTab', tab); } catch {}
