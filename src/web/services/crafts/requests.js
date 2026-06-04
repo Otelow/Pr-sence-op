@@ -56,11 +56,15 @@ function createCraftRequestService(deps) {
         return ['sale', 'personal'].includes(clean) ? clean : null;
     }
 
-    function insertRequest(user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test = false) {
+    function insertRequest(user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test = false, out_of_stock = false) {
         const normalizedType = normalizeCraftRequestType(request_type);
-        const r = db.prepare('INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test) VALUES (?, ?, ?, ?, ?, ?, ?)')
-            .run(user_id, user_name, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0, normalizedType, is_test ? 1 : 0);
+        const r = db.prepare('INSERT INTO craft_requests (user_id, user_name, weapon_id, has_plan, has_money, request_type, is_test, out_of_stock) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(user_id, user_name, weapon_id, has_plan ? 1 : 0, has_money ? 1 : 0, normalizedType, is_test ? 1 : 0, out_of_stock ? 1 : 0);
         return r.lastInsertRowid;
+    }
+
+    function shouldConsumeDynamicStock(request) {
+        return !request.is_test && !request.out_of_stock;
     }
 
     function isPermanentWeaponLink(weapon) {
@@ -93,7 +97,7 @@ function createCraftRequestService(deps) {
         if (status === 'crafted') {
             const serial = String(options.serial ?? current.serial_number ?? '').trim();
             if (!serial) throw createStockError('Numero de serie obligatoire pour passer en crafte', 400);
-            if (!current.is_test && !current.stock_consumed_at) {
+            if (shouldConsumeDynamicStock(current) && !current.stock_consumed_at) {
                 consumeStockForCraftRequest(current, now);
             }
             db.prepare(`

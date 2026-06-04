@@ -854,7 +854,13 @@
                 </div>
 
                 <div class="craft-field">
-                    <label>Type de demande *</label>
+                    <div class="craft-request-type-header">
+                        <label>Type de demande *</label>
+                        <label class="craft-checkbox-label craft-manager-field craft-out-stock-inline" id="craftOutOfStockField" style="display:none;">
+                            <input type="checkbox" id="craftOutOfStock">
+                            <span>📦 <strong>Hors Stock</strong></span>
+                        </label>
+                    </div>
                     <div class="craft-request-type-choice">
                         <label class="craft-request-type-option">
                             <input type="radio" name="craftRequestType" value="sale">

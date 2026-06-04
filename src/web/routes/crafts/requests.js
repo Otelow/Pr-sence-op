@@ -284,7 +284,7 @@ function registerCraftRequestRoutes(app, deps) {
     }
     app.post('/api/crafts/requests', requireAuth, async (req, res) => {
         try {
-            const { weapon_id, has_plan, has_money, request_type, is_test } = req.body;
+            const { weapon_id, has_plan, has_money, request_type, is_test, out_of_stock } = req.body;
             const userId = req.session.user.id;
             const userName = req.session.user.username;
             if (!weapon_id) return res.status(400).json({ error: 'Arme requise' });
@@ -296,7 +296,11 @@ function registerCraftRequestRoutes(app, deps) {
             if (is_test && !requestIsTest) {
                 return res.status(403).json({ error: 'Mode test réservé aux hauts gradés' });
             }
-            const id = insertRequest(userId, userName, weapon_id, has_plan, has_money, normalizedType, requestIsTest);
+            const requestOutOfStock = !!out_of_stock && isCraftManager(req.session.user);
+            if (out_of_stock && !requestOutOfStock) {
+                return res.status(403).json({ error: 'Option Hors Stock réservée aux hauts gradés' });
+            }
+            const id = insertRequest(userId, userName, weapon_id, has_plan, has_money, normalizedType, requestIsTest, requestOutOfStock);
 
             // Message Discord
             if (!requestIsTest) {
@@ -312,6 +316,7 @@ function registerCraftRequestRoutes(app, deps) {
                     weapon_name: weapon.name,
                     request_type: normalizedType,
                     is_test: requestIsTest,
+                    out_of_stock: requestOutOfStock,
                     has_plan: !!has_plan,
                     has_money: !!has_money,
                 },

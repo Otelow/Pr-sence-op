@@ -6073,6 +6073,20 @@ body {
     accent-color: var(--accent);
 }
 
+.craft-request-type-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.craft-out-stock-inline {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 7px 10px;
+}
+
 .craft-request-type-chip {
     display: inline-flex;
     align-items: center;
@@ -6109,6 +6123,13 @@ body {
     text-transform: uppercase;
     letter-spacing: .08em;
     box-shadow: 0 0 14px rgba(96, 165, 250, 0.08);
+}
+
+.craft-request-out-stock-chip {
+    border-color: rgba(250, 204, 21, 0.38);
+    background: rgba(250, 204, 21, 0.12);
+    color: #fde68a;
+    box-shadow: 0 0 14px rgba(250, 204, 21, 0.08);
 }
 
 .craft-weapon-card-craftable {

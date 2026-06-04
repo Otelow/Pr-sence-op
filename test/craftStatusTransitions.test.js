@@ -22,6 +22,7 @@ function setupCraftDb({ restoreThrows = false } = {}) {
             has_money INTEGER DEFAULT 0,
             request_type TEXT,
             is_test INTEGER DEFAULT 0,
+            out_of_stock INTEGER DEFAULT 0,
             status TEXT DEFAULT 'pending',
             crafted INTEGER DEFAULT 0,
             serial_number TEXT,
@@ -69,8 +70,9 @@ function setupCraftDb({ restoreThrows = false } = {}) {
         const result = db.prepare(`
             INSERT INTO craft_requests (
                 user_id, user_name, weapon_id, status, crafted, serial_number, craft_date,
-                stock_consumed_at, completed_by_id, completed_by_name, buyer_org, sale_price, sale_date
-            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                stock_consumed_at, completed_by_id, completed_by_name, buyer_org, sale_price, sale_date,
+                out_of_stock
+            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
             values.user_id || 'u1',
             values.user_name || 'User',
@@ -83,7 +85,8 @@ function setupCraftDb({ restoreThrows = false } = {}) {
             values.completed_by_name || null,
             values.buyer_org || null,
             values.sale_price ?? null,
-            values.sale_date || null
+            values.sale_date || null,
+            values.out_of_stock ? 1 : 0
         );
         return result.lastInsertRowid;
     }
@@ -116,6 +119,21 @@ test('passage en crafted consomme le stock et renseigne les champs craft', () =>
     assert.equal(row.crafted_by_id, 'crafter-1');
     assert.ok(row.stock_consumed_at);
     assert.equal(calls.consume, 1);
+    db.close();
+});
+
+test('demande hors stock passe en crafted sans consommer le stock dynamique', () => {
+    const { db, service, calls, insertRequest } = setupCraftDb();
+    const id = insertRequest({ status: 'in_progress', out_of_stock: true });
+
+    service.updateRequestCraft(id, true, 'SER-OOS', 'crafter-1', 'Ney');
+
+    const row = db.prepare('SELECT status, crafted, stock_consumed_at, out_of_stock FROM craft_requests WHERE id = ?').get(id);
+    assert.equal(row.status, 'crafted');
+    assert.equal(row.crafted, 1);
+    assert.equal(row.out_of_stock, 1);
+    assert.equal(row.stock_consumed_at, null);
+    assert.equal(calls.consume, 0);
     db.close();
 });
 

@@ -117,6 +117,7 @@ function createStockService(deps) {
 
         for (const request of activeRequests) {
             if (request.is_test) continue;
+            if (request.out_of_stock) continue;
             if (request.stock_consumed_at) continue;
             if (!reservedStatuses.includes(request.status)) continue;
             const weapon = weaponsById.get(Number(request.weapon_id));

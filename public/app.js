@@ -4141,6 +4141,7 @@ async function submitCraftRequest() {
     const hasMoney = document.getElementById('craftHasMoney').checked;
     const requestType = document.querySelector('input[name="craftRequestType"]:checked')?.value || '';
     const isTest = !!document.getElementById('craftIsTest')?.checked && canValidateCraftClient();
+    const outOfStock = !!document.getElementById('craftOutOfStock')?.checked && canValidateCraftClient();
 
     if (!weaponId) { toast('❌ Choisis une arme', 'error'); return; }
 
@@ -4153,7 +4154,7 @@ async function submitCraftRequest() {
         const res = await fetch('/api/crafts/requests', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ weapon_id: parseInt(weaponId), has_plan: hasPlan, has_money: hasMoney, request_type: requestType, is_test: isTest })
+            body: JSON.stringify({ weapon_id: parseInt(weaponId), has_plan: hasPlan, has_money: hasMoney, request_type: requestType, is_test: isTest, out_of_stock: outOfStock })
         });
         const data = await res.json();
         if (res.ok) {
@@ -4164,6 +4165,8 @@ async function submitCraftRequest() {
             document.getElementById('craftHasMoney').checked = false;
             const testInput = document.getElementById('craftIsTest');
             if (testInput) testInput.checked = false;
+            const outOfStockInput = document.getElementById('craftOutOfStock');
+            if (outOfStockInput) outOfStockInput.checked = false;
             document.querySelectorAll('input[name="craftRequestType"]').forEach(input => { input.checked = false; });
             const label = document.getElementById('craftWeaponLabel');
             if (label) {
@@ -4479,6 +4482,7 @@ function renderCraftRequestsList() {
                     <div class="craft-request-chip-row">
                         <div class="craft-request-type-chip">${escapeHtml(getCraftRequestTypeLabel(r.request_type))}</div>
                         ${r.is_test ? '<div class="craft-request-test-chip">TEST</div>' : ''}
+                        ${r.out_of_stock ? '<div class="craft-request-test-chip craft-request-out-stock-chip">HORS STOCK</div>' : ''}
                     </div>
                     <div class="craft-request-meta">
                         <span>👤 ${escapeHtml(r.user_name)}</span>
@@ -4594,8 +4598,12 @@ function syncCraftPermissionUI() {
     const canManageCraft = canValidateCraftClient();
     const testField = document.getElementById('craftTestField');
     const testInput = document.getElementById('craftIsTest');
+    const outOfStockField = document.getElementById('craftOutOfStockField');
+    const outOfStockInput = document.getElementById('craftOutOfStock');
     if (testField) testField.style.display = canManageCraft ? 'flex' : 'none';
     if (!canManageCraft && testInput) testInput.checked = false;
+    if (outOfStockField) outOfStockField.style.display = canManageCraft ? 'flex' : 'none';
+    if (!canManageCraft && outOfStockInput) outOfStockInput.checked = false;
 }
 
 async function updateRequestStatus(requestId, status) {
