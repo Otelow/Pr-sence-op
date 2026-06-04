@@ -9,6 +9,13 @@ const DATA_DIR = process.env.DATA_DIR
     || process.env.RAILWAY_VOLUME_MOUNT_PATH
     || (isRailway ? '/data' : path.join(ROOT_DIR, 'data'));
 
+function csv(value, fallback = '') {
+    return String(value || fallback)
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
 const config = {
     env: process.env.NODE_ENV || 'development',
     isProduction: process.env.NODE_ENV === 'production',
@@ -31,7 +38,16 @@ const config = {
     web: {
         port: Number(process.env.PORT || 3000),
         sessionSecret: process.env.SESSION_SECRET || 'change-me-local',
-        sessionMaxAgeMs: Number(process.env.SESSION_MAX_AGE_MS || 10 * 60 * 1000)
+        sessionMaxAgeMs: Number(process.env.SESSION_MAX_AGE_MS || 7 * 24 * 60 * 60 * 1000)
+    },
+    permissions: {
+        adminUserId: process.env.ADMIN_USER_ID || '952986899667103804',
+        adminRoleId: process.env.ADMIN_ROLE_ID || '1485279148246175764',
+        fullAccessRoles: csv(process.env.FULL_ACCESS_ROLES, '1485279148246175764,1486744891848654988,1485279534650494976'),
+        limitedCraftAccessRoles: csv(process.env.LIMITED_CRAFT_ACCESS_ROLES, '1495448653945634987,1485270431291277383'),
+        mapViewRoles: csv(process.env.MAP_VIEW_ROLES, '1485279148246175764,1486744891848654988,1485279534650494976,1485270431291277383'),
+        labVisibleUsers: csv(process.env.LAB_VISIBLE_USERS, '952986899667103804,780164840798552066,769670622380294265'),
+        myWeaponsDeleteRole: process.env.MY_WEAPONS_DELETE_ROLE || '1490361524408291459'
     },
     uploads: {
         maxFileSizeBytes: Number(process.env.UPLOAD_MAX_FILE_SIZE || 25 * 1024 * 1024),
@@ -52,20 +68,11 @@ const config = {
         backfillBatchSize: Number(process.env.CLIPS_BACKFILL_BATCH_SIZE || 50),
         // Catégories Discord (parentId d'un salon) où les liens/vidéos sont autorisés
         // sans suppression ni rappel automatique.
-        allowedCategoryIds: (process.env.CLIPS_ALLOWED_CATEGORY_IDS || '1485642192746971146')
-            .split(',')
-            .map(id => id.trim())
-            .filter(Boolean),
+        allowedCategoryIds: csv(process.env.CLIPS_ALLOWED_CATEGORY_IDS, '1485642192746971146'),
         // Salons précis où les liens/vidéos sont autorisés, sans dépendre de la catégorie.
-        allowedChannelIds: (process.env.CLIPS_ALLOWED_CHANNEL_IDS || '1486729752479006770')
-            .split(',')
-            .map(id => id.trim())
-            .filter(Boolean),
+        allowedChannelIds: csv(process.env.CLIPS_ALLOWED_CHANNEL_IDS, '1486729752479006770'),
         // Utilisateurs jamais modérés par le système clips.
-        bypassUserIds: (process.env.CLIPS_BYPASS_USER_IDS || '952986899667103804')
-            .split(',')
-            .map(id => id.trim())
-            .filter(Boolean)
+        bypassUserIds: csv(process.env.CLIPS_BYPASS_USER_IDS, '952986899667103804')
     },
     timeouts: {
         requestMs: Number(process.env.REQUEST_TIMEOUT_MS || 15000),

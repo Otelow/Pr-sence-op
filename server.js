@@ -145,7 +145,6 @@ function startServer(client, getState) {
                 mediaSrc: ["'self'", 'https://cdn.discordapp.com', 'https://media.discordapp.net'],
                 connectSrc: ["'self'", 'ws:', 'wss:'],
                 frameSrc: ["'none'"],
-                objectSrc: ["'none'"],
             },
         },
     }));
