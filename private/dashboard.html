@@ -42,8 +42,8 @@
     </div>
 
     <div class="dashboard-reorder-controls">
-        <button id="dashReorderToggleBtn" class="btn-secondary btn-small" onclick="toggleDashTabReorder()">🔧 Réorganiser</button>
-        <button id="dashReorderResetBtn" class="btn-secondary btn-small" onclick="resetDashTabOrder()" style="display:none;">↺ Ordre par défaut</button>
+        <button id="dashReorderToggleBtn" class="btn-secondary btn-small" data-click-call="toggleDashTabReorder()">🔧 Réorganiser</button>
+        <button id="dashReorderResetBtn" class="btn-secondary btn-small" data-click-call="resetDashTabOrder()" style="display:none;">↺ Ordre par défaut</button>
     </div>
 
     <nav class="nav" id="dashTabsNav">
@@ -100,7 +100,7 @@
             </div>
         </div>
         <label class="audit-toast-toggle">
-            <input type="checkbox" id="auditToastToggle" onchange="toggleAuditToastPreference()" checked>
+            <input type="checkbox" id="auditToastToggle" data-change-call="toggleAuditToastPreference()" checked>
             <span>🔔 Notifications activités admin</span>
         </label>
     </div>
@@ -118,7 +118,7 @@
                 <span class="live-dot"></span>
                 <span class="live-text">LIVE</span>
             </div>
-            <button class="btn-refresh" onclick="refreshAll({ forceSync: true })" title="Rafraîchir">↻</button>
+            <button class="btn-refresh" data-click-call="refreshAll({ forceSync: true })" title="Rafraîchir">↻</button>
         </div>
     </header>
 
@@ -133,12 +133,12 @@
                 <div class="cc-live-indicator" role="status" aria-label="Rafraîchissement temps réel actif" title="Rafraîchissement temps réel actif">
                     <span class="cc-live-dot"></span>LIVE
                 </div>
-                <button class="cc-refresh-btn" onclick="reloadDashboardOverview()" title="Actualiser">↻</button>
+                <button class="cc-refresh-btn" data-click-call="reloadDashboardOverview()" title="Actualiser">↻</button>
             </div>
         </div>
 
         <div class="cc-bento-grid">
-            <div class="cc-bento-card cc-card-hero" data-bento="hero" onclick="openCommandModal('presence-detail')">
+            <div class="cc-bento-card cc-card-hero" data-bento="hero" data-click-call="openCommandModal('presence-detail')">
                 <div>
                     <div class="cc-card-label">Présence — 1ère OP</div>
                     <div class="cc-hero-value">
@@ -153,7 +153,7 @@
                 <div class="cc-hero-trend" id="ccPresenceTrend"></div>
             </div>
 
-            <div class="cc-bento-card cc-card-mini" onclick="openCommandModal('membres-list')">
+            <div class="cc-bento-card cc-card-mini" data-click-call="openCommandModal('membres-list')">
                 <div class="cc-card-label">Membres</div>
                 <div class="cc-mini-value" id="ccMembresTotal">—</div>
                 <div class="cc-mini-foot">
@@ -162,7 +162,7 @@
                 </div>
             </div>
 
-            <div class="cc-bento-card cc-card-mini" onclick="openCommandModal('crafts-list')">
+            <div class="cc-bento-card cc-card-mini" data-click-call="openCommandModal('crafts-list')">
                 <div class="cc-card-label">Crafts en attente</div>
                 <div class="cc-mini-value" id="ccCraftsOuverts">—</div>
                 <div class="cc-mini-foot">
@@ -171,7 +171,7 @@
                 </div>
             </div>
 
-            <div class="cc-bento-card cc-card-mini" onclick="openCommandModal('weapons-list')">
+            <div class="cc-bento-card cc-card-mini" data-click-call="openCommandModal('weapons-list')">
                 <div class="cc-card-label">Armes en vente</div>
                 <div class="cc-mini-value" id="ccArmesEnVente">—</div>
                 <div class="cc-mini-foot">
@@ -180,7 +180,7 @@
                 </div>
             </div>
 
-            <div class="cc-bento-card cc-card-mini" onclick="openCommandModal('absences-list')">
+            <div class="cc-bento-card cc-card-mini" data-click-call="openCommandModal('absences-list')">
                 <div class="cc-card-label">Absences semaine</div>
                 <div class="cc-mini-value" id="ccAbsencesSemaine">—</div>
                 <div class="cc-mini-foot">
@@ -189,7 +189,7 @@
                 </div>
             </div>
 
-            <div class="cc-bento-card cc-card-wide" data-bento="wide" onclick="openCommandModal('decroches-detail')">
+            <div class="cc-bento-card cc-card-wide" data-bento="wide" data-click-call="openCommandModal('decroches-detail')">
                 <div class="cc-wide-left">
                     <div class="cc-wide-icon">⚠</div>
                     <div>
@@ -247,7 +247,7 @@
         <div class="presence-stats-section">
             <div class="presence-stats-header">
                 <h3>📊 Statistiques de présence</h3>
-                <select id="presenceStatsPeriod" onchange="loadPresenceStats()">
+                <select id="presenceStatsPeriod" data-change-call="loadPresenceStats()">
                     <option value="7">7 derniers jours</option>
                     <option value="30" selected>30 derniers jours</option>
                     <option value="90">90 derniers jours</option>
@@ -333,47 +333,47 @@
         <div class="cmd-section">
             <h2 class="section-title">🚨 Alertes terrain</h2>
             <div class="cmd-grid">
-                <button class="cmd-btn cmd-danger" onclick="runCmd('qg')">
+                <button class="cmd-btn cmd-danger" data-click-call="runCmd('qg')">
                     <span class="cmd-icon">📍</span>
                     <span class="cmd-name">QG</span>
                     <span class="cmd-desc">Rendez-vous au Hood (5 min)</span>
                 </button>
-                <button class="cmd-btn cmd-danger" onclick="runCmd('defense')">
+                <button class="cmd-btn cmd-danger" data-click-call="runCmd('defense')">
                     <span class="cmd-icon">🔥</span>
                     <span class="cmd-name">Défense Labo</span>
                     <span class="cmd-desc">Laboratoire attaqué</span>
                 </button>
-                <button class="cmd-btn" onclick="runCmd('garage')">
+                <button class="cmd-btn" data-click-call="runCmd('garage')">
                     <span class="cmd-icon">🏗</span>
                     <span class="cmd-name">Garage</span>
                     <span class="cmd-desc">Rendez-vous au Garage Hood</span>
                 </button>
-                <button class="cmd-btn" onclick="runCmd('alignement')">
+                <button class="cmd-btn" data-click-call="runCmd('alignement')">
                     <span class="cmd-icon">📐</span>
                     <span class="cmd-name">Alignement</span>
                     <span class="cmd-desc">3 minutes pour s'aligner</span>
                 </button>
-                <button class="cmd-btn" onclick="runCmd('position')">
+                <button class="cmd-btn" data-click-call="runCmd('position')">
                     <span class="cmd-icon">🎯</span>
                     <span class="cmd-name">Positions</span>
                     <span class="cmd-desc">Prendre des positions</span>
                 </button>
-                <button class="cmd-btn" onclick="runCmd('tir')">
+                <button class="cmd-btn" data-click-call="runCmd('tir')">
                     <span class="cmd-icon">✋</span>
                     <span class="cmd-name">Stop Tir</span>
                     <span class="cmd-desc">Arrêter de tirer</span>
                 </button>
-                <button class="cmd-btn" onclick="runCmd('weed')">
+                <button class="cmd-btn" data-click-call="runCmd('weed')">
                     <span class="cmd-icon">🌿</span>
                     <span class="cmd-name">Weed</span>
                     <span class="cmd-desc">Aller sur la weed</span>
                 </button>
-                <button class="cmd-btn" onclick="runCmd('traitement-weed')">
+                <button class="cmd-btn" data-click-call="runCmd('traitement-weed')">
                     <span class="cmd-icon">⚗</span>
                     <span class="cmd-name">Traitement</span>
                     <span class="cmd-desc">Traitement de la weed</span>
                 </button>
-                <button class="cmd-btn" onclick="runCmd('trash')">
+                <button class="cmd-btn" data-click-call="runCmd('trash')">
                     <span class="cmd-icon">🚫</span>
                     <span class="cmd-name">Anti-Trash</span>
                     <span class="cmd-desc">Avertissement trash</span>
@@ -384,27 +384,27 @@
         <div class="cmd-section">
             <h2 class="section-title">📡 Présences & radio</h2>
             <div class="cmd-grid">
-                <button class="cmd-btn cmd-info" onclick="runCmd('radio')">
+                <button class="cmd-btn cmd-info" data-click-call="runCmd('radio')">
                     <span class="cmd-icon">📻</span>
                     <span class="cmd-name">Nouvelle Radio</span>
                     <span class="cmd-desc">Fréquence aléatoire</span>
                 </button>
-                <button class="cmd-btn cmd-info" onclick="runCmd('presence')">
+                <button class="cmd-btn cmd-info" data-click-call="runCmd('presence')">
                     <span class="cmd-icon">📋</span>
                     <span class="cmd-name">1ère Présence OP</span>
                     <span class="cmd-desc">Lancer sans relances auto</span>
                 </button>
-                <button class="cmd-btn cmd-danger" onclick="runCmd('presence-stop')">
+                <button class="cmd-btn cmd-danger" data-click-call="runCmd('presence-stop')">
                     <span class="cmd-icon">⏹</span>
                     <span class="cmd-name">Stop 1ère OP</span>
                     <span class="cmd-desc">Arrêter le suivi</span>
                 </button>
-                <button class="cmd-btn cmd-info" onclick="runCmd('presence2')">
+                <button class="cmd-btn cmd-info" data-click-call="runCmd('presence2')">
                     <span class="cmd-icon">📋</span>
                     <span class="cmd-name">2ème Présence OP</span>
                     <span class="cmd-desc">Sans relances</span>
                 </button>
-                <button class="cmd-btn cmd-danger" onclick="runCmd('presence2-stop')">
+                <button class="cmd-btn cmd-danger" data-click-call="runCmd('presence2-stop')">
                     <span class="cmd-icon">⏹</span>
                     <span class="cmd-name">Stop 2ème OP</span>
                     <span class="cmd-desc">Arrêter le suivi</span>
@@ -420,15 +420,15 @@
 
             <div class="comm-tabs-wrapper">
                 <div class="comm-tabs">
-                    <button type="button" class="comm-tab active" data-comm="annonce" onclick="switchCommTab('annonce')">
+                    <button type="button" class="comm-tab active" data-comm="annonce" data-click-call="switchCommTab('annonce')">
                         <span class="comm-tab-icon">📢</span>
                         <span class="comm-tab-label">Annonce</span>
                     </button>
-                    <button type="button" class="comm-tab" data-comm="rappel" onclick="switchCommTab('rappel')">
+                    <button type="button" class="comm-tab" data-comm="rappel" data-click-call="switchCommTab('rappel')">
                         <span class="comm-tab-icon">📌</span>
                         <span class="comm-tab-label">Rappel</span>
                     </button>
-                    <button type="button" class="comm-tab" data-comm="sanction" onclick="switchCommTab('sanction')">
+                    <button type="button" class="comm-tab" data-comm="sanction" data-click-call="switchCommTab('sanction')">
                         <span class="comm-tab-icon">⚠️</span>
                         <span class="comm-tab-label">Sanction</span>
                     </button>
@@ -441,12 +441,12 @@
                     <div class="comm-field">
                         <label class="comm-label">Rôle à mentionner</label>
                         <div class="custom-dropdown" id="annonceRoleDropdownWrapper">
-                            <button type="button" class="custom-dropdown-trigger" onclick="toggleRoleDropdown('annonce', event)">
+                            <button type="button" class="custom-dropdown-trigger" data-click-call="toggleRoleDropdown('annonce', event)">
                                 <span class="custom-dropdown-placeholder" id="annonceRoleLabel">— Choisir un rôle —</span>
                                 <span class="custom-dropdown-arrow">▾</span>
                             </button>
                             <div class="custom-dropdown-menu" id="annonceRoleMenu" style="display:none;">
-                                <input type="text" class="custom-dropdown-search" id="annonceRoleSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                                <input type="text" class="custom-dropdown-search" id="annonceRoleSearch" placeholder="🔍 Filtrer..." data-click-call="event.stopPropagation()">
                                 <div class="custom-dropdown-list" id="annonceRoleList"></div>
                             </div>
                             <input type="hidden" id="annonceRole">
@@ -459,17 +459,17 @@
                         </div>
                         <textarea id="annonceMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton annonce ici...&#10;&#10;Tu peux faire des retours à la ligne et insérer des :emojis: du serveur."></textarea>
                         <div class="comm-toolbar">
-                            <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('annonceMessage')">
+                            <button type="button" class="comm-tool-btn" data-click-call="toggleEmojiPicker('annonceMessage')">
                                 <span>😀</span> Emojis
                             </button>
                             <label class="comm-embed-toggle">
-                                <input type="checkbox" id="annonceUseEmbed" onchange="toggleEmbedMode('annonce')">
+                                <input type="checkbox" id="annonceUseEmbed" data-change-call="toggleEmbedMode('annonce')">
                                 <span>Mode embed (4000 car.)</span>
                             </label>
                         </div>
                     </div>
                     <div class="comm-actions">
-                        <button class="comm-send-btn comm-send-annonce" onclick="sendAnnonce()">
+                        <button class="comm-send-btn comm-send-annonce" data-click-call="sendAnnonce()">
                             📤 Envoyer l'annonce
                         </button>
                     </div>
@@ -482,12 +482,12 @@
                     <div class="comm-field">
                         <label class="comm-label">Rôle à mentionner</label>
                         <div class="custom-dropdown" id="rappelRoleDropdownWrapper">
-                            <button type="button" class="custom-dropdown-trigger" onclick="toggleRoleDropdown('rappel', event)">
+                            <button type="button" class="custom-dropdown-trigger" data-click-call="toggleRoleDropdown('rappel', event)">
                                 <span class="custom-dropdown-placeholder" id="rappelRoleLabel">— Choisir un rôle —</span>
                                 <span class="custom-dropdown-arrow">▾</span>
                             </button>
                             <div class="custom-dropdown-menu" id="rappelRoleMenu" style="display:none;">
-                                <input type="text" class="custom-dropdown-search" id="rappelRoleSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                                <input type="text" class="custom-dropdown-search" id="rappelRoleSearch" placeholder="🔍 Filtrer..." data-click-call="event.stopPropagation()">
                                 <div class="custom-dropdown-list" id="rappelRoleList"></div>
                             </div>
                             <input type="hidden" id="rappelRole">
@@ -500,17 +500,17 @@
                         </div>
                         <textarea id="rappelMessage" class="comm-textarea" rows="10" maxlength="2000" placeholder="Tape ton rappel ici..."></textarea>
                         <div class="comm-toolbar">
-                            <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('rappelMessage')">
+                            <button type="button" class="comm-tool-btn" data-click-call="toggleEmojiPicker('rappelMessage')">
                                 <span>😀</span> Emojis
                             </button>
                             <label class="comm-embed-toggle">
-                                <input type="checkbox" id="rappelUseEmbed" onchange="toggleEmbedMode('rappel')">
+                                <input type="checkbox" id="rappelUseEmbed" data-change-call="toggleEmbedMode('rappel')">
                                 <span>Mode embed (4000 car.)</span>
                             </label>
                         </div>
                     </div>
                     <div class="comm-actions">
-                        <button class="comm-send-btn comm-send-rappel" onclick="sendRappel()">
+                        <button class="comm-send-btn comm-send-rappel" data-click-call="sendRappel()">
                             📌 Envoyer le rappel
                         </button>
                     </div>
@@ -523,12 +523,12 @@
                     <div class="comm-field">
                         <label class="comm-label">Utilisateur à sanctionner</label>
                         <div class="custom-dropdown" id="sanctionUserDropdownWrapper">
-                            <button type="button" class="custom-dropdown-trigger" id="sanctionDropdownTrigger" onclick="toggleSanctionDropdown(event)">
+                            <button type="button" class="custom-dropdown-trigger" id="sanctionDropdownTrigger" data-click-call="toggleSanctionDropdown(event)">
                                 <span class="custom-dropdown-placeholder" id="sanctionDropdownLabel">— Sélectionne un membre —</span>
                                 <span class="custom-dropdown-arrow">▾</span>
                             </button>
                             <div class="custom-dropdown-menu" id="sanctionDropdownMenu" style="display:none;">
-                                <input type="text" class="custom-dropdown-search" id="sanctionDropdownSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                                <input type="text" class="custom-dropdown-search" id="sanctionDropdownSearch" placeholder="🔍 Filtrer..." data-click-call="event.stopPropagation()">
                                 <div class="custom-dropdown-list" id="sanctionDropdownList"></div>
                             </div>
                             <input type="hidden" id="sanctionUser">
@@ -548,13 +548,13 @@
                         </div>
                         <textarea id="sanctionRaison" class="comm-textarea" rows="6" maxlength="2000" placeholder="Explique la raison de l'avertissement..."></textarea>
                         <div class="comm-toolbar">
-                            <button type="button" class="comm-tool-btn" onclick="toggleEmojiPicker('sanctionRaison')">
+                            <button type="button" class="comm-tool-btn" data-click-call="toggleEmojiPicker('sanctionRaison')">
                                 <span>😀</span> Emojis
                             </button>
                         </div>
                     </div>
                     <div class="comm-actions">
-                        <button class="comm-send-btn comm-send-sanction" onclick="sendSanction()">
+                        <button class="comm-send-btn comm-send-sanction" data-click-call="sendSanction()">
                             ⚠️ Envoyer l'avertissement
                         </button>
                     </div>
@@ -623,7 +623,7 @@
         </div>
         <div class="channels-toolbar">
             <input type="text" id="channelSearch" placeholder="Rechercher un salon..." class="channel-search">
-            <button class="btn-back-channels" id="backToChannelsBtn" style="display:none;" onclick="backToChannels()">← Retour aux salons</button>
+            <button class="btn-back-channels" id="backToChannelsBtn" style="display:none;" data-click-call="backToChannels()">← Retour aux salons</button>
         </div>
 
         <!-- Vue grille des salons -->
@@ -651,9 +651,9 @@
                 <div class="message-input-wrapper">
                     <textarea id="messageInput" placeholder="Écris un message..." rows="1" maxlength="2000"></textarea>
                     <div class="message-input-actions">
-                        <button class="msg-action-btn" title="Emojis" onclick="toggleMessageEmojiPicker()">😀</button>
-                        <button class="msg-action-btn" title="Mentionner" onclick="insertMention()">@</button>
-                        <button class="msg-send-btn" id="sendMessageBtn" onclick="sendChannelMessage()">Envoyer ↗</button>
+                        <button class="msg-action-btn" title="Emojis" data-click-call="toggleMessageEmojiPicker()">😀</button>
+                        <button class="msg-action-btn" title="Mentionner" data-click-call="insertMention()">@</button>
+                        <button class="msg-send-btn" id="sendMessageBtn" data-click-call="sendChannelMessage()">Envoyer ↗</button>
                     </div>
                 </div>
                 <!-- Picker emojis pour message -->
@@ -685,10 +685,10 @@
                     <button class="map-mode-btn" data-mode="delete" id="mapDeleteBtn" style="display:none;">🗑 Supprimer</button>
                 </div>
                 <div class="map-zoom-controls">
-                    <button class="map-zoom-btn" onclick="mapZoom(-1)" title="Dézoomer">−</button>
+                    <button class="map-zoom-btn" data-click-call="mapZoom(-1)" title="Dézoomer">−</button>
                     <span class="map-zoom-label" id="mapZoomLabel">100%</span>
-                    <button class="map-zoom-btn" onclick="mapZoom(1)" title="Zoomer">+</button>
-                    <button class="map-zoom-btn" onclick="mapZoomReset()" title="Reset">⟲</button>
+                    <button class="map-zoom-btn" data-click-call="mapZoom(1)" title="Zoomer">+</button>
+                    <button class="map-zoom-btn" data-click-call="mapZoomReset()" title="Reset">⟲</button>
                 </div>
             </div>
         </div>
@@ -717,7 +717,7 @@
 
     <!-- Modal pour ajouter un point -->
     <div class="modal" id="pointModal" style="display:none;">
-        <div class="modal-backdrop" onclick="closePointModal()"></div>
+        <div class="modal-backdrop" data-click-call="closePointModal()"></div>
         <div class="modal-content">
             <h3 class="modal-title">📍 Ajouter un point</h3>
             <div class="modal-field">
@@ -726,7 +726,7 @@
             </div>
             <div class="modal-field">
                 <label>Type</label>
-                <select id="pointType" onchange="onPointTypeChange()">
+                <select id="pointType" data-change-call="onPointTypeChange()">
                     <option value="weed">🌿 Champ de Weed</option>
                     <option value="weed-treatment">⚗ Traitement Weed</option>
                     <option value="opium">🌺 Champ Opium</option>
@@ -747,49 +747,49 @@
                     <p class="empty" style="padding:12px;">Chargement...</p>
                 </div>
                 <div class="roles-quick-actions">
-                    <button type="button" class="btn-quick" onclick="selectAllRoles()">Tout cocher</button>
-                    <button type="button" class="btn-quick" onclick="selectNoRoles()">Tout décocher</button>
+                    <button type="button" class="btn-quick" data-click-call="selectAllRoles()">Tout cocher</button>
+                    <button type="button" class="btn-quick" data-click-call="selectNoRoles()">Tout décocher</button>
                 </div>
             </div>
             <div class="modal-actions">
-                <button onclick="closePointModal()" class="btn-secondary">Annuler</button>
-                <button onclick="confirmAddPoint()" class="btn-primary">Placer</button>
+                <button data-click-call="closePointModal()" class="btn-secondary">Annuler</button>
+                <button data-click-call="confirmAddPoint()" class="btn-primary">Placer</button>
             </div>
         </div>
     </div>
 
     <!-- Modal détails d'un point -->
     <div class="modal" id="pointDetailsModal" style="display:none;">
-        <div class="modal-backdrop" onclick="closeDetailsModal()"></div>
+        <div class="modal-backdrop" data-click-call="closeDetailsModal()"></div>
         <div class="modal-content">
             <h3 class="modal-title" id="detailsTitle">📍 Point</h3>
             <div class="point-details" id="detailsContent"></div>
             <div class="modal-actions">
-                <button onclick="closeDetailsModal()" class="btn-secondary">Fermer</button>
+                <button data-click-call="closeDetailsModal()" class="btn-secondary">Fermer</button>
             </div>
         </div>
     </div>
 
     <!-- Modal détails d'une arme -->
     <div class="modal" id="craftWeaponDetailsModal" style="display:none;">
-        <div class="modal-backdrop" onclick="closeCraftWeaponDetails()"></div>
+        <div class="modal-backdrop" data-click-call="closeCraftWeaponDetails()"></div>
         <div class="modal-content craft-detail-modal">
             <h3 class="modal-title" id="craftWeaponDetailsTitle">Arme</h3>
             <div id="craftWeaponDetailsContent"></div>
             <div class="modal-actions">
-                <button onclick="closeCraftWeaponDetails()" class="btn-secondary">Fermer</button>
+                <button data-click-call="closeCraftWeaponDetails()" class="btn-secondary">Fermer</button>
             </div>
         </div>
     </div>
 
     <!-- Modal détails stats présence -->
     <div class="modal" id="presenceStatDetailsModal" style="display:none;">
-        <div class="modal-backdrop" onclick="closePresenceStatDetails()"></div>
+        <div class="modal-backdrop" data-click-call="closePresenceStatDetails()"></div>
         <div class="modal-content presence-stat-modal">
             <h3 class="modal-title" id="presenceStatDetailsTitle">Détails</h3>
             <div id="presenceStatDetailsContent"></div>
             <div class="modal-actions">
-                <button onclick="closePresenceStatDetails()" class="btn-secondary">Fermer</button>
+                <button data-click-call="closePresenceStatDetails()" class="btn-secondary">Fermer</button>
             </div>
         </div>
     </div>
@@ -803,10 +803,10 @@
             </div>
         </div>
         <div class="crafts-subtabs">
-            <button class="crafts-subtab active" data-subtab="catalog" onclick="switchCraftSubtab('catalog')">📦 Catalogue</button>
-            <button class="crafts-subtab" data-subtab="request" onclick="switchCraftSubtab('request')">📝 Faire une demande</button>
-            <button class="crafts-subtab" data-subtab="board" onclick="switchCraftSubtab('board')">⚒ Tableau de craft</button>
-            <button class="crafts-subtab" data-subtab="history" onclick="switchCraftSubtab('history')">✓ Historique</button>
+            <button class="crafts-subtab active" data-subtab="catalog" data-click-call="switchCraftSubtab('catalog')">📦 Catalogue</button>
+            <button class="crafts-subtab" data-subtab="request" data-click-call="switchCraftSubtab('request')">📝 Faire une demande</button>
+            <button class="crafts-subtab" data-subtab="board" data-click-call="switchCraftSubtab('board')">⚒ Tableau de craft</button>
+            <button class="crafts-subtab" data-subtab="history" data-click-call="switchCraftSubtab('history')">✓ Historique</button>
         </div>
 
         <!-- Sous-section : Catalogue -->
@@ -841,12 +841,12 @@
                 <div class="craft-field">
                     <label>Arme souhaitée</label>
                     <div class="custom-dropdown" id="craftWeaponDropdownWrapper">
-                        <button type="button" class="custom-dropdown-trigger" onclick="toggleCraftWeaponDropdown(event)">
+                        <button type="button" class="custom-dropdown-trigger" data-click-call="toggleCraftWeaponDropdown(event)">
                             <span class="custom-dropdown-placeholder" id="craftWeaponLabel">— Choisir une arme —</span>
                             <span class="custom-dropdown-arrow">▾</span>
                         </button>
                         <div class="custom-dropdown-menu" id="craftWeaponMenu" style="display:none;">
-                            <input type="text" class="custom-dropdown-search" id="craftWeaponSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                            <input type="text" class="custom-dropdown-search" id="craftWeaponSearch" placeholder="🔍 Filtrer..." data-click-call="event.stopPropagation()">
                             <div class="custom-dropdown-list" id="craftWeaponList"></div>
                         </div>
                         <input type="hidden" id="craftWeaponId">
@@ -883,8 +883,8 @@
                 </div>
 
                 <div class="craft-actions">
-                    <button id="craftSubmitRequestBtn" class="btn-primary" onclick="submitCraftRequest()">✅ Soumettre la demande</button>
-                    <button class="btn-secondary" onclick="goToCraftBoard()">→ Aller au tableau</button>
+                    <button id="craftSubmitRequestBtn" class="btn-primary" data-click-call="submitCraftRequest()">✅ Soumettre la demande</button>
+                    <button class="btn-secondary" data-click-call="goToCraftBoard()">→ Aller au tableau</button>
                 </div>
             </div>
 
@@ -894,13 +894,13 @@
                     <div class="craft-requests-search">
                         <label class="comm-label" for="craftRequestsUserSearch">Recherche utilisateur</label>
                         <div class="craft-requests-search-row">
-                            <input type="search" id="craftRequestsUserSearch" class="comm-input craft-requests-search-input" placeholder="Rechercher un utilisateur..." oninput="updateCraftRequestsUserSearch()">
-                            <button type="button" class="craft-requests-clear" onclick="clearCraftRequestsUserSearch()" title="Vider la recherche">×</button>
+                            <input type="search" id="craftRequestsUserSearch" class="comm-input craft-requests-search-input" placeholder="Rechercher un utilisateur..." data-input-call="updateCraftRequestsUserSearch()">
+                            <button type="button" class="craft-requests-clear" data-click-call="clearCraftRequestsUserSearch()" title="Vider la recherche">×</button>
                         </div>
                     </div>
                     <div class="craft-board-sort">
                         <label class="comm-label" for="craftRequestsSortBy">Trier par</label>
-                        <select id="craftRequestsSortBy" class="comm-input craft-board-select" onchange="updateCraftRequestsSort()">
+                        <select id="craftRequestsSortBy" class="comm-input craft-board-select" data-change-call="updateCraftRequestsSort()">
                             <option value="date">Date</option>
                             <option value="user">Utilisateur</option>
                             <option value="weapon">Arme</option>
@@ -909,7 +909,7 @@
                     </div>
                     <div class="craft-board-sort">
                         <label class="comm-label" for="craftRequestsStatusFilter">Statut</label>
-                        <select id="craftRequestsStatusFilter" class="comm-input craft-board-select" onchange="updateCraftRequestsStatusFilter()">
+                        <select id="craftRequestsStatusFilter" class="comm-input craft-board-select" data-change-call="updateCraftRequestsStatusFilter()">
                             <option value="all">Tous</option>
                             <option value="archive">Archive</option>
                             <option value="crafted">⚒ Crafté</option>
@@ -921,7 +921,7 @@
                     </div>
                     <div class="craft-board-sort">
                         <label class="comm-label" for="craftRequestsSortDir">Ordre</label>
-                        <select id="craftRequestsSortDir" class="comm-input craft-board-select" onchange="updateCraftRequestsSort()">
+                        <select id="craftRequestsSortDir" class="comm-input craft-board-select" data-change-call="updateCraftRequestsSort()">
                             <option value="desc">Décroissant</option>
                             <option value="asc">Croissant</option>
                         </select>
@@ -946,7 +946,7 @@
             <div class="craft-board-toolbar">
                 <div class="craft-board-sort">
                     <label class="comm-label" for="craftBoardSortBy">Trier par</label>
-                    <select id="craftBoardSortBy" class="comm-input craft-board-select" onchange="updateCraftBoardSort()">
+                    <select id="craftBoardSortBy" class="comm-input craft-board-select" data-change-call="updateCraftBoardSort()">
                         <option value="created">Date de demande</option>
                         <option value="user">Utilisateur</option>
                         <option value="weapon">Nom de l'arme</option>
@@ -954,7 +954,7 @@
                 </div>
                 <div class="craft-board-sort">
                     <label class="comm-label" for="craftBoardSortDir">Ordre</label>
-                    <select id="craftBoardSortDir" class="comm-input craft-board-select" onchange="updateCraftBoardSort()">
+                    <select id="craftBoardSortDir" class="comm-input craft-board-select" data-change-call="updateCraftBoardSort()">
                         <option value="asc">Croissant</option>
                         <option value="desc">Decroissant</option>
                     </select>
@@ -1013,7 +1013,7 @@
                     </div>
                     <div class="comm-field">
                         <label class="comm-label">Statut vente</label>
-                        <select id="manualCraftSold" class="comm-input" onchange="toggleManualCraftSaleFields()">
+                        <select id="manualCraftSold" class="comm-input" data-change-call="toggleManualCraftSaleFields()">
                             <option value="0">Non vendu</option>
                             <option value="1">Déjà vendu</option>
                         </select>
@@ -1035,12 +1035,12 @@
                         <input type="number" id="manualCraftSalePrice" class="comm-input" min="0" placeholder="Ex: 2000000">
                     </div>
                     <label class="manual-craft-free-option manual-craft-sale-field" style="display:none;">
-                        <input type="checkbox" id="manualCraftFreeSale" onchange="toggleManualCraftFreeSale()">
+                        <input type="checkbox" id="manualCraftFreeSale" data-change-call="toggleManualCraftFreeSale()">
                         <span>Vente gratuite</span>
                     </label>
                 </div>
                 <div class="craft-actions">
-                    <button class="btn-primary" onclick="submitManualCraft()">+ Ajouter au suivi</button>
+                    <button class="btn-primary" data-click-call="submitManualCraft()">+ Ajouter au suivi</button>
                 </div>
             </div>
             <div class="craft-history-list" id="craftHistoryList">
@@ -1076,12 +1076,12 @@
 
                 <div class="comm-field">
                     <label class="comm-label">Réduction (%)</label>
-                    <input type="number" id="groupOrderDiscount" class="comm-input" min="0" max="100" step="0.01" value="0" oninput="renderGroupOrderTotals()">
+                    <input type="number" id="groupOrderDiscount" class="comm-input" min="0" max="100" step="0.01" value="0" data-input-call="renderGroupOrderTotals()">
                 </div>
 
                 <div class="group-order-form-head">
                     <h4 class="admin-subtitle">Armes demandées</h4>
-                    <button type="button" class="btn-secondary btn-small" onclick="addGroupOrderItem()">+ Ajouter une arme</button>
+                    <button type="button" class="btn-secondary btn-small" data-click-call="addGroupOrderItem()">+ Ajouter une arme</button>
                 </div>
                 <div id="groupOrderItems"></div>
 
@@ -1095,15 +1095,15 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="btn-secondary" onclick="resetGroupOrderForm()">Réinitialiser</button>
-                    <button type="button" class="btn-primary" onclick="saveGroupOrder()">💾 Enregistrer</button>
+                    <button type="button" class="btn-secondary" data-click-call="resetGroupOrderForm()">Réinitialiser</button>
+                    <button type="button" class="btn-primary" data-click-call="saveGroupOrder()">💾 Enregistrer</button>
                 </div>
             </div>
 
             <div class="group-orders-history">
                 <div class="group-orders-history-head">
                     <h3 class="section-title">📜 Commandes enregistrées</h3>
-                    <button type="button" class="btn-secondary btn-small" onclick="loadGroupOrders()">↻ Actualiser</button>
+                    <button type="button" class="btn-secondary btn-small" data-click-call="loadGroupOrders()">↻ Actualiser</button>
                 </div>
                 <div id="groupOrdersList">
                     <p class="empty">Chargement...</p>
@@ -1153,11 +1153,11 @@
                             <label class="comm-label">Origine de l'arme *</label>
                             <div class="myweapons-origin-choice">
                                 <label class="myweapons-origin-option">
-                                    <input type="radio" name="mwOrigin" value="crafted" checked onchange="toggleMwCrafted()">
+                                    <input type="radio" name="mwOrigin" value="crafted" checked data-change-call="toggleMwCrafted()">
                                     <span>⚒ Arme craftée par les <strong>21 Block Savage</strong></span>
                                 </label>
                                 <label class="myweapons-origin-option">
-                                    <input type="radio" name="mwOrigin" value="external" onchange="toggleMwCrafted()">
+                                    <input type="radio" name="mwOrigin" value="external" data-change-call="toggleMwCrafted()">
                                     <span>⛔ Arme non craftée par les <strong>21 Block Savage</strong></span>
                                 </label>
                             </div>
@@ -1183,7 +1183,7 @@
 
                         <div class="comm-field" id="mwLinkedCraftField" style="display:none;">
                             <label class="comm-label">Craft termine disponible</label>
-                            <select id="mwLinkedCraft" class="comm-input" onchange="selectMwLinkedCraft()">
+                            <select id="mwLinkedCraft" class="comm-input" data-change-call="selectMwLinkedCraft()">
                                 <option value="">-- Choisir un craft termine --</option>
                             </select>
                             <p class="mw-serial-hint">Optionnel - pre-remplit automatiquement l'arme et le numero de serie depuis un craft termine disponible.</p>
@@ -1202,7 +1202,7 @@
                     <div class="mw-section-grid mw-section-grid-compact">
                         <div class="comm-field" id="mwSellForField" style="display:none;">
                             <label class="comm-label">Vendre au nom de</label>
-                            <select id="mwSellFor" class="comm-input" onchange="handleMwSellForChange()">
+                            <select id="mwSellFor" class="comm-input" data-change-call="handleMwSellForChange()">
                                 <option value="">Moi-même</option>
                             </select>
                             <p class="mw-serial-hint">Cette vente sera creee au nom de l'utilisateur selectionne.</p>
@@ -1210,7 +1210,7 @@
 
                         <div class="comm-field" id="mwQuantityField">
                             <label class="comm-label">Nombre d'exemplaires *</label>
-                            <input type="number" id="mwQuantity" class="comm-input" min="1" max="50" value="1" oninput="updateMwSerialFields()" onchange="updateMwSerialFields()">
+                            <input type="number" id="mwQuantity" class="comm-input" min="1" max="50" value="1" data-input-call="updateMwSerialFields()" data-change-call="updateMwSerialFields()">
                         </div>
                     </div>
                 </div>
@@ -1252,7 +1252,7 @@
                 </div>
 
                 <div class="mw-form-actions">
-                    <button id="mwSubmitBtn" class="btn-primary" onclick="submitMyWeapon()">📤 Mettre en vente</button>
+                    <button id="mwSubmitBtn" class="btn-primary" data-click-call="submitMyWeapon()">📤 Mettre en vente</button>
                 </div>
             </div>
         </div>
@@ -1278,7 +1278,7 @@
     <div class="modal-backdrop" id="markSoldModal" style="display:none;">
         <div class="modal-content">
             <h3 class="modal-title" id="markSoldTitle">Marquer comme vendu</h3>
-            <form id="markSoldForm" onsubmit="confirmMarkSold(event)">
+            <form id="markSoldForm" data-submit-call="confirmMarkSold(event)">
                 <input type="hidden" id="markSoldId">
 
                 <div class="comm-field" id="markSoldSerialField" style="display:none;">
@@ -1296,12 +1296,12 @@
                 <div class="comm-field">
                     <label class="comm-label">Groupe acheteur</label>
                     <div class="custom-dropdown" id="markSoldBuyerWrapper">
-                        <button type="button" class="custom-dropdown-trigger" onclick="toggleMarkSoldBuyerDropdown(event)">
+                        <button type="button" class="custom-dropdown-trigger" data-click-call="toggleMarkSoldBuyerDropdown(event)">
                             <span class="custom-dropdown-placeholder" id="markSoldBuyerLabel">— Choisir —</span>
                             <span class="custom-dropdown-arrow">▾</span>
                         </button>
                         <div class="custom-dropdown-menu" id="markSoldBuyerMenu" style="display:none;">
-                            <input type="text" class="custom-dropdown-search" id="markSoldBuyerSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
+                            <input type="text" class="custom-dropdown-search" id="markSoldBuyerSearch" placeholder="🔍 Filtrer..." data-click-call="event.stopPropagation()">
                             <div class="custom-dropdown-list" id="markSoldBuyerList"></div>
                         </div>
                         <input type="hidden" id="markSoldBuyer">
@@ -1314,7 +1314,7 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="btn-secondary" onclick="closeMarkSoldModal()">Annuler</button>
+                    <button type="button" class="btn-secondary" data-click-call="closeMarkSoldModal()">Annuler</button>
                     <button type="submit" class="btn-primary">✅ Confirmer la vente</button>
                 </div>
             </form>
@@ -1325,7 +1325,7 @@
     <div class="modal-backdrop" id="editMyWeaponModal" style="display:none;">
         <div class="modal-content">
             <h3 class="modal-title">Modifier l'annonce</h3>
-            <form id="editMyWeaponForm" onsubmit="submitEditMyWeapon(event)">
+            <form id="editMyWeaponForm" data-submit-call="submitEditMyWeapon(event)">
                 <input type="hidden" id="editMwId">
 
                 <div class="comm-field">
@@ -1364,7 +1364,7 @@
 
                 <div class="comm-field">
                     <label class="comm-label">Statut</label>
-                    <select id="editMwSold" class="comm-input" onchange="toggleEditMyWeaponSoldFields()">
+                    <select id="editMwSold" class="comm-input" data-change-call="toggleEditMyWeaponSoldFields()">
                         <option value="0">En vente</option>
                         <option value="1">Vendue</option>
                     </select>
@@ -1388,7 +1388,7 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="btn-secondary" onclick="closeEditMyWeaponModal()">Annuler</button>
+                    <button type="button" class="btn-secondary" data-click-call="closeEditMyWeaponModal()">Annuler</button>
                     <button type="submit" class="btn-primary">Enregistrer</button>
                 </div>
             </form>
@@ -1399,11 +1399,11 @@
 
 <!-- Modal détails historique présence -->
 <div class="modal" id="historyDayModal" style="display:none;">
-    <div class="modal-backdrop" onclick="closeHistoryDayModal()"></div>
+    <div class="modal-backdrop" data-click-call="closeHistoryDayModal()"></div>
     <div class="modal-content history-detail-modal">
         <div class="modal-header">
             <h3 class="modal-title" id="historyDayModalTitle">Détails</h3>
-            <button type="button" class="modal-close" onclick="closeHistoryDayModal()" aria-label="Fermer">×</button>
+            <button type="button" class="modal-close" data-click-call="closeHistoryDayModal()" aria-label="Fermer">×</button>
         </div>
         <div class="modal-body" id="historyDayModalBody"></div>
     </div>
@@ -1411,11 +1411,11 @@
 
 <!-- Modal détails Command Center -->
 <div class="modal" id="cmdDetailModal" style="display:none;">
-    <div class="modal-backdrop" onclick="closeCommandModal()"></div>
+    <div class="modal-backdrop" data-click-call="closeCommandModal()"></div>
     <div class="modal-content cmd-detail-modal">
         <div class="modal-header">
             <h3 class="modal-title" id="cmdDetailModalTitle">Détails</h3>
-            <button type="button" class="modal-close" onclick="closeCommandModal()" aria-label="Fermer">×</button>
+            <button type="button" class="modal-close" data-click-call="closeCommandModal()" aria-label="Fermer">×</button>
         </div>
         <div class="modal-body" id="cmdDetailModalBody"></div>
     </div>
@@ -1423,13 +1423,13 @@
 
 <!-- Modal craft commande groupe -->
 <div class="modal" id="groupOrderCraftModal" style="display:none;">
-    <div class="modal-backdrop" onclick="closeGroupOrderCraftModal()"></div>
+    <div class="modal-backdrop" data-click-call="closeGroupOrderCraftModal()"></div>
     <div class="modal-content group-order-craft-modal">
         <div class="modal-header">
             <h3 class="modal-title" id="groupOrderCraftModalTitle">Renseigner craft</h3>
-            <button type="button" class="modal-close" onclick="closeGroupOrderCraftModal()" aria-label="Fermer">×</button>
+            <button type="button" class="modal-close" data-click-call="closeGroupOrderCraftModal()" aria-label="Fermer">×</button>
         </div>
-        <form class="modal-body" id="groupOrderCraftForm" onsubmit="recordGroupOrderCraft(event)">
+        <form class="modal-body" id="groupOrderCraftForm" data-submit-call="recordGroupOrderCraft(event)">
             <input type="hidden" id="groupOrderCraftOrderId">
             <div class="craft-field-row">
                 <div class="comm-field" style="flex:1;">
@@ -1447,7 +1447,7 @@
                 <textarea id="groupOrderCraftNote" class="comm-input" rows="3" placeholder="Numéros, détails, livraison..."></textarea>
             </div>
             <div class="modal-actions">
-                <button type="button" class="btn-secondary" onclick="closeGroupOrderCraftModal()">Annuler</button>
+                <button type="button" class="btn-secondary" data-click-call="closeGroupOrderCraftModal()">Annuler</button>
                 <button type="submit" class="btn-primary">✅ Enregistrer le craft</button>
             </div>
         </form>
@@ -1457,7 +1457,8 @@
 <!-- Toast -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260604-craft-board-order"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/delegated-actions.js"></script>
+    <script src="/app.js?v=20260604-craft-board-order"></script>
 </body>
 </html>

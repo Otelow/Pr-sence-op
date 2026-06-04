@@ -925,7 +925,7 @@ function renderOP(prefix, op) {
         const absenceOption = (selected === 'absenceValid' || m.hasValidAbsence)
             ? `<option value="absenceValid"${selected === 'absenceValid' ? ' selected' : ''}>Justifié salon</option>`
             : '';
-        const editor = `<select class="presence-reaction-editor" data-op="${prefix}" data-user-id="${escapeHtml(m.id || m.user_id)}" onclick="event.stopPropagation()" onchange="updatePresenceReaction(this)">
+        const editor = `<select class="presence-reaction-editor" data-op="${prefix}" data-user-id="${escapeHtml(m.id || m.user_id)}" data-click-call="event.stopPropagation()" data-change-call="updatePresenceReaction(this)">
                 ${absenceOption}
                 <option value="none"${selected === 'none' ? ' selected' : ''}>Pas réagi</option>
                 <option value="check"${selected === 'check' ? ' selected' : ''}>Présent</option>
@@ -940,7 +940,7 @@ function renderOP(prefix, op) {
             👥 <strong style="color:var(--text);">${total}</strong> membres
         </div>
     ` + categories.map(c => `
-        <div class="op-category" onclick="this.classList.toggle('open')">
+        <div class="op-category" data-click-call="this.classList.toggle('open')">
             <div class="op-cat-header">
                 <span><span class="op-cat-icon">${c.icon}</span>${c.label}</span>
                 <span class="op-cat-count">${c.list.length}</span>
@@ -1161,7 +1161,7 @@ function renderHistoryDayDetails(container, data) {
 
     const renderReactionEditor = (user, op, status) => {
         const selected = statusToReaction[status] || 'none';
-        return `<select class="history-reaction-editor" data-date="${escapeHtml(data.date)}" data-op="${op}" data-user-id="${escapeHtml(user.user_id || user.id)}" onclick="event.stopPropagation()" onchange="updateHistoryPresenceReaction(this)">
+        return `<select class="history-reaction-editor" data-date="${escapeHtml(data.date)}" data-op="${op}" data-user-id="${escapeHtml(user.user_id || user.id)}" data-click-call="event.stopPropagation()" data-change-call="updateHistoryPresenceReaction(this)">
             <option value="check"${selected === 'check' ? ' selected' : ''}>Présent</option>
             <option value="retard"${selected === 'retard' ? ' selected' : ''}>Retard</option>
             <option value="no"${selected === 'no' ? ' selected' : ''}>Absent</option>
@@ -2118,7 +2118,7 @@ function renderThread(t, parentId) {
         let textContent = '';
         if (fm.content) {
             const truncated = fm.content.length > 200 ? fm.content.substring(0, 200) + '…' : fm.content;
-            textContent = escapeHtml(truncated).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" onclick="event.stopPropagation()">$1</a>');
+            textContent = escapeHtml(truncated).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" data-click-call="event.stopPropagation()">$1</a>');
         }
 
         preview = `
@@ -2146,7 +2146,7 @@ function renderThread(t, parentId) {
             </div>
         </div>
         ${preview}
-        <button class="btn-thread-open" onclick="openThread('${t.id}', '${escapeHtml(t.name).replace(/'/g, "\\'")}')">Voir le fil →</button>
+        <button class="btn-thread-open" data-click-call="openThread('${t.id}', '${escapeHtml(t.name).replace(/'/g, "\\'")}')">Voir le fil →</button>
     `;
     return div;
 }
@@ -2215,7 +2215,7 @@ function renderMessage(m) {
         const escapedUrl = escapeHtml(attachmentUrl);
         const jsUrl = escapeJsArg(attachmentUrl);
         if (a.isImage) {
-            attachmentsHtml += `<img class="message-attachment-img" src="${escapedUrl}" alt="${escapeHtml(a.name)}" onclick="window.open('${jsUrl}', '_blank')">`;
+            attachmentsHtml += `<img class="message-attachment-img" src="${escapedUrl}" alt="${escapeHtml(a.name)}" data-click-call="window.open('${jsUrl}', '_blank')">`;
         } else if (a.isVideo) {
             attachmentsHtml += `<video class="message-attachment-video" src="${escapedUrl}" controls></video>`;
         } else {
@@ -2604,7 +2604,7 @@ function updateImpersonateBanner() {
         }
         banner.innerHTML = `
             <span>👁 Vous êtes en mode <strong>impersonate</strong> du rôle ${role}</span>
-            <button onclick="exitImpersonate()" class="btn-impersonate-exit">✗ Quitter</button>
+            <button data-click-call="exitImpersonate()" class="btn-impersonate-exit">✗ Quitter</button>
         `;
         banner.style.display = 'flex';
     } else if (banner) {
@@ -2825,7 +2825,7 @@ function showPointDetails(p) {
         codeHtml = `
             <div class="point-code-box">
                 <div class="point-code-label">🔐 CODE D'ACCÈS</div>
-                <div class="point-code-value" onclick="copyCodeToClipboard('${escapeHtml(p.code).replace(/'/g, "\\'")}')">${escapeHtml(p.code)}</div>
+                <div class="point-code-value" data-click-call="copyCodeToClipboard('${escapeHtml(p.code).replace(/'/g, "\\'")}')">${escapeHtml(p.code)}</div>
                 <div class="point-code-hint">Clique pour copier</div>
             </div>
         `;
@@ -2837,7 +2837,7 @@ function showPointDetails(p) {
         <div class="detail-row"><span>Type</span><span>${getPointTypeLabel(p.type)}</span></div>
         <div class="detail-row"><span>Placé par</span><span>${escapeHtml(displayName(p.createdBy))}</span></div>
         <div class="detail-row"><span>Date</span><span>${date}</span></div>
-        ${userPermissions.canEditMap ? `<button class="btn-delete-point" onclick="deletePoint('${p.id}'); closeDetailsModal();">🗑 Supprimer ce point</button>` : ''}
+        ${userPermissions.canEditMap ? `<button class="btn-delete-point" data-click-call="deletePoint('${p.id}'); closeDetailsModal();">🗑 Supprimer ce point</button>` : ''}
     `;
     document.getElementById('pointDetailsModal').style.display = 'flex';
 }
@@ -2878,7 +2878,7 @@ async function loadCommands() {
         const comms = data.commands.filter(c => c.category === 'comm');
 
         const renderBtn = (c) => `
-            <button class="cmd-btn ${c.danger ? 'cmd-danger' : ''} ${c.info ? 'cmd-info' : ''}" onclick="runCmd('${c.id}')">
+            <button class="cmd-btn ${c.danger ? 'cmd-danger' : ''} ${c.info ? 'cmd-info' : ''}" data-click-call="runCmd('${c.id}')">
                 <span class="cmd-icon">${c.icon}</span>
                 <span class="cmd-name">${escapeHtml(c.name)}</span>
                 <span class="cmd-desc">${escapeHtml(c.desc)}</span>
@@ -3057,7 +3057,7 @@ function switchCommTab(name) {
     if (picker) picker.style.display = 'none';
 }
 
-// Exposer les fonctions globalement pour les onclick inline
+// Exposer les fonctions globalement pour les actions déléguées data-*.
 window.switchCommTab = switchCommTab;
 
 let emojiPickerCategory = 'server'; // 'server' ou 'discord'
@@ -3093,8 +3093,8 @@ function renderEmojiPicker() {
 
     const tabsHTML = `
         <div class="emoji-picker-tabs">
-            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'server' ? 'active' : ''}" onclick="switchEmojiCategory('server')">🎨 Serveur</button>
-            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'discord' ? 'active' : ''}" onclick="switchEmojiCategory('discord')">😀 Discord</button>
+            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'server' ? 'active' : ''}" data-click-call="switchEmojiCategory('server')">🎨 Serveur</button>
+            <button type="button" class="emoji-picker-tab ${emojiPickerCategory === 'discord' ? 'active' : ''}" data-click-call="switchEmojiCategory('discord')">😀 Discord</button>
         </div>
     `;
 
@@ -3105,7 +3105,7 @@ function renderEmojiPicker() {
             contentHTML = '<p class="empty" style="padding:24px;text-align:center;">Aucun emoji custom sur le serveur</p>';
         } else {
             contentHTML = `<div class="emoji-picker-grid">` + serverEmojis.map(e => `
-                <div class="emoji-item" title=":${e.name}:" onclick="insertEmoji('${e.code.replace(/'/g, "\\'")}')">
+                <div class="emoji-item" title=":${e.name}:" data-click-call="insertEmoji('${e.code.replace(/'/g, "\\'")}')">
                     <img src="${e.url}" alt=":${e.name}:">
                 </div>
             `).join('') + `</div>`;
@@ -3117,7 +3117,7 @@ function renderEmojiPicker() {
             contentHTML += `<div class="emoji-category-title">${catName}</div>`;
             contentHTML += '<div class="emoji-picker-grid">';
             for (const emoji of emojis) {
-                contentHTML += `<div class="emoji-item emoji-item-unicode" title="${emoji}" onclick="insertEmoji('${emoji}')">${emoji}</div>`;
+                contentHTML += `<div class="emoji-item emoji-item-unicode" title="${emoji}" data-click-call="insertEmoji('${emoji}')">${emoji}</div>`;
             }
             contentHTML += '</div>';
         }
@@ -3448,7 +3448,7 @@ function renderMessageEmojiPicker() {
         return;
     }
     picker.innerHTML = serverEmojis.map(e => `
-        <div class="emoji-item" title=":${e.name}:" onclick="insertMessageEmoji('${e.code.replace(/'/g, "\\'")}')">
+        <div class="emoji-item" title=":${e.name}:" data-click-call="insertMessageEmoji('${e.code.replace(/'/g, "\\'")}')">
             <img src="${e.url}" alt=":${e.name}:">
         </div>
     `).join('');
@@ -3899,7 +3899,7 @@ function renderCraftStockState() {
                 const imageUrl = getStockImageUrl(stock);
                 return `
                     <div class="craft-stock-card stock-${level}">
-                        ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}" onerror="this.outerHTML='<span class=&quot;craft-stock-placeholder&quot; aria-hidden=&quot;true&quot;>◆</span>'">` : '<span class="craft-stock-placeholder" aria-hidden="true">◆</span>'}
+                        ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(stock.name)}" data-error-call="this.outerHTML='<span class=&quot;craft-stock-placeholder&quot; aria-hidden=&quot;true&quot;>◆</span>'">` : '<span class="craft-stock-placeholder" aria-hidden="true">◆</span>'}
                         <div>
                             <strong>${escapeHtml(stock.name)}</strong>
                             <span>${available}</span>
@@ -3982,7 +3982,7 @@ function renderCraftCatalog() {
             : '<span class="craft-stock-badge blocked">Stock insuffisant</span>';
 
         return `
-            <button type="button" class="craft-weapon-card craft-weapon-card-button ${maxCraftable > 0 ? 'craft-weapon-card-craftable' : 'craft-weapon-card-blocked'}" onclick="openCraftWeaponDetails(${w.id})">
+            <button type="button" class="craft-weapon-card craft-weapon-card-button ${maxCraftable > 0 ? 'craft-weapon-card-craftable' : 'craft-weapon-card-blocked'}" data-click-call="openCraftWeaponDetails(${w.id})">
                 <div class="craft-weapon-image">
                     ${imageUrl ? `<img src="${imageUrl}" alt="${escapeHtml(w.name)}">` : '<span class="craft-weapon-placeholder">Arme</span>'}
                 </div>
@@ -4320,9 +4320,9 @@ function renderCraftRequestsPagination(total, totalPages, start, end) {
     const displayStart = total ? start + 1 : 0;
     pagination.innerHTML = `
         <span class="craft-board-page-info">${displayStart}-${end} / ${total} demandes</span>
-        <button type="button" class="craft-board-page-btn" onclick="changeCraftRequestsPage(-1)" ${craftRequestsListState.page <= 1 ? 'disabled' : ''}>Precedent</button>
+        <button type="button" class="craft-board-page-btn" data-click-call="changeCraftRequestsPage(-1)" ${craftRequestsListState.page <= 1 ? 'disabled' : ''}>Precedent</button>
         <span class="craft-board-page-current">Page ${craftRequestsListState.page} / ${totalPages}</span>
-        <button type="button" class="craft-board-page-btn" onclick="changeCraftRequestsPage(1)" ${craftRequestsListState.page >= totalPages ? 'disabled' : ''}>Suivant</button>
+        <button type="button" class="craft-board-page-btn" data-click-call="changeCraftRequestsPage(1)" ${craftRequestsListState.page >= totalPages ? 'disabled' : ''}>Suivant</button>
     `;
 }
 
@@ -4453,19 +4453,19 @@ function renderCraftRequestsList() {
         // Hauts gradés : peuvent changer statut + supprimer
         // User normal : peut juste annuler/supprimer SA demande tant que pas craftée
         let actionButtons = `
-            <button class="btn-status-details" onclick="toggleCraftRequestDetails(${r.id}, this)" aria-expanded="false" aria-controls="craftRequestDetails-${r.id}">Détails</button>
+            <button class="btn-status-details" data-click-call="toggleCraftRequestDetails(${r.id}, this)" aria-expanded="false" aria-controls="craftRequestDetails-${r.id}">Détails</button>
         `;
         if (canChangeStatus) {
             actionButtons += `
-                    ${r.status !== 'waiting_materials' && r.status !== 'crafted' ? `<button class="btn-status-materials" onclick="updateRequestStatus(${r.id}, 'waiting_materials')">📦 Matières</button>` : ''}
-                    ${r.status !== 'in_progress' ? `<button class="btn-status-progress" onclick="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
-                    ${r.status !== 'rejected' ? `<button class="btn-status-reject" onclick="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
-                    ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" onclick="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
-                    <button class="btn-status-delete" onclick="deleteCraftRequest(${r.id})">🗑</button>
+                    ${r.status !== 'waiting_materials' && r.status !== 'crafted' ? `<button class="btn-status-materials" data-click-call="updateRequestStatus(${r.id}, 'waiting_materials')">📦 Matières</button>` : ''}
+                    ${r.status !== 'in_progress' ? `<button class="btn-status-progress" data-click-call="updateRequestStatus(${r.id}, 'in_progress')">⏳ En cours</button>` : ''}
+                    ${r.status !== 'rejected' ? `<button class="btn-status-reject" data-click-call="updateRequestStatus(${r.id}, 'rejected')">✗ Refuser</button>` : ''}
+                    ${r.status !== 'pending' && r.status !== 'crafted' ? `<button class="btn-status-pending" data-click-call="updateRequestStatus(${r.id}, 'pending')">↩ En attente</button>` : ''}
+                    <button class="btn-status-delete" data-click-call="deleteCraftRequest(${r.id})">🗑</button>
             `;
         } else if (isMine && r.status !== 'crafted' && r.status !== 'completed') {
             actionButtons += `
-                    <button class="btn-status-delete" onclick="cancelMyCraftRequest(${r.id})">🗑 Annuler ma demande</button>
+                    <button class="btn-status-delete" data-click-call="cancelMyCraftRequest(${r.id})">🗑 Annuler ma demande</button>
             `;
         }
         const statusActions = `<div class="craft-status-actions">${actionButtons}</div>`;
@@ -4610,7 +4610,7 @@ async function updateRequestStatus(requestId, status) {
     };
     if (!await confirmAction({ title: 'Changer le statut', message: `Passer cette demande en "${labels[status]}" ?`, confirmText: 'Changer le statut', danger: status === 'rejected' })) return;
     craftStatusActionLocks.add(lockKey);
-    document.querySelectorAll(`[onclick="updateRequestStatus(${requestId}, '${status}')"]`).forEach(btn => { btn.disabled = true; });
+        document.querySelectorAll(`[data-click-call="updateRequestStatus(${requestId}, '${status}')"]`).forEach(btn => { btn.disabled = true; });
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}/status`, {
             method: 'PATCH',
@@ -4630,7 +4630,7 @@ async function updateRequestStatus(requestId, status) {
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
     finally {
         craftStatusActionLocks.delete(lockKey);
-        document.querySelectorAll(`[onclick="updateRequestStatus(${requestId}, '${status}')"]`).forEach(btn => { btn.disabled = false; });
+        document.querySelectorAll(`[data-click-call="updateRequestStatus(${requestId}, '${status}')"]`).forEach(btn => { btn.disabled = false; });
     }
 }
 
@@ -4642,7 +4642,7 @@ async function deleteCraftRequest(requestId) {
         : 'Supprimer définitivement cette demande ? Si le stock a été consommé et que la vente n’est pas finalisée, il sera restauré.';
     if (!await confirmAction({ title: 'Supprimer la demande', message, confirmText: 'Supprimer', danger: true })) return;
     craftDeleteActionLocks.add(requestId);
-    document.querySelectorAll(`[onclick="deleteCraftRequest(${requestId})"]`).forEach(btn => { btn.disabled = true; });
+        document.querySelectorAll(`[data-click-call="deleteCraftRequest(${requestId})"]`).forEach(btn => { btn.disabled = true; });
     try {
         const res = await fetch(`/api/crafts/requests/${requestId}`, { method: 'DELETE' });
         const data = await res.json();
@@ -4658,7 +4658,7 @@ async function deleteCraftRequest(requestId) {
     } catch (e) { toast(`❌ ${e.message}`, 'error'); }
     finally {
         craftDeleteActionLocks.delete(requestId);
-        document.querySelectorAll(`[onclick="deleteCraftRequest(${requestId})"]`).forEach(btn => { btn.disabled = false; });
+        document.querySelectorAll(`[data-click-call="deleteCraftRequest(${requestId})"]`).forEach(btn => { btn.disabled = false; });
     }
 }
 
@@ -4775,9 +4775,9 @@ function renderCraftBoardPagination(total, totalPages, start, end) {
     const displayStart = total ? start + 1 : 0;
     pagination.innerHTML = `
         <span class="craft-board-page-info">${displayStart}-${end} / ${total} demandes</span>
-        <button type="button" class="craft-board-page-btn" onclick="changeCraftBoardPage(-1)" ${craftBoardState.page <= 1 ? 'disabled' : ''}>Precedent</button>
+        <button type="button" class="craft-board-page-btn" data-click-call="changeCraftBoardPage(-1)" ${craftBoardState.page <= 1 ? 'disabled' : ''}>Precedent</button>
         <span class="craft-board-page-current">Page ${craftBoardState.page} / ${totalPages}</span>
-        <button type="button" class="craft-board-page-btn" onclick="changeCraftBoardPage(1)" ${craftBoardState.page >= totalPages ? 'disabled' : ''}>Suivant</button>
+        <button type="button" class="craft-board-page-btn" data-click-call="changeCraftBoardPage(1)" ${craftBoardState.page >= totalPages ? 'disabled' : ''}>Suivant</button>
     `;
 }
 
@@ -4885,16 +4885,16 @@ function renderCraftBoardLine(num, r) {
                 </div>
             </td>
             <td>
-                <input type="checkbox" class="craft-checkbox-crafted" ${r.crafted ? 'checked' : ''} ${canEditCraft ? '' : 'disabled'} onchange="toggleCraftCrafted(${r.id}, this.checked)">
+                <input type="checkbox" class="craft-checkbox-crafted" ${r.crafted ? 'checked' : ''} ${canEditCraft ? '' : 'disabled'} data-change-call="toggleCraftCrafted(${r.id}, this.checked)">
             </td>
             <td>
-                <input type="text" class="craft-input-serial" placeholder="N°Série" value="${r.serial_number || ''}" ${canEditCraft ? '' : 'disabled'} onblur="updateCraftSerial(${r.id}, this.value)">
+                <input type="text" class="craft-input-serial" placeholder="N°Série" value="${r.serial_number || ''}" ${canEditCraft ? '' : 'disabled'} data-blur-call="updateCraftSerial(${r.id}, this.value)">
             </td>
             <td>${craftDate}</td>
             <td>${renderCraftBoardSaleState(r, saleState)}</td>
             <td>
-                ${canListWeapon ? `<button class="btn-craft-validate" onclick="openCraftListingFromBoard(${r.id})">Mettre en vente</button>` : ''}
-                ${canEditCraft && !completed ? `<button class="btn-status-delete btn-craft-delete" onclick="deleteCraftRequest(${r.id})">Supprimer</button>` : ''}
+                ${canListWeapon ? `<button class="btn-craft-validate" data-click-call="openCraftListingFromBoard(${r.id})">Mettre en vente</button>` : ''}
+                ${canEditCraft && !completed ? `<button class="btn-status-delete btn-craft-delete" data-click-call="deleteCraftRequest(${r.id})">Supprimer</button>` : ''}
             </td>
         </tr>
     `;
@@ -5067,9 +5067,9 @@ function renderCraftHistory() {
     const pagination = `
         <div class="craft-history-pagination">
             <span>${start + 1}-${end} / ${total} crafts</span>
-            <button type="button" class="craft-board-page-btn" onclick="changeCraftHistoryPage(-1)" ${craftHistoryState.page <= 1 ? 'disabled' : ''}>Précédent</button>
+            <button type="button" class="craft-board-page-btn" data-click-call="changeCraftHistoryPage(-1)" ${craftHistoryState.page <= 1 ? 'disabled' : ''}>Précédent</button>
             <span>Page ${craftHistoryState.page} / ${totalPages}</span>
-            <button type="button" class="craft-board-page-btn" onclick="changeCraftHistoryPage(1)" ${craftHistoryState.page >= totalPages ? 'disabled' : ''}>Suivant</button>
+            <button type="button" class="craft-board-page-btn" data-click-call="changeCraftHistoryPage(1)" ${craftHistoryState.page >= totalPages ? 'disabled' : ''}>Suivant</button>
         </div>
     `;
 
@@ -5605,7 +5605,7 @@ function renderGroupOrderItemRows() {
             <div class="group-order-item-row">
                 <div class="comm-field group-order-item-weapon">
                     <label class="comm-label">Arme</label>
-                    <select class="comm-input" onchange="updateGroupOrderItem(${index}, 'weapon_name', this.value)">
+                    <select class="comm-input" data-change-call="updateGroupOrderItem(${index}, 'weapon_name', this.value)">
                         <option value="">— Choisir une arme —</option>
                         ${groupOrderWeaponOptions(item.weapon_name)}
                     </select>
@@ -5613,9 +5613,9 @@ function renderGroupOrderItemRows() {
                 </div>
                 <div class="comm-field group-order-item-quantity">
                     <label class="comm-label">Qté</label>
-                    <input type="number" class="comm-input" min="1" value="${Number(item.quantity) || 1}" onchange="updateGroupOrderItem(${index}, 'quantity', this.value)" oninput="updateGroupOrderItem(${index}, 'quantity', this.value)">
+                    <input type="number" class="comm-input" min="1" value="${Number(item.quantity) || 1}" data-change-call="updateGroupOrderItem(${index}, 'quantity', this.value)" data-input-call="updateGroupOrderItem(${index}, 'quantity', this.value)">
                 </div>
-                <button type="button" class="btn-secondary group-order-remove-btn" onclick="removeGroupOrderItem(${index})">×</button>
+                <button type="button" class="btn-secondary group-order-remove-btn" data-click-call="removeGroupOrderItem(${index})">×</button>
             </div>
         `;
     }).join('');
@@ -5804,8 +5804,8 @@ function renderGroupOrderCraftRows() {
                 <strong>${escapeHtml(item.weapon_name)}</strong>
                 <span>Restant : ${Number(item.remaining).toLocaleString('fr-FR')}</span>
             </div>
-            <input type="number" class="comm-input" min="0" max="${Number(item.remaining)}" value="${Number(item.quantity) || 0}" oninput="updateGroupOrderCraftItem(${index}, 'quantity', this.value)">
-            <input type="text" class="comm-input" placeholder="N° série séparés par virgules" oninput="updateGroupOrderCraftItem(${index}, 'serial_numbers', this.value)">
+            <input type="number" class="comm-input" min="0" max="${Number(item.remaining)}" value="${Number(item.quantity) || 0}" data-input-call="updateGroupOrderCraftItem(${index}, 'quantity', this.value)">
+            <input type="text" class="comm-input" placeholder="N° série séparés par virgules" data-input-call="updateGroupOrderCraftItem(${index}, 'serial_numbers', this.value)">
         </div>
     `).join('');
 }
@@ -5860,11 +5860,11 @@ function renderGroupOrdersList() {
         const actionsHtml = checkUserAccess()
             ? `<div class="group-order-actions">
                     ${order.status === 'cancelled'
-                        ? `<button type="button" class="btn-danger group-order-delete-btn" onclick="deleteGroupOrder(${Number(order.id)})">Supprimer</button>`
+                        ? `<button type="button" class="btn-danger group-order-delete-btn" data-click-call="deleteGroupOrder(${Number(order.id)})">Supprimer</button>`
                         : `
-                            <button type="button" class="btn-secondary" onclick="editGroupOrder(${Number(order.id)})">Modifier</button>
-                            <button type="button" class="btn-primary" onclick="openGroupOrderCraftModal(${Number(order.id)})">Renseigner craft</button>
-                            <button type="button" class="btn-danger" onclick="cancelGroupOrder(${Number(order.id)})">Annuler</button>
+                            <button type="button" class="btn-secondary" data-click-call="editGroupOrder(${Number(order.id)})">Modifier</button>
+                            <button type="button" class="btn-primary" data-click-call="openGroupOrderCraftModal(${Number(order.id)})">Renseigner craft</button>
+                            <button type="button" class="btn-danger" data-click-call="cancelGroupOrder(${Number(order.id)})">Annuler</button>
                         `}
                 </div>`
             : '';
@@ -6497,10 +6497,10 @@ function renderMyWeapons() {
             : '<span class="weapon-meta-badge weapon-origin-badge external">Externe</span>';
         const quantityBadge = `<span class="weapon-meta-badge weapon-qty-badge">${availableQty}/${totalQty}</span>`;
         const actionButtons = [
-            canEditWeapon ? `<button class="btn-action btn-edit" onclick="openEditMyWeaponModal(${w.id})">✏ Modifier</button>` : '',
-            canToggleInProgress ? `<button class="btn-action btn-progress ${isInProgress ? 'active' : ''}" onclick="toggleWeaponInProgress(${w.id}, ${isInProgress ? 'false' : 'true'})">${isInProgress ? 'Annuler en cours' : '🟡 En cours de vente'}</button>` : '',
-            canMarkSoldWeapon ? `<button class="btn-action btn-sold" onclick="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>` : '',
-            canDeleteWeapon ? `<button class="btn-action btn-delete" onclick="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : '',
+            canEditWeapon ? `<button class="btn-action btn-edit" data-click-call="openEditMyWeaponModal(${w.id})">✏ Modifier</button>` : '',
+            canToggleInProgress ? `<button class="btn-action btn-progress ${isInProgress ? 'active' : ''}" data-click-call="toggleWeaponInProgress(${w.id}, ${isInProgress ? 'false' : 'true'})">${isInProgress ? 'Annuler en cours' : '🟡 En cours de vente'}</button>` : '',
+            canMarkSoldWeapon ? `<button class="btn-action btn-sold" data-click-call="openMarkSoldModal(${w.id})">✅ Marquer vendu</button>` : '',
+            canDeleteWeapon ? `<button class="btn-action btn-delete" data-click-call="deleteMyWeapon(${w.id})" title="Supprimer" aria-label="Supprimer">&#128465;</button>` : '',
         ].filter(Boolean).join('');
         const inProgressWave = isInProgress ? `
                 <span class="shimmer-overlay"></span>

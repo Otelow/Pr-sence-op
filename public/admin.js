@@ -791,8 +791,8 @@ function renderAdminWeapons() {
                 </small>
             </div>
             <div class="admin-weapon-actions">
-                <button class="btn-secondary btn-small" onclick="openWeaponEditor(${w.id})">Modifier</button>
-                <button class="btn-danger btn-small" onclick="deleteWeapon(${w.id})">Supprimer</button>
+                <button class="btn-secondary btn-small" data-click-call="openWeaponEditor(${w.id})">Modifier</button>
+                <button class="btn-danger btn-small" data-click-call="deleteWeapon(${w.id})">Supprimer</button>
             </div>
         </div>
     `;
@@ -883,9 +883,9 @@ function renderIngredientsEditor() {
         return `
             <div class="ingredient-row">
                 ${preview}
-                <select onchange="updateIngredientName(${i}, this)">${options}</select>
-                <input type="number" placeholder="Quantité" value="${ing.amount || 0}" oninput="updateIngredientAmount(${i}, this.value)" min="0">
-                <button type="button" class="btn-danger btn-small" onclick="removeIngredient(${i})">×</button>
+                <select data-change-call="updateIngredientName(${i}, this)">${options}</select>
+                <input type="number" placeholder="Quantité" value="${ing.amount || 0}" data-input-call="updateIngredientAmount(${i}, this.value)" min="0">
+                <button type="button" class="btn-danger btn-small" data-click-call="removeIngredient(${i})">×</button>
             </div>
         `;
     }).join('');
@@ -1033,8 +1033,8 @@ function renderAdminMyWeaponNames() {
             <input type="number" class="comm-input admin-myweapon-price-input" id="myWeaponMaxSalePrice-${item.id}" min="0" value="${Number(item.max_sale_price) || 0}" placeholder="Prix maximal">
             <span class="admin-myweapon-price-source">${item.price_source === 'craft_catalog' ? 'Prix catalogue craftable prioritaires si renseignés' : 'Prix Vos Armes'}</span>
             <div class="admin-myweapon-name-actions">
-                <button class="btn-secondary btn-small" onclick="saveMyWeaponNameFromAdmin(${item.id})">Enregistrer</button>
-                <button class="btn-danger btn-small" onclick="deleteMyWeaponNameFromAdmin(${item.id})">Supprimer</button>
+                <button class="btn-secondary btn-small" data-click-call="saveMyWeaponNameFromAdmin(${item.id})">Enregistrer</button>
+                <button class="btn-danger btn-small" data-click-call="deleteMyWeaponNameFromAdmin(${item.id})">Supprimer</button>
             </div>
         </div>
     `).join('');
@@ -1141,8 +1141,8 @@ function renderAdminIngredients() {
             ${imageUrl ? `<img class="admin-ingredient-img" src="${imageUrl}" alt="${escapeHtml(i.name)}">` : '<span class="admin-ingredient-placeholder">Ingredient</span>'}
             <div class="admin-ingredient-name">${escapeHtml(i.name)}</div>
             <div class="admin-ingredient-actions">
-                <button class="btn-secondary btn-small" onclick="openIngredientEditor(${i.id})">Modifier</button>
-                <button class="btn-danger btn-small" onclick="deleteIngredient(${i.id})">Supprimer</button>
+                <button class="btn-secondary btn-small" data-click-call="openIngredientEditor(${i.id})">Modifier</button>
+                <button class="btn-danger btn-small" data-click-call="deleteIngredient(${i.id})">Supprimer</button>
             </div>
         </div>
     `;
@@ -1286,7 +1286,7 @@ function renderAdminOrgs() {
     list.innerHTML = adminOrgs.map(o => `
         <div class="admin-org-row">
             <span>🏢 ${escapeHtml(o.name)}</span>
-            <button class="btn-danger btn-small" onclick="deleteOrg(${o.id})">×</button>
+            <button class="btn-danger btn-small" data-click-call="deleteOrg(${o.id})">×</button>
         </div>
     `).join('');
 }
@@ -1476,7 +1476,7 @@ function renderOrderAdvanceItems(prefillItems = null) {
                        value="${prefilledQty || ''}"
                        data-unit-price="${Number(ing.unit_price) || 0}"
                        data-ingredient-name="${escapeHtml(ing.name)}"
-                       oninput="updateOrderAdvanceTotalFromItems()">
+                       data-input-call="updateOrderAdvanceTotalFromItems()">
                 <div class="order-item-line-total" data-line-total="${escapeHtml(ing.name)}">
                     ${(prefilledQty * (Number(ing.unit_price) || 0)).toLocaleString('fr-FR')} $
                 </div>
@@ -1527,7 +1527,7 @@ function normalizeOrderAdvanceLabels() {
     const info = section.querySelector('.admin-info');
     if (title) title.textContent = 'Suivi commandes / avances';
     if (info) info.textContent = 'Suivi admin des commandes de matières premières et remboursements détaillés.';
-    const resetButton = section.querySelector('button[onclick="resetOrderAdvanceForm()"]');
+        const resetButton = section.querySelector('button[data-click-call="resetOrderAdvanceForm()"]');
     if (resetButton) resetButton.textContent = 'Réinitialiser';
     const submitButton = section.querySelector('button[type="submit"]');
     if (submitButton) submitButton.textContent = 'Enregistrer la commande';
@@ -1880,8 +1880,8 @@ function renderOrderAdvances() {
                     ${repayment.weapon_name ? `<small>Arme : ${escapeHtml(repayment.weapon_name)}</small>` : ''}
                 </div>
                 <div class="order-repayment-actions">
-                    <button class="btn-secondary btn-small" onclick="editOrderRepayment(${order.id}, ${repayment.id})">Modifier</button>
-                    <button class="btn-danger btn-small" onclick="deleteOrderRepayment(${order.id}, ${repayment.id})">Supprimer</button>
+                    <button class="btn-secondary btn-small" data-click-call="editOrderRepayment(${order.id}, ${repayment.id})">Modifier</button>
+                    <button class="btn-danger btn-small" data-click-call="deleteOrderRepayment(${order.id}, ${repayment.id})">Supprimer</button>
                 </div>
             </div>
         `).join('');
@@ -1905,7 +1905,7 @@ function renderOrderAdvances() {
                 <div class="order-repayment-section">
                     <div class="order-repayment-head">
                         <h4>Remboursements</h4>
-                        <button class="btn-primary btn-small" onclick="toggleOrderRepaymentForm(${order.id})">Ajouter remboursement</button>
+                        <button class="btn-primary btn-small" data-click-call="toggleOrderRepaymentForm(${order.id})">Ajouter remboursement</button>
                     </div>
                     <div class="order-repayment-form" id="orderRepaymentForm-${order.id}" style="display:none;">
                         <input type="hidden" class="order-repayment-id">
@@ -1914,15 +1914,15 @@ function renderOrderAdvances() {
                         <input type="text" class="comm-input order-repayment-reason" placeholder="Raison / description">
                         <input type="text" class="comm-input order-repayment-weapon" placeholder="Arme concernée (optionnel)">
                         <input type="date" class="comm-input order-repayment-date" value="${todayDateValue()}">
-                        <button class="btn-primary btn-small" onclick="saveOrderRepayment(${order.id})">Enregistrer</button>
+                        <button class="btn-primary btn-small" data-click-call="saveOrderRepayment(${order.id})">Enregistrer</button>
                     </div>
                     <div class="order-repayment-list">${repayments || '<p class="empty">Aucun remboursement détaillé.</p>'}</div>
                 </div>
                 <div class="order-advance-actions">
                     ${publishedBadge}
-                    <button class="btn-secondary btn-small" onclick="editOrderAdvance(${order.id})">Modifier</button>
-                    <button class="btn-primary btn-small" onclick="settleOrderAdvance(${order.id})" ${meta.className === 'settled' ? 'disabled' : ''}>Solder</button>
-                    <button class="btn-danger btn-small" onclick="deleteOrderAdvance(${order.id})">Supprimer</button>
+                    <button class="btn-secondary btn-small" data-click-call="editOrderAdvance(${order.id})">Modifier</button>
+                    <button class="btn-primary btn-small" data-click-call="settleOrderAdvance(${order.id})" ${meta.className === 'settled' ? 'disabled' : ''}>Solder</button>
+                    <button class="btn-danger btn-small" data-click-call="deleteOrderAdvance(${order.id})">Supprimer</button>
                 </div>
             </article>
         `;
