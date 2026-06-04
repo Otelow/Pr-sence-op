@@ -4702,11 +4702,11 @@ function getCraftBoardActiveRequests() {
 function getCraftBoardLogicRank(r) {
     const saleState = r.sale_state || 'not_listed';
     const readyToSell = r.status === 'crafted' || r.crafted || r.craft_date || r.serial_number;
-    if (saleState === 'not_listed' && readyToSell && r.status !== 'completed') return 10;
-    if (saleState === 'listed') return 20;
-    if (saleState === 'sold' || r.status === 'completed') return 30;
-    if (r.status === 'materials' || r.status === 'waiting_materials') return 40;
-    if (r.status === 'in_progress') return 50;
+    if (r.status === 'in_progress') return 5;
+    if (r.status === 'materials' || r.status === 'waiting_materials') return 10;
+    if (saleState === 'not_listed' && readyToSell && r.status !== 'completed') return 20;
+    if (saleState === 'listed') return 30;
+    if (saleState === 'sold' || r.status === 'completed') return 40;
     return 90;
 }
 
