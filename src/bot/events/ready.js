@@ -254,6 +254,25 @@ client.once('ready', async () => {
         }
     }
 
+    try {
+        const finalSync = [];
+        if (presenceData.messageId) {
+            finalSync.push(restoreReactionsFromMessage(presenceData.messageId, reactionsOP1));
+        }
+        if (presence2Data.messageId) {
+            finalSync.push(restoreReactionsFromMessage(presence2Data.messageId, reactionsOP2));
+        }
+        if (finalSync.length > 0) {
+            await Promise.allSettled(finalSync);
+            applyManualPresenceOverrides?.();
+            expirePresenceAtMidnight?.();
+            savePresenceState?.();
+            log.info(`✅ Check post-redémarrage présence terminé (OP1: ${reactionsOP1.size}, OP2: ${reactionsOP2.size})`);
+        }
+    } catch (e) {
+        log.error(`❌ Check post-redémarrage présence échoué: ${e.message}`);
+    }
+
     const todayStr = getParisDateKey ? getParisDateKey(new Date()) : new Date().toISOString().slice(0, 10);
     if (reactionsOP1.size > 0 || reactionsOP2.size > 0) {
         await runPresenceSnapshot(todayStr, {}, 'Snapshot de rattrapage au boot').catch(e => {

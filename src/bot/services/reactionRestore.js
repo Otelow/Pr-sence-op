@@ -12,6 +12,23 @@ function createReactionRestoreService(deps) {
         emojiToType,
     } = deps;
 
+    async function fetchAllReactionUsers(reaction) {
+        const usersById = new Map();
+        let after;
+
+        while (true) {
+            const users = await reaction.users.fetch({ limit: 100, after });
+            for (const [userId, user] of users) {
+                usersById.set(userId, user);
+            }
+            if (users.size < 100) break;
+            after = users.lastKey();
+            if (!after) break;
+        }
+
+        return usersById;
+    }
+
     async function restoreReactionsFromMessage(messageId, reactionMap) {
         const before = new Map();
         for (const [userId, set] of reactionMap) {
@@ -22,22 +39,28 @@ function createReactionRestoreService(deps) {
             const channel = client.channels.cache.get(CONFIG.CHANNELS.PRESENCE);
             if (!channel) return false;
 
-            const msg = await channel.messages.fetch(messageId).catch(() => null);
+            const msg = await channel.messages.fetch({ message: messageId, cache: false, force: true }).catch(() => null);
             if (!msg) {
                 log.warn(`⚠️ Message ${messageId} introuvable, conservation des réactions depuis disk (${before.size} users)`);
                 return false;
             }
 
             reactionMap.clear();
+            const counts = {};
             for (const [, reaction] of msg.reactions.cache) {
-                const users = await reaction.users.fetch();
+                const type = emojiToType(reaction.emoji.name, reaction.emoji.id);
+                if (!type) continue;
+
+                const users = await fetchAllReactionUsers(reaction);
+                let humanCount = 0;
                 for (const [userId, user] of users) {
                     if (user.bot) continue;
-                    const type = emojiToType(reaction.emoji.name, reaction.emoji.id);
-                    if (type) ensureReactionSet(reactionMap, userId).add(type);
+                    humanCount += 1;
+                    ensureReactionSet(reactionMap, userId).add(type);
                 }
+                counts[type] = (counts[type] || 0) + humanCount;
             }
-            log.info(`   ↳ ${reactionMap.size} réaction(s) restaurées depuis Discord`);
+            log.info({ messageId, counts, totalUsers: reactionMap.size }, 'Réactions présence restaurées depuis Discord');
             return true;
         } catch (e) {
             log.error('❌ Erreur restauration réactions:', e.message);
