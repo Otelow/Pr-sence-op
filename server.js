@@ -130,9 +130,10 @@ function startServer(client, getState) {
         contentSecurityPolicy: {
             directives: {
                 defaultSrc: ["'self'"],
-                // Les actions JS inline sont migrées vers /delegated-actions.js + attributs data-*.
-                scriptSrc: ["'self'"],
-                scriptSrcAttr: ["'none'"],
+                // TODO audit-hardening: unsafe-inline reste temporaire pour les anciens handlers inline du dashboard/admin.
+                // Les zones craft/org/admin les plus risquées sont migrées progressivement vers data-* + addEventListener.
+                scriptSrc: ["'self'", "'unsafe-inline'"],
+                scriptSrcAttr: ["'unsafe-inline'"],
                 styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
                 styleSrcAttr: ["'unsafe-inline'"],
                 objectSrc: ["'none'"],

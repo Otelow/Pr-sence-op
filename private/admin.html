@@ -38,21 +38,21 @@
 <main class="admin-main">
 
     <div class="admin-reorder-controls">
-        <button id="adminReorderToggleBtn" class="btn-secondary btn-small" data-click-call="toggleAdminTabReorder()">&#128295; R&eacute;organiser</button>
-        <button id="adminReorderResetBtn" class="btn-secondary btn-small" data-click-call="resetAdminTabOrder()" style="display:none;">&#8634; Ordre par d&eacute;faut</button>
+        <button id="adminReorderToggleBtn" class="btn-secondary btn-small" onclick="toggleAdminTabReorder()">&#128295; R&eacute;organiser</button>
+        <button id="adminReorderResetBtn" class="btn-secondary btn-small" onclick="resetAdminTabOrder()" style="display:none;">&#8634; Ordre par d&eacute;faut</button>
     </div>
 
     <!-- TABS ADMIN -->
     <nav class="admin-tabs" id="adminTabsNav">
-        <button class="admin-tab active" data-admin-tab="weapons" data-click-call="switchAdminTab('weapons')">🔫 Armes</button>
-        <button class="admin-tab" data-admin-tab="saleNames" data-click-call="switchAdminTab('saleNames')">📋 Armes à vendre</button>
-        <button class="admin-tab" data-admin-tab="ingredients" data-click-call="switchAdminTab('ingredients')">🧪 Ingrédients</button>
-        <button class="admin-tab" data-admin-tab="stocks" data-click-call="switchAdminTab('stocks')">📦 Stocks matières</button>
-        <button class="admin-tab" data-admin-tab="orgs" data-click-call="switchAdminTab('orgs')">🏢 Organisations</button>
-        <button class="admin-tab" data-admin-tab="impersonate" data-click-call="switchAdminTab('impersonate')">👁 Vue impersonate</button>
-        <button class="admin-tab" data-admin-tab="advances" data-click-call="switchAdminTab('advances')">Avances commandes</button>
-        <button class="admin-tab" data-admin-tab="audit" data-click-call="switchAdminTab('audit')">Historique</button>
-        <button class="admin-tab" data-admin-tab="monitoring" data-click-call="switchAdminTab('monitoring')">Monitoring</button>
+        <button class="admin-tab active" data-admin-tab="weapons" onclick="switchAdminTab('weapons')">🔫 Armes</button>
+        <button class="admin-tab" data-admin-tab="saleNames" onclick="switchAdminTab('saleNames')">📋 Armes à vendre</button>
+        <button class="admin-tab" data-admin-tab="ingredients" onclick="switchAdminTab('ingredients')">🧪 Ingrédients</button>
+        <button class="admin-tab" data-admin-tab="stocks" onclick="switchAdminTab('stocks')">📦 Stocks matières</button>
+        <button class="admin-tab" data-admin-tab="orgs" onclick="switchAdminTab('orgs')">🏢 Organisations</button>
+        <button class="admin-tab" data-admin-tab="impersonate" onclick="switchAdminTab('impersonate')">👁 Vue impersonate</button>
+        <button class="admin-tab" data-admin-tab="advances" onclick="switchAdminTab('advances')">Avances commandes</button>
+        <button class="admin-tab" data-admin-tab="audit" onclick="switchAdminTab('audit')">Historique</button>
+        <button class="admin-tab" data-admin-tab="monitoring" onclick="switchAdminTab('monitoring')">Monitoring</button>
     </nav>
 
     <!-- ARMES -->
@@ -63,7 +63,7 @@
 
             <div class="admin-toolbar">
                 <input type="search" id="adminWeaponSearch" class="admin-search-input" placeholder="Rechercher une arme, ingrédient, prix...">
-                <button class="btn-primary" data-click-call="openWeaponEditor()">+ Ajouter une arme</button>
+                <button class="btn-primary" onclick="openWeaponEditor()">+ Ajouter une arme</button>
             </div>
 
             <div class="admin-weapons-list" id="adminWeaponsList">
@@ -82,7 +82,7 @@
                 <input type="text" id="newMyWeaponName" class="comm-input" placeholder="Ex: Pistolet Cal.50">
                 <input type="number" id="newMyWeaponSalePrice" class="comm-input" min="0" placeholder="Prix vente conseillé ($)">
                 <input type="number" id="newMyWeaponMaxSalePrice" class="comm-input" min="0" placeholder="Prix maximal ($)">
-                <button class="btn-primary" data-click-call="addMyWeaponNameFromAdmin()">+ Ajouter</button>
+                <button class="btn-primary" onclick="addMyWeaponNameFromAdmin()">+ Ajouter</button>
             </div>
 
             <div class="admin-myweapon-names-list" id="adminMyWeaponNamesList">
@@ -99,7 +99,7 @@
 
             <div class="admin-toolbar">
                 <input type="search" id="adminIngredientSearch" class="admin-search-input" placeholder="Rechercher un ingrédient...">
-                <button class="btn-primary" data-click-call="openIngredientEditor()">+ Ajouter un ingrédient</button>
+                <button class="btn-primary" onclick="openIngredientEditor()">+ Ajouter un ingrédient</button>
             </div>
 
             <div class="admin-ingredients-grid" id="adminIngredientsList">
@@ -119,7 +119,7 @@
             </div>
 
             <div class="admin-stocks-actions">
-                <button class="btn-primary" data-click-call="saveAdminStocks()">Sauvegarder les stocks</button>
+                <button class="btn-primary" onclick="saveAdminStocks()">Sauvegarder les stocks</button>
             </div>
         </div>
     </section>
@@ -132,7 +132,7 @@
 
             <div class="admin-org-form">
                 <input type="text" id="newOrgName" class="comm-input" placeholder="Nom de l'organisation">
-                <button class="btn-primary" data-click-call="addOrgFromAdmin()">+ Ajouter</button>
+                <button class="btn-primary" onclick="addOrgFromAdmin()">+ Ajouter</button>
             </div>
 
             <div class="admin-orgs-list" id="adminOrgsList"></div>
@@ -145,7 +145,7 @@
             <h2 class="section-title">💰 Suivi commandes / avances</h2>
             <p class="admin-info">Suivi admin des commandes de matières premières et remboursements détaillés.</p>
 
-            <form id="orderAdvanceForm" class="order-advance-form" data-submit-call="saveOrderAdvance(event)">
+            <form id="orderAdvanceForm" class="order-advance-form" onsubmit="saveOrderAdvance(event)">
                 <input type="hidden" id="orderAdvanceId">
                 <input type="hidden" id="orderAdvanceHadMessageId" value="">
                 <div class="order-advance-grid">
@@ -155,7 +155,7 @@
                     </div>
                     <div class="comm-field">
                         <label class="comm-label">Nombre de participants</label>
-                        <select id="orderAdvanceParticipantCount" class="comm-input" data-change-call="setOrderAdvanceParticipantCount()">
+                        <select id="orderAdvanceParticipantCount" class="comm-input" onchange="setOrderAdvanceParticipantCount()">
                             <option value="1">1 participant</option>
                             <option value="2">2 participants</option>
                             <option value="3">3 participants</option>
@@ -177,7 +177,7 @@
                 <div class="order-advance-balance" id="orderAdvanceBalance"></div>
 
                 <div class="modal-actions">
-                    <button type="button" class="btn-secondary" data-click-call="resetOrderAdvanceForm()">Réinitialiser</button>
+                    <button type="button" class="btn-secondary" onclick="resetOrderAdvanceForm()">Réinitialiser</button>
                     <button type="submit" class="btn-primary" id="orderAdvanceSubmitBtn">
                         🚀 Passer commande
                     </button>
@@ -214,9 +214,9 @@
                     <input type="date" id="auditFilterSince" class="comm-input">
                 </div>
                 <div class="audit-filters-actions">
-                    <button class="btn-primary" data-click-call="applyAuditFilters()">Filtrer</button>
-                    <button class="btn-secondary" data-click-call="exportAuditCSV()">📥 Exporter CSV</button>
-                    <button class="btn-secondary" data-click-call="resetAuditFilters()">Réinitialiser</button>
+                    <button class="btn-primary" onclick="applyAuditFilters()">Filtrer</button>
+                    <button class="btn-secondary" onclick="exportAuditCSV()">📥 Exporter CSV</button>
+                    <button class="btn-secondary" onclick="resetAuditFilters()">Réinitialiser</button>
                 </div>
             </div>
 
@@ -243,7 +243,7 @@
             </div>
 
             <div class="audit-pagination">
-                <button class="btn-secondary" id="auditLoadMoreBtn" data-click-call="loadMoreAuditLogs()">Charger plus</button>
+                <button class="btn-secondary" id="auditLoadMoreBtn" onclick="loadMoreAuditLogs()">Charger plus</button>
             </div>
         </div>
     </section>
@@ -272,19 +272,19 @@
             <div class="impersonate-panel-admin">
                 <label class="comm-label">Rôle à simuler</label>
                 <div class="custom-dropdown" id="impersonateDropdownWrapper">
-                    <button type="button" class="custom-dropdown-trigger" data-click-call="toggleImpersonateDropdown(event)">
+                    <button type="button" class="custom-dropdown-trigger" onclick="toggleImpersonateDropdown(event)">
                         <span class="custom-dropdown-placeholder" id="impersonateLabel">— Choisir un rôle —</span>
                         <span class="custom-dropdown-arrow">▾</span>
                     </button>
                     <div class="custom-dropdown-menu" id="impersonateMenu" style="display:none;">
-                        <input type="text" class="custom-dropdown-search" id="impersonateSearch" placeholder="🔍 Filtrer..." data-click-call="event.stopPropagation()">
+                        <input type="text" class="custom-dropdown-search" id="impersonateSearch" placeholder="🔍 Filtrer..." onclick="event.stopPropagation()">
                         <div class="custom-dropdown-list" id="impersonateList"></div>
                     </div>
                     <input type="hidden" id="impersonateRoleId">
                 </div>
                 <div class="modal-actions" style="margin-top:20px;">
-                    <button class="btn-primary" data-click-call="applyImpersonate()">Appliquer la vue</button>
-                    <button class="btn-secondary" data-click-call="resetImpersonate()">↩ Réinitialiser</button>
+                    <button class="btn-primary" onclick="applyImpersonate()">Appliquer la vue</button>
+                    <button class="btn-secondary" onclick="resetImpersonate()">↩ Réinitialiser</button>
                 </div>
             </div>
         </div>
@@ -295,7 +295,7 @@
         <div class="modal-content modal-large">
             <h3 class="modal-title" id="weaponEditorTitle">Ajouter une arme</h3>
 
-            <form id="weaponEditorForm" data-submit-call="saveWeapon(event)" enctype="multipart/form-data">
+            <form id="weaponEditorForm" onsubmit="saveWeapon(event)" enctype="multipart/form-data">
                 <input type="hidden" id="weaponId">
 
                 <div class="comm-field">
@@ -348,11 +348,11 @@
                     <label class="comm-label">Ingrédients</label>
                     <p class="empty-small" style="margin-bottom:8px;">Choisis dans la liste et indique la quantité.</p>
                     <div id="ingredientsList" class="ingredients-editor"></div>
-                    <button type="button" class="btn-secondary btn-small" data-click-call="addIngredient()">+ Ajouter un ingrédient</button>
+                    <button type="button" class="btn-secondary btn-small" onclick="addIngredient()">+ Ajouter un ingrédient</button>
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="btn-secondary" data-click-call="closeWeaponEditor()">Annuler</button>
+                    <button type="button" class="btn-secondary" onclick="closeWeaponEditor()">Annuler</button>
                     <button type="submit" class="btn-primary">💾 Enregistrer</button>
                 </div>
             </form>
@@ -364,7 +364,7 @@
         <div class="modal-content">
             <h3 class="modal-title" id="ingredientEditorTitle">Ajouter un ingrédient</h3>
 
-            <form id="ingredientEditorForm" data-submit-call="saveIngredient(event)" enctype="multipart/form-data">
+            <form id="ingredientEditorForm" onsubmit="saveIngredient(event)" enctype="multipart/form-data">
                 <input type="hidden" id="ingredientId">
 
                 <div class="comm-field">
@@ -379,7 +379,7 @@
                 </div>
 
                 <div class="modal-actions">
-                    <button type="button" class="btn-secondary" data-click-call="closeIngredientEditor()">Annuler</button>
+                    <button type="button" class="btn-secondary" onclick="closeIngredientEditor()">Annuler</button>
                     <button type="submit" class="btn-primary">💾 Enregistrer</button>
                 </div>
             </form>
@@ -390,7 +390,6 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-    <script src="/delegated-actions.js"></script>
-    <script src="/admin.js?v=20260526-craftanim"></script>
+<script src="/admin.js?v=20260526-craftanim"></script>
 </body>
 </html>
