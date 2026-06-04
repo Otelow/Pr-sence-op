@@ -1971,7 +1971,7 @@ async function loadMessages(channelId, before = null) {
 
         const container = document.getElementById('channelTimeline');
         if (data.error) {
-            container.innerHTML = `<p class="empty">❌ ${data.error}</p>`;
+            container.innerHTML = `<p class="empty">❌ ${escapeHtml(data.error)}</p>`;
             return;
         }
 

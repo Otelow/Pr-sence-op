@@ -1,0 +1,40 @@
+export default [
+  {
+    ignores: [
+      'node_modules/**',
+      'data/**',
+      'public/vendor/**',
+      'coverage/**',
+      '*.config.mjs',
+    ],
+  },
+  {
+    files: ['**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'commonjs',
+      globals: {
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        Buffer: 'readonly',
+        console: 'readonly',
+        clearInterval: 'readonly',
+        clearTimeout: 'readonly',
+        document: 'readonly',
+        fetch: 'readonly',
+        FormData: 'readonly',
+        global: 'readonly',
+        localStorage: 'readonly',
+        module: 'readonly',
+        navigator: 'readonly',
+        process: 'readonly',
+        require: 'readonly',
+        setInterval: 'readonly',
+        setTimeout: 'readonly',
+        URLSearchParams: 'readonly',
+        window: 'readonly',
+      },
+    },
+    rules: {},
+  },
+];

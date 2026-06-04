@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node index.js",
     "syntax": "node scripts/check-js-syntax.js",
+    "lint": "eslint .",
     "test": "node --test \"test/**/*.test.js\"",
     "audit:high": "npm audit --omit=dev --audit-level=high",
     "smoke": "npm run smoke:remote --",
@@ -33,7 +34,9 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
+    "eslint": "^10.4.1",
     "pino-pretty": "^11.2.2",
+    "prettier": "^3.8.3",
     "sharp": "^0.33.5"
   }
 }
