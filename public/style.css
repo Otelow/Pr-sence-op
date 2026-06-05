@@ -6073,18 +6073,9 @@ body {
     accent-color: var(--accent);
 }
 
-.craft-request-type-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.craft-out-stock-inline {
-    flex: 0 0 auto;
-    min-width: 0;
-    padding: 7px 10px;
+.craft-out-stock-field {
+    border-color: rgba(250, 204, 21, 0.28);
+    background: rgba(250, 204, 21, 0.06);
 }
 
 .craft-request-type-chip {

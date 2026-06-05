@@ -25,7 +25,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260604-craft-board-order">
+<link rel="stylesheet" href="/style.css?v=20260605-oos-visible">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -854,13 +854,7 @@
                 </div>
 
                 <div class="craft-field">
-                    <div class="craft-request-type-header">
-                        <label>Type de demande *</label>
-                        <label class="craft-checkbox-label craft-manager-field craft-out-stock-inline" id="craftOutOfStockField" style="display:none;">
-                            <input type="checkbox" id="craftOutOfStock">
-                            <span>📦 <strong>Hors Stock</strong></span>
-                        </label>
-                    </div>
+                    <label>Type de demande *</label>
                     <div class="craft-request-type-choice">
                         <label class="craft-request-type-option">
                             <input type="radio" name="craftRequestType" value="sale">
@@ -885,6 +879,10 @@
                     <label class="craft-checkbox-label craft-test-field" id="craftTestField" style="display:none;">
                         <input type="checkbox" id="craftIsTest">
                         <span>🧪 <strong>Test</strong></span>
+                    </label>
+                    <label class="craft-checkbox-label craft-manager-field craft-out-stock-field" id="craftOutOfStockField" style="display:none;">
+                        <input type="checkbox" id="craftOutOfStock">
+                        <span>📦 <strong>Hors Stock</strong></span>
                     </label>
                 </div>
 
@@ -1464,6 +1462,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260604-craft-board-order"></script>
+<script src="/app.js?v=20260605-oos-visible"></script>
 </body>
 </html>
