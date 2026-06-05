@@ -4546,6 +4546,30 @@ function canAdminManageMyWeaponsClient() {
     return canDeleteMyWeaponsClient() || canValidateCraftClient();
 }
 
+function ensureCraftOutOfStockField() {
+    let field = document.getElementById('craftOutOfStockField');
+    if (field) return field;
+
+    const testField = document.getElementById('craftTestField');
+    const anchor = testField || document.getElementById('craftHasMoney')?.closest('label');
+    const row = anchor?.parentElement;
+    if (!row) return null;
+
+    field = document.createElement('label');
+    field.className = 'craft-checkbox-label craft-test-field craft-out-stock-field';
+    field.id = 'craftOutOfStockField';
+    field.innerHTML = `
+        <input type="checkbox" id="craftOutOfStock">
+        <span>📦 <strong>Hors Stock</strong></span>
+    `;
+    if (testField) {
+        testField.insertAdjacentElement('afterend', field);
+    } else {
+        row.appendChild(field);
+    }
+    return field;
+}
+
 function playCraftStatusChangeAnimation(requestId, status) {
     const id = Number(requestId);
     if (!Number.isFinite(id) || id <= 0) return;
@@ -4598,7 +4622,7 @@ function syncCraftPermissionUI() {
     const canManageCraft = canValidateCraftClient();
     const testField = document.getElementById('craftTestField');
     const testInput = document.getElementById('craftIsTest');
-    const outOfStockField = document.getElementById('craftOutOfStockField');
+    const outOfStockField = ensureCraftOutOfStockField();
     const outOfStockInput = document.getElementById('craftOutOfStock');
     if (testField) testField.style.display = canManageCraft ? 'flex' : 'none';
     if (!canManageCraft && testInput) testInput.checked = false;
