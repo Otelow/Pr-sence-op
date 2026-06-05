@@ -4626,7 +4626,10 @@ function syncCraftPermissionUI() {
     const outOfStockInput = document.getElementById('craftOutOfStock');
     if (testField) testField.style.display = canManageCraft ? 'flex' : 'none';
     if (!canManageCraft && testInput) testInput.checked = false;
-    if (outOfStockField) outOfStockField.style.display = canManageCraft ? 'flex' : 'none';
+    if (outOfStockField) {
+        const displayMode = outOfStockField.classList.contains('craft-out-stock-panel') ? 'block' : 'flex';
+        outOfStockField.style.display = canManageCraft ? displayMode : 'none';
+    }
     if (!canManageCraft && outOfStockInput) outOfStockInput.checked = false;
 }
 

@@ -25,7 +25,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — 21 Block Savage</title>
-<link rel="stylesheet" href="/style.css?v=20260605-oos-fallback">
+<link rel="stylesheet" href="/style.css?v=20260605-oos-nocache">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -880,9 +880,12 @@
                         <input type="checkbox" id="craftIsTest">
                         <span>🧪 <strong>Test</strong></span>
                     </label>
-                    <label class="craft-checkbox-label craft-test-field craft-out-stock-field" id="craftOutOfStockField">
+                </div>
+
+                <div class="craft-out-stock-panel" id="craftOutOfStockField">
+                    <label class="craft-checkbox-label craft-out-stock-field">
                         <input type="checkbox" id="craftOutOfStock">
-                        <span>📦 <strong>Hors Stock</strong></span>
+                        <span>📦 <strong>Hors Stock</strong> — ne déduit pas le stock dynamique</span>
                     </label>
                 </div>
 
@@ -1462,6 +1465,6 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=20260605-oos-fallback"></script>
+<script src="/app.js?v=20260605-oos-nocache"></script>
 </body>
 </html>

@@ -6078,6 +6078,15 @@ body {
     background: rgba(250, 204, 21, 0.06);
 }
 
+.craft-out-stock-panel {
+    display: block;
+    margin: -4px 0 16px;
+}
+
+.craft-out-stock-panel .craft-checkbox-label {
+    width: 100%;
+}
+
 .craft-request-type-chip {
     display: inline-flex;
     align-items: center;
