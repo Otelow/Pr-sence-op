@@ -44,13 +44,25 @@ function normalizeIngredientsPayload(value) {
         err.statusCode = 400;
         throw err;
     }
-    return parsed.map(item => {
+    return parsed.filter(item => {
         const name = String(item?.name || '').trim();
         const ingredientId = item?.ingredient_id === undefined || item?.ingredient_id === null || item?.ingredient_id === ''
             ? null
             : parseId(item.ingredient_id);
-        const quantity = parseNonNegativeInteger(item?.quantity);
-        if ((!name && ingredientId === null) || quantity === null) {
+        const quantityRaw = item?.quantity ?? item?.amount ?? item?.required;
+        const quantityText = quantityRaw === undefined || quantityRaw === null ? '' : String(quantityRaw).trim();
+        const quantity = parseNonNegativeInteger(quantityRaw);
+        if (!name && ingredientId === null && (!quantityText || quantity === 0)) {
+            return false;
+        }
+        return Boolean(name || ingredientId !== null || quantityText);
+    }).map(item => {
+        const name = String(item?.name || '').trim();
+        const ingredientId = item?.ingredient_id === undefined || item?.ingredient_id === null || item?.ingredient_id === ''
+            ? null
+            : parseId(item.ingredient_id);
+        const quantity = parseNonNegativeInteger(item?.quantity ?? item?.amount ?? item?.required);
+        if ((!name && ingredientId === null) || quantity === null || quantity <= 0) {
             const err = new Error('Ingrédient invalide : nom/ID et quantité positive requis');
             err.statusCode = 400;
             throw err;
@@ -60,6 +72,7 @@ function normalizeIngredientsPayload(value) {
             name,
             ingredient_id: ingredientId,
             quantity,
+            amount: quantity,
         };
     });
 }
@@ -437,4 +450,7 @@ function registerCraftCatalogRoutes(app, deps) {
 
 module.exports = {
     registerCraftCatalogRoutes,
+    _test: {
+        normalizeIngredientsPayload,
+    },
 };
