@@ -4627,10 +4627,10 @@ function syncCraftPermissionUI() {
     if (testField) testField.style.display = canManageCraft ? 'flex' : 'none';
     if (!canManageCraft && testInput) testInput.checked = false;
     if (outOfStockField) {
-        const displayMode = outOfStockField.classList.contains('craft-out-stock-panel') ? 'block' : 'flex';
-        outOfStockField.style.display = canManageCraft ? displayMode : 'none';
+        outOfStockField.style.display = outOfStockField.classList.contains('craft-out-stock-panel') ? 'block' : 'flex';
     }
-    if (!canManageCraft && outOfStockInput) outOfStockInput.checked = false;
+    if (!canManageCraft && outOfStockInput) outOfStockInput.disabled = true;
+    if (canManageCraft && outOfStockInput) outOfStockInput.disabled = false;
 }
 
 async function updateRequestStatus(requestId, status) {
